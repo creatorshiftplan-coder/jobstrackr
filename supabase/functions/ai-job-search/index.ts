@@ -34,7 +34,9 @@ function parseAgeLimit(ageLimit: string): { min: number; max: number } {
   return { min: 18, max: 65 };
 }
 
-const JOB_DISCOVERY_PROMPT = `You are a government job information extraction assistant for India. Given a search query about a government job, provide structured information about that job.
+const JOB_DISCOVERY_PROMPT = `You are a government job information extraction assistant for India with access to Google Search.
+
+IMPORTANT: Use Google Search to find the LATEST and most ACCURATE information about Indian government jobs.
 
 Return ONLY a valid JSON object with this exact schema (no markdown, no extra text):
 {
@@ -64,12 +66,15 @@ Return ONLY a valid JSON object with this exact schema (no markdown, no extra te
   ]
 }
 
-Important:
+CRITICAL RULES:
+- ALWAYS return at least 1-3 relevant government job postings from your search
+- If exact match not found, return similar/related government jobs
+- Use Google Search to find current, real job notifications
 - Be accurate with job titles - use the official name
 - For salary, provide monthly salary in INR
-- For confidence: 1.0 = very sure about this info, 0.5 = somewhat sure, 0.0 = guessing
-- If you find multiple relevant jobs, include all of them (max 3)
-- Return ONLY the JSON, no other text`;
+- For confidence: 1.0 = verified from official source, 0.7 = from reliable news, 0.5 = estimated
+- Return ONLY the JSON, no other text
+- If unsure, still provide best effort results with appropriate confidence scores`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -120,13 +125,22 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Update log to mark job as created
+      // Fix: Update log to mark job as created - first get the latest log ID
       if (userId) {
-        await supabase.from("ai_job_discover_logs")
-          .update({ job_created: true })
+        const { data: latestLog } = await supabase
+          .from("ai_job_discover_logs")
+          .select("id")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
-          .limit(1);
+          .limit(1)
+          .single();
+
+        if (latestLog) {
+          await supabase
+            .from("ai_job_discover_logs")
+            .update({ job_created: true })
+            .eq("id", latestLog.id);
+        }
       }
 
       return new Response(
@@ -170,18 +184,35 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Call Gemini API
-    console.log("Calling Gemini API for job discovery:", query);
+    // Call Gemini API with Google Search grounding
+    console.log("Calling Gemini API with Google Search grounding for:", query);
 
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: JOB_DISCOVERY_PROMPT }] },
-          contents: [{ role: "user", parts: [{ text: `Search query: "${query}"\n\nProvide current government job information for this search.` }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+          contents: [{ 
+            role: "user", 
+            parts: [{ 
+              text: `Search for current Indian government jobs matching: "${query}"
+
+Please use Google Search to find:
+1. Official notifications from government websites
+2. Current application dates and deadlines
+3. Eligibility criteria and fees
+4. Any recent news about this exam/job
+
+Return structured JSON with the job details.` 
+            }] 
+          }],
+          generationConfig: { 
+            temperature: 0.2, 
+            maxOutputTokens: 4096 
+          },
+          tools: [{ googleSearch: {} }],
         }),
       }
     );
@@ -193,7 +224,16 @@ Deno.serve(async (req) => {
     }
 
     const geminiData = await geminiResponse.json();
-    const aiContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    console.log("Gemini response candidates:", JSON.stringify(geminiData.candidates?.[0]?.content?.parts?.length || 0, null, 2));
+    
+    // Extract text from all parts
+    let aiContent = "";
+    const parts = geminiData.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      if (part.text) {
+        aiContent += part.text;
+      }
+    }
 
     console.log("AI raw response:", aiContent);
 
@@ -232,8 +272,26 @@ Deno.serve(async (req) => {
     }
 
     if (!parseOk || jobs.length === 0) {
+      console.log("No jobs found or parse failed, returning error");
       return new Response(
-        JSON.stringify({ status: "error", error: "Failed to extract job information", raw: aiContent }),
+        JSON.stringify({ 
+          status: "error", 
+          error: "No jobs found for this search. Try a different query.", 
+          raw: aiContent 
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Filter out very low confidence results
+    const validJobs = jobs.filter((j: any) => (j.confidence || 0.5) >= 0.3);
+    
+    if (validJobs.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          status: "error", 
+          error: "No reliable job information found. Try a more specific query." 
+        }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -247,7 +305,7 @@ Deno.serve(async (req) => {
     let existingJob = null;
 
     for (const job of existingJobs || []) {
-      const similarity = calculateSimilarity(jobs[0].exam_name || jobs[0].title || "", job.title);
+      const similarity = calculateSimilarity(validJobs[0].exam_name || validJobs[0].title || "", job.title);
       if (similarity > 0.8) {
         duplicateStatus = "exists";
         existingJob = job;
@@ -258,8 +316,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    console.log("Returning", validJobs.length, "jobs with status:", duplicateStatus);
+
     return new Response(
-      JSON.stringify({ status: duplicateStatus, jobs, existingJob, latencyMs }),
+      JSON.stringify({ status: duplicateStatus, jobs: validJobs, existingJob, latencyMs }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
