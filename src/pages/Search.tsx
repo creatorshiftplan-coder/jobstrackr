@@ -14,7 +14,7 @@ export default function Search() {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<string[]>([]);
   const { data: jobs, isLoading } = useJobs();
-  const { isSearching, aiResult, searchStatus, searchWithAI, saveAIJob, clearAIResult } = useAIJobSearch();
+  const { isSearching, isSaving, aiResults, searchStatus, searchWithAI, saveAIJob, clearAIResults, dismissJob } = useAIJobSearch();
 
   const locations = useMemo(() => {
     if (!jobs) return [];
@@ -53,7 +53,7 @@ export default function Search() {
   };
 
   const handleSearch = () => {
-    if (query.length >= 3 && filteredJobs.length === 0) {
+    if (query.length >= 3) {
       searchWithAI(query);
     }
   };
@@ -64,7 +64,7 @@ export default function Search() {
     }
   };
 
-  const showAISearch = query.length >= 3 && filteredJobs.length === 0 && !aiResult;
+  const showAISearch = query.length >= 3 && filteredJobs.length === 0 && aiResults.length === 0;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -75,7 +75,10 @@ export default function Search() {
           <Input
             placeholder="Job title, department, location..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              if (!e.target.value) clearAIResults();
+            }}
             onKeyDown={handleKeyDown}
             className="pl-10 bg-secondary border-0"
           />
@@ -117,6 +120,22 @@ export default function Search() {
               <JobCard key={job.id} job={job} />
             ))}
 
+            {/* AI Search Results */}
+            {aiResults.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="font-semibold text-sm text-muted-foreground">AI Found Results</h3>
+                {aiResults.map((job, index) => (
+                  <AISearchResult
+                    key={`${job.exam_name}-${index}`}
+                    job={job}
+                    onSave={() => saveAIJob(job)}
+                    onDismiss={() => dismissJob(job)}
+                    isSaving={isSaving}
+                  />
+                ))}
+              </div>
+            )}
+
             {/* AI Search Section */}
             {showAISearch && !isSearching && (
               <div className="text-center py-8 space-y-4">
@@ -141,16 +160,7 @@ export default function Search() {
               </div>
             )}
 
-            {aiResult && (
-              <AISearchResult
-                job={aiResult}
-                onSave={saveAIJob}
-                onDismiss={clearAIResult}
-                isSaving={false}
-              />
-            )}
-
-            {searchStatus === "error" && !aiResult && (
+            {searchStatus === "error" && aiResults.length === 0 && (
               <div className="text-center py-4">
                 <p className="text-sm text-muted-foreground">
                   Couldn't find information about this job. Try a different search term.
