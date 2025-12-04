@@ -1,12 +1,29 @@
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Profile() {
-  // TODO: Implement with authentication
-  const isLoggedIn = false;
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
+  const userInitials = userName.substring(0, 2).toUpperCase();
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -15,7 +32,7 @@ export default function Profile() {
       </header>
 
       <main className="px-4 py-4 space-y-4">
-        {!isLoggedIn ? (
+        {!user ? (
           <Card className="border-0 shadow-card">
             <CardContent className="p-6 text-center">
               <div className="mx-auto h-20 w-20 rounded-full bg-secondary flex items-center justify-center mb-4">
@@ -36,11 +53,11 @@ export default function Profile() {
           <Card className="border-0 shadow-card">
             <CardContent className="p-4 flex items-center gap-4">
               <div className="h-16 w-16 rounded-full gradient-primary flex items-center justify-center">
-                <span className="text-2xl font-bold text-primary-foreground">JD</span>
+                <span className="text-2xl font-bold text-primary-foreground">{userInitials}</span>
               </div>
               <div>
-                <h3 className="font-display font-semibold text-foreground">John Doe</h3>
-                <p className="text-sm text-muted-foreground">john@example.com</p>
+                <h3 className="font-display font-semibold text-foreground">{userName}</h3>
+                <p className="text-sm text-muted-foreground">{user.email}</p>
               </div>
             </CardContent>
           </Card>
@@ -52,7 +69,8 @@ export default function Profile() {
               { icon: Bell, label: "Notifications", path: "/notifications" },
               { icon: Settings, label: "Settings", path: "/settings" },
               { icon: HelpCircle, label: "Help & Support", path: "/help" },
-            ].map(({ icon: Icon, label, path }, index) => (
+              ...(user ? [{ icon: Shield, label: "Admin Panel", path: "/admin" }] : []),
+            ].map(({ icon: Icon, label, path }) => (
               <Link
                 key={path}
                 to={path}
@@ -68,8 +86,12 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {isLoggedIn && (
-          <Button variant="outline" className="w-full text-destructive hover:text-destructive">
+        {user && (
+          <Button 
+            variant="outline" 
+            className="w-full text-destructive hover:text-destructive"
+            onClick={handleLogout}
+          >
             <LogOut className="mr-2 h-4 w-4" />
             Logout
           </Button>
