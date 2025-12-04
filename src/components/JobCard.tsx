@@ -1,0 +1,94 @@
+import { Job } from "@/types/job";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { MapPin, Calendar, IndianRupee, Users, Bookmark } from "lucide-react";
+import { format, differenceInDays } from "date-fns";
+import { Link } from "react-router-dom";
+
+interface JobCardProps {
+  job: Job;
+}
+
+export function JobCard({ job }: JobCardProps) {
+  const daysLeft = differenceInDays(new Date(job.last_date), new Date());
+  const isUrgent = daysLeft <= 7 && daysLeft >= 0;
+  const isExpired = daysLeft < 0;
+
+  const formatSalary = (min: number | null, max: number | null) => {
+    if (!min && !max) return "Not disclosed";
+    if (min && max) return `₹${(min / 1000).toFixed(0)}k - ₹${(max / 1000).toFixed(0)}k`;
+    if (min) return `₹${(min / 1000).toFixed(0)}k+`;
+    return `Up to ₹${(max! / 1000).toFixed(0)}k`;
+  };
+
+  return (
+    <Link to={`/job/${job.id}`}>
+      <Card className="group shadow-card hover:shadow-card-hover transition-all duration-300 border-0 overflow-hidden animate-slide-up">
+        <CardContent className="p-4">
+          <div className="flex justify-between items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                {job.is_featured && (
+                  <Badge className="bg-warning text-warning-foreground text-xs">
+                    Featured
+                  </Badge>
+                )}
+                {isUrgent && !isExpired && (
+                  <Badge variant="destructive" className="text-xs">
+                    {daysLeft} days left
+                  </Badge>
+                )}
+                {isExpired && (
+                  <Badge variant="secondary" className="text-xs">
+                    Expired
+                  </Badge>
+                )}
+              </div>
+              <h3 className="font-display font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                {job.title}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">{job.department}</p>
+            </div>
+            <button 
+              className="p-2 rounded-full hover:bg-secondary transition-colors"
+              onClick={(e) => {
+                e.preventDefault();
+                // TODO: Save job functionality
+              }}
+            >
+              <Bookmark className="h-5 w-5 text-muted-foreground" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4 text-primary" />
+              <span className="truncate">{job.location}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <IndianRupee className="h-4 w-4 text-success" />
+              <span className="truncate">{formatSalary(job.salary_min, job.salary_max)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4 text-warning" />
+              <span className="truncate">{format(new Date(job.last_date), "dd MMM yyyy")}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Users className="h-4 w-4 text-info" />
+              <span className="truncate">{job.vacancies || 1} vacancies</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+            <span className="text-xs text-muted-foreground">
+              Age: {job.age_min || 18} - {job.age_max || 65} yrs
+            </span>
+            <span className="text-xs font-medium text-primary">
+              {job.application_fee ? `Fee: ₹${job.application_fee}` : "Free Apply"}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
