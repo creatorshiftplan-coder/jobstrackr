@@ -1,12 +1,12 @@
-import { Home, Search, Bookmark, User } from "lucide-react";
+import { Home, Mail, Bookmark, LayoutGrid } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
-  { icon: Search, label: "Search", path: "/search" },
+  { icon: Mail, label: "Messages", path: "/search" },
   { icon: Bookmark, label: "Saved", path: "/saved" },
-  { icon: User, label: "Profile", path: "/profile" },
+  { icon: LayoutGrid, label: "More", path: "/profile" },
 ];
 
 export function BottomNav() {
