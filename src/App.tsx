@@ -11,6 +11,7 @@ import Saved from "./pages/Saved";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import ExamTracker from "./pages/ExamTracker";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/tracker" element={<ExamTracker />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

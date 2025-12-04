@@ -5,13 +5,16 @@ import { Badge } from "@/components/ui/badge";
 import { JobCard } from "@/components/JobCard";
 import { BottomNav } from "@/components/BottomNav";
 import { useJobs } from "@/hooks/useJobs";
+import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search as SearchIcon, Filter, X } from "lucide-react";
+import { AISearchResult } from "@/components/AISearchResult";
+import { Search as SearchIcon, Filter, X, Sparkles, Loader2 } from "lucide-react";
 
 export default function Search() {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<string[]>([]);
   const { data: jobs, isLoading } = useJobs();
+  const { isSearching, aiResult, searchStatus, searchWithAI, saveAIJob, clearAIResult } = useAIJobSearch();
 
   const locations = useMemo(() => {
     if (!jobs) return [];
@@ -49,6 +52,20 @@ export default function Search() {
     );
   };
 
+  const handleSearch = () => {
+    if (query.length >= 3 && filteredJobs.length === 0) {
+      searchWithAI(query);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
+
+  const showAISearch = query.length >= 3 && filteredJobs.length === 0 && !aiResult;
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-4">
@@ -59,6 +76,7 @@ export default function Search() {
             placeholder="Job title, department, location..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="pl-10 bg-secondary border-0"
           />
         </div>
@@ -94,9 +112,51 @@ export default function Search() {
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">{filteredJobs.length} results</p>
+            
             {filteredJobs.map((job) => (
               <JobCard key={job.id} job={job} />
             ))}
+
+            {/* AI Search Section */}
+            {showAISearch && !isSearching && (
+              <div className="text-center py-8 space-y-4">
+                <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="font-semibold">No jobs found in database</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  Want to search with AI? We'll find information about this job and add it for you.
+                </p>
+                <Button onClick={handleSearch}>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Search with AI
+                </Button>
+              </div>
+            )}
+
+            {isSearching && (
+              <div className="text-center py-8 space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                <p className="text-sm text-muted-foreground">Searching with AI...</p>
+              </div>
+            )}
+
+            {aiResult && (
+              <AISearchResult
+                job={aiResult}
+                onSave={saveAIJob}
+                onDismiss={clearAIResult}
+                isSaving={false}
+              />
+            )}
+
+            {searchStatus === "error" && !aiResult && (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">
+                  Couldn't find information about this job. Try a different search term.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </main>

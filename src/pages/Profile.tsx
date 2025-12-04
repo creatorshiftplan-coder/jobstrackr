@@ -1,17 +1,33 @@
+import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2 } from "lucide-react";
+import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2, FileText } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { DocumentUploader } from "@/components/DocumentUploader";
+import { OCRResultModal } from "@/components/OCRResultModal";
 
 export default function Profile() {
   const { user, loading, signOut } = useAuth();
+  const { profile, upsertProfile } = useProfile();
   const navigate = useNavigate();
+  const [ocrModalOpen, setOcrModalOpen] = useState(false);
+  const [ocrData, setOcrData] = useState<Record<string, any>>({});
 
   const handleLogout = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const handleOCRComplete = (documentId: string, extractedData: any) => {
+    setOcrData(extractedData);
+    setOcrModalOpen(true);
+  };
+
+  const handleConfirmOCR = (selectedFields: Record<string, any>) => {
+    upsertProfile.mutate(selectedFields);
   };
 
   if (loading) {
@@ -22,7 +38,7 @@ export default function Profile() {
     );
   }
 
-  const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
+  const userName = user?.user_metadata?.full_name || profile?.full_name || user?.email?.split("@")[0] || "User";
   const userInitials = userName.substring(0, 2).toUpperCase();
 
   return (
@@ -50,17 +66,21 @@ export default function Profile() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="border-0 shadow-card">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="h-16 w-16 rounded-full gradient-primary flex items-center justify-center">
-                <span className="text-2xl font-bold text-primary-foreground">{userInitials}</span>
-              </div>
-              <div>
-                <h3 className="font-display font-semibold text-foreground">{userName}</h3>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
-              </div>
-            </CardContent>
-          </Card>
+          <>
+            <Card className="border-0 shadow-card">
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="h-16 w-16 rounded-full gradient-primary flex items-center justify-center">
+                  <span className="text-2xl font-bold text-primary-foreground">{userInitials}</span>
+                </div>
+                <div>
+                  <h3 className="font-display font-semibold text-foreground">{userName}</h3>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <DocumentUploader onOCRComplete={handleOCRComplete} />
+          </>
         )}
 
         <Card className="border-0 shadow-card overflow-hidden">
@@ -97,6 +117,13 @@ export default function Profile() {
           </Button>
         )}
       </main>
+
+      <OCRResultModal
+        isOpen={ocrModalOpen}
+        onClose={() => setOcrModalOpen(false)}
+        extractedData={ocrData}
+        onConfirm={handleConfirmOCR}
+      />
 
       <BottomNav />
     </div>

@@ -9,7 +9,7 @@ import { GraduationCap, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function ExamTracker() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { userExams, isLoading } = useExams();
   const navigate = useNavigate();
 
