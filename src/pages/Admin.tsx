@@ -63,24 +63,87 @@ interface BulkUploadJob extends JobFormData {
   duplicateOf?: string;
 }
 
-const JSON_FORMAT_EXAMPLE = `[
-  {
-    "title": "Assistant Engineer",
-    "department": "PWD",
-    "location": "Delhi",
-    "qualification": "B.Tech Civil",
-    "last_date": "2025-12-31",
-    "vacancies": 10,
-    "salary_min": 35000,
-    "salary_max": 100000,
-    "age_min": 21,
-    "age_max": 35,
-    "application_fee": 500,
-    "is_featured": false,
-    "apply_link": "https://example.com",
-    "description": "Job description here"
+interface BulkUploadInput {
+  exam_name: string;
+  agency: string;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  location: string;
+  last_date: string;
+  exam_date?: string | null;
+  age_limit?: string | null;
+  application_fees?: {
+    general?: number;
+    obc?: number;
+    sc_st?: number;
+    female?: number;
+  };
+  job_type?: string;
+  description?: string;
+  requirements?: string;
+  highlights?: string;
+  apply_link?: string;
+}
+
+const JSON_FORMAT_EXAMPLE = `{
+  "jobs": [
+    {
+      "exam_name": "SSC CGL 2024",
+      "agency": "Staff Selection Commission",
+      "salary_min": 25000,
+      "salary_max": 85000,
+      "location": "All India",
+      "last_date": "2024-12-31",
+      "exam_date": "2025-02-15",
+      "age_limit": "18-32 years",
+      "application_fees": {
+        "general": 100,
+        "obc": 100,
+        "sc_st": 0,
+        "female": 0
+      },
+      "job_type": "Government",
+      "description": "Combined Graduate Level examination",
+      "requirements": "Bachelor's Degree",
+      "highlights": "10000+ Vacancies"
+    }
+  ]
+}`;
+
+// Parse age_limit string like "18-32 years" into min/max
+const parseAgeLimit = (ageLimit?: string | null): { age_min: number; age_max: number } => {
+  if (!ageLimit) return { age_min: 18, age_max: 65 };
+  const match = ageLimit.match(/(\d+)\s*[-–]\s*(\d+)/);
+  if (match) {
+    return { age_min: parseInt(match[1]), age_max: parseInt(match[2]) };
   }
-]`;
+  return { age_min: 18, age_max: 65 };
+};
+
+// Map bulk upload input to JobFormData
+const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
+  const { age_min, age_max } = parseAgeLimit(input.age_limit);
+  const applicationFee = input.application_fees?.general || 0;
+  
+  return {
+    title: input.exam_name,
+    department: input.agency,
+    location: input.location,
+    qualification: input.requirements || "As per notification",
+    experience: "",
+    eligibility: input.highlights || "",
+    salary_min: input.salary_min || null,
+    salary_max: input.salary_max || null,
+    age_min,
+    age_max,
+    application_fee: applicationFee,
+    vacancies: 1,
+    last_date: input.last_date,
+    is_featured: false,
+    description: input.description || "",
+    apply_link: input.apply_link || "",
+  };
+};
 
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
@@ -172,17 +235,30 @@ export default function Admin() {
 
     try {
       const json = JSON.parse(jsonText);
-      const jobsArray = Array.isArray(json) ? json : [json];
       
-      const processedJobs: BulkUploadJob[] = jobsArray.map((job: JobFormData) => {
+      // Support both { "jobs": [...] } wrapper and direct array
+      let jobsArray: BulkUploadInput[];
+      if (json.jobs && Array.isArray(json.jobs)) {
+        jobsArray = json.jobs;
+      } else if (Array.isArray(json)) {
+        jobsArray = json;
+      } else {
+        jobsArray = [json];
+      }
+      
+      const processedJobs: BulkUploadJob[] = jobsArray.map((input: BulkUploadInput) => {
+        // Map the input format to JobFormData
+        const jobData = mapBulkInputToJobForm(input);
+        
+        // Check for duplicates based on exam_name (title) and agency (department)
         const duplicate = jobs?.find(
           (existingJob) =>
-            existingJob.title.toLowerCase() === job.title?.toLowerCase() &&
-            existingJob.department.toLowerCase() === job.department?.toLowerCase()
+            existingJob.title.toLowerCase() === jobData.title?.toLowerCase() &&
+            existingJob.department.toLowerCase() === jobData.department?.toLowerCase()
         );
+        
         return {
-          ...emptyFormData,
-          ...job,
+          ...jobData,
           isDuplicate: !!duplicate,
           duplicateOf: duplicate?.id,
         };
