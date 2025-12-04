@@ -1,24 +1,29 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
+export interface ApplicationFees {
+  general: number;
+  obc: number;
+  sc_st: number;
+  female: number;
+}
+
 export interface AIJobResult {
-  title: string;
-  department: string;
+  exam_name: string;
+  agency: string;
   location: string;
-  qualification: string;
-  experience: string | null;
-  eligibility: string | null;
-  description: string | null;
+  requirements: string | null;
   salary_min: number | null;
   salary_max: number | null;
-  age_min: number | null;
-  age_max: number | null;
-  application_fee: number | null;
-  vacancies: number | null;
+  age_limit: string;
+  application_fees: ApplicationFees;
   last_date: string | null;
+  exam_date: string | null;
+  job_type: string;
+  description: string | null;
+  highlights: string | null;
   apply_link: string | null;
   confidence: number;
 }
@@ -27,12 +32,13 @@ export function useAIJobSearch() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isSearching, setIsSearching] = useState(false);
-  const [aiResult, setAiResult] = useState<AIJobResult | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [aiResults, setAiResults] = useState<AIJobResult[]>([]);
   const [searchStatus, setSearchStatus] = useState<"new" | "exists" | "similar" | "error" | null>(null);
 
   const searchWithAI = async (query: string) => {
     setIsSearching(true);
-    setAiResult(null);
+    setAiResults([]);
     setSearchStatus(null);
 
     try {
@@ -68,15 +74,17 @@ export function useAIJobSearch() {
       if (result.status === "similar" && result.existingJob) {
         toast.info("A similar job was found");
         setSearchStatus("similar");
-        setAiResult(result.job);
+        if (result.jobs && result.jobs.length > 0) {
+          setAiResults(result.jobs);
+        }
         return result.existingJob;
       }
 
-      if (result.job) {
-        setAiResult(result.job);
+      if (result.jobs && result.jobs.length > 0) {
+        setAiResults(result.jobs);
         setSearchStatus("new");
-        toast.success("Job found via AI search!");
-        return result.job;
+        toast.success(`Found ${result.jobs.length} job(s) via AI search!`);
+        return result.jobs[0];
       }
 
       setSearchStatus("error");
@@ -91,54 +99,75 @@ export function useAIJobSearch() {
     }
   };
 
-  const saveAIJob = async () => {
-    if (!aiResult) return null;
+  const saveAIJob = async (jobToSave?: AIJobResult) => {
+    const job = jobToSave || aiResults[0];
+    if (!job) return null;
+
+    setIsSaving(true);
 
     try {
-      const { data, error } = await supabase.from("jobs").insert({
-        title: aiResult.title,
-        department: aiResult.department,
-        location: aiResult.location,
-        qualification: aiResult.qualification,
-        experience: aiResult.experience,
-        eligibility: aiResult.eligibility,
-        description: aiResult.description,
-        salary_min: aiResult.salary_min,
-        salary_max: aiResult.salary_max,
-        age_min: aiResult.age_min || 18,
-        age_max: aiResult.age_max || 65,
-        application_fee: aiResult.application_fee || 0,
-        vacancies: aiResult.vacancies || 1,
-        last_date: aiResult.last_date || new Date().toISOString().split("T")[0],
-        apply_link: aiResult.apply_link,
-        is_featured: false,
-      }).select().single();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-job-search`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            saveJob: true,
+            jobData: job,
+            userId: user?.id,
+          }),
+        }
+      );
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (result.error) {
+        toast.error(result.error);
+        return null;
+      }
 
       toast.success("Job saved to database!");
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      setAiResult(null);
-      setSearchStatus(null);
-      return data;
+      
+      // Remove saved job from results
+      setAiResults(prev => prev.filter(j => j.exam_name !== job.exam_name));
+      if (aiResults.length <= 1) {
+        setSearchStatus(null);
+      }
+      
+      return result.job;
     } catch (error) {
       console.error("Save job error:", error);
       toast.error("Failed to save job");
       return null;
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const clearAIResult = () => {
-    setAiResult(null);
+  const clearAIResults = () => {
+    setAiResults([]);
     setSearchStatus(null);
+  };
+
+  const dismissJob = (job: AIJobResult) => {
+    setAiResults(prev => prev.filter(j => j.exam_name !== job.exam_name));
+    if (aiResults.length <= 1) {
+      setSearchStatus(null);
+    }
   };
 
   return {
     isSearching,
-    aiResult,
+    isSaving,
+    aiResults,
     searchStatus,
     searchWithAI,
     saveAIJob,
-    clearAIResult,
+    clearAIResults,
+    dismissJob,
   };
 }

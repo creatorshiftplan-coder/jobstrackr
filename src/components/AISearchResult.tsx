@@ -1,7 +1,7 @@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Calendar, GraduationCap, Banknote, Sparkles, Save, X } from "lucide-react";
+import { MapPin, Calendar, GraduationCap, Banknote, Sparkles, Save, X, Users, Clock } from "lucide-react";
 import { AIJobResult } from "@/hooks/useAIJobSearch";
 
 interface AISearchResultProps {
@@ -18,6 +18,16 @@ export function AISearchResult({ job, onSave, onDismiss, isSaving }: AISearchRes
     if (min) return `From ₹${(min / 1000).toFixed(0)}K/month`;
     if (max) return `Up to ₹${(max / 1000).toFixed(0)}K/month`;
     return "Not specified";
+  };
+
+  const formatFees = (fees: { general: number; obc: number; sc_st: number; female: number }) => {
+    if (!fees) return null;
+    const parts: string[] = [];
+    if (fees.general > 0) parts.push(`Gen: ₹${fees.general}`);
+    if (fees.obc > 0 && fees.obc !== fees.general) parts.push(`OBC: ₹${fees.obc}`);
+    if (fees.sc_st === 0) parts.push(`SC/ST: Free`);
+    if (fees.female === 0) parts.push(`Female: Free`);
+    return parts.join(" | ");
   };
 
   const confidenceColor = job.confidence >= 0.7 ? "bg-green-500" : job.confidence >= 0.5 ? "bg-yellow-500" : "bg-red-500";
@@ -42,8 +52,8 @@ export function AISearchResult({ job, onSave, onDismiss, isSaving }: AISearchRes
 
       <CardContent className="space-y-3">
         <div>
-          <h3 className="font-semibold">{job.title}</h3>
-          <p className="text-sm text-muted-foreground">{job.department}</p>
+          <h3 className="font-semibold">{job.exam_name}</h3>
+          <p className="text-sm text-muted-foreground">{job.agency}</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -51,13 +61,16 @@ export function AISearchResult({ job, onSave, onDismiss, isSaving }: AISearchRes
             <MapPin className="h-3 w-3 mr-1" />
             {job.location}
           </Badge>
-          <Badge variant="secondary" className="text-xs">
-            <GraduationCap className="h-3 w-3 mr-1" />
-            {job.qualification}
-          </Badge>
-          {job.vacancies && (
+          {job.requirements && (
             <Badge variant="secondary" className="text-xs">
-              {job.vacancies} Vacancies
+              <GraduationCap className="h-3 w-3 mr-1" />
+              {job.requirements}
+            </Badge>
+          )}
+          {job.age_limit && (
+            <Badge variant="secondary" className="text-xs">
+              <Users className="h-3 w-3 mr-1" />
+              {job.age_limit}
             </Badge>
           )}
         </div>
@@ -75,8 +88,25 @@ export function AISearchResult({ job, onSave, onDismiss, isSaving }: AISearchRes
           )}
         </div>
 
+        {job.exam_date && (
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>Exam: {new Date(job.exam_date).toLocaleDateString()}</span>
+          </div>
+        )}
+
+        {job.application_fees && (
+          <p className="text-xs text-muted-foreground border-t pt-2">
+            <strong>Fees:</strong> {formatFees(job.application_fees)}
+          </p>
+        )}
+
         {job.description && (
-          <p className="text-sm text-muted-foreground line-clamp-3">{job.description}</p>
+          <p className="text-sm text-muted-foreground line-clamp-2">{job.description}</p>
+        )}
+
+        {job.highlights && (
+          <p className="text-xs text-primary/80 italic">{job.highlights}</p>
         )}
       </CardContent>
 
