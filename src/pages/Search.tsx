@@ -8,19 +8,19 @@ import { useJobs } from "@/hooks/useJobs";
 import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AISearchResult } from "@/components/AISearchResult";
-import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX, MapPin, Building } from "lucide-react";
+import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
 
 export default function Search() {
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState<string[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { data: jobs, isLoading } = useJobs();
   const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, clearAIResults, dismissJob } = useAIJobSearch();
-
-  const locations = useMemo(() => {
-    if (!jobs) return [];
-    const uniqueLocations = [...new Set(jobs.map((j) => j.location))];
-    return uniqueLocations.slice(0, 6);
-  }, [jobs]);
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
@@ -37,19 +37,40 @@ export default function Search() {
       );
     }
 
-    if (filters.length > 0) {
+    if (selectedLocations.length > 0) {
       filtered = filtered.filter((job) =>
-        filters.some((f) => job.location.toLowerCase().includes(f.toLowerCase()))
+        selectedLocations.some((loc) => job.location.toLowerCase().includes(loc.toLowerCase()))
+      );
+    }
+
+    if (selectedSectors.length > 0) {
+      filtered = filtered.filter((job) =>
+        selectedSectors.some(
+          (sector) =>
+            job.title.toLowerCase().includes(sector.toLowerCase()) ||
+            job.department.toLowerCase().includes(sector.toLowerCase())
+        )
       );
     }
 
     return filtered;
-  }, [jobs, query, filters]);
+  }, [jobs, query, selectedLocations, selectedSectors]);
 
-  const toggleFilter = (filter: string) => {
-    setFilters((prev) =>
-      prev.includes(filter) ? prev.filter((f) => f !== filter) : [...prev, filter]
+  const toggleLocation = (location: string) => {
+    setSelectedLocations((prev) =>
+      prev.includes(location) ? prev.filter((l) => l !== location) : [...prev, location]
     );
+  };
+
+  const toggleSector = (sector: string) => {
+    setSelectedSectors((prev) =>
+      prev.includes(sector) ? prev.filter((s) => s !== sector) : [...prev, sector]
+    );
+  };
+
+  const clearAllFilters = () => {
+    setSelectedLocations([]);
+    setSelectedSectors([]);
   };
 
   const handleSearch = () => {
@@ -64,46 +85,110 @@ export default function Search() {
     }
   };
 
+  const totalFilters = selectedLocations.length + selectedSectors.length;
   const showAISearch = query.length >= 3 && filteredJobs.length === 0 && aiResults.length === 0 && searchStatus !== "not_found";
 
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-4">
         <h1 className="font-display font-bold text-xl text-foreground mb-4">Search Jobs</h1>
-        <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Job title, department, location..."
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              if (!e.target.value) clearAIResults();
-            }}
-            onKeyDown={handleKeyDown}
-            className="pl-10 bg-secondary border-0"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Job title, department, location..."
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                if (!e.target.value) clearAIResults();
+              }}
+              onKeyDown={handleKeyDown}
+              className="pl-10 bg-secondary border-0"
+            />
+          </div>
+          <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className="relative">
+            <Filter className="h-4 w-4" />
+            {totalFilters > 0 && (
+              <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 justify-center text-xs">
+                {totalFilters}
+              </Badge>
+            )}
+          </Button>
         </div>
       </header>
 
-      <div className="px-4 py-3">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-muted-foreground">Filter by location</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {locations.map((loc) => (
-            <Badge
-              key={loc}
-              variant={filters.includes(loc) ? "default" : "secondary"}
-              className="cursor-pointer"
-              onClick={() => toggleFilter(loc)}
-            >
-              {loc}
-              {filters.includes(loc) && <X className="ml-1 h-3 w-3" />}
-            </Badge>
-          ))}
-        </div>
-      </div>
+      {/* Filter Sheet */}
+      <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+        <SheetContent side="bottom" className="rounded-t-3xl h-[70vh]">
+          <SheetHeader>
+            <SheetTitle>Filter Jobs</SheetTitle>
+          </SheetHeader>
+          <Tabs defaultValue="location" className="mt-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="location" className="gap-1">
+                <MapPin className="h-4 w-4" />
+                Location
+                {selectedLocations.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
+                    {selectedLocations.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="sector" className="gap-1">
+                <Building className="h-4 w-4" />
+                Exam Sector
+                {selectedSectors.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
+                    {selectedSectors.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="location" className="mt-4">
+              <ScrollArea className="h-[40vh]">
+                <div className="flex flex-wrap gap-2 pr-4">
+                  {INDIAN_STATES.map((state) => (
+                    <Badge
+                      key={state}
+                      variant={selectedLocations.includes(state) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => toggleLocation(state)}
+                    >
+                      {state}
+                      {selectedLocations.includes(state) && <X className="h-3 w-3 ml-1" />}
+                    </Badge>
+                  ))}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="sector" className="mt-4">
+              <ScrollArea className="h-[40vh]">
+                <div className="flex flex-wrap gap-2 pr-4">
+                  {EXAM_SECTORS.map((sector) => (
+                    <Badge
+                      key={sector}
+                      variant={selectedSectors.includes(sector) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => toggleSector(sector)}
+                    >
+                      {sector}
+                      {selectedSectors.includes(sector) && <X className="h-3 w-3 ml-1" />}
+                    </Badge>
+                  ))}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+
+          {totalFilters > 0 && (
+            <Button variant="ghost" size="sm" className="mt-4" onClick={clearAllFilters}>
+              Clear all filters ({totalFilters})
+            </Button>
+          )}
+        </SheetContent>
+      </Sheet>
 
       <main className="px-4 py-2">
         {isLoading ? (
@@ -115,7 +200,7 @@ export default function Search() {
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">{filteredJobs.length} results</p>
-            
+
             {filteredJobs.map((job) => (
               <JobCard key={job.id} job={job} />
             ))}
