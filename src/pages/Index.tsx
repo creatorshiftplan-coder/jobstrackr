@@ -11,24 +11,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { AISearchResult } from "@/components/AISearchResult";
-import { Briefcase, Sparkles, Loader2, X, SearchX } from "lucide-react";
+import { Briefcase, Sparkles, Loader2, X, SearchX, MapPin, Building } from "lucide-react";
+import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
 
 const colorVariants = ["pink", "blue", "green", "orange"] as const;
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { data: jobs, isLoading, error } = useJobs();
   const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, dismissJob, clearAIResults } = useAIJobSearch();
-
-  // Get unique locations for filter
-  const locations = useMemo(() => {
-    if (!jobs) return [];
-    const locs = [...new Set(jobs.map(job => job.location))];
-    return locs.slice(0, 8);
-  }, [jobs]);
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
@@ -46,11 +43,24 @@ const Index = () => {
     }
 
     if (selectedLocations.length > 0) {
-      result = result.filter(job => selectedLocations.includes(job.location));
+      result = result.filter(job => 
+        selectedLocations.some(loc => 
+          job.location.toLowerCase().includes(loc.toLowerCase())
+        )
+      );
+    }
+
+    if (selectedSectors.length > 0) {
+      result = result.filter(job =>
+        selectedSectors.some(sector =>
+          job.title.toLowerCase().includes(sector.toLowerCase()) ||
+          job.department.toLowerCase().includes(sector.toLowerCase())
+        )
+      );
     }
 
     return result;
-  }, [jobs, searchQuery, selectedLocations]);
+  }, [jobs, searchQuery, selectedLocations, selectedSectors]);
 
   const featuredJobs = useMemo(() => {
     return filteredJobs.filter(job => job.is_featured).slice(0, 5);
@@ -68,12 +78,26 @@ const Index = () => {
     );
   };
 
+  const toggleSector = (sector: string) => {
+    setSelectedSectors(prev => 
+      prev.includes(sector) 
+        ? prev.filter(s => s !== sector)
+        : [...prev, sector]
+    );
+  };
+
   const handleAISearch = async () => {
     if (searchQuery.length >= 3) {
       await searchWithAI(searchQuery);
     }
   };
 
+  const clearAllFilters = () => {
+    setSelectedLocations([]);
+    setSelectedSectors([]);
+  };
+
+  const totalFilters = selectedLocations.length + selectedSectors.length;
   const showNoResults = !isLoading && filteredJobs.length === 0;
   const canSearchAI = searchQuery.length >= 3 && !isSearching;
 
@@ -87,42 +111,88 @@ const Index = () => {
           if (!value) clearAIResults();
         }}
         onFilterClick={() => setIsFilterOpen(true)}
+        filterCount={totalFilters}
       />
 
       {/* Filter Sheet */}
       <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl">
+        <SheetContent side="bottom" className="rounded-t-3xl h-[70vh]">
           <SheetHeader>
             <SheetTitle>Filter Jobs</SheetTitle>
           </SheetHeader>
-          <div className="py-4">
-            <h4 className="text-sm font-medium mb-3">Location</h4>
-            <div className="flex flex-wrap gap-2">
-              {locations.map(location => (
-                <Badge
-                  key={location}
-                  variant={selectedLocations.includes(location) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleLocation(location)}
-                >
-                  {location}
-                  {selectedLocations.includes(location) && (
-                    <X className="h-3 w-3 ml-1" />
-                  )}
-                </Badge>
-              ))}
-            </div>
-            {selectedLocations.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-4"
-                onClick={() => setSelectedLocations([])}
-              >
-                Clear all filters
-              </Button>
-            )}
-          </div>
+          <Tabs defaultValue="location" className="mt-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="location" className="gap-1">
+                <MapPin className="h-4 w-4" />
+                Location
+                {selectedLocations.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
+                    {selectedLocations.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="sector" className="gap-1">
+                <Building className="h-4 w-4" />
+                Exam Sector
+                {selectedSectors.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
+                    {selectedSectors.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="location" className="mt-4">
+              <ScrollArea className="h-[40vh]">
+                <div className="flex flex-wrap gap-2 pr-4">
+                  {INDIAN_STATES.map(state => (
+                    <Badge
+                      key={state}
+                      variant={selectedLocations.includes(state) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => toggleLocation(state)}
+                    >
+                      {state}
+                      {selectedLocations.includes(state) && (
+                        <X className="h-3 w-3 ml-1" />
+                      )}
+                    </Badge>
+                  ))}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+            
+            <TabsContent value="sector" className="mt-4">
+              <ScrollArea className="h-[40vh]">
+                <div className="flex flex-wrap gap-2 pr-4">
+                  {EXAM_SECTORS.map(sector => (
+                    <Badge
+                      key={sector}
+                      variant={selectedSectors.includes(sector) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => toggleSector(sector)}
+                    >
+                      {sector}
+                      {selectedSectors.includes(sector) && (
+                        <X className="h-3 w-3 ml-1" />
+                      )}
+                    </Badge>
+                  ))}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+
+          {totalFilters > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-4"
+              onClick={clearAllFilters}
+            >
+              Clear all filters ({totalFilters})
+            </Button>
+          )}
         </SheetContent>
       </Sheet>
       

@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useJobs } from "@/hooks/useJobs";
+import { useAdminStats } from "@/hooks/useAdminStats";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,8 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Upload, Trash2, Edit, Loader2, AlertCircle, Check, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase } from "lucide-react";
 import { format } from "date-fns";
 import { Job } from "@/types/job";
 
@@ -60,13 +63,31 @@ interface BulkUploadJob extends JobFormData {
   duplicateOf?: string;
 }
 
+const JSON_FORMAT_EXAMPLE = `[
+  {
+    "title": "Assistant Engineer",
+    "department": "PWD",
+    "location": "Delhi",
+    "qualification": "B.Tech Civil",
+    "last_date": "2025-12-31",
+    "vacancies": 10,
+    "salary_min": 35000,
+    "salary_max": 100000,
+    "age_min": 21,
+    "age_max": 35,
+    "application_fee": 500,
+    "is_featured": false,
+    "apply_link": "https://example.com",
+    "description": "Job description here"
+  }
+]`;
+
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const { data: jobs, isLoading: jobsLoading } = useJobs();
+  const { userStats, apiStats, isLoading: statsLoading } = useAdminStats();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
@@ -75,6 +96,7 @@ export default function Admin() {
   const [saving, setSaving] = useState(false);
   const [bulkJobs, setBulkJobs] = useState<BulkUploadJob[]>([]);
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [jsonText, setJsonText] = useState("");
 
   if (authLoading) {
     return (
@@ -110,10 +132,7 @@ export default function Admin() {
     setSaving(true);
     try {
       if (editingJob) {
-        const { error } = await supabase
-          .from("jobs")
-          .update(formData)
-          .eq("id", editingJob.id);
+        const { error } = await supabase.from("jobs").update(formData).eq("id", editingJob.id);
         if (error) throw error;
         toast({ title: "Job updated successfully!" });
       } else {
@@ -145,39 +164,35 @@ export default function Admin() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleParseJSON = () => {
+    if (!jsonText.trim()) {
+      toast({ title: "Error", description: "Please paste JSON data", variant: "destructive" });
+      return;
+    }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        const jobsArray = Array.isArray(json) ? json : [json];
-        
-        // Check for duplicates
-        const processedJobs: BulkUploadJob[] = jobsArray.map((job: JobFormData) => {
-          const duplicate = jobs?.find(
-            (existingJob) =>
-              existingJob.title.toLowerCase() === job.title?.toLowerCase() &&
-              existingJob.department.toLowerCase() === job.department?.toLowerCase()
-          );
-          return {
-            ...emptyFormData,
-            ...job,
-            isDuplicate: !!duplicate,
-            duplicateOf: duplicate?.id,
-          };
-        });
+    try {
+      const json = JSON.parse(jsonText);
+      const jobsArray = Array.isArray(json) ? json : [json];
+      
+      const processedJobs: BulkUploadJob[] = jobsArray.map((job: JobFormData) => {
+        const duplicate = jobs?.find(
+          (existingJob) =>
+            existingJob.title.toLowerCase() === job.title?.toLowerCase() &&
+            existingJob.department.toLowerCase() === job.department?.toLowerCase()
+        );
+        return {
+          ...emptyFormData,
+          ...job,
+          isDuplicate: !!duplicate,
+          duplicateOf: duplicate?.id,
+        };
+      });
 
-        setBulkJobs(processedJobs);
-        setShowBulkDialog(true);
-      } catch (error) {
-        toast({ title: "Error", description: "Invalid JSON file", variant: "destructive" });
-      }
-    };
-    reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+      setBulkJobs(processedJobs);
+      setShowBulkDialog(true);
+    } catch (error) {
+      toast({ title: "Error", description: "Invalid JSON format. Please check the syntax.", variant: "destructive" });
+    }
   };
 
   const handleBulkUpload = async () => {
@@ -197,6 +212,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       setShowBulkDialog(false);
       setBulkJobs([]);
+      setJsonText("");
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -230,85 +246,281 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/profile" className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <h1 className="font-display font-bold text-xl text-foreground">Admin Panel</h1>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-4 w-4 mr-2" />
-              Bulk Upload
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <Button size="sm" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Job
-            </Button>
-          </div>
+        <div className="flex items-center gap-3">
+          <Link to="/profile" className="text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="font-display font-bold text-xl text-foreground">Admin Panel</h1>
         </div>
       </header>
 
       <main className="p-4">
-        <Card className="border-0 shadow-card">
-          <CardHeader>
-            <CardTitle>Jobs ({jobs?.length || 0})</CardTitle>
-            <CardDescription>Manage government job listings</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {jobsLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Last Date</TableHead>
-                      <TableHead>Vacancies</TableHead>
-                      <TableHead>Featured</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {jobs?.map((job) => (
-                      <TableRow key={job.id}>
-                        <TableCell className="font-medium max-w-[200px] truncate">{job.title}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{job.department}</TableCell>
-                        <TableCell>{format(new Date(job.last_date), "dd MMM yyyy")}</TableCell>
-                        <TableCell>{job.vacancies || 1}</TableCell>
-                        <TableCell>
-                          {job.is_featured && <Badge className="bg-warning text-warning-foreground">Featured</Badge>}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(job)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteJob(job.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="jobs" className="space-y-4">
+          <TabsList className="grid grid-cols-4 w-full">
+            <TabsTrigger value="jobs" className="gap-1">
+              <Briefcase className="h-4 w-4" />
+              <span className="hidden sm:inline">Jobs</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-1">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Users</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-1">
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">API Usage</span>
+            </TabsTrigger>
+            <TabsTrigger value="bulk" className="gap-1">
+              <FileJson className="h-4 w-4" />
+              <span className="hidden sm:inline">Bulk Upload</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Jobs Tab */}
+          <TabsContent value="jobs">
+            <Card className="border-0 shadow-card">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Jobs ({jobs?.length || 0})</CardTitle>
+                  <CardDescription>Manage government job listings</CardDescription>
+                </div>
+                <Button size="sm" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Job
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                {jobsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[500px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Department</TableHead>
+                          <TableHead>Last Date</TableHead>
+                          <TableHead>Vacancies</TableHead>
+                          <TableHead>Featured</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {jobs?.map((job) => (
+                          <TableRow key={job.id}>
+                            <TableCell className="font-medium max-w-[200px] truncate">{job.title}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{job.department}</TableCell>
+                            <TableCell>{format(new Date(job.last_date), "dd MMM yyyy")}</TableCell>
+                            <TableCell>{job.vacancies || 1}</TableCell>
+                            <TableCell>
+                              {job.is_featured && <Badge className="bg-warning text-warning-foreground">Featured</Badge>}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="icon" onClick={() => openEditDialog(job)}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDeleteJob(job.id)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Total Users</CardDescription>
+                  <CardTitle className="text-3xl">{statsLoading ? "..." : userStats.totalUsers}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Today's Registrations</CardDescription>
+                  <CardTitle className="text-3xl">{statsLoading ? "..." : userStats.todayRegistrations}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>This Week</CardDescription>
+                  <CardTitle className="text-3xl">{statsLoading ? "..." : userStats.weekRegistrations}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Registrations</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {statsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[400px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Joined</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {userStats.recentUsers.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">{user.full_name || "Not set"}</TableCell>
+                            <TableCell>{user.email || "Not set"}</TableCell>
+                            <TableCell>{format(new Date(user.created_at), "dd MMM yyyy")}</TableCell>
+                          </TableRow>
+                        ))}
+                        {userStats.recentUsers.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                              No users registered yet
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* API Analytics Tab */}
+          <TabsContent value="analytics">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Total AI Searches</CardDescription>
+                  <CardTitle className="text-2xl">{statsLoading ? "..." : apiStats.totalSearches}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Today's Searches</CardDescription>
+                  <CardTitle className="text-2xl">{statsLoading ? "..." : apiStats.todaySearches}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Avg Latency</CardDescription>
+                  <CardTitle className="text-2xl">{statsLoading ? "..." : `${apiStats.avgLatency}ms`}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Success Rate</CardDescription>
+                  <CardTitle className="text-2xl">{statsLoading ? "..." : `${apiStats.successRate}%`}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent AI Searches</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {statsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[400px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Query</TableHead>
+                          <TableHead>Latency</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Time</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {apiStats.recentSearches.map((search) => (
+                          <TableRow key={search.id}>
+                            <TableCell className="font-medium max-w-[200px] truncate">{search.query}</TableCell>
+                            <TableCell>{search.latency_ms ? `${search.latency_ms}ms` : "-"}</TableCell>
+                            <TableCell>
+                              {search.parse_ok ? (
+                                <Badge variant="outline" className="text-green-600 border-green-600">
+                                  <Check className="h-3 w-3 mr-1" /> Success
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-destructive border-destructive">
+                                  <X className="h-3 w-3 mr-1" /> Failed
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>{format(new Date(search.created_at), "dd MMM, HH:mm")}</TableCell>
+                          </TableRow>
+                        ))}
+                        {apiStats.recentSearches.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                              No AI searches yet
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Bulk Upload Tab */}
+          <TabsContent value="bulk">
+            <Card>
+              <CardHeader>
+                <CardTitle>Bulk Job Upload</CardTitle>
+                <CardDescription>
+                  Paste JSON data in the format below. The app will check for duplicates before uploading.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">JSON Format Example</Label>
+                  <div className="bg-muted p-3 rounded-lg overflow-x-auto">
+                    <pre className="text-xs font-mono whitespace-pre-wrap">{JSON_FORMAT_EXAMPLE}</pre>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="jsonInput" className="text-sm font-medium mb-2 block">Paste JSON Data</Label>
+                  <Textarea
+                    id="jsonInput"
+                    placeholder="Paste your JSON array here..."
+                    rows={12}
+                    value={jsonText}
+                    onChange={(e) => setJsonText(e.target.value)}
+                    className="font-mono text-sm"
+                  />
+                </div>
+
+                <Button onClick={handleParseJSON} disabled={!jsonText.trim()}>
+                  <FileJson className="h-4 w-4 mr-2" />
+                  Preview Jobs
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Add/Edit Job Dialog */}
@@ -395,16 +607,16 @@ export default function Admin() {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Upload Dialog */}
+      {/* Bulk Upload Preview Dialog */}
       <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Bulk Upload Preview</DialogTitle>
             <DialogDescription>
-              Review jobs before uploading. Duplicates (same title & department) are marked.
+              Review jobs before uploading. Duplicates (same title & department) are marked and will be skipped.
             </DialogDescription>
           </DialogHeader>
-          <div className="overflow-x-auto">
+          <ScrollArea className="h-[400px]">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -424,32 +636,32 @@ export default function Admin() {
                           <X className="h-3 w-3" /> Duplicate
                         </Badge>
                       ) : (
-                        <Badge className="bg-success text-success-foreground gap-1">
+                        <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
                           <Check className="h-3 w-3" /> New
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate">{job.title}</TableCell>
-                    <TableCell className="max-w-[150px] truncate">{job.department}</TableCell>
+                    <TableCell className="font-medium max-w-[150px] truncate">{job.title}</TableCell>
+                    <TableCell className="max-w-[100px] truncate">{job.department}</TableCell>
                     <TableCell>{job.location}</TableCell>
                     <TableCell>{job.last_date}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-          <div className="flex justify-between items-center mt-4">
-            <p className="text-sm text-muted-foreground">
-              {bulkJobs.filter((j) => !j.isDuplicate).length} new jobs will be uploaded
-            </p>
+          </ScrollArea>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <div className="text-sm text-muted-foreground">
+              {bulkJobs.filter(j => !j.isDuplicate).length} new jobs, {bulkJobs.filter(j => j.isDuplicate).length} duplicates
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Cancel</Button>
-              <Button onClick={handleBulkUpload} disabled={bulkUploading || bulkJobs.filter((j) => !j.isDuplicate).length === 0}>
+              <Button onClick={handleBulkUpload} disabled={bulkUploading || bulkJobs.filter(j => !j.isDuplicate).length === 0}>
                 {bulkUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Upload {bulkJobs.filter((j) => !j.isDuplicate).length} Jobs
+                Upload {bulkJobs.filter(j => !j.isDuplicate).length} Jobs
               </Button>
             </div>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

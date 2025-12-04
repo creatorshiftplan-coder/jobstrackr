@@ -1,14 +1,16 @@
 import { Search, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface SearchWithFilterProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onFilterClick?: () => void;
+  filterCount?: number;
 }
 
-export function SearchWithFilter({ searchQuery, onSearchChange, onFilterClick }: SearchWithFilterProps) {
+export function SearchWithFilter({ searchQuery, onSearchChange, onFilterClick, filterCount = 0 }: SearchWithFilterProps) {
   return (
     <div className="px-5 pb-4">
       <div className="flex items-center gap-3">
@@ -26,9 +28,14 @@ export function SearchWithFilter({ searchQuery, onSearchChange, onFilterClick }:
           variant="default"
           size="icon"
           onClick={onFilterClick}
-          className="h-14 w-14 rounded-2xl bg-primary hover:bg-primary/90 shrink-0"
+          className="h-14 w-14 rounded-2xl bg-primary hover:bg-primary/90 shrink-0 relative"
         >
           <SlidersHorizontal className="h-5 w-5" />
+          {filterCount > 0 && (
+            <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 justify-center text-xs bg-destructive">
+              {filterCount}
+            </Badge>
+          )}
         </Button>
       </div>
     </div>
