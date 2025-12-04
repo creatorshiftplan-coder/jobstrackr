@@ -1,17 +1,17 @@
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Calendar, GraduationCap, Banknote, Sparkles, Save, X, Users, Clock } from "lucide-react";
+import { MapPin, Calendar, GraduationCap, Banknote, Sparkles, Eye, X, Users, Clock, CheckCircle } from "lucide-react";
 import { AIJobResult } from "@/hooks/useAIJobSearch";
 
 interface AISearchResultProps {
   job: AIJobResult;
-  onSave: () => void;
   onDismiss: () => void;
-  isSaving: boolean;
+  savedJobId?: string;
 }
 
-export function AISearchResult({ job, onSave, onDismiss, isSaving }: AISearchResultProps) {
+export function AISearchResult({ job, onDismiss, savedJobId }: AISearchResultProps) {
   const formatSalary = (min: number | null, max: number | null) => {
     if (!min && !max) return "Not specified";
     if (min && max) return `₹${(min / 1000).toFixed(0)}K - ₹${(max / 1000).toFixed(0)}K/month`;
@@ -32,8 +32,6 @@ export function AISearchResult({ job, onSave, onDismiss, isSaving }: AISearchRes
     return parts.length > 0 ? parts.join(" | ") : "Check notification";
   };
 
-  const confidenceColor = job.confidence >= 0.7 ? "bg-green-500" : job.confidence >= 0.5 ? "bg-yellow-500" : "bg-red-500";
-
   return (
     <Card className="border-primary/50 bg-gradient-to-br from-primary/5 to-transparent">
       <CardHeader className="pb-2">
@@ -46,10 +44,15 @@ export function AISearchResult({ job, onSave, onDismiss, isSaving }: AISearchRes
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Confidence: <span className={`inline-block w-2 h-2 rounded-full ${confidenceColor} mr-1`}></span>
-          {Math.round(job.confidence * 100)}%
-        </p>
+        <div className="flex items-center gap-2">
+          <Badge className="bg-green-500 text-white text-xs">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Auto-saved
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            Confidence: {Math.round(job.confidence * 100)}%
+          </span>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-3">
@@ -113,10 +116,18 @@ export function AISearchResult({ job, onSave, onDismiss, isSaving }: AISearchRes
       </CardContent>
 
       <CardFooter className="pt-2">
-        <Button onClick={onSave} disabled={isSaving} className="w-full">
-          <Save className="h-4 w-4 mr-2" />
-          {isSaving ? "Saving..." : "Save to Database"}
-        </Button>
+        {savedJobId ? (
+          <Link to={`/job/${savedJobId}`} className="w-full">
+            <Button variant="default" className="w-full">
+              <Eye className="h-4 w-4 mr-2" />
+              View Details
+            </Button>
+          </Link>
+        ) : (
+          <Button variant="outline" className="w-full" disabled>
+            Saving...
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );

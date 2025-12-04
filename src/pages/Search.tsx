@@ -8,13 +8,13 @@ import { useJobs } from "@/hooks/useJobs";
 import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AISearchResult } from "@/components/AISearchResult";
-import { Search as SearchIcon, Filter, X, Sparkles, Loader2 } from "lucide-react";
+import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX } from "lucide-react";
 
 export default function Search() {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<string[]>([]);
   const { data: jobs, isLoading } = useJobs();
-  const { isSearching, isSaving, aiResults, searchStatus, searchWithAI, saveAIJob, clearAIResults, dismissJob } = useAIJobSearch();
+  const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, clearAIResults, dismissJob } = useAIJobSearch();
 
   const locations = useMemo(() => {
     if (!jobs) return [];
@@ -64,7 +64,7 @@ export default function Search() {
     }
   };
 
-  const showAISearch = query.length >= 3 && filteredJobs.length === 0 && aiResults.length === 0;
+  const showAISearch = query.length >= 3 && filteredJobs.length === 0 && aiResults.length === 0 && searchStatus !== "not_found";
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -128,11 +128,23 @@ export default function Search() {
                   <AISearchResult
                     key={`${job.exam_name}-${index}`}
                     job={job}
-                    onSave={() => saveAIJob(job)}
                     onDismiss={() => dismissJob(job)}
-                    isSaving={isSaving}
+                    savedJobId={getSavedJobId(job.exam_name)}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* AI Search "Not Found" Status */}
+            {searchStatus === "not_found" && (
+              <div className="text-center py-8 space-y-4">
+                <div className="mx-auto h-16 w-16 rounded-full bg-secondary flex items-center justify-center">
+                  <SearchX className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold">No exams found</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  No exams found for this search. Try another category or keyword.
+                </p>
               </div>
             )}
 
