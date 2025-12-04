@@ -14,6 +14,194 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_exam_discover_logs: {
+        Row: {
+          created_at: string
+          id: string
+          latency_ms: number | null
+          parse_ok: boolean | null
+          query: string
+          raw_ai_response: Json | null
+          url: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          latency_ms?: number | null
+          parse_ok?: boolean | null
+          query: string
+          raw_ai_response?: Json | null
+          url?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          latency_ms?: number | null
+          parse_ok?: boolean | null
+          query?: string
+          raw_ai_response?: Json | null
+          url?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ai_job_discover_logs: {
+        Row: {
+          created_at: string
+          id: string
+          job_created: boolean | null
+          latency_ms: number | null
+          parse_ok: boolean | null
+          query: string
+          raw_ai_response: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_created?: boolean | null
+          latency_ms?: number | null
+          parse_ok?: boolean | null
+          query: string
+          raw_ai_response?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_created?: boolean | null
+          latency_ms?: number | null
+          parse_ok?: boolean | null
+          query?: string
+          raw_ai_response?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          created_at: string
+          document_type: string
+          file_name: string | null
+          file_url: string
+          id: string
+          ocr_result: Json | null
+          ocr_status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_type: string
+          file_name?: string | null
+          file_url: string
+          id?: string
+          ocr_result?: Json | null
+          ocr_status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_type?: string
+          file_name?: string | null
+          file_url?: string
+          id?: string
+          ocr_result?: Json | null
+          ocr_status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      exam_attempts: {
+        Row: {
+          created_at: string
+          exam_id: string
+          id: string
+          notes: string | null
+          status: string | null
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          exam_id: string
+          id?: string
+          notes?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+          year?: number
+        }
+        Update: {
+          created_at?: string
+          exam_id?: string
+          id?: string
+          notes?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_attempts_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exams: {
+        Row: {
+          ai_cached_response: Json | null
+          ai_last_updated_at: string | null
+          ai_updated_by: string | null
+          category: string | null
+          conducting_body: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          official_website: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_cached_response?: Json | null
+          ai_last_updated_at?: string | null
+          ai_updated_by?: string | null
+          category?: string | null
+          conducting_body?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          official_website?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_cached_response?: Json | null
+          ai_last_updated_at?: string | null
+          ai_updated_by?: string | null
+          category?: string | null
+          conducting_body?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          official_website?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       jobs: {
         Row: {
           age_max: number | null
@@ -80,6 +268,75 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          aadhar_number: string | null
+          address: string | null
+          caste_certificate_number: string | null
+          caste_name: string | null
+          category: string | null
+          created_at: string
+          date_of_birth: string | null
+          email: string | null
+          father_name: string | null
+          full_name: string | null
+          gender: string | null
+          id: string
+          mother_name: string | null
+          pan_number: string | null
+          passport_number: string | null
+          phone: string | null
+          photo_url: string | null
+          signature_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aadhar_number?: string | null
+          address?: string | null
+          caste_certificate_number?: string | null
+          caste_name?: string | null
+          category?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
+          father_name?: string | null
+          full_name?: string | null
+          gender?: string | null
+          id?: string
+          mother_name?: string | null
+          pan_number?: string | null
+          passport_number?: string | null
+          phone?: string | null
+          photo_url?: string | null
+          signature_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aadhar_number?: string | null
+          address?: string | null
+          caste_certificate_number?: string | null
+          caste_name?: string | null
+          category?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
+          father_name?: string | null
+          full_name?: string | null
+          gender?: string | null
+          id?: string
+          mother_name?: string | null
+          pan_number?: string | null
+          passport_number?: string | null
+          phone?: string | null
+          photo_url?: string | null
+          signature_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       saved_jobs: {
         Row: {
           created_at: string
@@ -109,6 +366,42 @@ export type Database = {
           },
         ]
       }
+      update_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          source: string
+          target_id: string | null
+          target_table: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          source: string
+          target_id?: string | null
+          target_table?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          source?: string
+          target_id?: string | null
+          target_table?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -132,6 +425,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_user_rate_limit: {
+        Args: { _daily_limit: number; _user_id: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

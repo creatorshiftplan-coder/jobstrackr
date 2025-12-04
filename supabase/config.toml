@@ -1,1 +1,41 @@
 project_id = "fdxksytpdfgmbkttipdf"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[functions.ai-job-search]
+verify_jwt = false
+
+[functions.ocr-process]
+verify_jwt = true
+
+[functions.ai-assist]
+verify_jwt = true
+
+[functions.exams]
+verify_jwt = false
