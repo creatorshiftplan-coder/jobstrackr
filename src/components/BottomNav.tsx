@@ -1,10 +1,11 @@
-import { Home, Mail, Bookmark, LayoutGrid } from "lucide-react";
+import { Home, Search, Bookmark, GraduationCap, LayoutGrid } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
-  { icon: Mail, label: "Messages", path: "/search" },
+  { icon: Search, label: "Search", path: "/search" },
+  { icon: GraduationCap, label: "Tracker", path: "/tracker" },
   { icon: Bookmark, label: "Saved", path: "/saved" },
   { icon: LayoutGrid, label: "More", path: "/profile" },
 ];
