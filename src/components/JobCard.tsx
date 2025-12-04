@@ -1,9 +1,10 @@
 import { Job } from "@/types/job";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { MapPin, Calendar, IndianRupee, Users, Bookmark } from "lucide-react";
+import { MapPin, Calendar, IndianRupee, Users } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { Link } from "react-router-dom";
+import { SaveJobButton } from "./SaveJobButton";
 
 interface JobCardProps {
   job: Job;
@@ -49,15 +50,7 @@ export function JobCard({ job }: JobCardProps) {
               </h3>
               <p className="text-sm text-muted-foreground mt-1">{job.department}</p>
             </div>
-            <button 
-              className="p-2 rounded-full hover:bg-secondary transition-colors"
-              onClick={(e) => {
-                e.preventDefault();
-                // TODO: Save job functionality
-              }}
-            >
-              <Bookmark className="h-5 w-5 text-muted-foreground" />
-            </button>
+            <SaveJobButton jobId={job.id} />
           </div>
 
           <div className="grid grid-cols-2 gap-2 mt-4">
