@@ -20,14 +20,16 @@ export function AISearchResult({ job, onSave, onDismiss, isSaving }: AISearchRes
     return "Not specified";
   };
 
-  const formatFees = (fees: { general: number; obc: number; sc_st: number; female: number }) => {
+  const formatFees = (fees: { general: number; obc: number; sc_st: number; female: number } | null | undefined) => {
     if (!fees) return null;
     const parts: string[] = [];
-    if (fees.general > 0) parts.push(`Gen: ₹${fees.general}`);
-    if (fees.obc > 0 && fees.obc !== fees.general) parts.push(`OBC: ₹${fees.obc}`);
-    if (fees.sc_st === 0) parts.push(`SC/ST: Free`);
-    if (fees.female === 0) parts.push(`Female: Free`);
-    return parts.join(" | ");
+    if (fees.general != null && fees.general > 0) parts.push(`Gen: ₹${fees.general}`);
+    if (fees.obc != null && fees.obc > 0 && fees.obc !== fees.general) parts.push(`OBC: ₹${fees.obc}`);
+    if (fees.sc_st != null && fees.sc_st === 0) parts.push(`SC/ST: Free`);
+    else if (fees.sc_st != null && fees.sc_st > 0) parts.push(`SC/ST: ₹${fees.sc_st}`);
+    if (fees.female != null && fees.female === 0) parts.push(`Female: Free`);
+    else if (fees.female != null && fees.female > 0) parts.push(`Female: ₹${fees.female}`);
+    return parts.length > 0 ? parts.join(" | ") : "Check notification";
   };
 
   const confidenceColor = job.confidence >= 0.7 ? "bg-green-500" : job.confidence >= 0.5 ? "bg-yellow-500" : "bg-red-500";

@@ -81,10 +81,14 @@ export function useAIJobSearch() {
       }
 
       if (result.jobs && result.jobs.length > 0) {
-        setAiResults(result.jobs);
-        setSearchStatus("new");
-        toast.success(`Found ${result.jobs.length} job(s) via AI search!`);
-        return result.jobs[0];
+        // Filter out low-confidence results on frontend as extra safety
+        const validJobs = result.jobs.filter((j: AIJobResult) => (j.confidence || 0.5) >= 0.3);
+        if (validJobs.length > 0) {
+          setAiResults(validJobs);
+          setSearchStatus("new");
+          toast.success(`Found ${validJobs.length} job(s) via AI search!`);
+          return validJobs[0];
+        }
       }
 
       setSearchStatus("error");
