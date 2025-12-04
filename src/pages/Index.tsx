@@ -10,9 +10,9 @@ import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AISearchResult } from "@/components/AISearchResult";
-import { Briefcase, Sparkles, Loader2, X } from "lucide-react";
+import { Briefcase, Sparkles, Loader2, X, SearchX } from "lucide-react";
 
 const colorVariants = ["pink", "blue", "green", "orange"] as const;
 
@@ -21,7 +21,7 @@ const Index = () => {
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { data: jobs, isLoading, error } = useJobs();
-  const { isSearching, isSaving, aiResults, searchWithAI, saveAIJob, dismissJob, clearAIResults } = useAIJobSearch();
+  const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, dismissJob, clearAIResults } = useAIJobSearch();
 
   // Get unique locations for filter
   const locations = useMemo(() => {
@@ -149,16 +149,36 @@ const Index = () => {
                   <AISearchResult
                     key={`${job.exam_name}-${index}`}
                     job={job}
-                    onSave={() => saveAIJob(job)}
                     onDismiss={() => dismissJob(job)}
-                    isSaving={isSaving}
+                    savedJobId={getSavedJobId(job.exam_name)}
                   />
                 ))}
               </section>
             )}
 
+            {/* AI Search "Not Found" Status */}
+            {searchStatus === "not_found" && (
+              <div className="text-center py-8 px-5">
+                <div className="mx-auto h-16 w-16 rounded-full bg-secondary flex items-center justify-center mb-4">
+                  <SearchX className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-bold text-foreground mb-2">No exams found</h3>
+                <p className="text-sm text-muted-foreground">
+                  No exams found for this search. Try another category or keyword.
+                </p>
+              </div>
+            )}
+
+            {/* AI Searching State */}
+            {isSearching && (
+              <div className="text-center py-8 px-5">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
+                <p className="text-sm text-muted-foreground">Searching with AI...</p>
+              </div>
+            )}
+
             {/* No Results - Show AI Search Option */}
-            {showNoResults && aiResults.length === 0 && (
+            {showNoResults && aiResults.length === 0 && searchStatus !== "not_found" && !isSearching && (
               <div className="text-center py-12 px-5">
                 <div className="mx-auto h-16 w-16 rounded-full bg-secondary flex items-center justify-center mb-4">
                   <Briefcase className="h-8 w-8 text-muted-foreground" />
@@ -170,24 +190,15 @@ const Index = () => {
                 
                 {canSearchAI && (
                   <Button onClick={handleAISearch} disabled={isSearching}>
-                    {isSearching ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Searching...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Search with AI
-                      </>
-                    )}
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Search with AI
                   </Button>
                 )}
               </div>
             )}
 
             {/* Featured Jobs Section */}
-            {featuredJobs.length > 0 && (
+            {featuredJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
               <section className="mb-8">
                 <SectionHeader title="New Government Jobs" />
                 <div className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide">
@@ -199,7 +210,7 @@ const Index = () => {
             )}
 
             {/* Recommended Jobs Section */}
-            {recommendedJobs.length > 0 && (
+            {recommendedJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
               <section>
                 <SectionHeader title="Recommended Jobs" />
                 <div className="grid grid-cols-2 gap-4 px-5">
@@ -215,7 +226,7 @@ const Index = () => {
             )}
 
             {/* Show all jobs if no featured/recommended split */}
-            {featuredJobs.length === 0 && recommendedJobs.length === 0 && filteredJobs.length > 0 && (
+            {featuredJobs.length === 0 && recommendedJobs.length === 0 && filteredJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
               <section>
                 <SectionHeader title="All Jobs" />
                 <div className="grid grid-cols-2 gap-4 px-5">

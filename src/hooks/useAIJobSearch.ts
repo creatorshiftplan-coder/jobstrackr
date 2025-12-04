@@ -34,12 +34,47 @@ export function useAIJobSearch() {
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [aiResults, setAiResults] = useState<AIJobResult[]>([]);
-  const [searchStatus, setSearchStatus] = useState<"new" | "exists" | "similar" | "error" | null>(null);
+  const [searchStatus, setSearchStatus] = useState<"new" | "exists" | "similar" | "error" | "not_found" | null>(null);
+  const [autoSavedJobIds, setAutoSavedJobIds] = useState<Map<string, string>>(new Map());
+
+  // Auto-save job silently (no toast)
+  const autoSaveJobSilently = async (job: AIJobResult): Promise<{ id: string } | null> => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-job-search`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            saveJob: true,
+            jobData: job,
+            userId: user?.id,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.error) {
+        console.error("Auto-save error:", result.error);
+        return null;
+      }
+
+      return result.job;
+    } catch (error) {
+      console.error("Auto-save error:", error);
+      return null;
+    }
+  };
 
   const searchWithAI = async (query: string) => {
     setIsSearching(true);
     setAiResults([]);
     setSearchStatus(null);
+    setAutoSavedJobIds(new Map());
 
     try {
       const response = await fetch(
@@ -74,24 +109,39 @@ export function useAIJobSearch() {
       if (result.status === "similar" && result.existingJob) {
         toast.info("A similar job was found");
         setSearchStatus("similar");
-        if (result.jobs && result.jobs.length > 0) {
-          setAiResults(result.jobs);
-        }
         return result.existingJob;
       }
 
       if (result.jobs && result.jobs.length > 0) {
-        // Filter out low-confidence results on frontend as extra safety
-        const validJobs = result.jobs.filter((j: AIJobResult) => (j.confidence || 0.5) >= 0.3);
+        // Filter only high-confidence results (>= 70%)
+        const validJobs = result.jobs.filter((j: AIJobResult) => (j.confidence || 0) >= 0.7);
+        
         if (validJobs.length > 0) {
+          // Auto-save all high confidence jobs
+          const savedIds = new Map<string, string>();
+          
+          for (const job of validJobs) {
+            const savedJob = await autoSaveJobSilently(job);
+            if (savedJob?.id) {
+              savedIds.set(job.exam_name, savedJob.id);
+            }
+          }
+          
+          setAutoSavedJobIds(savedIds);
           setAiResults(validJobs);
           setSearchStatus("new");
-          toast.success(`Found ${validJobs.length} job(s) via AI search!`);
+          queryClient.invalidateQueries({ queryKey: ["jobs"] });
+          toast.success(`Found ${validJobs.length} exam(s)! Auto-saved to database.`);
           return validJobs[0];
+        } else {
+          // No high confidence results - show "not found" message
+          setSearchStatus("not_found");
+          return null;
         }
       }
 
-      setSearchStatus("error");
+      // No results at all
+      setSearchStatus("not_found");
       return null;
     } catch (error) {
       console.error("AI search error:", error);
@@ -103,58 +153,14 @@ export function useAIJobSearch() {
     }
   };
 
-  const saveAIJob = async (jobToSave?: AIJobResult) => {
-    const job = jobToSave || aiResults[0];
-    if (!job) return null;
-
-    setIsSaving(true);
-
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-job-search`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({
-            saveJob: true,
-            jobData: job,
-            userId: user?.id,
-          }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (result.error) {
-        toast.error(result.error);
-        return null;
-      }
-
-      toast.success("Job saved to database!");
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      
-      // Remove saved job from results
-      setAiResults(prev => prev.filter(j => j.exam_name !== job.exam_name));
-      if (aiResults.length <= 1) {
-        setSearchStatus(null);
-      }
-      
-      return result.job;
-    } catch (error) {
-      console.error("Save job error:", error);
-      toast.error("Failed to save job");
-      return null;
-    } finally {
-      setIsSaving(false);
-    }
+  const getSavedJobId = (examName: string): string | undefined => {
+    return autoSavedJobIds.get(examName);
   };
 
   const clearAIResults = () => {
     setAiResults([]);
     setSearchStatus(null);
+    setAutoSavedJobIds(new Map());
   };
 
   const dismissJob = (job: AIJobResult) => {
@@ -169,8 +175,9 @@ export function useAIJobSearch() {
     isSaving,
     aiResults,
     searchStatus,
+    autoSavedJobIds,
     searchWithAI,
-    saveAIJob,
+    getSavedJobId,
     clearAIResults,
     dismissJob,
   };
