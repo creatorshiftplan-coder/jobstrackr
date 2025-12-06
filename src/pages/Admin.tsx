@@ -290,10 +290,10 @@ export default function Admin() {
   const [vacanciesFilter, setVacanciesFilter] = useState<string>("all");
   
   // Sorting for jobs
-  const [sortField, setSortField] = useState<"last_date" | "vacancies" | null>(null);
+  const [sortField, setSortField] = useState<"last_date" | "vacancies" | "title" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  const handleSort = (field: "last_date" | "vacancies") => {
+  const handleSort = (field: "last_date" | "vacancies" | "title") => {
     if (sortField === field) {
       if (sortDirection === "asc") {
         setSortDirection("desc");
@@ -308,7 +308,7 @@ export default function Admin() {
     }
   };
 
-  const getSortIcon = (field: "last_date" | "vacancies") => {
+  const getSortIcon = (field: "last_date" | "vacancies" | "title") => {
     if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1" />;
     if (sortDirection === "asc") return <ArrowUp className="h-4 w-4 ml-1" />;
     return <ArrowDown className="h-4 w-4 ml-1" />;
@@ -356,6 +356,12 @@ export default function Admin() {
       const vacA = a.vacancies || 1;
       const vacB = b.vacancies || 1;
       return sortDirection === "asc" ? vacA - vacB : vacB - vacA;
+    }
+    
+    if (sortField === "title") {
+      return sortDirection === "asc" 
+        ? a.title.localeCompare(b.title) 
+        : b.title.localeCompare(a.title);
     }
     
     return 0;
@@ -678,7 +684,15 @@ export default function Admin() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Title</TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50 select-none"
+                            onClick={() => handleSort("title")}
+                          >
+                            <div className="flex items-center">
+                              Title
+                              {getSortIcon("title")}
+                            </div>
+                          </TableHead>
                           <TableHead>Department</TableHead>
                           <TableHead 
                             className="cursor-pointer hover:bg-muted/50 select-none"
