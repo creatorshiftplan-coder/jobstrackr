@@ -38,9 +38,21 @@ const FIELD_LABELS: Record<string, string> = {
   institute_name: "Institute Name",
   board_university: "Board/University",
   qualification_name: "Qualification",
+  qualification_type: "Qualification Type",
   date_of_passing: "Date of Passing",
   percentage: "Percentage",
   cgpa: "CGPA",
+  marks_obtained: "Marks Obtained",
+  maximum_marks: "Maximum Marks",
+  marital_status: "Marital Status",
+  pincode: "PIN Code",
+  ews_certificate_number: "EWS Certificate Number",
+  ews_issuing_authority: "EWS Issuing Authority",
+  sub_category: "Sub-Category",
+  disability_type: "Disability Type",
+  disability_certificate_number: "Disability Certificate Number",
+  disability_percentage: "Disability Percentage",
+  current_status: "Current Status",
 };
 
 export function OCRResultModal({ isOpen, onClose, extractedData, onConfirm }: OCRResultModalProps) {

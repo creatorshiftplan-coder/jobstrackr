@@ -130,12 +130,33 @@ Return ONLY JSON: { "full_name": "", "date_of_birth": "", "gender": "", "aadhar_
 Return ONLY JSON: { "full_name": "", "father_name": "", "date_of_birth": "", "pan_number": "" }`,
       passport: `Extract from this passport: Full Name, Date of Birth (YYYY-MM-DD), Gender, Passport Number, Father's Name, Mother's Name.
 Return ONLY JSON: { "full_name": "", "date_of_birth": "", "gender": "", "passport_number": "", "father_name": "", "mother_name": "" }`,
+      class_10_certificate: `Extract from this Class 10 certificate: Full Name, Father's Name, Mother's Name, Date of Birth (YYYY-MM-DD), Roll Number, School/Institute Name, Board Name, Year of Passing.
+Return ONLY JSON: { "full_name": "", "father_name": "", "mother_name": "", "date_of_birth": "", "roll_number": "", "institute_name": "", "board_university": "", "qualification_type": "10th", "date_of_passing": "" }`,
+      class_10_marksheet: `Extract from this Class 10 marksheet: Full Name, Father's Name, Mother's Name, Date of Birth, Roll Number, School Name, Board Name, Marks Obtained, Maximum Marks, Percentage, Year of Passing.
+Return ONLY JSON: { "full_name": "", "father_name": "", "mother_name": "", "date_of_birth": "", "roll_number": "", "institute_name": "", "board_university": "", "qualification_type": "10th", "marks_obtained": null, "maximum_marks": null, "percentage": null, "date_of_passing": "" }`,
+      class_12_certificate: `Extract from this Class 12 certificate: Full Name, Father's Name, Mother's Name, Roll Number, School/Institute Name, Board Name, Stream/Subject, Year of Passing.
+Return ONLY JSON: { "full_name": "", "father_name": "", "mother_name": "", "roll_number": "", "institute_name": "", "board_university": "", "qualification_type": "12th", "qualification_name": "", "date_of_passing": "" }`,
+      class_12_marksheet: `Extract from this Class 12 marksheet: Full Name, Father's Name, Roll Number, School Name, Board Name, Stream, Marks Obtained, Maximum Marks, Percentage, Year of Passing.
+Return ONLY JSON: { "full_name": "", "father_name": "", "roll_number": "", "institute_name": "", "board_university": "", "qualification_type": "12th", "qualification_name": "", "marks_obtained": null, "maximum_marks": null, "percentage": null, "date_of_passing": "" }`,
+      graduation_degree: `Extract from this graduation degree: Full Name, Father's Name, Degree Name, University Name, College Name, Year of Passing.
+Return ONLY JSON: { "full_name": "", "father_name": "", "qualification_type": "graduation", "qualification_name": "", "board_university": "", "institute_name": "", "date_of_passing": "" }`,
+      graduation_marksheet: `Extract from this graduation marksheet: Full Name, Roll Number, Degree Name, University Name, Semester/Year, Marks Obtained, Maximum Marks, Percentage/CGPA.
+Return ONLY JSON: { "full_name": "", "roll_number": "", "qualification_type": "graduation", "qualification_name": "", "board_university": "", "marks_obtained": null, "maximum_marks": null, "percentage": null, "cgpa": null, "date_of_passing": "" }`,
+      post_graduation_degree: `Extract from this post graduation degree: Full Name, Degree Name (e.g., M.Tech, MBA), University Name, College Name, Year of Passing.
+Return ONLY JSON: { "full_name": "", "qualification_type": "post_graduation", "qualification_name": "", "board_university": "", "institute_name": "", "date_of_passing": "" }`,
+      post_graduation_marksheet: `Extract from this post graduation marksheet: Full Name, Roll Number, Degree Name, University Name, Marks Obtained, Maximum Marks, Percentage/CGPA, Year.
+Return ONLY JSON: { "full_name": "", "roll_number": "", "qualification_type": "post_graduation", "qualification_name": "", "board_university": "", "marks_obtained": null, "maximum_marks": null, "percentage": null, "cgpa": null, "date_of_passing": "" }`,
       marksheet: `Extract from this marksheet: Full Name, Father's Name, Mother's Name, Date of Birth, Roll Number, Institute, Board/University, Qualification, Passing Date, Percentage/CGPA.
 Return ONLY JSON: { "full_name": "", "father_name": "", "mother_name": "", "date_of_birth": "", "roll_number": "", "institute_name": "", "board_university": "", "qualification_name": "", "date_of_passing": "", "percentage": null, "cgpa": null }`,
       caste_certificate: `Extract from this Caste Certificate: Full Name, Father's Name, Category (SC/ST/OBC/EWS), Caste Name, Certificate Number, Issuing Authority, Issue Date, Address.
 Return ONLY JSON: { "full_name": "", "father_name": "", "category": "", "caste_name": "", "caste_certificate_number": "", "caste_issuing_authority": "", "caste_issue_date": "", "address": "" }`,
+      ews_certificate: `Extract from this EWS Certificate: Full Name, Father's Name, Certificate Number, Issuing Authority, Issue Date, Valid Until.
+Return ONLY JSON: { "full_name": "", "father_name": "", "category": "EWS", "ews_certificate_number": "", "ews_issuing_authority": "", "ews_issue_date": "" }`,
+      disability_certificate: `Extract from this Disability Certificate: Full Name, Father's Name, Disability Type, Disability Percentage, Certificate Number, Issuing Authority, Issue Date.
+Return ONLY JSON: { "full_name": "", "father_name": "", "disability_type": "", "disability_percentage": null, "disability_certificate_number": "", "sub_category": "PwBD" }`,
       photo: `Return ONLY JSON: { "photo_uploaded": true }`,
       signature: `Return ONLY JSON: { "signature_uploaded": true }`,
+      thumb_impression: `Return ONLY JSON: { "thumb_impression_uploaded": true }`,
     };
 
     const prompt = extractionPrompts[document_type] || `Extract all personal information from this document. Return ONLY JSON with fields like: full_name, date_of_birth, gender, address, etc.`;

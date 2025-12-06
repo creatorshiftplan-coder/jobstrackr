@@ -24,6 +24,18 @@ export interface Profile {
   signature_url: string | null;
   created_at: string;
   updated_at: string;
+  // New fields
+  marital_status: string | null;
+  pincode: string | null;
+  ews_certificate_number: string | null;
+  ews_issuing_authority: string | null;
+  sub_category: string | null;
+  disability_type: string | null;
+  disability_certificate_number: string | null;
+  caste_issuing_authority: string | null;
+  caste_issue_date: string | null;
+  current_status: string | null;
+  left_thumb_url: string | null;
 }
 
 export function useProfile() {
