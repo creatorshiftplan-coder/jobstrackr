@@ -5,8 +5,8 @@ import { ExamCard } from "@/components/ExamCard";
 import { AddExamModal } from "@/components/AddExamModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Plus } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { GraduationCap, Plus, Bookmark } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function ExamTracker() {
   const { user, loading: authLoading } = useAuth();
@@ -32,10 +32,17 @@ export default function ExamTracker() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-4">
-          <h1 className="font-display font-bold text-xl text-foreground flex items-center gap-2">
-            <GraduationCap className="h-5 w-5" />
-            Exam Tracker
-          </h1>
+          <div className="flex items-center justify-between">
+            <h1 className="font-display font-bold text-xl text-foreground flex items-center gap-2">
+              <GraduationCap className="h-5 w-5" />
+              Exam Tracker
+            </h1>
+            <Link to="/saved">
+              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
+                <Bookmark className="h-5 w-5 text-foreground" />
+              </div>
+            </Link>
+          </div>
         </header>
         <main className="px-4 py-8">
           <div className="text-center space-y-4">
@@ -60,14 +67,21 @@ export default function ExamTracker() {
             <GraduationCap className="h-5 w-5" />
             Exam Tracker
           </h1>
-          <AddExamModal
-            trigger={
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
-            }
-          />
+          <div className="flex items-center gap-2">
+            <Link to="/saved">
+              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
+                <Bookmark className="h-5 w-5 text-foreground" />
+              </div>
+            </Link>
+            <AddExamModal
+              trigger={
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              }
+            />
+          </div>
         </div>
       </header>
 

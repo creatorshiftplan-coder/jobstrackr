@@ -11,7 +11,8 @@ import { AISearchResult } from "@/components/AISearchResult";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX, MapPin, Building } from "lucide-react";
+import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark } from "lucide-react";
+import { Link } from "react-router-dom";
 import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
 
 export default function Search() {
@@ -91,7 +92,14 @@ export default function Search() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-4">
-        <h1 className="font-display font-bold text-xl text-foreground mb-4">Search Jobs</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="font-display font-bold text-xl text-foreground">Search Jobs</h1>
+          <Link to="/saved">
+            <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
+              <Bookmark className="h-5 w-5 text-foreground" />
+            </div>
+          </Link>
+        </div>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
