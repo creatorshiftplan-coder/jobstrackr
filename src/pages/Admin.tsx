@@ -107,7 +107,8 @@ const JSON_FORMAT_EXAMPLE = `{
       "job_type": "Government",
       "description": "Combined Graduate Level examination",
       "requirements": "Bachelor's Degree",
-      "highlights": "10000+ Vacancies"
+      "highlights": "10000+ Vacancies",
+      "apply_link": "https://ssc.nic.in"
     }
   ]
 }`;
