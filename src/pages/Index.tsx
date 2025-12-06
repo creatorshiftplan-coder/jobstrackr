@@ -62,12 +62,14 @@ const Index = () => {
     return result;
   }, [jobs, searchQuery, selectedLocations, selectedSectors]);
 
-  const featuredJobs = useMemo(() => {
-    return filteredJobs.filter(job => job.is_featured).slice(0, 5);
+  // Show the 5 most recently uploaded jobs (already sorted by created_at DESC from useJobs)
+  const newJobs = useMemo(() => {
+    return filteredJobs.slice(0, 5);
   }, [filteredJobs]);
 
+  // Show next 4 jobs for recommended section (avoid overlap with newJobs)
   const recommendedJobs = useMemo(() => {
-    return filteredJobs.filter(job => !job.is_featured).slice(0, 4);
+    return filteredJobs.slice(5, 9);
   }, [filteredJobs]);
 
   const toggleLocation = (location: string) => {
@@ -267,12 +269,12 @@ const Index = () => {
               </div>
             )}
 
-            {/* Featured Jobs Section */}
-            {featuredJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
+            {/* New Government Jobs Section - Latest uploaded jobs */}
+            {newJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
               <section className="mb-8">
                 <SectionHeader title="New Government Jobs" />
                 <div className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide">
-                  {featuredJobs.map((job) => (
+                  {newJobs.map((job) => (
                     <FeaturedJobCard key={job.id} job={job} />
                   ))}
                 </div>
@@ -296,7 +298,7 @@ const Index = () => {
             )}
 
             {/* Show all jobs if no featured/recommended split */}
-            {featuredJobs.length === 0 && recommendedJobs.length === 0 && filteredJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
+            {newJobs.length === 0 && recommendedJobs.length === 0 && filteredJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
               <section>
                 <SectionHeader title="All Jobs" />
                 <div className="grid grid-cols-2 gap-4 px-5">
