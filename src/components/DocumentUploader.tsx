@@ -7,6 +7,7 @@ import { Upload, FileText, Loader2, Trash2, Scan, CheckCircle, XCircle } from "l
 import { Badge } from "@/components/ui/badge";
 
 const DOCUMENT_TYPES = [
+  { value: "job_application", label: "Job Application Form (PDF)" },
   { value: "aadhar", label: "Aadhaar Card" },
   { value: "pan", label: "PAN Card" },
   { value: "passport", label: "Passport" },
