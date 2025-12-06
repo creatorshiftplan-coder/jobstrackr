@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { WelcomeHeader } from "@/components/WelcomeHeader";
 import { SearchWithFilter } from "@/components/SearchWithFilter";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -7,6 +8,7 @@ import { RecommendedJobCard } from "@/components/RecommendedJobCard";
 import { BottomNav } from "@/components/BottomNav";
 import { useJobs } from "@/hooks/useJobs";
 import { useAIJobSearch } from "@/hooks/useAIJobSearch";
+import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +22,14 @@ import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
 const colorVariants = ["pink", "blue", "green", "orange"] as const;
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/welcome", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
