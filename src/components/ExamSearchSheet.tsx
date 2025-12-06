@@ -4,8 +4,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Sparkles, BookOpen, Loader2, Plus } from "lucide-react";
+import { Search, Sparkles, BookOpen, Loader2, Plus, Briefcase } from "lucide-react";
 import { useExams } from "@/hooks/useExams";
+import { useJobs } from "@/hooks/useJobs";
 import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -18,10 +19,13 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [isAddingAIResult, setIsAddingAIResult] = useState(false);
+  const [isAddingJob, setIsAddingJob] = useState(false);
   
   const { exams, addExamAttempt } = useExams();
+  const { data: jobs = [] } = useJobs();
   const { isSearching, aiResults, searchWithAI, clearAIResults } = useAIJobSearch();
 
   const currentYear = new Date().getFullYear();
@@ -35,6 +39,28 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
       )
     : [];
 
+  // Filter jobs based on search query
+  const filteredJobs = searchQuery.trim()
+    ? jobs.filter(job =>
+        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.department?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
+
+  const hasResults = filteredExams.length > 0 || filteredJobs.length > 0;
+
+  const handleSelectExam = (examId: string) => {
+    setSelectedExamId(examId);
+    setSelectedJobId(null);
+  };
+
+  const handleSelectJob = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setSelectedExamId(null);
+  };
+
   const handleAddExam = async () => {
     if (!selectedExamId) {
       toast.error("Please select an exam first");
@@ -42,7 +68,6 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
     }
 
     try {
-      // Just add to tracker - exam already exists
       await addExamAttempt.mutateAsync({
         examId: selectedExamId,
         year: parseInt(selectedYear),
@@ -53,6 +78,58 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
       resetState();
     } catch (error) {
       toast.error("Failed to add exam");
+    }
+  };
+
+  const handleAddJob = async () => {
+    if (!selectedJobId) {
+      toast.error("Please select a job first");
+      return;
+    }
+
+    setIsAddingJob(true);
+    try {
+      const selectedJob = jobs.find(j => j.id === selectedJobId);
+      if (!selectedJob) throw new Error("Job not found");
+
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `https://fdxksytpdfgmbkttipdf.supabase.co/functions/v1/ai-job-search`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            createExam: true,
+            examData: {
+              name: selectedJob.title,
+              conducting_body: selectedJob.department,
+              category: "Government",
+              description: selectedJob.description,
+              official_website: selectedJob.apply_link,
+            },
+            year: parseInt(selectedYear),
+          }),
+        }
+      );
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      toast.success("Job added to tracker!");
+      setOpen(false);
+      resetState();
+    } catch (error) {
+      console.error("Add job error:", error);
+      toast.error("Failed to add job");
+    } finally {
+      setIsAddingJob(false);
     }
   };
 
@@ -67,7 +144,6 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   const handleAddAIResult = async (result: any) => {
     setIsAddingAIResult(true);
     try {
-      // Call edge function to create exam server-side (bypasses RLS)
       const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch(
@@ -112,8 +188,11 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   const resetState = () => {
     setSearchQuery("");
     setSelectedExamId(null);
+    setSelectedJobId(null);
     clearAIResults();
   };
+
+  const isSelected = selectedExamId || selectedJobId;
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => {
@@ -149,7 +228,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
-            placeholder="Search by exam name..."
+            placeholder="Search exams or jobs..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 h-12 rounded-xl bg-muted/50 border-0"
@@ -157,14 +236,15 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
         </div>
 
         {/* Search Results */}
-        <div className="flex-1 overflow-y-auto max-h-[40vh] space-y-2 mb-4">
-          {/* Database Results - Now showing exams directly */}
+        <div className="flex-1 overflow-y-auto max-h-[40vh] space-y-4 mb-4">
+          {/* Exams Section */}
           {searchQuery && filteredExams.length > 0 && (
-            <>
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground px-1 uppercase tracking-wide">From Exams</p>
               {filteredExams.map((exam) => (
                 <button
                   key={exam.id}
-                  onClick={() => setSelectedExamId(exam.id)}
+                  onClick={() => handleSelectExam(exam.id)}
                   className={`w-full p-4 rounded-xl text-left transition-colors ${
                     selectedExamId === exam.id 
                       ? "bg-blue-100 border-2 border-blue-500" 
@@ -182,17 +262,51 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
                   </div>
                 </button>
               ))}
-            </>
-          )}
-
-          {/* No results message */}
-          {searchQuery && filteredExams.length === 0 && !isSearching && aiResults.length === 0 && (
-            <div className="text-center py-6">
-              <p className="text-muted-foreground">No exams found in database</p>
             </div>
           )}
 
-          {/* AI Search Button - Always visible when there's a search query */}
+          {/* Jobs Section */}
+          {searchQuery && filteredJobs.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground px-1 uppercase tracking-wide">From Job Listings ({filteredJobs.length})</p>
+              {filteredJobs.slice(0, 10).map((job) => (
+                <button
+                  key={job.id}
+                  onClick={() => handleSelectJob(job.id)}
+                  className={`w-full p-4 rounded-xl text-left transition-colors ${
+                    selectedJobId === job.id 
+                      ? "bg-green-100 border-2 border-green-500" 
+                      : "bg-muted/30 hover:bg-muted/50"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <Briefcase className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-foreground truncate">{job.title}</h3>
+                      <p className="text-sm text-muted-foreground truncate">{job.department}</p>
+                      <p className="text-xs text-muted-foreground">{job.location}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+              {filteredJobs.length > 10 && (
+                <p className="text-xs text-center text-muted-foreground py-2">
+                  +{filteredJobs.length - 10} more results
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* No results message */}
+          {searchQuery && !hasResults && !isSearching && aiResults.length === 0 && (
+            <div className="text-center py-6">
+              <p className="text-muted-foreground">No exams or jobs found</p>
+            </div>
+          )}
+
+          {/* AI Search Button */}
           {searchQuery && !isSearching && aiResults.length === 0 && (
             <div className="flex justify-center py-4 border-t border-dashed">
               <Button 
@@ -217,7 +331,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
           {/* AI Results */}
           {aiResults.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground px-1">AI Discovered Exams</p>
+              <p className="text-xs font-medium text-muted-foreground px-1 uppercase tracking-wide">AI Discovered</p>
               {aiResults.map((result, index) => (
                 <button
                   key={index}
@@ -246,7 +360,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
         </div>
 
         {/* Year Selector and Add Button */}
-        {selectedExamId && (
+        {isSelected && (
           <div className="border-t pt-4 space-y-4">
             <div className="flex items-center gap-4">
               <span className="text-sm font-medium text-muted-foreground">Select Year:</span>
@@ -264,11 +378,11 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
               </Select>
             </div>
             <Button 
-              onClick={handleAddExam}
+              onClick={selectedExamId ? handleAddExam : handleAddJob}
               className="w-full h-12 bg-blue-600 hover:bg-blue-700"
-              disabled={addExamAttempt.isPending}
+              disabled={addExamAttempt.isPending || isAddingJob}
             >
-              {addExamAttempt.isPending ? (
+              {(addExamAttempt.isPending || isAddingJob) ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 "Add to Tracker"
