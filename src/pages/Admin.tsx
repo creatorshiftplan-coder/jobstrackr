@@ -65,6 +65,43 @@ interface BulkUploadJob extends JobFormData {
   duplicateOf?: string;
 }
 
+// Helper to check if a value is a TBD-like string
+const isTBDValue = (value: string | number | null | undefined): boolean => {
+  if (typeof value !== 'string') return false;
+  const tbdPatterns = ['tbd', 'to be announced', 'walk in', 'walk-in', 'walkin', 'n/a', 'na', 'not available', 'not applicable', '-', 'nil', 'various', 'multiple', 'as per rules'];
+  const lowerValue = value.toLowerCase().trim();
+  return tbdPatterns.some(pattern => lowerValue === pattern || lowerValue.includes(pattern));
+};
+
+// Helper to parse vacancies - returns null for TBD-like values
+const parseVacancies = (value: string | number | null | undefined): number | null => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return value;
+  if (isTBDValue(value)) return null;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? null : parsed;
+};
+
+// Helper to parse date - returns a far future date for TBD-like values so the job remains active
+const parseDateValue = (value: string | null | undefined): string => {
+  if (!value) return new Date().toISOString().split('T')[0]; // Default to today if empty
+  if (isTBDValue(value)) {
+    // Return a date 1 year from now for TBD dates to keep job active
+    const futureDate = new Date();
+    futureDate.setFullYear(futureDate.getFullYear() + 1);
+    return futureDate.toISOString().split('T')[0];
+  }
+  // Check if it's a valid date format
+  const date = new Date(value);
+  if (isNaN(date.getTime())) {
+    // Invalid date, return 1 year from now
+    const futureDate = new Date();
+    futureDate.setFullYear(futureDate.getFullYear() + 1);
+    return futureDate.toISOString().split('T')[0];
+  }
+  return value;
+};
+
 interface BulkUploadInput {
   exam_name: string;
   agency: string;
@@ -74,7 +111,7 @@ interface BulkUploadInput {
   last_date: string;
   exam_date?: string | null;
   age_limit?: string | null;
-  vacancies?: number;
+  vacancies?: number | string;
   eligibility?: string;
   application_fees?: {
     general?: number;
@@ -153,8 +190,8 @@ const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
     age_min,
     age_max,
     application_fee: applicationFee,
-    vacancies: input.vacancies ?? null,
-    last_date: input.last_date,
+    vacancies: parseVacancies(input.vacancies),
+    last_date: parseDateValue(input.last_date),
     is_featured: false,
     description: fullDescription.trim(),
     apply_link: input.apply_link || "",
