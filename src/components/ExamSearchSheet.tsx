@@ -139,31 +139,43 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
 
         {/* Search Results */}
         <div className="flex-1 overflow-y-auto max-h-[40vh] space-y-2 mb-4">
-          {searchQuery && filteredJobs.length > 0 ? (
-            filteredJobs.map((job) => (
-              <button
-                key={job.id}
-                onClick={() => setSelectedJobId(job.id)}
-                className={`w-full p-4 rounded-xl text-left transition-colors ${
-                  selectedJobId === job.id 
-                    ? "bg-blue-100 border-2 border-blue-500" 
-                    : "bg-muted/30 hover:bg-muted/50"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <BookOpen className="h-5 w-5 text-blue-600" />
+          {/* Database Results */}
+          {searchQuery && filteredJobs.length > 0 && (
+            <>
+              {filteredJobs.map((job) => (
+                <button
+                  key={job.id}
+                  onClick={() => setSelectedJobId(job.id)}
+                  className={`w-full p-4 rounded-xl text-left transition-colors ${
+                    selectedJobId === job.id 
+                      ? "bg-blue-100 border-2 border-blue-500" 
+                      : "bg-muted/30 hover:bg-muted/50"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <BookOpen className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-foreground">{job.title}</h3>
+                      <p className="text-sm text-muted-foreground">{job.department}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-medium text-foreground">{job.title}</h3>
-                    <p className="text-sm text-muted-foreground">{job.department}</p>
-                  </div>
-                </div>
-              </button>
-            ))
-          ) : searchQuery && filteredJobs.length === 0 && !isSearching && aiResults.length === 0 ? (
-            <div className="text-center py-8 space-y-4">
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* No results message */}
+          {searchQuery && filteredJobs.length === 0 && !isSearching && aiResults.length === 0 && (
+            <div className="text-center py-6">
               <p className="text-muted-foreground">No exams found in database</p>
+            </div>
+          )}
+
+          {/* AI Search Button - Always visible when there's a search query */}
+          {searchQuery && !isSearching && aiResults.length === 0 && (
+            <div className="flex justify-center py-4 border-t border-dashed">
               <Button 
                 onClick={handleAISearch}
                 variant="outline"
@@ -173,7 +185,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
                 Search with AI
               </Button>
             </div>
-          ) : null}
+          )}
 
           {/* AI Search Loading */}
           {isSearching && (
