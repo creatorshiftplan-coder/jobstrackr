@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import welcomeIllustration from "@/assets/welcome-illustration.png";
 
 const Welcome = () => {
   const navigate = useNavigate();
@@ -47,7 +46,7 @@ const Welcome = () => {
         {/* Illustration */}
         <div className="w-full max-w-sm mb-12">
           <img
-            src={welcomeIllustration}
+            src="/welcome-illustration.png"
             alt="Government job discovery illustration"
             className="w-full h-auto object-contain"
           />
