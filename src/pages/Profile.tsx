@@ -6,12 +6,14 @@ import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { DocumentUploader } from "@/components/DocumentUploader";
 import { OCRResultModal } from "@/components/OCRResultModal";
 
 export default function Profile() {
   const { user, loading, signOut } = useAuth();
   const { profile, upsertProfile } = useProfile();
+  const { isAdmin } = useAdminRole();
   const navigate = useNavigate();
   const [ocrModalOpen, setOcrModalOpen] = useState(false);
   const [ocrData, setOcrData] = useState<Record<string, any>>({});
@@ -89,7 +91,7 @@ export default function Profile() {
               { icon: Bell, label: "Notifications", path: "/notifications" },
               { icon: Settings, label: "Settings", path: "/settings" },
               { icon: HelpCircle, label: "Help & Support", path: "/help" },
-              ...(user ? [{ icon: Shield, label: "Admin Panel", path: "/admin" }] : []),
+              ...(user && isAdmin ? [{ icon: Shield, label: "Admin Panel", path: "/admin" }] : []),
             ].map(({ icon: Icon, label, path }) => (
               <Link
                 key={path}
