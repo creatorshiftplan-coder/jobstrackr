@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Sparkles, BookOpen, Loader2, Plus } from "lucide-react";
-import { useJobs } from "@/hooks/useJobs";
 import { useExams } from "@/hooks/useExams";
 import { useAIJobSearch } from "@/hooks/useAIJobSearch";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface ExamSearchSheetProps {
@@ -17,49 +17,34 @@ interface ExamSearchSheetProps {
 export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [isAddingAIResult, setIsAddingAIResult] = useState(false);
   
-  const { data: jobs = [] } = useJobs();
-  const { addExamAttempt, createExam } = useExams();
+  const { exams, addExamAttempt } = useExams();
   const { isSearching, aiResults, searchWithAI, clearAIResults } = useAIJobSearch();
 
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear + 1];
 
-  // Filter jobs based on search query
-  const filteredJobs = searchQuery.trim() 
-    ? jobs.filter(job => 
-        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.department.toLowerCase().includes(searchQuery.toLowerCase())
+  // Filter exams based on search query
+  const filteredExams = searchQuery.trim() 
+    ? exams.filter(exam => 
+        exam.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (exam.conducting_body?.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : [];
 
-  const handleAddJob = async () => {
-    if (!selectedJobId) {
+  const handleAddExam = async () => {
+    if (!selectedExamId) {
       toast.error("Please select an exam first");
       return;
     }
 
-    const selectedJob = jobs.find(j => j.id === selectedJobId);
-    if (!selectedJob) {
-      toast.error("Job not found");
-      return;
-    }
-
     try {
-      // Create an exam entry from the job
-      const newExam = await createExam.mutateAsync({
-        name: selectedJob.title,
-        conducting_body: selectedJob.department,
-        category: "Government",
-        description: selectedJob.description,
-        official_website: selectedJob.apply_link,
-      });
-
-      // Then add to tracker
+      // Just add to tracker - exam already exists
       await addExamAttempt.mutateAsync({
-        examId: newExam.id,
+        examId: selectedExamId,
         year: parseInt(selectedYear),
       });
 
@@ -80,33 +65,53 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   };
 
   const handleAddAIResult = async (result: any) => {
+    setIsAddingAIResult(true);
     try {
-      // Create the exam first
-      const newExam = await createExam.mutateAsync({
-        name: result.exam_name,
-        conducting_body: result.agency,
-        category: result.category || "Government",
-        description: result.description,
-        official_website: result.apply_link,
-      });
+      // Call edge function to create exam server-side (bypasses RLS)
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `https://fdxksytpdfgmbkttipdf.supabase.co/functions/v1/ai-job-search`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            createExam: true,
+            examData: {
+              name: result.exam_name,
+              conducting_body: result.agency,
+              category: result.category || "Government",
+              description: result.description,
+              official_website: result.apply_link,
+            },
+            year: parseInt(selectedYear),
+          }),
+        }
+      );
 
-      // Then add to tracker
-      await addExamAttempt.mutateAsync({
-        examId: newExam.id,
-        year: parseInt(selectedYear),
-      });
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
 
       toast.success("Exam discovered and added to tracker!");
       setOpen(false);
       resetState();
     } catch (error) {
+      console.error("Add AI result error:", error);
       toast.error("Failed to add exam");
+    } finally {
+      setIsAddingAIResult(false);
     }
   };
 
   const resetState = () => {
     setSearchQuery("");
-    setSelectedJobId(null);
+    setSelectedExamId(null);
     clearAIResults();
   };
 
@@ -153,15 +158,15 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
 
         {/* Search Results */}
         <div className="flex-1 overflow-y-auto max-h-[40vh] space-y-2 mb-4">
-          {/* Database Results */}
-          {searchQuery && filteredJobs.length > 0 && (
+          {/* Database Results - Now showing exams directly */}
+          {searchQuery && filteredExams.length > 0 && (
             <>
-              {filteredJobs.map((job) => (
+              {filteredExams.map((exam) => (
                 <button
-                  key={job.id}
-                  onClick={() => setSelectedJobId(job.id)}
+                  key={exam.id}
+                  onClick={() => setSelectedExamId(exam.id)}
                   className={`w-full p-4 rounded-xl text-left transition-colors ${
-                    selectedJobId === job.id 
+                    selectedExamId === exam.id 
                       ? "bg-blue-100 border-2 border-blue-500" 
                       : "bg-muted/30 hover:bg-muted/50"
                   }`}
@@ -171,8 +176,8 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
                       <BookOpen className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="font-medium text-foreground">{job.title}</h3>
-                      <p className="text-sm text-muted-foreground">{job.department}</p>
+                      <h3 className="font-medium text-foreground">{exam.name}</h3>
+                      <p className="text-sm text-muted-foreground">{exam.conducting_body}</p>
                     </div>
                   </div>
                 </button>
@@ -181,7 +186,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
           )}
 
           {/* No results message */}
-          {searchQuery && filteredJobs.length === 0 && !isSearching && aiResults.length === 0 && (
+          {searchQuery && filteredExams.length === 0 && !isSearching && aiResults.length === 0 && (
             <div className="text-center py-6">
               <p className="text-muted-foreground">No exams found in database</p>
             </div>
@@ -217,11 +222,16 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
                 <button
                   key={index}
                   onClick={() => handleAddAIResult(result)}
-                  className="w-full p-4 rounded-xl text-left bg-gradient-to-r from-purple-50 to-blue-50 hover:from-purple-100 hover:to-blue-100 transition-colors border border-purple-200"
+                  disabled={isAddingAIResult}
+                  className="w-full p-4 rounded-xl text-left bg-gradient-to-r from-purple-50 to-blue-50 hover:from-purple-100 hover:to-blue-100 transition-colors border border-purple-200 disabled:opacity-50"
                 >
                   <div className="flex items-start gap-3">
                     <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="h-5 w-5 text-purple-600" />
+                      {isAddingAIResult ? (
+                        <Loader2 className="h-5 w-5 text-purple-600 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-5 w-5 text-purple-600" />
+                      )}
                     </div>
                     <div>
                       <h3 className="font-medium text-foreground">{result.exam_name}</h3>
@@ -236,7 +246,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
         </div>
 
         {/* Year Selector and Add Button */}
-        {selectedJobId && (
+        {selectedExamId && (
           <div className="border-t pt-4 space-y-4">
             <div className="flex items-center gap-4">
               <span className="text-sm font-medium text-muted-foreground">Select Year:</span>
@@ -254,11 +264,11 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
               </Select>
             </div>
             <Button 
-              onClick={handleAddJob}
+              onClick={handleAddExam}
               className="w-full h-12 bg-blue-600 hover:bg-blue-700"
-              disabled={addExamAttempt.isPending || createExam.isPending}
+              disabled={addExamAttempt.isPending}
             >
-              {(addExamAttempt.isPending || createExam.isPending) ? (
+              {addExamAttempt.isPending ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 "Add to Tracker"

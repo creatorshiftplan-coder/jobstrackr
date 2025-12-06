@@ -84,13 +84,123 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const { query, userId, saveJob, jobData } = await req.json();
+    const { query, userId, saveJob, jobData, createExam, examData, year } = await req.json();
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Handle create exam request (for AI-discovered exams - bypasses RLS using service role)
+    if (createExam && examData) {
+      console.log("Creating exam server-side:", examData.name);
+
+      // Get user ID from auth header
+      const authHeader = req.headers.get("Authorization");
+      let authenticatedUserId = userId;
+      
+      if (authHeader) {
+        const token = authHeader.replace("Bearer ", "");
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (user) {
+          authenticatedUserId = user.id;
+        }
+      }
+
+      if (!authenticatedUserId) {
+        return new Response(
+          JSON.stringify({ error: "Authentication required" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if exam already exists
+      const { data: existingExam } = await supabase
+        .from("exams")
+        .select("id")
+        .ilike("name", examData.name)
+        .limit(1)
+        .single();
+
+      let examId: string;
+
+      if (existingExam) {
+        console.log("Exam already exists, using existing ID:", existingExam.id);
+        examId = existingExam.id;
+      } else {
+        // Create the exam using service role (bypasses RLS)
+        const { data: newExam, error: examError } = await supabase
+          .from("exams")
+          .insert({
+            name: examData.name,
+            conducting_body: examData.conducting_body || null,
+            category: examData.category || "Government",
+            description: examData.description || null,
+            official_website: examData.official_website || null,
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (examError) {
+          console.error("Create exam error:", examError);
+          return new Response(
+            JSON.stringify({ error: "Failed to create exam", details: examError.message }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        console.log("Created new exam:", newExam.id);
+        examId = newExam.id;
+      }
+
+      // Add exam attempt for the user
+      const attemptYear = year || new Date().getFullYear();
+      
+      // Check if user already has this exam in tracker
+      const { data: existingAttempt } = await supabase
+        .from("exam_attempts")
+        .select("id")
+        .eq("user_id", authenticatedUserId)
+        .eq("exam_id", examId)
+        .eq("year", attemptYear)
+        .limit(1)
+        .single();
+
+      if (existingAttempt) {
+        return new Response(
+          JSON.stringify({ status: "exists", message: "Exam already in your tracker", examId }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: attempt, error: attemptError } = await supabase
+        .from("exam_attempts")
+        .insert({
+          user_id: authenticatedUserId,
+          exam_id: examId,
+          year: attemptYear,
+          status: "tracking",
+        })
+        .select()
+        .single();
+
+      if (attemptError) {
+        console.error("Create attempt error:", attemptError);
+        return new Response(
+          JSON.stringify({ error: "Failed to add exam to tracker", details: attemptError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log("Added exam attempt:", attempt.id);
+
+      return new Response(
+        JSON.stringify({ status: "created", examId, attemptId: attempt.id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Handle save job request
     if (saveJob && jobData) {
