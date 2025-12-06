@@ -9,6 +9,7 @@ import JobDetails from "./pages/JobDetails";
 import Search from "./pages/Search";
 import Saved from "./pages/Saved";
 import Profile from "./pages/Profile";
+import More from "./pages/More";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import ExamTracker from "./pages/ExamTracker";
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/search" element={<Search />} />
             <Route path="/saved" element={<Saved />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/more" element={<More />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/tracker" element={<ExamTracker />} />
