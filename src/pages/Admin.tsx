@@ -74,6 +74,8 @@ interface BulkUploadInput {
   last_date: string;
   exam_date?: string | null;
   age_limit?: string | null;
+  vacancies?: number;
+  eligibility?: string;
   application_fees?: {
     general?: number;
     obc?: number;
@@ -130,22 +132,31 @@ const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
   const { age_min, age_max } = parseAgeLimit(input.age_limit);
   const applicationFee = input.application_fees?.general || 0;
   
+  // Build description with job_type and highlights if provided
+  let fullDescription = input.description || "";
+  if (input.job_type && !fullDescription.includes(input.job_type)) {
+    fullDescription = `[${input.job_type}] ${fullDescription}`;
+  }
+  if (input.highlights && !fullDescription.includes(input.highlights)) {
+    fullDescription = `${fullDescription} | Highlights: ${input.highlights}`;
+  }
+  
   return {
     title: input.exam_name,
     department: input.agency,
     location: input.location,
     qualification: input.requirements || "As per notification",
     experience: "",
-    eligibility: input.highlights || "",
+    eligibility: input.eligibility || "",
     salary_min: input.salary_min || null,
     salary_max: input.salary_max || null,
     age_min,
     age_max,
     application_fee: applicationFee,
-    vacancies: 1,
+    vacancies: input.vacancies || 1,
     last_date: input.last_date,
     is_featured: false,
-    description: input.description || "",
+    description: fullDescription.trim(),
     apply_link: input.apply_link || "",
   };
 };
