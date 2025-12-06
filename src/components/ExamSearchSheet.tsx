@@ -115,22 +115,26 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
       setOpen(isOpen);
       if (!isOpen) resetState();
     }}>
-      <SheetTrigger asChild>
-        {trigger || (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
+      {trigger ? (
+        <SheetTrigger asChild>
+          {trigger}
+        </SheetTrigger>
+      ) : (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <SheetTrigger asChild>
                 <button className="fixed bottom-24 right-6 z-50 w-14 h-14 bg-blue-600 rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 transition-colors active:scale-95">
                   <Plus className="h-7 w-7 text-white" />
                 </button>
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                <p>Add Exam</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-      </SheetTrigger>
+              </SheetTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Add Exam</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
       <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl">
         <SheetHeader className="pb-4">
           <SheetTitle className="text-lg font-semibold">Search Exam to Track</SheetTitle>
