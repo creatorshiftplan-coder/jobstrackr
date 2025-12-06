@@ -17,7 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { Job } from "@/types/job";
 
@@ -162,6 +163,41 @@ export default function Admin() {
   const [bulkJobs, setBulkJobs] = useState<BulkUploadJob[]>([]);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [jsonText, setJsonText] = useState("");
+  
+  // Filters for jobs
+  const [lastDateFilter, setLastDateFilter] = useState<string>("all");
+  const [vacanciesFilter, setVacanciesFilter] = useState<string>("all");
+
+  // Filter jobs based on selected filters
+  const filteredJobs = jobs?.filter((job) => {
+    // Last date filter
+    if (lastDateFilter !== "all") {
+      const today = new Date();
+      const lastDate = new Date(job.last_date);
+      
+      if (lastDateFilter === "expired" && lastDate >= today) return false;
+      if (lastDateFilter === "active" && lastDate < today) return false;
+      if (lastDateFilter === "7days") {
+        const sevenDays = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        if (lastDate < today || lastDate > sevenDays) return false;
+      }
+      if (lastDateFilter === "30days") {
+        const thirtyDays = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+        if (lastDate < today || lastDate > thirtyDays) return false;
+      }
+    }
+    
+    // Vacancies filter
+    if (vacanciesFilter !== "all") {
+      const vacancies = job.vacancies || 1;
+      if (vacanciesFilter === "1-10" && (vacancies < 1 || vacancies > 10)) return false;
+      if (vacanciesFilter === "11-50" && (vacancies < 11 || vacancies > 50)) return false;
+      if (vacanciesFilter === "51-100" && (vacancies < 51 || vacancies > 100)) return false;
+      if (vacanciesFilter === "100+" && vacancies <= 100) return false;
+    }
+    
+    return true;
+  });
 
   if (authLoading || roleLoading) {
     return (
@@ -356,15 +392,62 @@ export default function Admin() {
           {/* Jobs Tab */}
           <TabsContent value="jobs">
             <Card className="border-0 shadow-card">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Jobs ({jobs?.length || 0})</CardTitle>
-                  <CardDescription>Manage government job listings</CardDescription>
+              <CardHeader className="space-y-4">
+                <div className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Jobs ({filteredJobs?.length || 0} of {jobs?.length || 0})</CardTitle>
+                    <CardDescription>Manage government job listings</CardDescription>
+                  </div>
+                  <Button size="sm" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Job
+                  </Button>
                 </div>
-                <Button size="sm" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Job
-                </Button>
+                
+                {/* Filters */}
+                <div className="flex flex-wrap gap-3 items-center">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Filters:</span>
+                  </div>
+                  
+                  <Select value={lastDateFilter} onValueChange={setLastDateFilter}>
+                    <SelectTrigger className="w-[150px] h-9">
+                      <SelectValue placeholder="Last Date" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Dates</SelectItem>
+                      <SelectItem value="active">Active Only</SelectItem>
+                      <SelectItem value="expired">Expired</SelectItem>
+                      <SelectItem value="7days">Next 7 Days</SelectItem>
+                      <SelectItem value="30days">Next 30 Days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={vacanciesFilter} onValueChange={setVacanciesFilter}>
+                    <SelectTrigger className="w-[150px] h-9">
+                      <SelectValue placeholder="Vacancies" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Vacancies</SelectItem>
+                      <SelectItem value="1-10">1-10</SelectItem>
+                      <SelectItem value="11-50">11-50</SelectItem>
+                      <SelectItem value="51-100">51-100</SelectItem>
+                      <SelectItem value="100+">100+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  {(lastDateFilter !== "all" || vacanciesFilter !== "all") && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => { setLastDateFilter("all"); setVacanciesFilter("all"); }}
+                      className="text-muted-foreground"
+                    >
+                      Clear filters
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {jobsLoading ? (
@@ -385,11 +468,15 @@ export default function Admin() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {jobs?.map((job) => (
+                        {filteredJobs?.map((job) => (
                           <TableRow key={job.id}>
                             <TableCell className="font-medium max-w-[200px] truncate">{job.title}</TableCell>
                             <TableCell className="max-w-[150px] truncate">{job.department}</TableCell>
-                            <TableCell>{format(new Date(job.last_date), "dd MMM yyyy")}</TableCell>
+                            <TableCell>
+                              <span className={new Date(job.last_date) < new Date() ? "text-destructive" : ""}>
+                                {format(new Date(job.last_date), "dd MMM yyyy")}
+                              </span>
+                            </TableCell>
                             <TableCell>{job.vacancies || 1}</TableCell>
                             <TableCell>
                               {job.is_featured && <Badge className="bg-warning text-warning-foreground">Featured</Badge>}
@@ -406,6 +493,13 @@ export default function Admin() {
                             </TableCell>
                           </TableRow>
                         ))}
+                        {filteredJobs?.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                              No jobs match the selected filters
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </ScrollArea>
