@@ -13,6 +13,8 @@ import More from "./pages/More";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import ExamTracker from "./pages/ExamTracker";
+import EditProfile from "./pages/EditProfile";
+import EditEducation from "./pages/EditEducation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +32,8 @@ const App = () => (
             <Route path="/search" element={<Search />} />
             <Route path="/saved" element={<Saved />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/edit-profile" element={<EditProfile />} />
+            <Route path="/edit-education" element={<EditEducation />} />
             <Route path="/more" element={<More />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/admin" element={<Admin />} />

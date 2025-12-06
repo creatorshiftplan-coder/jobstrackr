@@ -1,23 +1,26 @@
 import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Edit2, Calendar, User, GraduationCap, Briefcase, CheckCircle } from "lucide-react";
+import { ArrowLeft, Edit2, Calendar, User, GraduationCap, Briefcase, CheckCircle, Phone, Mail, MapPin, FileText, ChevronRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useExams } from "@/hooks/useExams";
+import { useEducation } from "@/hooks/useEducation";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { ProfileCompleteness } from "@/components/ProfileCompleteness";
 
 export default function Profile() {
   const { user, loading } = useAuth();
   const { profile, isLoading: profileLoading } = useProfile();
   const { data: savedJobs } = useSavedJobs();
   const { userExams } = useExams();
+  const { education, isLoading: educationLoading } = useEducation();
   const navigate = useNavigate();
 
-  if (loading || profileLoading) {
+  if (loading || profileLoading || educationLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -61,6 +64,24 @@ export default function Profile() {
     ? format(new Date(profile.date_of_birth), "dd/MM/yyyy")
     : "Not set";
 
+  // Get highest education
+  const qualificationOrder = ["phd", "post_graduation", "graduation", "diploma", "12th", "10th"];
+  const highestEducation = education.sort((a, b) => {
+    return qualificationOrder.indexOf(a.qualification_type) - qualificationOrder.indexOf(b.qualification_type);
+  })[0];
+
+  const getQualificationLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      "10th": "Matriculation",
+      "12th": "Intermediate",
+      "diploma": "Diploma",
+      "graduation": "Graduate",
+      "post_graduation": "Post Graduate",
+      "phd": "PhD",
+    };
+    return labels[type] || type;
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
@@ -69,7 +90,7 @@ export default function Profile() {
           <button onClick={() => navigate(-1)} className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </button>
-          <Link to="/more" className="flex items-center gap-2 text-primary font-medium">
+          <Link to="/edit-profile" className="flex items-center gap-2 text-primary font-medium">
             <Edit2 className="h-4 w-4" />
             Edit
           </Link>
@@ -88,10 +109,15 @@ export default function Profile() {
           </div>
           <h2 className="font-display font-bold text-xl text-foreground">{userName}</h2>
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-sm text-muted-foreground">Graduate</span>
-            <CheckCircle className="h-4 w-4 text-green-500 fill-green-500" />
+            <span className="text-sm text-muted-foreground">
+              {highestEducation ? getQualificationLabel(highestEducation.qualification_type) : "Add Education"}
+            </span>
+            {highestEducation && <CheckCircle className="h-4 w-4 text-green-500 fill-green-500" />}
           </div>
         </div>
+
+        {/* Profile Completeness */}
+        <ProfileCompleteness profile={profile} education={education} />
 
         {/* Stats Row */}
         <Card className="border-0 shadow-card">
@@ -117,10 +143,27 @@ export default function Profile() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-display font-semibold text-foreground">Personal Details</h3>
-            <Link to="/more" className="text-sm text-primary font-medium">See all</Link>
+            <Link to="/edit-profile" className="text-sm text-primary font-medium flex items-center">
+              See all <ChevronRight className="h-4 w-4" />
+            </Link>
           </div>
           <Card className="border-0 shadow-card">
-            <CardContent className="p-4">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Father's Name</p>
+                    <p className="text-sm font-medium text-foreground">{profile?.father_name || "Not set"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Mother's Name</p>
+                    <p className="text-sm font-medium text-foreground">{profile?.mother_name || "Not set"}</p>
+                  </div>
+                </div>
+              </div>
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Calendar className="h-5 w-5 text-primary" />
@@ -140,35 +183,96 @@ export default function Profile() {
           </Card>
         </div>
 
-        {/* Education */}
+        {/* Contact Information */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-display font-semibold text-foreground">Education</h3>
-            <Link to="/more" className="text-sm text-primary font-medium">See all</Link>
+            <h3 className="font-display font-semibold text-foreground">Contact Information</h3>
+            <Link to="/edit-profile" className="text-sm text-primary font-medium flex items-center">
+              See all <ChevronRight className="h-4 w-4" />
+            </Link>
           </div>
           <Card className="border-0 shadow-card">
-            <CardContent className="p-4">
+            <CardContent className="p-4 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <GraduationCap className="h-5 w-5 text-primary" />
+                  <Phone className="h-5 w-5 text-primary" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-foreground">Graduation</p>
-                    <p className="text-xs text-muted-foreground">India</p>
+                <div className="flex-1 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Mobile</p>
+                    <p className="text-sm font-medium text-foreground">{profile?.phone || "Not set"}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">Bachelor's Degree</p>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Email</p>
+                    <p className="text-sm font-medium text-foreground truncate">{profile?.email || user?.email || "Not set"}</p>
+                  </div>
                 </div>
               </div>
+              {profile?.address && (
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <MapPin className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground mb-0.5">Address</p>
+                    <p className="text-sm font-medium text-foreground">{profile.address}</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Other Details */}
+        {/* Education */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-display font-semibold text-foreground">Education</h3>
+            <Link to="/edit-education" className="text-sm text-primary font-medium flex items-center">
+              See all <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <Card className="border-0 shadow-card">
+            <CardContent className="p-4">
+              {education.length === 0 ? (
+                <div className="text-center py-4">
+                  <GraduationCap className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">No education records added</p>
+                  <Link to="/edit-education">
+                    <Button size="sm" variant="outline" className="mt-2">Add Education</Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {education.slice(0, 2).map((edu) => (
+                    <div key={edu.id} className="flex items-start gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <GraduationCap className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-foreground">{edu.qualification_name || getQualificationLabel(edu.qualification_type)}</p>
+                          {edu.percentage && <span className="text-xs text-muted-foreground">{edu.percentage}%</span>}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{edu.board_university || edu.institute_name}</p>
+                        {edu.date_of_passing && (
+                          <p className="text-xs text-muted-foreground">Passed: {new Date(edu.date_of_passing).getFullYear()}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Category & Other Details */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-display font-semibold text-foreground">Other Details</h3>
-            <Link to="/more" className="text-sm text-primary font-medium">See all</Link>
+            <Link to="/edit-profile" className="text-sm text-primary font-medium flex items-center">
+              See all <ChevronRight className="h-4 w-4" />
+            </Link>
           </div>
           <Card className="border-0 shadow-card">
             <CardContent className="p-4">
@@ -183,10 +287,29 @@ export default function Profile() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-0.5">Current Status</p>
-                    <p className="text-sm font-medium text-foreground">Job Seeker</p>
+                    <p className="text-sm font-medium text-foreground">{(profile as any)?.current_status || "Job Seeker"}</p>
                   </div>
                 </div>
               </div>
+              {profile?.aadhar_number && (
+                <div className="flex items-start gap-3 mt-4">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <FileText className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Aadhaar</p>
+                      <p className="text-sm font-medium text-foreground">XXXX-XXXX-{profile.aadhar_number.slice(-4)}</p>
+                    </div>
+                    {profile?.pan_number && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">PAN</p>
+                        <p className="text-sm font-medium text-foreground">{profile.pan_number}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -196,4 +319,3 @@ export default function Profile() {
     </div>
   );
 }
-

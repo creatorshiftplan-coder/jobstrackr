@@ -116,6 +116,60 @@ export type Database = {
         }
         Relationships: []
       }
+      education_qualifications: {
+        Row: {
+          board_university: string | null
+          cgpa: number | null
+          created_at: string | null
+          date_of_passing: string | null
+          id: string
+          institute_name: string | null
+          is_verified: boolean | null
+          marks_obtained: number | null
+          maximum_marks: number | null
+          percentage: number | null
+          qualification_name: string | null
+          qualification_type: string
+          roll_number: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          board_university?: string | null
+          cgpa?: number | null
+          created_at?: string | null
+          date_of_passing?: string | null
+          id?: string
+          institute_name?: string | null
+          is_verified?: boolean | null
+          marks_obtained?: number | null
+          maximum_marks?: number | null
+          percentage?: number | null
+          qualification_name?: string | null
+          qualification_type: string
+          roll_number?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          board_university?: string | null
+          cgpa?: number | null
+          created_at?: string | null
+          date_of_passing?: string | null
+          id?: string
+          institute_name?: string | null
+          is_verified?: boolean | null
+          marks_obtained?: number | null
+          maximum_marks?: number | null
+          percentage?: number | null
+          qualification_name?: string | null
+          qualification_type?: string
+          roll_number?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       exam_attempts: {
         Row: {
           created_at: string
@@ -279,21 +333,32 @@ export type Database = {
           aadhar_number: string | null
           address: string | null
           caste_certificate_number: string | null
+          caste_issue_date: string | null
+          caste_issuing_authority: string | null
           caste_name: string | null
           category: string | null
           created_at: string
+          current_status: string | null
           date_of_birth: string | null
+          disability_certificate_number: string | null
+          disability_type: string | null
           email: string | null
+          ews_certificate_number: string | null
+          ews_issuing_authority: string | null
           father_name: string | null
           full_name: string | null
           gender: string | null
           id: string
+          left_thumb_url: string | null
+          marital_status: string | null
           mother_name: string | null
           pan_number: string | null
           passport_number: string | null
           phone: string | null
           photo_url: string | null
+          pincode: string | null
           signature_url: string | null
+          sub_category: string | null
           updated_at: string
           user_id: string
         }
@@ -301,21 +366,32 @@ export type Database = {
           aadhar_number?: string | null
           address?: string | null
           caste_certificate_number?: string | null
+          caste_issue_date?: string | null
+          caste_issuing_authority?: string | null
           caste_name?: string | null
           category?: string | null
           created_at?: string
+          current_status?: string | null
           date_of_birth?: string | null
+          disability_certificate_number?: string | null
+          disability_type?: string | null
           email?: string | null
+          ews_certificate_number?: string | null
+          ews_issuing_authority?: string | null
           father_name?: string | null
           full_name?: string | null
           gender?: string | null
           id?: string
+          left_thumb_url?: string | null
+          marital_status?: string | null
           mother_name?: string | null
           pan_number?: string | null
           passport_number?: string | null
           phone?: string | null
           photo_url?: string | null
+          pincode?: string | null
           signature_url?: string | null
+          sub_category?: string | null
           updated_at?: string
           user_id: string
         }
@@ -323,21 +399,32 @@ export type Database = {
           aadhar_number?: string | null
           address?: string | null
           caste_certificate_number?: string | null
+          caste_issue_date?: string | null
+          caste_issuing_authority?: string | null
           caste_name?: string | null
           category?: string | null
           created_at?: string
+          current_status?: string | null
           date_of_birth?: string | null
+          disability_certificate_number?: string | null
+          disability_type?: string | null
           email?: string | null
+          ews_certificate_number?: string | null
+          ews_issuing_authority?: string | null
           father_name?: string | null
           full_name?: string | null
           gender?: string | null
           id?: string
+          left_thumb_url?: string | null
+          marital_status?: string | null
           mother_name?: string | null
           pan_number?: string | null
           passport_number?: string | null
           phone?: string | null
           photo_url?: string | null
+          pincode?: string | null
           signature_url?: string | null
+          sub_category?: string | null
           updated_at?: string
           user_id?: string
         }

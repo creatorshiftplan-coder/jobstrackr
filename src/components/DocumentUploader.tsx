@@ -10,10 +10,20 @@ const DOCUMENT_TYPES = [
   { value: "aadhar", label: "Aadhaar Card" },
   { value: "pan", label: "PAN Card" },
   { value: "passport", label: "Passport" },
-  { value: "marksheet", label: "Marksheet / Certificate" },
+  { value: "class_10_certificate", label: "Class 10 Certificate" },
+  { value: "class_10_marksheet", label: "Class 10 Marksheet" },
+  { value: "class_12_certificate", label: "Class 12 Certificate" },
+  { value: "class_12_marksheet", label: "Class 12 Marksheet" },
+  { value: "graduation_degree", label: "Graduation Degree" },
+  { value: "graduation_marksheet", label: "Graduation Marksheet" },
+  { value: "post_graduation_degree", label: "Post Graduation Degree" },
+  { value: "post_graduation_marksheet", label: "Post Graduation Marksheet" },
   { value: "caste_certificate", label: "Caste Certificate" },
+  { value: "ews_certificate", label: "EWS Certificate" },
+  { value: "disability_certificate", label: "Disability Certificate" },
   { value: "photo", label: "Passport Photo" },
   { value: "signature", label: "Signature" },
+  { value: "thumb_impression", label: "Left Thumb Impression" },
 ];
 
 interface DocumentUploaderProps {
