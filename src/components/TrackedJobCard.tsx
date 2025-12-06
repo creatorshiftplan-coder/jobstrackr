@@ -165,10 +165,10 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
           <div className="flex gap-2">
             <button
               className={cn(
-                "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 1 
-                  ? "bg-blue-600 text-white" 
-                  : "bg-slate-200 text-muted-foreground hover:bg-slate-300"
+                  ? "bg-blue-600 text-white shadow-md" 
+                  : "bg-white text-slate-500 border border-slate-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
               )}
               onClick={() => setActivePhase(1)}
             >
@@ -176,10 +176,10 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             </button>
             <button
               className={cn(
-                "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 2 
-                  ? "bg-blue-600 text-white" 
-                  : "bg-slate-200 text-muted-foreground hover:bg-slate-300"
+                  ? "bg-blue-600 text-white shadow-md" 
+                  : "bg-white text-slate-500 border border-slate-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
               )}
               onClick={() => setActivePhase(2)}
             >
