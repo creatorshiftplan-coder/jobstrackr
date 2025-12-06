@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { useJobs } from "@/hooks/useJobs";
 import { useAdminStats } from "@/hooks/useAdminStats";
 import { supabase } from "@/integrations/supabase/client";
@@ -147,6 +148,7 @@ const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
 
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
+  const { isAdmin, isLoading: roleLoading } = useAdminRole();
   const { data: jobs, isLoading: jobsLoading } = useJobs();
   const { userStats, apiStats, isLoading: statsLoading } = useAdminStats();
   const queryClient = useQueryClient();
@@ -161,7 +163,7 @@ export default function Admin() {
   const [bulkUploading, setBulkUploading] = useState(false);
   const [jsonText, setJsonText] = useState("");
 
-  if (authLoading) {
+  if (authLoading || roleLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -169,16 +171,16 @@ export default function Admin() {
     );
   }
 
-  if (!user) {
+  if (!user || !isAdmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <h2 className="font-display text-xl font-semibold mb-2">Access Denied</h2>
-            <p className="text-muted-foreground mb-4">Please login to access the admin panel.</p>
-            <Link to="/auth">
-              <Button>Login</Button>
+            <p className="text-muted-foreground mb-4">You don't have permission to access the admin panel.</p>
+            <Link to="/">
+              <Button>Go Home</Button>
             </Link>
           </CardContent>
         </Card>
