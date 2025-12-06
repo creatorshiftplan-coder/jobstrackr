@@ -17,7 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { Job } from "@/types/job";
@@ -231,6 +232,7 @@ export default function Admin() {
   const [bulkJobs, setBulkJobs] = useState<BulkUploadJob[]>([]);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [jsonText, setJsonText] = useState("");
+  const [duplicateMode, setDuplicateMode] = useState<"skip" | "replace">("skip");
   
   // Filters for jobs
   const [lastDateFilter, setLastDateFilter] = useState<string>("all");
@@ -419,23 +421,52 @@ export default function Admin() {
   };
 
   const handleBulkUpload = async () => {
-    const jobsToUpload = bulkJobs.filter((job) => !job.isDuplicate);
-    if (jobsToUpload.length === 0) {
-      toast({ title: "No new jobs to upload", variant: "destructive" });
+    const newJobs = bulkJobs.filter((job) => !job.isDuplicate);
+    const duplicateJobs = bulkJobs.filter((job) => job.isDuplicate);
+    
+    const hasNewJobs = newJobs.length > 0;
+    const hasUpdates = duplicateMode === "replace" && duplicateJobs.length > 0;
+    
+    if (!hasNewJobs && !hasUpdates) {
+      toast({ title: "No jobs to upload or update", variant: "destructive" });
       return;
     }
 
     setBulkUploading(true);
     try {
-      const cleanJobs = jobsToUpload.map(({ isDuplicate, duplicateOf, ...job }) => job);
-      const { error } = await supabase.from("jobs").insert(cleanJobs);
-      if (error) throw error;
+      let insertedCount = 0;
+      let updatedCount = 0;
       
-      toast({ title: `${cleanJobs.length} jobs uploaded successfully!` });
+      // Insert new jobs
+      if (newJobs.length > 0) {
+        const cleanNewJobs = newJobs.map(({ isDuplicate, duplicateOf, ...job }) => job);
+        const { error } = await supabase.from("jobs").insert(cleanNewJobs);
+        if (error) throw error;
+        insertedCount = cleanNewJobs.length;
+      }
+      
+      // Update existing jobs if replace mode is selected
+      if (duplicateMode === "replace" && duplicateJobs.length > 0) {
+        for (const dupJob of duplicateJobs) {
+          const { isDuplicate, duplicateOf, ...jobData } = dupJob;
+          if (duplicateOf) {
+            const { error } = await supabase.from("jobs").update(jobData).eq("id", duplicateOf);
+            if (error) throw error;
+            updatedCount++;
+          }
+        }
+      }
+      
+      const messages = [];
+      if (insertedCount > 0) messages.push(`${insertedCount} jobs created`);
+      if (updatedCount > 0) messages.push(`${updatedCount} jobs updated`);
+      
+      toast({ title: messages.join(", ") + "!" });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       setShowBulkDialog(false);
       setBulkJobs([]);
       setJsonText("");
+      setDuplicateMode("skip");
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -912,10 +943,32 @@ export default function Admin() {
           <DialogHeader>
             <DialogTitle>Bulk Upload Preview</DialogTitle>
             <DialogDescription>
-              Review jobs before uploading. Duplicates (same title & department) are marked and will be skipped.
+              Review jobs before uploading. Duplicates are detected by matching title & department.
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="h-[400px]">
+          
+          {/* Duplicate Handling Options */}
+          {bulkJobs.some(j => j.isDuplicate) && (
+            <div className="bg-muted/50 rounded-lg p-4 border border-border">
+              <p className="text-sm font-medium mb-3">Duplicate Handling</p>
+              <RadioGroup value={duplicateMode} onValueChange={(v) => setDuplicateMode(v as "skip" | "replace")} className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="skip" id="skip" />
+                  <Label htmlFor="skip" className="text-sm font-normal cursor-pointer">
+                    Skip duplicates <span className="text-muted-foreground">(only upload new jobs)</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="replace" id="replace" />
+                  <Label htmlFor="replace" className="text-sm font-normal cursor-pointer">
+                    Replace duplicates <span className="text-muted-foreground">(update existing jobs with new data)</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
+          
+          <ScrollArea className="h-[350px]">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -928,14 +981,29 @@ export default function Admin() {
               </TableHeader>
               <TableBody>
                 {bulkJobs.map((job, index) => (
-                  <TableRow key={index} className={job.isDuplicate ? "opacity-50" : ""}>
+                  <TableRow 
+                    key={index} 
+                    className={
+                      job.isDuplicate 
+                        ? duplicateMode === "skip" 
+                          ? "opacity-50 line-through" 
+                          : "bg-amber-50 dark:bg-amber-950/20"
+                        : ""
+                    }
+                  >
                     <TableCell>
                       {job.isDuplicate ? (
-                        <Badge variant="destructive" className="gap-1">
-                          <X className="h-3 w-3" /> Duplicate
-                        </Badge>
+                        duplicateMode === "skip" ? (
+                          <Badge variant="destructive" className="gap-1">
+                            <X className="h-3 w-3" /> Skip
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="gap-1 text-amber-600 border-amber-600 dark:text-amber-400 dark:border-amber-400">
+                            <RefreshCw className="h-3 w-3" /> Update
+                          </Badge>
+                        )
                       ) : (
-                        <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
+                        <Badge variant="outline" className="gap-1 text-green-600 border-green-600 dark:text-green-400 dark:border-green-400">
                           <Check className="h-3 w-3" /> New
                         </Badge>
                       )}
@@ -943,21 +1011,32 @@ export default function Admin() {
                     <TableCell className="font-medium max-w-[150px] truncate">{job.title}</TableCell>
                     <TableCell className="max-w-[100px] truncate">{job.department}</TableCell>
                     <TableCell>{job.location}</TableCell>
-                    <TableCell>{job.last_date}</TableCell>
+                    <TableCell>{job.last_date_display || job.last_date}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </ScrollArea>
+          
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <div className="text-sm text-muted-foreground">
-              {bulkJobs.filter(j => !j.isDuplicate).length} new jobs, {bulkJobs.filter(j => j.isDuplicate).length} duplicates
+            <div className="text-sm text-muted-foreground flex-1">
+              {bulkJobs.filter(j => !j.isDuplicate).length} new
+              {duplicateMode === "skip" 
+                ? `, ${bulkJobs.filter(j => j.isDuplicate).length} will be skipped`
+                : `, ${bulkJobs.filter(j => j.isDuplicate).length} will be updated`
+              }
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Cancel</Button>
-              <Button onClick={handleBulkUpload} disabled={bulkUploading || bulkJobs.filter(j => !j.isDuplicate).length === 0}>
+              <Button 
+                onClick={handleBulkUpload} 
+                disabled={bulkUploading || (bulkJobs.filter(j => !j.isDuplicate).length === 0 && duplicateMode === "skip")}
+              >
                 {bulkUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Upload {bulkJobs.filter(j => !j.isDuplicate).length} Jobs
+                {duplicateMode === "skip" 
+                  ? `Upload ${bulkJobs.filter(j => !j.isDuplicate).length} Jobs`
+                  : `Upload ${bulkJobs.length} Jobs`
+                }
               </Button>
             </div>
           </DialogFooter>
