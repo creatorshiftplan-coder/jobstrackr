@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface TrackedJobCardProps {
   attempt: ExamAttempt;
@@ -25,25 +27,30 @@ interface TrackedJobCardProps {
 
 export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   const { removeExamAttempt, getExamStatus } = useExams();
+  const queryClient = useQueryClient();
   const [isExpanded, setIsExpanded] = useState(false);
   const [activePhase, setActivePhase] = useState(1);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
-  const [statusData, setStatusData] = useState<any>(null);
+  
+  // Initialize from cached response in database - no auto-fetch
+  const [statusData, setStatusData] = useState<any>(() => {
+    return attempt.exams?.ai_cached_response || null;
+  });
 
   const exam = attempt.exams;
+  const lastUpdatedAt = attempt.exams?.ai_last_updated_at;
 
-  useEffect(() => {
-    // Auto-fetch status when card mounts
-    fetchStatus(false);
-  }, []);
-
-  const fetchStatus = async (forceRefresh = false) => {
+  // Only called when user clicks "Refresh Status"
+  const fetchStatus = async () => {
     setIsLoadingStatus(true);
     try {
-      const data = await getExamStatus(attempt.id, forceRefresh);
+      const data = await getExamStatus(attempt.id, true); // Always force refresh
       setStatusData(data);
+      toast.success("Status updated successfully");
+      // Invalidate query to refresh cached data for all cards
+      queryClient.invalidateQueries({ queryKey: ["exam_attempts"] });
     } catch (error: any) {
-      // Silent fail for auto-fetch
+      toast.error(error.message || "Failed to refresh status");
     } finally {
       setIsLoadingStatus(false);
     }
@@ -59,7 +66,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   };
 
   const getCurrentPhase = () => {
-    if (!statusData) return "Application";
+    if (!statusData) return "No Data";
     const status = statusData.current_status;
     if (status === "result_declared") return "Result";
     if (status === "exam_completed") return "Result Awaited";
@@ -141,7 +148,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-2 w-full" />
               </div>
-            ) : (
+            ) : statusData ? (
               <>
                 <div className="flex items-center gap-2 mb-2">
                   <CheckCircle className="h-4 w-4 text-blue-600" />
@@ -155,7 +162,17 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                   </div>
                   <Progress value={getProgress()} className="h-2 bg-slate-200" />
                 </div>
+                {lastUpdatedAt && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Updated {formatDistanceToNow(new Date(lastUpdatedAt))} ago
+                  </p>
+                )}
               </>
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-sm text-muted-foreground">No status data yet</p>
+                <p className="text-xs text-muted-foreground">Expand and click "Refresh Status" to get updates</p>
+              </div>
             )}
           </div>
         )}
@@ -196,7 +213,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
             </div>
-          ) : (
+          ) : statusData ? (
             <>
               {/* Admit Card Section */}
               <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200">
@@ -315,21 +332,33 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 </div>
               )}
 
-              {/* Refresh Button */}
-              <div className="flex justify-end pt-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => fetchStatus(true)}
-                  disabled={isLoadingStatus}
-                  className="text-xs text-muted-foreground"
-                >
-                  <RefreshCw className={cn("h-3 w-3 mr-1", isLoadingStatus && "animate-spin")} />
-                  Refresh Status
-                </Button>
-              </div>
+              {/* Last Updated Info */}
+              {lastUpdatedAt && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Last updated {formatDistanceToNow(new Date(lastUpdatedAt))} ago
+                </p>
+              )}
             </>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="text-sm mb-1">No status data available</p>
+              <p className="text-xs">Click "Refresh Status" below to fetch latest updates</p>
+            </div>
           )}
+
+          {/* Refresh Button - Always visible */}
+          <div className="flex justify-end pt-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={fetchStatus}
+              disabled={isLoadingStatus}
+              className="text-xs text-muted-foreground"
+            >
+              <RefreshCw className={cn("h-3 w-3 mr-1", isLoadingStatus && "animate-spin")} />
+              Refresh Status
+            </Button>
+          </div>
         </CardContent>
       )}
     </Card>
