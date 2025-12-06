@@ -116,7 +116,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
     }}>
       <SheetTrigger asChild>
         {trigger || (
-          <button className="fixed bottom-24 left-6 z-50 w-14 h-14 bg-blue-600 rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 transition-colors active:scale-95">
+          <button className="fixed bottom-24 right-6 z-50 w-14 h-14 bg-blue-600 rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 transition-colors active:scale-95">
             <Plus className="h-7 w-7 text-white" />
           </button>
         )}

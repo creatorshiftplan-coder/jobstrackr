@@ -5,7 +5,7 @@ import { TrackedJobCard } from "@/components/TrackedJobCard";
 import { ExamSearchSheet } from "@/components/ExamSearchSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Bookmark } from "lucide-react";
+import { GraduationCap, Bookmark, Plus } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function ExamTracker() {
@@ -37,11 +37,20 @@ export default function ExamTracker() {
               <GraduationCap className="h-5 w-5" />
               My Exams
             </h1>
-            <Link to="/saved">
-              <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
-                <Bookmark className="h-5 w-5 text-white" />
-              </div>
-            </Link>
+            <div className="flex items-center gap-2">
+              <ExamSearchSheet 
+                trigger={
+                  <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors cursor-pointer">
+                    <Plus className="h-5 w-5 text-white" />
+                  </div>
+                }
+              />
+              <Link to="/saved">
+                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
+                  <Bookmark className="h-5 w-5 text-white" />
+                </div>
+              </Link>
+            </div>
           </div>
         </header>
         <main className="px-4 py-8">
@@ -75,11 +84,20 @@ export default function ExamTracker() {
             <GraduationCap className="h-5 w-5" />
             My Exams
           </h1>
-          <Link to="/saved">
-            <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
-              <Bookmark className="h-5 w-5 text-white" />
-            </div>
-          </Link>
+          <div className="flex items-center gap-2">
+            <ExamSearchSheet 
+              trigger={
+                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors cursor-pointer">
+                  <Plus className="h-5 w-5 text-white" />
+                </div>
+              }
+            />
+            <Link to="/saved">
+              <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
+                <Bookmark className="h-5 w-5 text-white" />
+              </div>
+            </Link>
+          </div>
         </div>
       </header>
 
