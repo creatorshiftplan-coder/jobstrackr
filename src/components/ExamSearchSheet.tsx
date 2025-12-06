@@ -92,42 +92,53 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
       const selectedJob = jobs.find(j => j.id === selectedJobId);
       if (!selectedJob) throw new Error("Job not found");
 
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const response = await fetch(
-        `https://fdxksytpdfgmbkttipdf.supabase.co/functions/v1/ai-job-search`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({
-            createExam: true,
-            examData: {
-              name: selectedJob.title,
-              conducting_body: selectedJob.department,
-              category: "Government",
-              description: selectedJob.description,
-              official_website: selectedJob.apply_link,
-            },
-            year: parseInt(selectedYear),
-          }),
-        }
-      );
+      // Check if exam already exists (case-insensitive match)
+      const { data: existingExam } = await supabase
+        .from("exams")
+        .select("id")
+        .ilike("name", selectedJob.title)
+        .limit(1)
+        .maybeSingle();
 
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
+      let examId: string;
+
+      if (existingExam) {
+        examId = existingExam.id;
+      } else {
+        // Create new exam directly in database
+        const { data: newExam, error: examError } = await supabase
+          .from("exams")
+          .insert({
+            name: selectedJob.title,
+            conducting_body: selectedJob.department,
+            category: "Government",
+            description: selectedJob.description,
+            official_website: selectedJob.apply_link,
+            is_active: true,
+          })
+          .select("id")
+          .single();
+
+        if (examError) throw examError;
+        examId = newExam.id;
       }
+
+      // Add exam attempt using existing mutation
+      await addExamAttempt.mutateAsync({
+        examId,
+        year: parseInt(selectedYear),
+      });
 
       toast.success("Job added to tracker!");
       setOpen(false);
       resetState();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Add job error:", error);
-      toast.error("Failed to add job");
+      if (error.message?.includes("duplicate") || error.code === "23505") {
+        toast.error("This exam is already in your tracker");
+      } else {
+        toast.error("Failed to add job");
+      }
     } finally {
       setIsAddingJob(false);
     }
