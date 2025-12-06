@@ -288,6 +288,7 @@ export default function Admin() {
   // Filters for jobs
   const [lastDateFilter, setLastDateFilter] = useState<string>("all");
   const [vacanciesFilter, setVacanciesFilter] = useState<string>("all");
+  const [applyLinkFilter, setApplyLinkFilter] = useState<string>("all");
   
   // Sorting for jobs
   const [sortField, setSortField] = useState<"last_date" | "vacancies" | "title" | null>(null);
@@ -340,6 +341,13 @@ export default function Admin() {
       if (vacanciesFilter === "11-50" && (vacancies < 11 || vacancies > 50)) return false;
       if (vacanciesFilter === "51-100" && (vacancies < 51 || vacancies > 100)) return false;
       if (vacanciesFilter === "100+" && vacancies <= 100) return false;
+    }
+    
+    // Apply link filter
+    if (applyLinkFilter === "missing") {
+      if (job.apply_link && job.apply_link.trim() !== "") return false;
+    } else if (applyLinkFilter === "present") {
+      if (!job.apply_link || job.apply_link.trim() === "") return false;
     }
     
     return true;
@@ -662,11 +670,22 @@ export default function Admin() {
                     </SelectContent>
                   </Select>
                   
-                  {(lastDateFilter !== "all" || vacanciesFilter !== "all") && (
+                  <Select value={applyLinkFilter} onValueChange={setApplyLinkFilter}>
+                    <SelectTrigger className="w-[150px] h-9">
+                      <SelectValue placeholder="Apply Link" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Jobs</SelectItem>
+                      <SelectItem value="missing">Missing Link</SelectItem>
+                      <SelectItem value="present">Has Link</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  {(lastDateFilter !== "all" || vacanciesFilter !== "all" || applyLinkFilter !== "all") && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => { setLastDateFilter("all"); setVacanciesFilter("all"); }}
+                      onClick={() => { setLastDateFilter("all"); setVacanciesFilter("all"); setApplyLinkFilter("all"); }}
                       className="text-muted-foreground"
                     >
                       Clear filters
