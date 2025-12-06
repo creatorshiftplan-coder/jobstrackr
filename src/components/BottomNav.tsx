@@ -1,12 +1,13 @@
-import { Home, Search, GraduationCap, LayoutGrid } from "lucide-react";
+import { Home, Compass, Briefcase, User, LayoutGrid } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
-  { icon: Search, label: "Search", path: "/search" },
-  { icon: GraduationCap, label: "Tracker", path: "/tracker" },
-  { icon: LayoutGrid, label: "More", path: "/profile" },
+  { icon: Compass, label: "Explore", path: "/search" },
+  { icon: Briefcase, label: "My Jobs", path: "/tracker" },
+  { icon: User, label: "Profile", path: "/profile" },
+  { icon: LayoutGrid, label: "More", path: "/more" },
 ];
 
 export function BottomNav() {
