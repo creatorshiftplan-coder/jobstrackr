@@ -11,7 +11,9 @@ export interface Job {
   qualification: string;
   experience: string | null;
   vacancies: number | null;
+  vacancies_display: string | null;
   last_date: string;
+  last_date_display: string | null;
   description: string | null;
   eligibility: string | null;
   apply_link: string | null;

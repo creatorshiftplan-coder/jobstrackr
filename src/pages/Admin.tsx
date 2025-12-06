@@ -34,8 +34,10 @@ interface JobFormData {
   age_min: number;
   age_max: number;
   application_fee: number;
-  vacancies: number;
+  vacancies: number | null;
+  vacancies_display: string | null;
   last_date: string;
+  last_date_display: string | null;
   is_featured: boolean;
   description: string;
   apply_link: string;
@@ -53,8 +55,10 @@ const emptyFormData: JobFormData = {
   age_min: 18,
   age_max: 65,
   application_fee: 0,
-  vacancies: 1,
+  vacancies: null,
+  vacancies_display: null,
   last_date: "",
+  last_date_display: null,
   is_featured: false,
   description: "",
   apply_link: "",
@@ -178,6 +182,17 @@ const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
     fullDescription = `${fullDescription} | Highlights: ${input.highlights}`;
   }
   
+  // Determine display values for vacancies and last_date
+  const isTBDVacancies = isTBDValue(input.vacancies);
+  const vacanciesDisplay = input.vacancies !== undefined && input.vacancies !== null 
+    ? String(input.vacancies) 
+    : null;
+  
+  const isTBDDate = isTBDValue(input.last_date);
+  const lastDateDisplay = isTBDDate 
+    ? String(input.last_date)
+    : input.last_date || null;
+  
   return {
     title: input.exam_name,
     department: input.agency,
@@ -191,7 +206,9 @@ const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
     age_max,
     application_fee: applicationFee,
     vacancies: parseVacancies(input.vacancies),
+    vacancies_display: vacanciesDisplay,
     last_date: parseDateValue(input.last_date),
+    last_date_display: lastDateDisplay,
     is_featured: false,
     description: fullDescription.trim(),
     apply_link: input.apply_link || "",
@@ -440,8 +457,10 @@ export default function Admin() {
       age_min: job.age_min || 18,
       age_max: job.age_max || 65,
       application_fee: job.application_fee || 0,
-      vacancies: job.vacancies || 1,
+      vacancies: job.vacancies,
+      vacancies_display: job.vacancies_display,
       last_date: job.last_date,
+      last_date_display: job.last_date_display,
       is_featured: job.is_featured || false,
       description: job.description || "",
       apply_link: job.apply_link || "",

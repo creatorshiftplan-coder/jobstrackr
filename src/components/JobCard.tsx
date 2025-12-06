@@ -10,10 +10,19 @@ interface JobCardProps {
   job: Job;
 }
 
+// Check if last_date_display contains TBD-like values
+const isTBDDateDisplay = (displayValue: string | null): boolean => {
+  if (!displayValue) return false;
+  const tbdPatterns = ['tbd', 'to be announced', 'walk in', 'walk-in', 'walkin', 'n/a', 'not available'];
+  const lowerValue = displayValue.toLowerCase().trim();
+  return tbdPatterns.some(pattern => lowerValue.includes(pattern));
+};
+
 export function JobCard({ job }: JobCardProps) {
   const daysLeft = differenceInDays(new Date(job.last_date), new Date());
   const isUrgent = daysLeft <= 7 && daysLeft >= 0;
   const isExpired = daysLeft < 0;
+  const isTBDDate = isTBDDateDisplay(job.last_date_display);
 
   const formatSalary = (min: number | null, max: number | null) => {
     if (!min && !max) return "Not disclosed";
@@ -34,12 +43,17 @@ export function JobCard({ job }: JobCardProps) {
                     Featured
                   </Badge>
                 )}
-                {isUrgent && !isExpired && (
+                {isTBDDate && (
+                  <Badge variant="outline" className="text-xs bg-muted">
+                    Date TBD
+                  </Badge>
+                )}
+                {!isTBDDate && isUrgent && !isExpired && (
                   <Badge variant="destructive" className="text-xs">
                     {daysLeft} days left
                   </Badge>
                 )}
-                {isExpired && (
+                {!isTBDDate && isExpired && (
                   <Badge variant="secondary" className="text-xs">
                     Expired
                   </Badge>
@@ -64,11 +78,15 @@ export function JobCard({ job }: JobCardProps) {
             </div>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4 text-warning" />
-              <span className="truncate">{format(new Date(job.last_date), "dd MMM yyyy")}</span>
+              <span className="truncate">
+                {job.last_date_display || format(new Date(job.last_date), "dd MMM yyyy")}
+              </span>
             </div>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Users className="h-4 w-4 text-info" />
-              <span className="truncate">{job.vacancies || 1} vacancies</span>
+              <span className="truncate">
+                {job.vacancies_display || (job.vacancies ? `${job.vacancies} vacancies` : "TBD")}
+              </span>
             </div>
           </div>
 

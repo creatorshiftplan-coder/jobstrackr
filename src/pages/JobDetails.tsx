@@ -18,6 +18,14 @@ import {
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 
+// Check if last_date_display contains TBD-like values
+const isTBDDateDisplay = (displayValue: string | null): boolean => {
+  if (!displayValue) return false;
+  const tbdPatterns = ['tbd', 'to be announced', 'walk in', 'walk-in', 'walkin', 'n/a', 'not available'];
+  const lowerValue = displayValue.toLowerCase().trim();
+  return tbdPatterns.some(pattern => lowerValue.includes(pattern));
+};
+
 export default function JobDetails() {
   const { id } = useParams<{ id: string }>();
   const { data: job, isLoading, error } = useJob(id || "");
@@ -47,6 +55,7 @@ export default function JobDetails() {
 
   const daysLeft = differenceInDays(new Date(job.last_date), new Date());
   const isExpired = daysLeft < 0;
+  const isTBDDate = isTBDDateDisplay(job.last_date_display);
 
   const formatSalary = (min: number | null, max: number | null) => {
     if (!min && !max) return "Not disclosed";
@@ -81,10 +90,13 @@ export default function JobDetails() {
             {job.is_featured && (
               <Badge className="bg-warning text-warning-foreground">Featured</Badge>
             )}
-            {!isExpired && daysLeft <= 7 && (
+            {isTBDDate && (
+              <Badge variant="outline" className="bg-muted">Date TBD</Badge>
+            )}
+            {!isTBDDate && !isExpired && daysLeft <= 7 && (
               <Badge variant="destructive">{daysLeft} days left</Badge>
             )}
-            {isExpired && <Badge variant="secondary">Expired</Badge>}
+            {!isTBDDate && isExpired && <Badge variant="secondary">Expired</Badge>}
           </div>
           <h1 className="font-display font-bold text-2xl text-foreground mb-2">{job.title}</h1>
           <p className="text-muted-foreground">{job.department}</p>
@@ -121,7 +133,9 @@ export default function JobDetails() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Last Date</p>
-                <p className="font-medium text-sm">{format(new Date(job.last_date), "dd MMM yyyy")}</p>
+                <p className="font-medium text-sm">
+                  {job.last_date_display || format(new Date(job.last_date), "dd MMM yyyy")}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -132,7 +146,9 @@ export default function JobDetails() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Vacancies</p>
-                <p className="font-medium text-sm">{job.vacancies || 1} Posts</p>
+                <p className="font-medium text-sm">
+                  {job.vacancies_display || (job.vacancies ? `${job.vacancies} Posts` : "TBD")}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -203,7 +219,7 @@ export default function JobDetails() {
           </a>
         ) : (
           <Button disabled className="w-full h-12">
-            {isExpired ? "Application Closed" : "Apply Link Not Available"}
+            {isExpired && !isTBDDate ? "Application Closed" : isTBDDate ? "Apply Link Not Available" : "Apply Link Not Available"}
           </Button>
         )}
       </div>

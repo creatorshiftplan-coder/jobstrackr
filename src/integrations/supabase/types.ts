@@ -216,6 +216,7 @@ export type Database = {
           id: string
           is_featured: boolean | null
           last_date: string
+          last_date_display: string | null
           location: string
           qualification: string
           salary_max: number | null
@@ -223,6 +224,7 @@ export type Database = {
           title: string
           updated_at: string
           vacancies: number | null
+          vacancies_display: string | null
         }
         Insert: {
           age_max?: number | null
@@ -237,6 +239,7 @@ export type Database = {
           id?: string
           is_featured?: boolean | null
           last_date: string
+          last_date_display?: string | null
           location: string
           qualification: string
           salary_max?: number | null
@@ -244,6 +247,7 @@ export type Database = {
           title: string
           updated_at?: string
           vacancies?: number | null
+          vacancies_display?: string | null
         }
         Update: {
           age_max?: number | null
@@ -258,6 +262,7 @@ export type Database = {
           id?: string
           is_featured?: boolean | null
           last_date?: string
+          last_date_display?: string | null
           location?: string
           qualification?: string
           salary_max?: number | null
@@ -265,6 +270,7 @@ export type Database = {
           title?: string
           updated_at?: string
           vacancies?: number | null
+          vacancies_display?: string | null
         }
         Relationships: []
       }
