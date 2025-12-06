@@ -34,11 +34,18 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    // Create a client with the user's token to validate authentication
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+    
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
 
     if (authError || !user) {
+      console.error("Auth error:", authError?.message);
       return new Response(
-        JSON.stringify({ data: null, error: "Invalid token", success: false }),
+        JSON.stringify({ data: null, error: "Invalid or expired session. Please log in again.", success: false }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
