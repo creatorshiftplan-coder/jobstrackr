@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { Job } from "@/types/job";
@@ -167,8 +167,33 @@ export default function Admin() {
   // Filters for jobs
   const [lastDateFilter, setLastDateFilter] = useState<string>("all");
   const [vacanciesFilter, setVacanciesFilter] = useState<string>("all");
+  
+  // Sorting for jobs
+  const [sortField, setSortField] = useState<"last_date" | "vacancies" | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // Filter jobs based on selected filters
+  const handleSort = (field: "last_date" | "vacancies") => {
+    if (sortField === field) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else {
+        // Reset sorting on third click
+        setSortField(null);
+        setSortDirection("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (field: "last_date" | "vacancies") => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1" />;
+    if (sortDirection === "asc") return <ArrowUp className="h-4 w-4 ml-1" />;
+    return <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
+  // Filter and sort jobs
   const filteredJobs = jobs?.filter((job) => {
     // Last date filter
     if (lastDateFilter !== "all") {
@@ -197,6 +222,22 @@ export default function Admin() {
     }
     
     return true;
+  }).sort((a, b) => {
+    if (!sortField) return 0;
+    
+    if (sortField === "last_date") {
+      const dateA = new Date(a.last_date).getTime();
+      const dateB = new Date(b.last_date).getTime();
+      return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
+    }
+    
+    if (sortField === "vacancies") {
+      const vacA = a.vacancies || 1;
+      const vacB = b.vacancies || 1;
+      return sortDirection === "asc" ? vacA - vacB : vacB - vacA;
+    }
+    
+    return 0;
   });
 
   if (authLoading || roleLoading) {
@@ -461,8 +502,24 @@ export default function Admin() {
                         <TableRow>
                           <TableHead>Title</TableHead>
                           <TableHead>Department</TableHead>
-                          <TableHead>Last Date</TableHead>
-                          <TableHead>Vacancies</TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50 select-none"
+                            onClick={() => handleSort("last_date")}
+                          >
+                            <div className="flex items-center">
+                              Last Date
+                              {getSortIcon("last_date")}
+                            </div>
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50 select-none"
+                            onClick={() => handleSort("vacancies")}
+                          >
+                            <div className="flex items-center">
+                              Vacancies
+                              {getSortIcon("vacancies")}
+                            </div>
+                          </TableHead>
                           <TableHead>Featured</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
