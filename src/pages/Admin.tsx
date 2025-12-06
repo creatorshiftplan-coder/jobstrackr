@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -68,6 +68,8 @@ const emptyFormData: JobFormData = {
 interface BulkUploadJob extends JobFormData {
   isDuplicate?: boolean;
   duplicateOf?: string;
+  matchType?: "exact" | "similar" | "none";
+  similarityScore?: number;
 }
 
 // Helper to check if a value is a TBD-like string
@@ -169,6 +171,55 @@ const parseAgeLimit = (ageLimit?: string | null): { age_min: number; age_max: nu
   return { age_min: 18, age_max: 65 };
 };
 
+// Calculate similarity score between two strings (0-100%)
+const calculateSimilarity = (str1: string, str2: string): number => {
+  const s1 = str1.toLowerCase().trim();
+  const s2 = str2.toLowerCase().trim();
+  
+  // Exact match
+  if (s1 === s2) return 100;
+  
+  // Check if one contains the other
+  if (s1.includes(s2) || s2.includes(s1)) return 85;
+  
+  // Token-based matching (word overlap)
+  const tokens1 = s1.split(/\s+/).filter(t => t.length > 2);
+  const tokens2 = s2.split(/\s+/).filter(t => t.length > 2);
+  
+  if (tokens1.length === 0 || tokens2.length === 0) return 0;
+  
+  const commonTokens = tokens1.filter(t => tokens2.includes(t));
+  const tokenScore = (commonTokens.length * 2) / (tokens1.length + tokens2.length) * 100;
+  
+  return Math.round(tokenScore);
+};
+
+// Check if jobs are similar based on multiple fields
+const checkJobSimilarity = (newJob: JobFormData, existingJob: Job): { isSimilar: boolean; score: number; matchType: "exact" | "similar" | "none" } => {
+  const titleSimilarity = calculateSimilarity(newJob.title, existingJob.title);
+  const deptSimilarity = calculateSimilarity(newJob.department, existingJob.department);
+  
+  // Exact match: both title and department match 100%
+  if (titleSimilarity === 100 && deptSimilarity === 100) {
+    return { isSimilar: true, score: 100, matchType: "exact" };
+  }
+  
+  // Similar match: high title similarity (>70%) AND same/similar department (>80%)
+  if (titleSimilarity >= 70 && deptSimilarity >= 80) {
+    const avgScore = Math.round((titleSimilarity + deptSimilarity) / 2);
+    return { isSimilar: true, score: avgScore, matchType: "similar" };
+  }
+  
+  // Also check location + department for additional context
+  const locationMatch = newJob.location?.toLowerCase() === existingJob.location?.toLowerCase();
+  if (titleSimilarity >= 60 && deptSimilarity >= 60 && locationMatch) {
+    const avgScore = Math.round((titleSimilarity + deptSimilarity) / 2);
+    return { isSimilar: true, score: avgScore, matchType: "similar" };
+  }
+  
+  return { isSimilar: false, score: 0, matchType: "none" };
+};
+
 // Map bulk upload input to JobFormData
 const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
   const { age_min, age_max } = parseAgeLimit(input.age_limit);
@@ -232,7 +283,7 @@ export default function Admin() {
   const [bulkJobs, setBulkJobs] = useState<BulkUploadJob[]>([]);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [jsonText, setJsonText] = useState("");
-  const [duplicateMode, setDuplicateMode] = useState<"skip" | "replace">("skip");
+  const [duplicateMode, setDuplicateMode] = useState<"skip" | "update" | "replace">("skip");
   
   // Filters for jobs
   const [lastDateFilter, setLastDateFilter] = useState<string>("all");
@@ -399,17 +450,23 @@ export default function Admin() {
         // Map the input format to JobFormData
         const jobData = mapBulkInputToJobForm(input);
         
-        // Check for duplicates based on exam_name (title) and agency (department)
-        const duplicate = jobs?.find(
-          (existingJob) =>
-            existingJob.title.toLowerCase() === jobData.title?.toLowerCase() &&
-            existingJob.department.toLowerCase() === jobData.department?.toLowerCase()
-        );
+        // Find best matching existing job using similarity detection
+        let bestMatch: { job: Job | null; score: number; matchType: "exact" | "similar" | "none" } = 
+          { job: null, score: 0, matchType: "none" };
+        
+        for (const existingJob of jobs || []) {
+          const similarity = checkJobSimilarity(jobData, existingJob);
+          if (similarity.isSimilar && similarity.score > bestMatch.score) {
+            bestMatch = { job: existingJob, score: similarity.score, matchType: similarity.matchType };
+          }
+        }
         
         return {
           ...jobData,
-          isDuplicate: !!duplicate,
-          duplicateOf: duplicate?.id,
+          isDuplicate: bestMatch.job !== null,
+          duplicateOf: bestMatch.job?.id,
+          matchType: bestMatch.matchType,
+          similarityScore: bestMatch.score,
         };
       });
 
@@ -425,7 +482,7 @@ export default function Admin() {
     const duplicateJobs = bulkJobs.filter((job) => job.isDuplicate);
     
     const hasNewJobs = newJobs.length > 0;
-    const hasUpdates = duplicateMode === "replace" && duplicateJobs.length > 0;
+    const hasUpdates = (duplicateMode === "update" || duplicateMode === "replace") && duplicateJobs.length > 0;
     
     if (!hasNewJobs && !hasUpdates) {
       toast({ title: "No jobs to upload or update", variant: "destructive" });
@@ -436,19 +493,20 @@ export default function Admin() {
     try {
       let insertedCount = 0;
       let updatedCount = 0;
+      let replacedCount = 0;
       
       // Insert new jobs
       if (newJobs.length > 0) {
-        const cleanNewJobs = newJobs.map(({ isDuplicate, duplicateOf, ...job }) => job);
+        const cleanNewJobs = newJobs.map(({ isDuplicate, duplicateOf, matchType, similarityScore, ...job }) => job);
         const { error } = await supabase.from("jobs").insert(cleanNewJobs);
         if (error) throw error;
         insertedCount = cleanNewJobs.length;
       }
       
-      // Update existing jobs if replace mode is selected
-      if (duplicateMode === "replace" && duplicateJobs.length > 0) {
+      // Update existing job records (keep ID)
+      if (duplicateMode === "update" && duplicateJobs.length > 0) {
         for (const dupJob of duplicateJobs) {
-          const { isDuplicate, duplicateOf, ...jobData } = dupJob;
+          const { isDuplicate, duplicateOf, matchType, similarityScore, ...jobData } = dupJob;
           if (duplicateOf) {
             const { error } = await supabase.from("jobs").update(jobData).eq("id", duplicateOf);
             if (error) throw error;
@@ -457,9 +515,28 @@ export default function Admin() {
         }
       }
       
+      // Replace: delete old, add new (new ID)
+      if (duplicateMode === "replace" && duplicateJobs.length > 0) {
+        for (const dupJob of duplicateJobs) {
+          const { isDuplicate, duplicateOf, matchType, similarityScore, ...jobData } = dupJob;
+          if (duplicateOf) {
+            // Delete old job
+            await supabase.from("jobs").delete().eq("id", duplicateOf);
+            // Insert as new
+            const { error } = await supabase.from("jobs").insert(jobData);
+            if (error) throw error;
+            replacedCount++;
+          }
+        }
+      }
+      
       const messages = [];
       if (insertedCount > 0) messages.push(`${insertedCount} jobs created`);
       if (updatedCount > 0) messages.push(`${updatedCount} jobs updated`);
+      if (replacedCount > 0) messages.push(`${replacedCount} jobs replaced`);
+      if (duplicateMode === "skip" && duplicateJobs.length > 0) {
+        messages.push(`${duplicateJobs.length} duplicates skipped`);
+      }
       
       toast({ title: messages.join(", ") + "!" });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
@@ -947,21 +1024,27 @@ export default function Admin() {
             </DialogDescription>
           </DialogHeader>
           
-          {/* Duplicate Handling Options */}
+          {/* Duplicate & Similar Job Handling Options */}
           {bulkJobs.some(j => j.isDuplicate) && (
             <div className="bg-muted/50 rounded-lg p-4 border border-border">
-              <p className="text-sm font-medium mb-3">Duplicate Handling</p>
-              <RadioGroup value={duplicateMode} onValueChange={(v) => setDuplicateMode(v as "skip" | "replace")} className="space-y-2">
+              <p className="text-sm font-medium mb-3">Duplicate & Similar Job Handling</p>
+              <RadioGroup value={duplicateMode} onValueChange={(v) => setDuplicateMode(v as "skip" | "update" | "replace")} className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="skip" id="skip" />
                   <Label htmlFor="skip" className="text-sm font-normal cursor-pointer">
-                    Skip duplicates <span className="text-muted-foreground">(only upload new jobs)</span>
+                    Skip <span className="text-muted-foreground">(only upload new jobs)</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="update" id="update" />
+                  <Label htmlFor="update" className="text-sm font-normal cursor-pointer">
+                    Update existing <span className="text-muted-foreground">(modify existing records with new data, keep ID)</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="replace" id="replace" />
                   <Label htmlFor="replace" className="text-sm font-normal cursor-pointer">
-                    Replace duplicates <span className="text-muted-foreground">(update existing jobs with new data)</span>
+                    Replace <span className="text-muted-foreground">(delete old & add as new jobs with new ID)</span>
                   </Label>
                 </div>
               </RadioGroup>
@@ -973,10 +1056,10 @@ export default function Admin() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Status</TableHead>
+                  <TableHead>Match</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Department</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Last Date</TableHead>
+                  <TableHead>Matched With</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -986,32 +1069,50 @@ export default function Admin() {
                     className={
                       job.isDuplicate 
                         ? duplicateMode === "skip" 
-                          ? "opacity-50 line-through" 
-                          : "bg-amber-50 dark:bg-amber-950/20"
+                          ? "opacity-50" 
+                          : duplicateMode === "update"
+                            ? "bg-amber-50 dark:bg-amber-950/20"
+                            : "bg-blue-50 dark:bg-blue-950/20"
                         : ""
                     }
                   >
                     <TableCell>
                       {job.isDuplicate ? (
-                        duplicateMode === "skip" ? (
-                          <Badge variant="destructive" className="gap-1">
-                            <X className="h-3 w-3" /> Skip
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="gap-1 text-amber-600 border-amber-600 dark:text-amber-400 dark:border-amber-400">
-                            <RefreshCw className="h-3 w-3" /> Update
-                          </Badge>
-                        )
+                        <>
+                          {duplicateMode === "skip" && (
+                            <Badge variant="destructive" className="gap-1">
+                              <X className="h-3 w-3" /> Skip
+                            </Badge>
+                          )}
+                          {duplicateMode === "update" && (
+                            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-600 dark:text-amber-400 dark:border-amber-400">
+                              <RefreshCw className="h-3 w-3" /> Update
+                            </Badge>
+                          )}
+                          {duplicateMode === "replace" && (
+                            <Badge variant="outline" className="gap-1 text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-400">
+                              <Replace className="h-3 w-3" /> Replace
+                            </Badge>
+                          )}
+                        </>
                       ) : (
                         <Badge variant="outline" className="gap-1 text-green-600 border-green-600 dark:text-green-400 dark:border-green-400">
                           <Check className="h-3 w-3" /> New
                         </Badge>
                       )}
                     </TableCell>
+                    <TableCell>
+                      {job.isDuplicate && (
+                        <Badge variant="secondary" className="text-xs">
+                          {job.matchType === "exact" ? "Exact" : `~${job.similarityScore}%`}
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium max-w-[150px] truncate">{job.title}</TableCell>
                     <TableCell className="max-w-[100px] truncate">{job.department}</TableCell>
-                    <TableCell>{job.location}</TableCell>
-                    <TableCell>{job.last_date_display || job.last_date}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">
+                      {job.isDuplicate ? jobs?.find(j => j.id === job.duplicateOf)?.title || "-" : "-"}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -1021,9 +1122,15 @@ export default function Admin() {
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <div className="text-sm text-muted-foreground flex-1">
               {bulkJobs.filter(j => !j.isDuplicate).length} new
-              {duplicateMode === "skip" 
-                ? `, ${bulkJobs.filter(j => j.isDuplicate).length} will be skipped`
-                : `, ${bulkJobs.filter(j => j.isDuplicate).length} will be updated`
+              {bulkJobs.filter(j => j.matchType === "exact").length > 0 && `, ${bulkJobs.filter(j => j.matchType === "exact").length} exact match`}
+              {bulkJobs.filter(j => j.matchType === "similar").length > 0 && `, ${bulkJobs.filter(j => j.matchType === "similar").length} similar`}
+              {duplicateMode === "skip" && bulkJobs.filter(j => j.isDuplicate).length > 0
+                ? " (will be skipped)"
+                : duplicateMode === "update" && bulkJobs.filter(j => j.isDuplicate).length > 0
+                  ? " (will be updated)"
+                  : duplicateMode === "replace" && bulkJobs.filter(j => j.isDuplicate).length > 0
+                    ? " (will be replaced)"
+                    : ""
               }
             </div>
             <div className="flex gap-2">
@@ -1035,7 +1142,7 @@ export default function Admin() {
                 {bulkUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 {duplicateMode === "skip" 
                   ? `Upload ${bulkJobs.filter(j => !j.isDuplicate).length} Jobs`
-                  : `Upload ${bulkJobs.length} Jobs`
+                  : `Process ${bulkJobs.length} Jobs`
                 }
               </Button>
             </div>
