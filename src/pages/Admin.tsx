@@ -90,14 +90,16 @@ interface BulkUploadInput {
 const JSON_FORMAT_EXAMPLE = `{
   "jobs": [
     {
-      "exam_name": "SSC CGL 2024",
+      "exam_name": "SSC CGL 2025",
       "agency": "Staff Selection Commission",
       "salary_min": 25000,
       "salary_max": 85000,
       "location": "All India",
-      "last_date": "2024-12-31",
-      "exam_date": "2025-02-15",
+      "last_date": "2025-02-15",
+      "exam_date": "2025-04-01",
       "age_limit": "18-32 years",
+      "vacancies": 10000,
+      "eligibility": "Bachelor's Degree from a recognized university",
       "application_fees": {
         "general": 100,
         "obc": 100,
