@@ -38,13 +38,14 @@ export default function ExamTracker() {
               My Exams
             </h1>
             <div className="flex items-center gap-2">
-              <ExamSearchSheet 
-                trigger={
-                  <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors cursor-pointer">
-                    <Plus className="h-5 w-5 text-white" />
-                  </div>
-                }
-              />
+            <ExamSearchSheet 
+              trigger={
+                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/20 hover:bg-white/30 transition-all cursor-pointer backdrop-blur-sm border border-white/30 shadow-sm">
+                  <Plus className="h-4 w-4 text-white" />
+                  <span className="text-white text-sm font-medium">Add Exam</span>
+                </div>
+              }
+            />
               <Link to="/saved">
                 <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
                   <Bookmark className="h-5 w-5 text-white" />
@@ -87,8 +88,9 @@ export default function ExamTracker() {
           <div className="flex items-center gap-2">
             <ExamSearchSheet 
               trigger={
-                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors cursor-pointer">
-                  <Plus className="h-5 w-5 text-white" />
+                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/20 hover:bg-white/30 transition-all cursor-pointer backdrop-blur-sm border border-white/30 shadow-sm">
+                  <Plus className="h-4 w-4 text-white" />
+                  <span className="text-white text-sm font-medium">Add Exam</span>
                 </div>
               }
             />
