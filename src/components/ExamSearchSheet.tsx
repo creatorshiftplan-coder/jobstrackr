@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Sparkles, BookOpen, Loader2, Plus } from "lucide-react";
+import { useJobs } from "@/hooks/useJobs";
 import { useExams } from "@/hooks/useExams";
 import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { toast } from "sonner";
@@ -15,32 +16,52 @@ interface ExamSearchSheetProps {
 export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   
-  const { exams, addExamAttempt, createExam } = useExams();
+  const { data: jobs = [] } = useJobs();
+  const { addExamAttempt, createExam } = useExams();
   const { isSearching, aiResults, searchWithAI, clearAIResults } = useAIJobSearch();
 
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear + 1];
 
-  // Filter exams based on search query
-  const filteredExams = exams.filter(exam => 
-    exam.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    exam.conducting_body?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter jobs based on search query
+  const filteredJobs = searchQuery.trim() 
+    ? jobs.filter(job => 
+        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.department.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
 
-  const handleAddExam = async () => {
-    if (!selectedExamId) {
+  const handleAddJob = async () => {
+    if (!selectedJobId) {
       toast.error("Please select an exam first");
       return;
     }
 
+    const selectedJob = jobs.find(j => j.id === selectedJobId);
+    if (!selectedJob) {
+      toast.error("Job not found");
+      return;
+    }
+
     try {
+      // Create an exam entry from the job
+      const newExam = await createExam.mutateAsync({
+        name: selectedJob.title,
+        conducting_body: selectedJob.department,
+        category: "Government",
+        description: selectedJob.description,
+        official_website: selectedJob.apply_link,
+      });
+
+      // Then add to tracker
       await addExamAttempt.mutateAsync({
-        examId: selectedExamId,
+        examId: newExam.id,
         year: parseInt(selectedYear),
       });
+
       toast.success("Exam added to tracker!");
       setOpen(false);
       resetState();
@@ -84,7 +105,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
 
   const resetState = () => {
     setSearchQuery("");
-    setSelectedExamId(null);
+    setSelectedJobId(null);
     clearAIResults();
   };
 
@@ -118,13 +139,13 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
 
         {/* Search Results */}
         <div className="flex-1 overflow-y-auto max-h-[40vh] space-y-2 mb-4">
-          {searchQuery && filteredExams.length > 0 ? (
-            filteredExams.map((exam) => (
+          {searchQuery && filteredJobs.length > 0 ? (
+            filteredJobs.map((job) => (
               <button
-                key={exam.id}
-                onClick={() => setSelectedExamId(exam.id)}
+                key={job.id}
+                onClick={() => setSelectedJobId(job.id)}
                 className={`w-full p-4 rounded-xl text-left transition-colors ${
-                  selectedExamId === exam.id 
+                  selectedJobId === job.id 
                     ? "bg-blue-100 border-2 border-blue-500" 
                     : "bg-muted/30 hover:bg-muted/50"
                 }`}
@@ -134,13 +155,13 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
                     <BookOpen className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="font-medium text-foreground">{exam.name}</h3>
-                    <p className="text-sm text-muted-foreground">{exam.conducting_body}</p>
+                    <h3 className="font-medium text-foreground">{job.title}</h3>
+                    <p className="text-sm text-muted-foreground">{job.department}</p>
                   </div>
                 </div>
               </button>
             ))
-          ) : searchQuery && filteredExams.length === 0 && !isSearching && aiResults.length === 0 ? (
+          ) : searchQuery && filteredJobs.length === 0 && !isSearching && aiResults.length === 0 ? (
             <div className="text-center py-8 space-y-4">
               <p className="text-muted-foreground">No exams found in database</p>
               <Button 
@@ -189,7 +210,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
         </div>
 
         {/* Year Selector and Add Button */}
-        {selectedExamId && (
+        {selectedJobId && (
           <div className="border-t pt-4 space-y-4">
             <div className="flex items-center gap-4">
               <span className="text-sm font-medium text-muted-foreground">Select Year:</span>
@@ -207,11 +228,11 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
               </Select>
             </div>
             <Button 
-              onClick={handleAddExam}
+              onClick={handleAddJob}
               className="w-full h-12 bg-blue-600 hover:bg-blue-700"
-              disabled={addExamAttempt.isPending}
+              disabled={addExamAttempt.isPending || createExam.isPending}
             >
-              {addExamAttempt.isPending ? (
+              {(addExamAttempt.isPending || createExam.isPending) ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 "Add to Tracker"
