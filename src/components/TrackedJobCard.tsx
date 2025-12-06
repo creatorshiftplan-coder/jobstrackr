@@ -98,65 +98,68 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
 
   return (
     <Card className="bg-slate-50 border-slate-200 overflow-hidden">
-      {/* Header - Always Visible */}
+      {/* Clickable Area - Header + Collapsed Summary */}
       <div 
-        className="flex items-center justify-between p-4 cursor-pointer"
+        className="cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex-1">
-          <h3 className="font-semibold text-foreground">
-            {exam?.name} {attempt.year}
-          </h3>
-          {exam?.conducting_body && (
-            <p className="text-xs text-muted-foreground mt-0.5">{exam.conducting_body}</p>
-          )}
+        {/* Header - Always Visible */}
+        <div className="flex items-center justify-between p-4">
+          <div className="flex-1">
+            <h3 className="font-semibold text-foreground">
+              {exam?.name} {attempt.year}
+            </h3>
+            {exam?.conducting_body && (
+              <p className="text-xs text-muted-foreground mt-0.5">{exam.conducting_body}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeExamAttempt.mutate(attempt.id);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            {isExpanded ? (
+              <ChevronUp className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              removeExamAttempt.mutate(attempt.id);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          {isExpanded ? (
-            <ChevronUp className="h-5 w-5 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-muted-foreground" />
-          )}
-        </div>
-      </div>
 
-      {/* Collapsed Summary */}
-      {!isExpanded && (
-        <div className="px-4 pb-4">
-          {isLoadingStatus ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-2 w-full" />
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="h-4 w-4 text-blue-600" />
-                <span className="text-sm text-foreground">{getCurrentPhase()}</span>
-                {getStatusBadge(getProgress() >= 33)}
+        {/* Collapsed Summary */}
+        {!isExpanded && (
+          <div className="px-4 pb-4">
+            {isLoadingStatus ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-2 w-full" />
               </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Phase 1 Progress</span>
-                  <span>{getProgress()}%</span>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm text-foreground">{getCurrentPhase()}</span>
+                  {getStatusBadge(getProgress() >= 33)}
                 </div>
-                <Progress value={getProgress()} className="h-2 bg-slate-200" />
-              </div>
-            </>
-          )}
-        </div>
-      )}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Phase 1 Progress</span>
+                    <span>{getProgress()}%</span>
+                  </div>
+                  <Progress value={getProgress()} className="h-2 bg-slate-200" />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Expanded Content */}
       {isExpanded && (
