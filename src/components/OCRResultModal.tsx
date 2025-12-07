@@ -56,8 +56,12 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 export function OCRResultModal({ isOpen, onClose, extractedData, onConfirm }: OCRResultModalProps) {
+  const validFields = Object.entries(extractedData).filter(
+    ([key, value]) => value !== null && value !== undefined && !["photo_uploaded", "signature_uploaded", "raw_text"].includes(key)
+  );
+
   const [selectedFields, setSelectedFields] = useState<Set<string>>(
-    new Set(Object.keys(extractedData).filter((key) => extractedData[key] !== null))
+    new Set(validFields.map(([key]) => key))
   );
 
   const toggleField = (field: string) => {
@@ -68,6 +72,16 @@ export function OCRResultModal({ isOpen, onClose, extractedData, onConfirm }: OC
       newSelected.add(field);
     }
     setSelectedFields(newSelected);
+  };
+
+  const allSelected = validFields.length > 0 && validFields.every(([key]) => selectedFields.has(key));
+
+  const handleSelectAll = () => {
+    if (allSelected) {
+      setSelectedFields(new Set());
+    } else {
+      setSelectedFields(new Set(validFields.map(([key]) => key)));
+    }
   };
 
   const handleConfirm = () => {
@@ -81,10 +95,6 @@ export function OCRResultModal({ isOpen, onClose, extractedData, onConfirm }: OC
     onClose();
   };
 
-  const validFields = Object.entries(extractedData).filter(
-    ([key, value]) => value !== null && value !== undefined && !["photo_uploaded", "signature_uploaded", "raw_text"].includes(key)
-  );
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
@@ -94,6 +104,20 @@ export function OCRResultModal({ isOpen, onClose, extractedData, onConfirm }: OC
             Select the fields you want to update in your profile
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex items-center justify-between mb-2 px-1">
+          <span className="text-sm text-muted-foreground">
+            {selectedFields.size} of {validFields.length} selected
+          </span>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleSelectAll}
+            disabled={validFields.length === 0}
+          >
+            {allSelected ? "Deselect All" : "Select All"}
+          </Button>
+        </div>
 
         <ScrollArea className="max-h-[400px]">
           <div className="space-y-3 p-1">
