@@ -218,12 +218,14 @@ export default function Search() {
             ))}
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <p className="text-sm text-muted-foreground">{filteredJobs.length} results</p>
 
-            {filteredJobs.map((job) => (
-              <JobCard key={job.id} job={job} />
-            ))}
+            <div className="flex flex-col gap-6">
+              {filteredJobs.map((job) => (
+                <JobCard key={job.id} job={job} />
+              ))}
+            </div>
 
             {/* AI Search Results */}
             {aiResults.length > 0 && (
