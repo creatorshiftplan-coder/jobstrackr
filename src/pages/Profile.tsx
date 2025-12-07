@@ -10,7 +10,7 @@ import { useEducation } from "@/hooks/useEducation";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { ProfileCompleteness } from "@/components/ProfileCompleteness";
+import { EmbeddedProfileProgress } from "@/components/ProfileCompleteness";
 
 export default function Profile() {
   const { user, loading } = useAuth();
@@ -114,12 +114,13 @@ export default function Profile() {
             </span>
             {highestEducation && <CheckCircle className="h-4 w-4 text-[hsl(var(--blue-300))] fill-[hsl(var(--blue-300))]" />}
           </div>
+          
+          {/* Embedded Profile Progress */}
+          <EmbeddedProfileProgress profile={profile} education={education} />
         </div>
       </div>
 
       <main className="px-4 py-6 space-y-6 -mt-12">
-        {/* Profile Completeness */}
-        <ProfileCompleteness profile={profile} education={education} />
 
         {/* Stats Row */}
         <Card className="border-0 shadow-card">

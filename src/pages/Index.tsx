@@ -114,7 +114,7 @@ const Index = () => {
   const canSearchAI = searchQuery.length >= 3 && !isSearching;
 
   return (
-    <div className="min-h-screen bg-[#E3F2FD] pb-24">
+    <div className="min-h-screen bg-white pb-24">
       <WelcomeHeader />
       <SearchWithFilter 
         searchQuery={searchQuery} 

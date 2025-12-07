@@ -1,8 +1,8 @@
 import { Progress } from "@/components/ui/progress";
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { CheckCircle2, ChevronRight } from "lucide-react";
 import { Profile } from "@/hooks/useProfile";
 import { EducationQualification } from "@/hooks/useEducation";
+import { Link } from "react-router-dom";
 
 interface ProfileCompletenessProps {
   profile: Profile | null;
@@ -24,7 +24,7 @@ const REQUIRED_FIELDS = [
   { key: "signature_url", label: "Signature" },
 ];
 
-export function ProfileCompleteness({ profile, education }: ProfileCompletenessProps) {
+function calculateCompleteness(profile: Profile | null, education: EducationQualification[]) {
   const filledFields = REQUIRED_FIELDS.filter((field) => {
     const value = profile?.[field.key as keyof Profile];
     return value !== null && value !== undefined && value !== "";
@@ -33,7 +33,7 @@ export function ProfileCompleteness({ profile, education }: ProfileCompletenessP
   const has10thEducation = education.some((e) => e.qualification_type === "10th");
   const has12thEducation = education.some((e) => e.qualification_type === "12th");
 
-  const totalRequired = REQUIRED_FIELDS.length + 2; // +2 for 10th and 12th education
+  const totalRequired = REQUIRED_FIELDS.length + 2;
   const totalFilled = filledFields.length + (has10thEducation ? 1 : 0) + (has12thEducation ? 1 : 0);
   const completionPercentage = Math.round((totalFilled / totalRequired) * 100);
 
@@ -46,45 +46,73 @@ export function ProfileCompleteness({ profile, education }: ProfileCompletenessP
     ...(!has12thEducation ? [{ key: "12th", label: "Class 12 Details" }] : []),
   ];
 
+  return { completionPercentage, missingFields, totalFilled, totalRequired };
+}
+
+// Sleek embedded progress indicator for the blue header section
+export function EmbeddedProfileProgress({ profile, education }: ProfileCompletenessProps) {
+  const { completionPercentage } = calculateCompleteness(profile, education);
+
   if (completionPercentage === 100) {
     return (
-      <Card className="border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
-        <CardContent className="p-4 flex items-center gap-3">
-          <CheckCircle2 className="h-5 w-5 text-green-600" />
-          <p className="text-sm text-green-700 dark:text-green-400 font-medium">
-            Profile complete! You're ready for job applications.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="mt-4 mx-4 flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm">
+        <CheckCircle2 className="h-4 w-4 text-white" />
+        <span className="text-sm font-medium text-white">Profile Complete</span>
+      </div>
     );
   }
 
   return (
-    <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-600" />
-            <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
-              Profile {completionPercentage}% complete
+    <div className="mt-4 mx-4 px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-white/90">{completionPercentage}% Complete</span>
+        <Link 
+          to="/edit-profile" 
+          className="flex items-center gap-0.5 text-xs font-medium text-white/70 hover:text-white transition-colors"
+        >
+          Complete profile
+          <ChevronRight className="h-3 w-3" />
+        </Link>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-white/20 overflow-hidden">
+        <div 
+          className="h-full rounded-full bg-white transition-all duration-500 ease-out"
+          style={{ width: `${completionPercentage}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Original card-based component (keeping for backwards compatibility)
+export function ProfileCompleteness({ profile, education }: ProfileCompletenessProps) {
+  const { completionPercentage, missingFields } = calculateCompleteness(profile, education);
+
+  if (completionPercentage === 100) {
+    return null;
+  }
+
+  return (
+    <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 rounded-lg p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+          Profile {completionPercentage}% complete
+        </span>
+        <span className="text-xs text-amber-600">{missingFields.length} missing</span>
+      </div>
+      <Progress value={completionPercentage} className="h-2" />
+      {missingFields.length <= 5 && (
+        <div className="flex flex-wrap gap-1.5">
+          {missingFields.slice(0, 5).map((field) => (
+            <span
+              key={field.key}
+              className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200"
+            >
+              {field.label}
             </span>
-          </div>
-          <span className="text-xs text-amber-600">{missingFields.length} missing</span>
+          ))}
         </div>
-        <Progress value={completionPercentage} className="h-2" />
-        {missingFields.length <= 5 && (
-          <div className="flex flex-wrap gap-1.5">
-            {missingFields.slice(0, 5).map((field) => (
-              <span
-                key={field.key}
-                className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200"
-              >
-                {field.label}
-              </span>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }
