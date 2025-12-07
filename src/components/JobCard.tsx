@@ -33,7 +33,7 @@ export function JobCard({ job }: JobCardProps) {
 
   return (
     <Link to={`/job/${job.id}`}>
-      <Card className="group shadow-card hover:shadow-card-hover transition-all duration-300 border-0 overflow-hidden animate-slide-up">
+      <Card className="group shadow-md hover:shadow-lg transition-all duration-300 border border-border/50 rounded-xl overflow-hidden animate-slide-up">
         <CardContent className="p-4">
           <div className="flex justify-between items-start gap-3">
             <div className="flex-1 min-w-0">

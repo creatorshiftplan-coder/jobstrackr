@@ -218,7 +218,7 @@ export default function Search() {
             ))}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <p className="text-sm text-muted-foreground">{filteredJobs.length} results</p>
 
             {filteredJobs.map((job) => (
