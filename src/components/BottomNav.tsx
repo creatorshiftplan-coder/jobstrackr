@@ -22,12 +22,14 @@ export function BottomNav() {
               key={path}
               to={path}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0 flex-shrink-0",
-                isActive ? "text-[#0A4174]" : "text-[#0A4174]/50 hover:text-[#0A4174]/80"
+                "flex flex-col items-center justify-center gap-0.5 px-4 py-2 rounded-2xl transition-all min-w-0 flex-shrink-0",
+                isActive 
+                  ? "text-[#0A4174] bg-[#0A4174]/10" 
+                  : "text-[#0A4174]/40 hover:text-[#0A4174]/70"
               )}
             >
-              <Icon className={cn("h-5 w-5", isActive && "fill-[#0A4174]/20")} />
-              <span className="text-[10px] font-medium whitespace-nowrap">{label}</span>
+              <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5px]")} />
+              <span className={cn("text-[10px] whitespace-nowrap", isActive ? "font-semibold" : "font-medium")}>{label}</span>
             </Link>
           );
         })}

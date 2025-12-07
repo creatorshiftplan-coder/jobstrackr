@@ -346,18 +346,28 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             </div>
           )}
 
-          {/* Refresh Button - Always visible */}
-          <div className="flex justify-end pt-2">
+          {/* Refresh Button - Prominent styling */}
+          <div className="flex justify-center pt-4">
             <Button
-              size="sm"
-              variant="ghost"
+              size="default"
               onClick={fetchStatus}
               disabled={isLoadingStatus}
-              className="text-xs text-muted-foreground"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6"
             >
-              <RefreshCw className={cn("h-3 w-3 mr-1", isLoadingStatus && "animate-spin")} />
+              <RefreshCw className={cn("h-4 w-4 mr-2", isLoadingStatus && "animate-spin")} />
               Refresh Status
             </Button>
+          </div>
+
+          {/* Collapse Button at Bottom Center */}
+          <div className="flex justify-center pt-4 border-t border-slate-200 mt-4">
+            <button 
+              onClick={() => setIsExpanded(false)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+            >
+              <ChevronUp className="h-4 w-4" />
+              <span className="text-sm font-medium">Collapse</span>
+            </button>
           </div>
         </CardContent>
       )}
