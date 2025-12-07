@@ -19,11 +19,8 @@ export function WelcomeHeader() {
   return (
     <header className="flex items-center justify-between px-5 pt-12 pb-4">
       <div>
-        <p className={`text-sm text-muted-foreground transition-all duration-300 ${showWelcome ? 'opacity-100 h-5' : 'opacity-0 h-0 overflow-hidden'}`}>
-          Welcome Back!
-        </p>
         <h1 className="text-2xl font-bold text-foreground">
-          {displayName} <span className="wave">👋</span>
+          Welcome <span className="wave">👋</span> {displayName}
         </h1>
       </div>
       
