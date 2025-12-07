@@ -55,28 +55,28 @@ export function EmbeddedProfileProgress({ profile, education }: ProfileCompleten
 
   if (completionPercentage === 100) {
     return (
-      <div className="mt-4 w-4/5 mx-auto flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm">
-        <CheckCircle2 className="h-4 w-4 text-white" />
-        <span className="text-sm font-medium text-white">Profile Complete</span>
+      <div className="mt-4 w-4/5 mx-auto flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-[#0A4174]/15 backdrop-blur-sm border border-[#0A4174]/20">
+        <CheckCircle2 className="h-4 w-4 text-[#0A4174]" />
+        <span className="text-sm font-medium text-[#0A4174]">Profile Complete</span>
       </div>
     );
   }
 
   return (
-    <div className="mt-4 w-4/5 mx-auto px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm">
+    <div className="mt-4 w-4/5 mx-auto px-4 py-3 rounded-2xl bg-[#0A4174]/10 backdrop-blur-sm border border-[#0A4174]/20">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-white/90">{completionPercentage}% Complete</span>
+        <span className="text-sm font-medium text-[#0A4174]">{completionPercentage}% Complete</span>
         <Link 
           to="/edit-profile" 
-          className="flex items-center gap-0.5 text-xs font-medium text-white/70 hover:text-white transition-colors"
+          className="flex items-center gap-0.5 text-xs font-medium text-[#0A4174]/70 hover:text-[#0A4174] transition-colors"
         >
           Complete profile
           <ChevronRight className="h-3 w-3" />
         </Link>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-white/20 overflow-hidden">
+      <div className="h-2 w-full rounded-full bg-[#0A4174]/20 overflow-hidden">
         <div 
-          className="h-full rounded-full bg-white transition-all duration-500 ease-out"
+          className="h-full rounded-full bg-[#0A4174] transition-all duration-500 ease-out"
           style={{ width: `${completionPercentage}%` }}
         />
       </div>

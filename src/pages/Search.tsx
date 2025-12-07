@@ -55,6 +55,17 @@ export default function Search() {
       );
     }
 
+    // Sort by newest active jobs first
+    const now = new Date();
+    filtered = [...filtered].sort((a, b) => {
+      const aActive = new Date(a.last_date) > now;
+      const bActive = new Date(b.last_date) > now;
+      // Prioritize active jobs
+      if (aActive !== bActive) return bActive ? 1 : -1;
+      // Then sort by created_at descending (newest first)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
     return filtered;
   }, [jobs, query, selectedLocations, selectedSectors]);
 
