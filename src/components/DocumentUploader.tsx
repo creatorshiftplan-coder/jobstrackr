@@ -73,11 +73,14 @@ export function DocumentUploader({ onOCRComplete }: DocumentUploaderProps) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
           <FileText className="h-5 w-5" />
-          Documents
+          Upload Your Documents
         </CardTitle>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+          With the help of AI, we'll auto-fill your profile information with your confirmation
+        </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2">

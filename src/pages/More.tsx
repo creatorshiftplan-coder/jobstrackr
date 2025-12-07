@@ -2,7 +2,7 @@ import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2, Bookmark, ArrowLeft } from "lucide-react";
+import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2, Bookmark, ArrowLeft, FileText } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -93,6 +93,24 @@ export default function More() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Application Guidance Link */}
+            <Link to="/formmate">
+              <Card className="border-0 shadow-card mb-4 hover:bg-secondary/30 transition-colors">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-100))] flex items-center justify-center">
+                      <FileText className="h-5 w-5 text-[hsl(var(--blue-700))]" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-foreground">Application Guidance</h4>
+                      <p className="text-xs text-muted-foreground">Quick copy your profile details</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </CardContent>
+              </Card>
+            </Link>
 
             <DocumentUploader onOCRComplete={handleOCRComplete} />
           </>

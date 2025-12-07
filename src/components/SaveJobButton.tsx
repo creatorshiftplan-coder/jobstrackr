@@ -7,9 +7,10 @@ import { cn } from "@/lib/utils";
 interface SaveJobButtonProps {
   jobId: string;
   className?: string;
+  variant?: "default" | "light";
 }
 
-export function SaveJobButton({ jobId, className }: SaveJobButtonProps) {
+export function SaveJobButton({ jobId, className, variant = "default" }: SaveJobButtonProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data: savedJobs } = useSavedJobs();
@@ -34,10 +35,19 @@ export function SaveJobButton({ jobId, className }: SaveJobButtonProps) {
     }
   };
 
+  const iconStyles = variant === "light"
+    ? isSaved 
+      ? "fill-white text-white" 
+      : "fill-white/30 text-white"
+    : isSaved 
+      ? "fill-primary text-primary" 
+      : "text-muted-foreground";
+
   return (
     <button
       className={cn(
-        "p-2 rounded-full hover:bg-secondary transition-colors",
+        "p-2 rounded-full transition-colors",
+        variant === "light" ? "hover:bg-white/20" : "hover:bg-secondary",
         className
       )}
       onClick={handleClick}
@@ -46,7 +56,7 @@ export function SaveJobButton({ jobId, className }: SaveJobButtonProps) {
       <Bookmark
         className={cn(
           "h-5 w-5 transition-colors",
-          isSaved ? "fill-primary text-primary" : "text-muted-foreground"
+          iconStyles
         )}
       />
     </button>
