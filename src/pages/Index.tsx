@@ -35,11 +35,12 @@ const Index = () => {
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { data: jobs, isLoading, error } = useJobs();
-  const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, dismissJob, clearAIResults } = useAIJobSearch();
+  const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, dismissJob, clearAIResults } =
+    useAIJobSearch();
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
-    
+
     let result = jobs;
 
     if (searchQuery) {
@@ -48,24 +49,23 @@ const Index = () => {
         (job) =>
           job.title.toLowerCase().includes(query) ||
           job.department.toLowerCase().includes(query) ||
-          job.location.toLowerCase().includes(query)
+          job.location.toLowerCase().includes(query),
       );
     }
 
     if (selectedLocations.length > 0) {
-      result = result.filter(job => 
-        selectedLocations.some(loc => 
-          job.location.toLowerCase().includes(loc.toLowerCase())
-        )
+      result = result.filter((job) =>
+        selectedLocations.some((loc) => job.location.toLowerCase().includes(loc.toLowerCase())),
       );
     }
 
     if (selectedSectors.length > 0) {
-      result = result.filter(job =>
-        selectedSectors.some(sector =>
-          job.title.toLowerCase().includes(sector.toLowerCase()) ||
-          job.department.toLowerCase().includes(sector.toLowerCase())
-        )
+      result = result.filter((job) =>
+        selectedSectors.some(
+          (sector) =>
+            job.title.toLowerCase().includes(sector.toLowerCase()) ||
+            job.department.toLowerCase().includes(sector.toLowerCase()),
+        ),
       );
     }
 
@@ -83,19 +83,13 @@ const Index = () => {
   }, [filteredJobs]);
 
   const toggleLocation = (location: string) => {
-    setSelectedLocations(prev => 
-      prev.includes(location) 
-        ? prev.filter(l => l !== location)
-        : [...prev, location]
+    setSelectedLocations((prev) =>
+      prev.includes(location) ? prev.filter((l) => l !== location) : [...prev, location],
     );
   };
 
   const toggleSector = (sector: string) => {
-    setSelectedSectors(prev => 
-      prev.includes(sector) 
-        ? prev.filter(s => s !== sector)
-        : [...prev, sector]
-    );
+    setSelectedSectors((prev) => (prev.includes(sector) ? prev.filter((s) => s !== sector) : [...prev, sector]));
   };
 
   const handleAISearch = async () => {
@@ -114,10 +108,10 @@ const Index = () => {
   const canSearchAI = searchQuery.length >= 3 && !isSearching;
 
   return (
-    <div className="min-h-screen bg-white pb-24">
+    <div className="min-h-screen bg-[2596BE] pb-24">
       <WelcomeHeader />
-      <SearchWithFilter 
-        searchQuery={searchQuery} 
+      <SearchWithFilter
+        searchQuery={searchQuery}
         onSearchChange={(value) => {
           setSearchQuery(value);
           if (!value) clearAIResults();
@@ -153,11 +147,11 @@ const Index = () => {
                 )}
               </TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="location" className="mt-4">
               <ScrollArea className="h-[40vh]">
                 <div className="flex flex-wrap gap-2 pr-4">
-                  {INDIAN_STATES.map(state => (
+                  {INDIAN_STATES.map((state) => (
                     <Badge
                       key={state}
                       variant={selectedLocations.includes(state) ? "default" : "outline"}
@@ -165,19 +159,17 @@ const Index = () => {
                       onClick={() => toggleLocation(state)}
                     >
                       {state}
-                      {selectedLocations.includes(state) && (
-                        <X className="h-3 w-3 ml-1" />
-                      )}
+                      {selectedLocations.includes(state) && <X className="h-3 w-3 ml-1" />}
                     </Badge>
                   ))}
                 </div>
               </ScrollArea>
             </TabsContent>
-            
+
             <TabsContent value="sector" className="mt-4">
               <ScrollArea className="h-[40vh]">
                 <div className="flex flex-wrap gap-2 pr-4">
-                  {EXAM_SECTORS.map(sector => (
+                  {EXAM_SECTORS.map((sector) => (
                     <Badge
                       key={sector}
                       variant={selectedSectors.includes(sector) ? "default" : "outline"}
@@ -185,9 +177,7 @@ const Index = () => {
                       onClick={() => toggleSector(sector)}
                     >
                       {sector}
-                      {selectedSectors.includes(sector) && (
-                        <X className="h-3 w-3 ml-1" />
-                      )}
+                      {selectedSectors.includes(sector) && <X className="h-3 w-3 ml-1" />}
                     </Badge>
                   ))}
                 </div>
@@ -196,18 +186,13 @@ const Index = () => {
           </Tabs>
 
           {totalFilters > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-4"
-              onClick={clearAllFilters}
-            >
+            <Button variant="ghost" size="sm" className="mt-4" onClick={clearAllFilters}>
               Clear all filters ({totalFilters})
             </Button>
           )}
         </SheetContent>
       </Sheet>
-      
+
       <main>
         {isLoading ? (
           <div className="px-5 space-y-6">
@@ -267,9 +252,11 @@ const Index = () => {
                 </div>
                 <h3 className="font-bold text-foreground mb-2">No jobs found</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {searchQuery ? "Try a different search term or use AI search" : "Check back later for new opportunities"}
+                  {searchQuery
+                    ? "Try a different search term or use AI search"
+                    : "Check back later for new opportunities"}
                 </p>
-                
+
                 {canSearchAI && (
                   <Button onClick={handleAISearch} disabled={isSearching}>
                     <Sparkles className="h-4 w-4 mr-2" />
@@ -297,9 +284,9 @@ const Index = () => {
                 <SectionHeader title="Recommended Jobs" />
                 <div className="grid grid-cols-2 gap-4 px-5">
                   {recommendedJobs.map((job, index) => (
-                    <RecommendedJobCard 
-                      key={job.id} 
-                      job={job} 
+                    <RecommendedJobCard
+                      key={job.id}
+                      job={job}
                       colorVariant={colorVariants[index % colorVariants.length]}
                     />
                   ))}
@@ -308,20 +295,24 @@ const Index = () => {
             )}
 
             {/* Show all jobs if no featured/recommended split */}
-            {newJobs.length === 0 && recommendedJobs.length === 0 && filteredJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
-              <section>
-                <SectionHeader title="All Jobs" />
-                <div className="grid grid-cols-2 gap-4 px-5">
-                  {filteredJobs.slice(0, 6).map((job, index) => (
-                    <RecommendedJobCard 
-                      key={job.id} 
-                      job={job} 
-                      colorVariant={colorVariants[index % colorVariants.length]}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
+            {newJobs.length === 0 &&
+              recommendedJobs.length === 0 &&
+              filteredJobs.length > 0 &&
+              !isSearching &&
+              searchStatus !== "not_found" && (
+                <section>
+                  <SectionHeader title="All Jobs" />
+                  <div className="grid grid-cols-2 gap-4 px-5">
+                    {filteredJobs.slice(0, 6).map((job, index) => (
+                      <RecommendedJobCard
+                        key={job.id}
+                        job={job}
+                        colorVariant={colorVariants[index % colorVariants.length]}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
           </>
         )}
       </main>
