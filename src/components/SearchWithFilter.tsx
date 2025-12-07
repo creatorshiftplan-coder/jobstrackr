@@ -10,7 +10,12 @@ interface SearchWithFilterProps {
   filterCount?: number;
 }
 
-export function SearchWithFilter({ searchQuery, onSearchChange, onFilterClick, filterCount = 0 }: SearchWithFilterProps) {
+export function SearchWithFilter({
+  searchQuery,
+  onSearchChange,
+  onFilterClick,
+  filterCount = 0,
+}: SearchWithFilterProps) {
   return (
     <div className="px-5 pb-4">
       <div className="flex items-center gap-3">
@@ -21,7 +26,7 @@ export function SearchWithFilter({ searchQuery, onSearchChange, onFilterClick, f
             placeholder="Search a job or position"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-12 pr-4 h-14 rounded-2xl bg-[#A7EBF2] border-0 text-base placeholder:text-muted-foreground"
+            className="pl-12 pr-4 h-14 rounded-2xl bg-[#BDD8E9] border-0 text-base placeholder:text-muted-foreground"
           />
         </div>
         <Button
