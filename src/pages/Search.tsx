@@ -91,18 +91,18 @@ export default function Search() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-4">
+      <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 py-4">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="font-display font-bold text-xl text-foreground">Search Jobs</h1>
+          <h1 className="font-display font-bold text-xl text-white">Explore Jobs</h1>
           <Link to="/saved">
-            <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
-              <Bookmark className="h-5 w-5 text-foreground" />
+            <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
+              <Bookmark className="h-5 w-5 text-white" />
             </div>
           </Link>
         </div>
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--blue-400))]" />
             <Input
               placeholder="Job title, department, location..."
               value={query}
@@ -111,13 +111,18 @@ export default function Search() {
                 if (!e.target.value) clearAIResults();
               }}
               onKeyDown={handleKeyDown}
-              className="pl-10 bg-secondary border-0"
+              className="pl-10 bg-[hsl(var(--blue-100))] border-0 text-[hsl(var(--blue-900))] placeholder:text-[hsl(var(--blue-600))]"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className="relative">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => setIsFilterOpen(true)} 
+            className="relative bg-[hsl(var(--blue-800))] border-[hsl(var(--blue-600))] hover:bg-[hsl(var(--blue-600))] text-white"
+          >
             <Filter className="h-4 w-4" />
             {totalFilters > 0 && (
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 justify-center text-xs">
+              <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 justify-center text-xs bg-[hsl(var(--blue-300))] text-[hsl(var(--blue-900))]">
                 {totalFilters}
               </Badge>
             )}

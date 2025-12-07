@@ -44,6 +44,15 @@
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
+    /* Blue theme palette */
+    --blue-900: 209 100% 11%;   /* #001D39 */
+    --blue-800: 209 82% 25%;    /* #0A4174 */
+    --blue-600: 209 37% 46%;    /* #49769F */
+    --blue-500: 191 36% 47%;    /* #4E8EA2 */
+    --blue-400: 191 33% 57%;    /* #6EA2B3 */
+    --blue-300: 204 70% 70%;    /* #7BBDE8 */
+    --blue-100: 204 54% 83%;    /* #BDD8E9 */
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 217 91% 60%;
@@ -89,6 +98,15 @@
     --success-foreground: 0 0% 100%;
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
+
+    /* Blue theme palette - dark mode */
+    --blue-900: 209 100% 11%;
+    --blue-800: 209 82% 25%;
+    --blue-600: 209 37% 46%;
+    --blue-500: 191 36% 47%;
+    --blue-400: 191 33% 57%;
+    --blue-300: 204 70% 70%;
+    --blue-100: 204 54% 83%;
 
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 210 40% 98%;
