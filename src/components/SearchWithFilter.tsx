@@ -19,7 +19,7 @@ export function SearchWithFilter({
   return (
     <div className="px-5 pb-4">
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 bg-[#A7EBF2]/40 backdrop-blur-md border border-white/60 rounded-2xl shadow-lg shadow-[#A7EBF2]/20">
+        <div className="relative flex-1 bg-white/15 backdrop-blur-md border border-white/40 rounded-2xl shadow-sm">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#0A4174]/60" />
           <Input
             type="text"
