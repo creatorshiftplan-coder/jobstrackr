@@ -11,11 +11,12 @@ import { AISearchResult } from "@/components/AISearchResult";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, ArrowLeft } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
 
 export default function Search() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
@@ -93,6 +94,12 @@ export default function Search() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 py-4">
         <div className="flex items-center justify-between mb-4">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 text-white" />
+          </button>
           <h1 className="font-display font-bold text-xl text-white">Explore Jobs</h1>
           <Link to="/saved">
             <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">

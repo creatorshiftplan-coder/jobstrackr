@@ -2,7 +2,7 @@ import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2, Bookmark } from "lucide-react";
+import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2, Bookmark, ArrowLeft } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -47,6 +47,12 @@ export default function More() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-4">
         <div className="flex items-center justify-between">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 text-white" />
+          </button>
           <h1 className="font-display font-bold text-xl text-foreground">More</h1>
           <Link to="/saved">
             <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
