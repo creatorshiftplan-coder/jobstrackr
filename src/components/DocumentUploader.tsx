@@ -143,11 +143,18 @@ export function DocumentUploader({ onOCRComplete }: DocumentUploaderProps) {
                       variant="outline"
                       onClick={() => handleProcessOCR(doc)}
                       disabled={processOCR.isPending}
+                      className="text-xs"
                     >
                       {processOCR.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Processing...
+                        </>
                       ) : (
-                        <Scan className="h-4 w-4" />
+                        <>
+                          <Scan className="h-3 w-3 mr-1" />
+                          Process with AI
+                        </>
                       )}
                     </Button>
                   )}

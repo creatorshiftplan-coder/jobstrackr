@@ -6,13 +6,31 @@ import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useEducation } from "@/hooks/useEducation";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { DocumentUploader } from "@/components/DocumentUploader";
 import { OCRResultModal } from "@/components/OCRResultModal";
 
+// Define which fields belong to profiles vs education
+const PROFILE_FIELDS = [
+  'full_name', 'date_of_birth', 'gender', 'father_name', 'mother_name',
+  'phone', 'email', 'address', 'aadhar_number', 'pan_number', 'passport_number',
+  'category', 'caste_name', 'caste_certificate_number', 'caste_issuing_authority',
+  'caste_issue_date', 'marital_status', 'pincode', 'ews_certificate_number',
+  'ews_issuing_authority', 'sub_category', 'disability_type', 
+  'disability_certificate_number', 'current_status'
+];
+
+const EDUCATION_FIELDS = [
+  'board_university', 'institute_name', 'roll_number', 'qualification_type',
+  'qualification_name', 'date_of_passing', 'marks_obtained', 'maximum_marks',
+  'percentage', 'cgpa'
+];
+
 export default function More() {
   const { user, loading, signOut } = useAuth();
   const { profile, upsertProfile } = useProfile();
+  const { addEducation } = useEducation();
   const { isAdmin } = useAdminRole();
   const navigate = useNavigate();
   const [ocrModalOpen, setOcrModalOpen] = useState(false);
@@ -29,7 +47,27 @@ export default function More() {
   };
 
   const handleConfirmOCR = (selectedFields: Record<string, any>) => {
-    upsertProfile.mutate(selectedFields);
+    // Separate profile and education fields
+    const profileData: Record<string, any> = {};
+    const educationData: Record<string, any> = {};
+    
+    Object.entries(selectedFields).forEach(([key, value]) => {
+      if (PROFILE_FIELDS.includes(key)) {
+        profileData[key] = value;
+      } else if (EDUCATION_FIELDS.includes(key)) {
+        educationData[key] = value;
+      }
+    });
+    
+    // Update profile if there are profile fields
+    if (Object.keys(profileData).length > 0) {
+      upsertProfile.mutate(profileData);
+    }
+    
+    // Add education record if there are education fields
+    if (Object.keys(educationData).length > 0) {
+      addEducation.mutate(educationData);
+    }
   };
 
   if (loading) {
@@ -95,7 +133,7 @@ export default function More() {
             </Card>
 
             {/* Application Guidance Link */}
-            <Link to="/formmate">
+            <Link to="/formmate" className="block mt-6">
               <Card className="border-0 shadow-card mb-4 hover:bg-secondary/30 transition-colors">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
