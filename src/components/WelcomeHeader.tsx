@@ -17,13 +17,7 @@ export function WelcomeHeader() {
   }, []);
 
   return (
-    <header className="flex items-center justify-between px-5 pt-12 pb-4">
-      <div>
-        <h1 className="text-2xl font-bold text-white">
-          Welcome <span className="wave">👋</span> {displayName}
-        </h1>
-      </div>
-      
+    <header className="flex items-center justify-end px-5 pt-12 pb-4">
       <div className="flex items-center gap-3">
         <Link to="/saved">
           <div className="h-10 w-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors">
