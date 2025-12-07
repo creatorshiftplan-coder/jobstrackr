@@ -82,27 +82,76 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Processing OCR for document ${document_id}, type: ${document_type}`);
+    console.log(`File URL received: ${file_url}`);
 
     // Update document status to processing
-    await supabase
+    const { error: updateError } = await supabase
       .from("documents")
       .update({ ocr_status: "processing" })
       .eq("id", document_id)
       .eq("user_id", user.id);
 
-    // Download the file
-    const urlParts = file_url.split("/storage/v1/object/public/documents/");
-    if (urlParts.length !== 2) {
-      throw new Error("Invalid file URL format");
+    if (updateError) {
+      console.error("Failed to update document status:", updateError);
     }
-    const filePath = decodeURIComponent(urlParts[1]);
+
+    // Download the file - handle different URL formats
+    let filePath = "";
+    
+    // Check for different URL patterns
+    if (file_url.includes("/storage/v1/object/public/documents/")) {
+      const urlParts = file_url.split("/storage/v1/object/public/documents/");
+      if (urlParts.length === 2) {
+        filePath = decodeURIComponent(urlParts[1]);
+      }
+    } else if (file_url.includes("/storage/v1/object/sign/documents/")) {
+      // Handle signed URLs
+      const urlParts = file_url.split("/storage/v1/object/sign/documents/");
+      if (urlParts.length === 2) {
+        filePath = decodeURIComponent(urlParts[1].split("?")[0]);
+      }
+    } else {
+      // Try to extract path from any URL format
+      const match = file_url.match(/documents\/(.+?)(?:\?|$)/);
+      if (match) {
+        filePath = decodeURIComponent(match[1]);
+      }
+    }
+
+    if (!filePath) {
+      console.error("Could not parse file path from URL:", file_url);
+      await supabase
+        .from("documents")
+        .update({ ocr_status: "failed" })
+        .eq("id", document_id)
+        .eq("user_id", user.id);
+      throw new Error("Invalid file URL format. Could not extract file path.");
+    }
+
+    console.log(`Extracted file path: ${filePath}`);
 
     const { data: fileData, error: downloadError } = await supabase.storage
       .from("documents")
       .download(filePath);
 
-    if (downloadError || !fileData) {
-      throw new Error(`Failed to download file: ${downloadError?.message || "Unknown error"}`);
+    if (downloadError) {
+      console.error("File download error:", downloadError);
+      await supabase
+        .from("documents")
+        .update({ ocr_status: "failed" })
+        .eq("id", document_id)
+        .eq("user_id", user.id);
+      throw new Error(`Failed to download file: ${downloadError.message}`);
+    }
+    
+    if (!fileData) {
+      console.error("No file data returned");
+      await supabase
+        .from("documents")
+        .update({ ocr_status: "failed" })
+        .eq("id", document_id)
+        .eq("user_id", user.id);
+      throw new Error("Failed to download file: No data returned");
     }
 
     // Convert to base64

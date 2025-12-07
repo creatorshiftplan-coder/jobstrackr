@@ -27,10 +27,10 @@ export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
         
         {/* Save button */}
         <div 
-          className="absolute top-3 sm:top-4 right-3 sm:right-4 z-10 bg-white/30 hover:bg-white/50 rounded-full p-1 backdrop-blur-sm shadow-md transition-colors" 
+          className="absolute top-3 sm:top-4 right-3 sm:right-4 z-10" 
           onClick={(e) => e.preventDefault()}
         >
-          <SaveJobButton jobId={job.id} className="text-white" />
+          <SaveJobButton jobId={job.id} variant="light" />
         </div>
 
         {/* Content */}
