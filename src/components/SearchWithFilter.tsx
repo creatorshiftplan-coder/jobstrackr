@@ -21,7 +21,7 @@ export function SearchWithFilter({ searchQuery, onSearchChange, onFilterClick, f
             placeholder="Search a job or position"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-12 pr-4 h-14 rounded-2xl bg-secondary/50 border-0 text-base placeholder:text-muted-foreground/70"
+            className="pl-12 pr-4 h-14 rounded-2xl bg-[#A7EBF2] border-0 text-base placeholder:text-muted-foreground"
           />
         </div>
         <Button
