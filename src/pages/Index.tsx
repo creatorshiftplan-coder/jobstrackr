@@ -164,7 +164,7 @@ const Index = () => {
             {activeExams.length > 0 && !isSearching && searchStatus !== "not_found" && (
               <section className="mb-8">
                 <SectionHeader title="My Active Exams" variant="dark" />
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 px-5">
+                <div className="flex gap-3 sm:gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide">
                   {activeExams.map((attempt) => (
                     <ActiveExamCard key={attempt.id} attempt={attempt} />
                   ))}

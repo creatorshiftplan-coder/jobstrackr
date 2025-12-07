@@ -91,24 +91,24 @@ export default function Search() {
   const showAISearch = query.length >= 3 && filteredJobs.length === 0 && aiResults.length === 0 && searchStatus !== "not_found";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--blue-900))] via-[hsl(var(--blue-700))] to-[hsl(var(--blue-100))] pb-20">
-      <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 pt-12 pb-4">
+    <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-20">
+      <header className="sticky top-0 z-40 bg-[#E8F4FD] px-4 pt-12 pb-4">
         <div className="flex items-center gap-3 mb-4">
           <Link to="/more">
-            <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-              <Menu className="h-5 w-5 text-white" />
+            <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
+              <Menu className="h-5 w-5 text-[#0A4174]" />
             </div>
           </Link>
-          <h1 className="font-display font-bold text-xl text-white flex-1 text-center">Explore Jobs</h1>
+          <h1 className="font-display font-bold text-xl text-[#0A4174] flex-1 text-center">Explore Jobs</h1>
           <Link to="/saved">
-            <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-              <Bookmark className="h-5 w-5 text-white" />
+            <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
+              <Bookmark className="h-5 w-5 text-[#0A4174]" />
             </div>
           </Link>
         </div>
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--blue-400))]" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#0A4174]/60" />
             <Input
               placeholder="Job title, department, location..."
               value={query}
@@ -117,18 +117,18 @@ export default function Search() {
                 if (!e.target.value) clearAIResults();
               }}
               onKeyDown={handleKeyDown}
-              className="pl-10 bg-[hsl(var(--blue-100))] border-0 text-[hsl(var(--blue-900))] placeholder:text-[hsl(var(--blue-600))]"
+              className="pl-10 bg-white/80 border-[#0A4174]/20 text-[#0A4174] placeholder:text-[#0A4174]/50"
             />
           </div>
           <Button 
             variant="outline" 
             size="icon" 
             onClick={() => setIsFilterOpen(true)} 
-            className="relative bg-[hsl(var(--blue-800))] border-[hsl(var(--blue-600))] hover:bg-[hsl(var(--blue-600))] text-white"
+            className="relative bg-[#0A4174] border-[#0A4174] hover:bg-[#0A4174]/90 text-white"
           >
             <Filter className="h-4 w-4" />
             {totalFilters > 0 && (
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 justify-center text-xs bg-[hsl(var(--blue-300))] text-[hsl(var(--blue-900))]">
+              <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 justify-center text-xs bg-[#A7EBF2] text-[#0A4174]">
                 {totalFilters}
               </Badge>
             )}
@@ -218,7 +218,7 @@ export default function Search() {
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-white/80">{filteredJobs.length} results</p>
+            <p className="text-sm text-[#0A4174]/80">{filteredJobs.length} results</p>
 
             <div className="flex flex-col gap-6">
               {filteredJobs.map((job) => (
@@ -229,7 +229,7 @@ export default function Search() {
             {/* AI Search Results */}
             {aiResults.length > 0 && (
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-white/90">AI Found Results</h3>
+                <h3 className="font-semibold text-sm text-[#0A4174]/90">AI Found Results</h3>
                 {aiResults.map((job, index) => (
                   <AISearchResult
                     key={`${job.exam_name}-${index}`}

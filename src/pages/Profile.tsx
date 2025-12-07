@@ -30,18 +30,18 @@ export default function Profile() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 pt-12 pb-4">
+      <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-20">
+        <header className="sticky top-0 z-40 bg-[#E8F4FD] px-4 pt-12 pb-4">
           <div className="flex items-center gap-3">
             <Link to="/more">
-              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-                <Menu className="h-5 w-5 text-white" />
+              <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
+                <Menu className="h-5 w-5 text-[#0A4174]" />
               </div>
             </Link>
-            <h1 className="font-display font-bold text-xl text-white flex-1 text-center">Profile</h1>
+            <h1 className="font-display font-bold text-xl text-[#0A4174] flex-1 text-center">Profile</h1>
             <Link to="/saved">
-              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-                <Bookmark className="h-5 w-5 text-white" />
+              <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
+                <Bookmark className="h-5 w-5 text-[#0A4174]" />
               </div>
             </Link>
           </div>
@@ -89,44 +89,44 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header with Blue Theme */}
-      <div className="bg-gradient-to-b from-[hsl(var(--blue-900))] to-[hsl(var(--blue-800))] pb-20">
+    <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-20">
+      {/* Header with Light Theme */}
+      <div className="bg-[#E8F4FD] pb-20">
         <header className="sticky top-0 z-40 px-4 pt-12 pb-4">
           <div className="flex items-center gap-3">
             <Link to="/more">
-              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-                <Menu className="h-5 w-5 text-white" />
+              <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
+                <Menu className="h-5 w-5 text-[#0A4174]" />
               </div>
             </Link>
             <div className="flex-1" />
             <Link to="/saved">
-              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-                <Bookmark className="h-5 w-5 text-white" />
+              <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
+                <Bookmark className="h-5 w-5 text-[#0A4174]" />
               </div>
             </Link>
-            <Link to="/edit-profile" className="flex items-center gap-2 text-[hsl(var(--blue-300))] font-medium hover:text-white transition-colors">
+            <Link to="/edit-profile" className="flex items-center gap-2 text-[#0A4174] font-medium hover:text-[#0A4174]/80 transition-colors">
               <Edit2 className="h-4 w-4" />
               Edit
             </Link>
           </div>
         </header>
 
-        {/* Profile Avatar & Name - in blue section */}
+        {/* Profile Avatar & Name */}
         <div className="flex flex-col items-center text-center px-4 -mb-16">
-          <div className="h-24 w-24 rounded-full bg-gradient-to-br from-[hsl(var(--blue-500))] to-[hsl(var(--blue-300))] flex items-center justify-center mb-3 shadow-lg ring-4 ring-[hsl(var(--blue-800))]">
+          <div className="h-24 w-24 rounded-full bg-gradient-to-br from-[#0A4174] to-[#1a5a9e] flex items-center justify-center mb-3 shadow-lg ring-4 ring-white">
             {profile?.photo_url ? (
               <img src={profile.photo_url} alt={userName} className="h-24 w-24 rounded-full object-cover" />
             ) : (
               <span className="text-3xl font-bold text-white">{userInitials}</span>
             )}
           </div>
-          <h2 className="font-display font-bold text-xl text-white">{userName}</h2>
+          <h2 className="font-display font-bold text-xl text-[#0A4174]">{userName}</h2>
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-sm text-[hsl(var(--blue-100))]">
+            <span className="text-sm text-[#0A4174]/70">
               {highestEducation ? getQualificationLabel(highestEducation.qualification_type) : "Add Education"}
             </span>
-            {highestEducation && <CheckCircle className="h-4 w-4 text-[hsl(var(--blue-300))] fill-[hsl(var(--blue-300))]" />}
+            {highestEducation && <CheckCircle className="h-4 w-4 text-[#0A4174] fill-[#0A4174]/20" />}
           </div>
           
           {/* Embedded Profile Progress */}
