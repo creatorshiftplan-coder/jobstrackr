@@ -20,44 +20,44 @@ export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
 
   return (
     <Link to={`/job/${job.id}`} className="block">
-      <div className="w-[300px] h-[180px] flex-shrink-0 p-5 rounded-3xl bg-white/20 backdrop-blur-xl border border-white/30 text-white relative overflow-hidden shadow-lg hover:bg-white/25 transition-all">
+      <div className="w-[260px] sm:w-[300px] h-[160px] sm:h-[180px] flex-shrink-0 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-[#0A4174] text-white relative overflow-hidden shadow-lg hover:bg-[#0A4174]/90 transition-all">
         {/* Background decorative elements */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+        <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-20 sm:w-24 h-20 sm:h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
         
         {/* Save button */}
-        <div className="absolute top-4 right-4 z-10" onClick={(e) => e.preventDefault()}>
+        <div className="absolute top-3 sm:top-4 right-3 sm:right-4 z-10" onClick={(e) => e.preventDefault()}>
           <SaveJobButton jobId={job.id} className="text-white hover:bg-white/20" />
         </div>
 
         {/* Content */}
         <div className="relative z-10 h-full flex flex-col">
-          <p className="text-lg font-bold mb-1 truncate pr-8">{job.title}</p>
-          <p className="text-sm text-white/80 mb-4 truncate">{job.department}</p>
+          <p className="text-sm sm:text-lg font-bold mb-0.5 sm:mb-1 truncate pr-8">{job.title}</p>
+          <p className="text-xs sm:text-sm text-white/80 mb-3 sm:mb-4 truncate">{job.department}</p>
 
           {/* Tags */}
-          <div className="flex gap-2 mb-4 flex-nowrap overflow-hidden">
+          <div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4 flex-nowrap overflow-hidden">
             {job.vacancies && (
-              <Badge variant="secondary" className="bg-white/20 text-white border-0 rounded-full text-xs flex-shrink-0">
+              <Badge variant="secondary" className="bg-white/20 text-white border-0 rounded-full text-[10px] sm:text-xs flex-shrink-0">
                 {job.vacancies} Vacancy
               </Badge>
             )}
-            <Badge variant="secondary" className="bg-white/20 text-white border-0 rounded-full text-xs flex-shrink-0">
+            <Badge variant="secondary" className="bg-white/20 text-white border-0 rounded-full text-[10px] sm:text-xs flex-shrink-0">
               Full-Time
             </Badge>
-            <Badge variant="secondary" className="bg-white/20 text-white border-0 rounded-full text-xs flex-shrink-0">
+            <Badge variant="secondary" className="bg-white/20 text-white border-0 rounded-full text-[10px] sm:text-xs flex-shrink-0">
               Govt
             </Badge>
           </div>
 
           {/* Salary and Location */}
           <div className="flex items-center justify-between mt-auto">
-            <p className="text-sm font-semibold truncate max-w-[140px]">
+            <p className="text-xs sm:text-sm font-semibold truncate max-w-[120px] sm:max-w-[140px]">
               {formatSalary(job.salary_min, job.salary_max)}
             </p>
-            <div className="flex items-center gap-1 text-sm text-white/80">
-              <MapPin className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate max-w-[80px]">{job.location}</span>
+            <div className="flex items-center gap-1 text-xs sm:text-sm text-white/80">
+              <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate max-w-[60px] sm:max-w-[80px]">{job.location}</span>
             </div>
           </div>
         </div>

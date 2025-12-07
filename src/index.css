@@ -124,6 +124,10 @@
     @apply border-border;
   }
 
+  html {
+    @apply text-sm sm:text-base;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
