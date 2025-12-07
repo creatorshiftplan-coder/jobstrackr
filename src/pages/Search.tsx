@@ -91,7 +91,7 @@ export default function Search() {
   const showAISearch = query.length >= 3 && filteredJobs.length === 0 && aiResults.length === 0 && searchStatus !== "not_found";
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--blue-900))] via-[hsl(var(--blue-700))] to-[hsl(var(--blue-100))] pb-20">
       <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 py-4">
         <div className="flex items-center justify-between mb-4">
           <button 
@@ -219,7 +219,7 @@ export default function Search() {
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{filteredJobs.length} results</p>
+            <p className="text-sm text-white/80">{filteredJobs.length} results</p>
 
             <div className="flex flex-col gap-6">
               {filteredJobs.map((job) => (
@@ -230,7 +230,7 @@ export default function Search() {
             {/* AI Search Results */}
             {aiResults.length > 0 && (
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-muted-foreground">AI Found Results</h3>
+                <h3 className="font-semibold text-sm text-white/90">AI Found Results</h3>
                 {aiResults.map((job, index) => (
                   <AISearchResult
                     key={`${job.exam_name}-${index}`}

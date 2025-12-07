@@ -1,11 +1,11 @@
-import { Home, Compass, Briefcase, User, LayoutGrid } from "lucide-react";
+import { Home, Search, Briefcase, User, LayoutGrid } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
-  { icon: Compass, label: "Explore", path: "/search" },
-  { icon: Briefcase, label: "My Exams", path: "/tracker" },
+  { icon: Search, label: "Explore", path: "/search" },
+  { icon: Briefcase, label: "Exams", path: "/tracker" },
   { icon: User, label: "Profile", path: "/profile" },
   { icon: LayoutGrid, label: "More", path: "/more" },
 ];
@@ -23,12 +23,12 @@ export function BottomNav() {
               key={path}
               to={path}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-colors",
+                "flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0 flex-shrink-0",
                 isActive ? "text-[#0A4174]" : "text-[#0A4174]/50 hover:text-[#0A4174]/80"
               )}
             >
               <Icon className={cn("h-5 w-5", isActive && "fill-[#0A4174]/20")} />
-              <span className="text-xs font-medium">{label}</span>
+              <span className="text-[10px] font-medium whitespace-nowrap">{label}</span>
             </Link>
           );
         })}
