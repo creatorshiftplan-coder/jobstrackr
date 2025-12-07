@@ -15,13 +15,13 @@ export default function ExamTracker() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--blue-900))] to-[hsl(var(--blue-800))] pb-20">
-        <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 py-4">
-          <Skeleton className="h-6 w-32 bg-blue-500" />
+      <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-20">
+        <header className="sticky top-0 z-40 bg-[#E8F4FD] px-4 py-4">
+          <Skeleton className="h-6 w-32 bg-[#0A4174]/20" />
         </header>
         <main className="px-4 py-4 space-y-4">
-          <Skeleton className="h-40 w-full rounded-lg bg-blue-500/30" />
-          <Skeleton className="h-40 w-full rounded-lg bg-blue-500/30" />
+          <Skeleton className="h-40 w-full rounded-lg bg-[#0A4174]/10" />
+          <Skeleton className="h-40 w-full rounded-lg bg-[#0A4174]/10" />
         </main>
         <BottomNav />
       </div>
@@ -30,30 +30,30 @@ export default function ExamTracker() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--blue-900))] to-[hsl(var(--blue-800))] pb-20">
-        <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 pt-12 pb-4">
+      <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-20">
+        <header className="sticky top-0 z-40 bg-[#E8F4FD] px-4 pt-12 pb-4">
           <div className="flex items-center gap-3">
             <Link to="/more">
-              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-                <Menu className="h-5 w-5 text-white" />
+              <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
+                <Menu className="h-5 w-5 text-[#0A4174]" />
               </div>
             </Link>
-            <h1 className="font-display font-bold text-xl text-white flex items-center gap-2 flex-1">
+            <h1 className="font-display font-bold text-xl text-[#0A4174] flex items-center gap-2 flex-1">
               <GraduationCap className="h-5 w-5" />
               My Exams
             </h1>
             <div className="flex items-center gap-2">
               <ExamSearchSheet 
                 trigger={
-                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[hsl(var(--blue-700))] hover:bg-[hsl(var(--blue-600))] transition-all cursor-pointer backdrop-blur-sm border border-[hsl(var(--blue-500))]/30 shadow-sm">
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#0A4174] hover:bg-[#0A4174]/90 transition-all cursor-pointer backdrop-blur-sm shadow-sm">
                     <Plus className="h-4 w-4 text-white" />
                     <span className="text-white text-sm font-medium">Add Exam</span>
                   </div>
                 }
               />
               <Link to="/saved">
-                <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-                  <Bookmark className="h-5 w-5 text-white" />
+                <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
+                  <Bookmark className="h-5 w-5 text-[#0A4174]" />
                 </div>
               </Link>
             </div>
@@ -61,16 +61,16 @@ export default function ExamTracker() {
         </header>
         <main className="px-4 py-8">
           <div className="text-center space-y-4">
-            <div className="h-20 w-20 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center mx-auto">
-              <GraduationCap className="h-10 w-10 text-white" />
+            <div className="h-20 w-20 rounded-full bg-[#0A4174]/10 flex items-center justify-center mx-auto">
+              <GraduationCap className="h-10 w-10 text-[#0A4174]" />
             </div>
-            <h2 className="text-lg font-semibold text-white">Track Your Exams</h2>
-            <p className="text-white/80 text-sm">
+            <h2 className="text-lg font-semibold text-[#0A4174]">Track Your Exams</h2>
+            <p className="text-[#0A4174]/70 text-sm">
               Sign in to track your exam preparations and get AI-powered status updates
             </p>
             <Button 
               onClick={() => navigate("/auth")}
-              className="bg-[hsl(var(--blue-400))] text-white hover:bg-[hsl(var(--blue-300))]"
+              className="bg-[#0A4174] text-white hover:bg-[#0A4174]/90"
             >
               Sign In
             </Button>
@@ -82,31 +82,31 @@ export default function ExamTracker() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--blue-900))] via-[hsl(var(--blue-800))] to-[hsl(var(--blue-100))] pb-24">
-      {/* Blue Header */}
-      <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 pt-12 pb-4">
+    <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-24">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-[#E8F4FD] px-4 pt-12 pb-4">
         <div className="flex items-center gap-3">
           <Link to="/more">
-            <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-              <Menu className="h-5 w-5 text-white" />
+            <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
+              <Menu className="h-5 w-5 text-[#0A4174]" />
             </div>
           </Link>
-          <h1 className="font-display font-bold text-xl text-white flex items-center gap-2 flex-1">
+          <h1 className="font-display font-bold text-xl text-[#0A4174] flex items-center gap-2 flex-1">
             <GraduationCap className="h-5 w-5" />
             My Exams
           </h1>
           <div className="flex items-center gap-2">
             <ExamSearchSheet 
               trigger={
-                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[hsl(var(--blue-700))] hover:bg-[hsl(var(--blue-600))] transition-all cursor-pointer backdrop-blur-sm border border-[hsl(var(--blue-500))]/30 shadow-sm">
+                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#0A4174] hover:bg-[#0A4174]/90 transition-all cursor-pointer backdrop-blur-sm shadow-sm">
                   <Plus className="h-4 w-4 text-white" />
                   <span className="text-white text-sm font-medium">Add Exam</span>
                 </div>
               }
             />
             <Link to="/saved">
-              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-                <Bookmark className="h-5 w-5 text-white" />
+              <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
+                <Bookmark className="h-5 w-5 text-[#0A4174]" />
               </div>
             </Link>
           </div>
@@ -114,13 +114,13 @@ export default function ExamTracker() {
       </header>
 
       {/* Subheader */}
-      <div className="bg-[hsl(var(--blue-900))] px-4 pb-6">
-        <h2 className="text-[hsl(var(--blue-300))]/90 text-sm font-medium">Your Tracked Exams</h2>
+      <div className="px-4 pb-4">
+        <h2 className="text-[#0A4174]/70 text-sm font-medium">Your Tracked Exams</h2>
       </div>
 
       {/* Content Area */}
-      <main className="px-4 -mt-2">
-        <div className="bg-[hsl(var(--blue-100))] rounded-t-3xl min-h-[60vh] pt-4">
+      <main className="px-4">
+        <div className="bg-white/60 backdrop-blur-sm rounded-3xl min-h-[60vh] pt-4 shadow-lg border border-white/50">
           {isLoading ? (
             <div className="space-y-4 px-2">
               <Skeleton className="h-32 w-full rounded-lg" />
@@ -128,8 +128,8 @@ export default function ExamTracker() {
             </div>
           ) : userExams.length === 0 ? (
             <div className="text-center py-12 space-y-4 px-4">
-              <div className="h-20 w-20 rounded-full bg-[hsl(var(--blue-300))] flex items-center justify-center mx-auto">
-                <GraduationCap className="h-10 w-10 text-[hsl(var(--blue-900))]" />
+              <div className="h-20 w-20 rounded-full bg-[#0A4174]/10 flex items-center justify-center mx-auto">
+                <GraduationCap className="h-10 w-10 text-[#0A4174]" />
               </div>
               <h2 className="text-lg font-semibold text-foreground">No Exams Tracked</h2>
               <p className="text-muted-foreground text-sm max-w-xs mx-auto">

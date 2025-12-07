@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useJob } from "@/hooks/useJobs";
+import { useExams } from "@/hooks/useExams";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,8 +18,12 @@ import {
   Share2,
   Bookmark,
   ExternalLink,
+  Loader2,
+  CheckCircle,
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 // Check if last_date_display contains TBD-like values
 const isTBDDateDisplay = (displayValue: string | null): boolean => {
@@ -29,6 +36,64 @@ const isTBDDateDisplay = (displayValue: string | null): boolean => {
 export default function JobDetails() {
   const { id } = useParams<{ id: string }>();
   const { data: job, isLoading, error } = useJob(id || "");
+  const { user } = useAuth();
+  const { userExams, addExamAttempt } = useExams();
+  const [isTracking, setIsTracking] = useState(false);
+
+  // Check if this job is already tracked
+  const isAlreadyTracked = userExams.some(
+    (attempt) => attempt.exams?.name?.toLowerCase() === job?.title?.toLowerCase()
+  );
+
+  const handleTrackExam = async () => {
+    if (!user) {
+      toast.error("Please sign in to track exams");
+      return;
+    }
+
+    if (!job) return;
+
+    setIsTracking(true);
+    try {
+      // Check if exam already exists by title
+      const { data: existingExam } = await supabase
+        .from("exams")
+        .select("id")
+        .ilike("name", job.title)
+        .maybeSingle();
+
+      let examId = existingExam?.id;
+
+      // If exam doesn't exist, create it
+      if (!examId) {
+        const { data: newExam, error: createError } = await supabase
+          .from("exams")
+          .insert({
+            name: job.title,
+            conducting_body: job.department,
+            category: "Government",
+            is_active: true,
+          })
+          .select("id")
+          .single();
+
+        if (createError) throw createError;
+        examId = newExam.id;
+      }
+
+      // Add exam attempt
+      await addExamAttempt.mutateAsync({
+        examId: examId,
+        year: new Date().getFullYear(),
+      });
+
+      toast.success("Exam added to your tracker!");
+    } catch (error: any) {
+      toast.error("Failed to track exam: " + error.message);
+    } finally {
+      setIsTracking(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -209,8 +274,36 @@ export default function JobDetails() {
         )}
       </main>
 
-      {/* Fixed Apply Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card/95 backdrop-blur-md border-t border-border">
+      {/* Fixed Buttons */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card/95 backdrop-blur-md border-t border-border space-y-2">
+        {/* Track This Exam Button */}
+        {user && (
+          <Button
+            onClick={handleTrackExam}
+            variant="outline"
+            className="w-full h-11 border-[#0A4174] text-[#0A4174] hover:bg-[#0A4174]/10"
+            disabled={isTracking || isAlreadyTracked}
+          >
+            {isTracking ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding...
+              </>
+            ) : isAlreadyTracked ? (
+              <>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Already Tracking
+              </>
+            ) : (
+              <>
+                <Briefcase className="mr-2 h-4 w-4" />
+                Track This Exam
+              </>
+            )}
+          </Button>
+        )}
+
+        {/* Apply Now Button */}
         {job.apply_link && !isExpired ? (
           <a href={job.apply_link} target="_blank" rel="noopener noreferrer" className="block">
             <Button className="w-full gradient-primary text-primary-foreground font-semibold h-12">

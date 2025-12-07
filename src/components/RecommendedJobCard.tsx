@@ -17,15 +17,20 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
   return (
     <Link to={`/job/${job.id}`} className="block">
       <div className="p-3 sm:p-4 rounded-2xl bg-white/80 backdrop-blur-md shadow-lg border border-white/50 h-[140px] sm:h-[160px] flex flex-col transition-all hover:bg-white/90 hover:scale-[1.02]">
-        {/* Icon */}
-        <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-[#0A4174] flex items-center justify-center mb-2 sm:mb-3">
-          <Building2 className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
+        {/* Icon + Job Title Row */}
+        <div className="flex items-start gap-2 mb-1">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#0A4174] flex items-center justify-center flex-shrink-0">
+            <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+          </div>
+          <h3 className="font-bold text-[#0A4174] text-xs sm:text-sm line-clamp-2 flex-1">
+            {job.title}
+          </h3>
         </div>
 
-        {/* Job Title - Full name, no department */}
-        <h3 className="font-bold text-[#0A4174] text-xs sm:text-sm mb-auto line-clamp-2">
-          {job.title}
-        </h3>
+        {/* Agency/Department Name */}
+        <p className="text-[10px] sm:text-xs text-[#0A4174]/70 line-clamp-1 mb-auto">
+          {job.department}
+        </p>
 
         {/* Vacancy Count */}
         <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold text-[#0A4174] mt-auto">
