@@ -1,6 +1,6 @@
 import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Edit2, Calendar, User, GraduationCap, Briefcase, CheckCircle, Phone, Mail, MapPin, FileText, ChevronRight } from "lucide-react";
+import { Menu, Edit2, Calendar, User, GraduationCap, Briefcase, CheckCircle, Phone, Mail, MapPin, FileText, ChevronRight, Bookmark } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -31,13 +31,19 @@ export default function Profile() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 py-4">
-          <div className="flex items-center justify-between">
-            <button onClick={() => navigate(-1)} className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-              <ArrowLeft className="h-5 w-5 text-white" />
-            </button>
-            <h1 className="font-display font-bold text-xl text-white">Profile</h1>
-            <div className="w-10" />
+        <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 pt-12 pb-4">
+          <div className="flex items-center gap-3">
+            <Link to="/more">
+              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
+                <Menu className="h-5 w-5 text-white" />
+              </div>
+            </Link>
+            <h1 className="font-display font-bold text-xl text-white flex-1 text-center">Profile</h1>
+            <Link to="/saved">
+              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
+                <Bookmark className="h-5 w-5 text-white" />
+              </div>
+            </Link>
           </div>
         </header>
         <main className="px-4 py-8 text-center">
@@ -86,11 +92,19 @@ export default function Profile() {
     <div className="min-h-screen bg-background pb-20">
       {/* Header with Blue Theme */}
       <div className="bg-gradient-to-b from-[hsl(var(--blue-900))] to-[hsl(var(--blue-800))] pb-20">
-        <header className="sticky top-0 z-40 px-4 py-4">
-          <div className="flex items-center justify-between">
-            <button onClick={() => navigate(-1)} className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
-              <ArrowLeft className="h-5 w-5 text-white" />
-            </button>
+        <header className="sticky top-0 z-40 px-4 pt-12 pb-4">
+          <div className="flex items-center gap-3">
+            <Link to="/more">
+              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
+                <Menu className="h-5 w-5 text-white" />
+              </div>
+            </Link>
+            <div className="flex-1" />
+            <Link to="/saved">
+              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
+                <Bookmark className="h-5 w-5 text-white" />
+              </div>
+            </Link>
             <Link to="/edit-profile" className="flex items-center gap-2 text-[hsl(var(--blue-300))] font-medium hover:text-white transition-colors">
               <Edit2 className="h-4 w-4" />
               Edit

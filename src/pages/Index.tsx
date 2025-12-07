@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { WelcomeHeader } from "@/components/WelcomeHeader";
+import { PageHeader } from "@/components/PageHeader";
 import { SectionHeader } from "@/components/SectionHeader";
 import { FeaturedJobCard } from "@/components/FeaturedJobCard";
 import { RecommendedJobCard } from "@/components/RecommendedJobCard";
@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AISearchResult } from "@/components/AISearchResult";
-import { Briefcase, Sparkles, Loader2, SearchX, Search } from "lucide-react";
+import { Briefcase, Sparkles, Loader2, SearchX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const colorVariants = ["pink", "blue", "green", "orange"] as const;
@@ -36,14 +36,16 @@ const Index = () => {
     return jobs;
   }, [jobs]);
 
-  // Show the 5 most recently uploaded jobs (already sorted by created_at DESC from useJobs)
+  // Show the 7 most recently uploaded jobs (already sorted by created_at DESC from useJobs)
   const newJobs = useMemo(() => {
-    return filteredJobs.slice(0, 5);
+    return filteredJobs.slice(0, 7);
   }, [filteredJobs]);
 
-  // Show next 4 jobs for recommended section (avoid overlap with newJobs)
+  // Show 6 jobs sorted by highest vacancy for recommended section
   const recommendedJobs = useMemo(() => {
-    return filteredJobs.slice(5, 9);
+    return [...filteredJobs]
+      .sort((a, b) => (b.vacancies || 0) - (a.vacancies || 0))
+      .slice(0, 6);
   }, [filteredJobs]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -56,15 +58,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0A4174] via-[#1a5a9e] to-[#deeefe] pb-24">
-      <WelcomeHeader />
-      
-      {/* Clickable Search Bar - navigates to Explore page */}
-      <div className="px-5 pb-4" onClick={() => navigate("/search")}>
-        <div className="flex items-center gap-3 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl shadow-lg h-12 px-4 cursor-pointer">
-          <Search className="h-5 w-5 text-white/70" />
-          <span className="text-white/60 text-base">Search a job or position</span>
-        </div>
-      </div>
+      <PageHeader />
 
       <main>
         {isLoading ? (

@@ -5,7 +5,7 @@ import { TrackedJobCard } from "@/components/TrackedJobCard";
 import { ExamSearchSheet } from "@/components/ExamSearchSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Bookmark, Plus, ArrowLeft } from "lucide-react";
+import { GraduationCap, Bookmark, Plus, Menu } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function ExamTracker() {
@@ -31,22 +31,21 @@ export default function ExamTracker() {
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--blue-900))] to-[hsl(var(--blue-800))] pb-20">
-        <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 py-4">
-          <div className="flex items-center justify-between">
-            <button 
-              onClick={() => navigate(-1)} 
-            className="h-10 w-10 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5 text-white" />
-            </button>
-            <h1 className="font-display font-bold text-xl text-white flex items-center gap-2">
+        <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 pt-12 pb-4">
+          <div className="flex items-center gap-3">
+            <Link to="/more">
+              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
+                <Menu className="h-5 w-5 text-white" />
+              </div>
+            </Link>
+            <h1 className="font-display font-bold text-xl text-white flex items-center gap-2 flex-1">
               <GraduationCap className="h-5 w-5" />
               My Exams
             </h1>
             <div className="flex items-center gap-2">
               <ExamSearchSheet 
                 trigger={
-                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[hsl(var(--blue-700))] hover:bg-[hsl(var(--blue-600))] transition-all cursor-pointer backdrop-blur-sm border border-[hsl(var(--blue-500))]/30 shadow-sm">
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[hsl(var(--blue-700))] hover:bg-[hsl(var(--blue-600))] transition-all cursor-pointer backdrop-blur-sm border border-[hsl(var(--blue-500))]/30 shadow-sm">
                     <Plus className="h-4 w-4 text-white" />
                     <span className="text-white text-sm font-medium">Add Exam</span>
                   </div>
@@ -85,15 +84,14 @@ export default function ExamTracker() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--blue-900))] via-[hsl(var(--blue-800))] to-[hsl(var(--blue-100))] pb-24">
       {/* Blue Header */}
-      <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 py-4">
-        <div className="flex items-center justify-between">
-          <button 
-            onClick={() => navigate(-1)} 
-            className="h-10 w-10 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 text-white" />
-          </button>
-          <h1 className="font-display font-bold text-xl text-white flex items-center gap-2">
+      <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 pt-12 pb-4">
+        <div className="flex items-center gap-3">
+          <Link to="/more">
+            <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
+              <Menu className="h-5 w-5 text-white" />
+            </div>
+          </Link>
+          <h1 className="font-display font-bold text-xl text-white flex items-center gap-2 flex-1">
             <GraduationCap className="h-5 w-5" />
             My Exams
           </h1>

@@ -11,7 +11,7 @@ import { AISearchResult } from "@/components/AISearchResult";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, ArrowLeft } from "lucide-react";
+import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, Menu } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
 
@@ -92,15 +92,14 @@ export default function Search() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--blue-900))] via-[hsl(var(--blue-700))] to-[hsl(var(--blue-100))] pb-20">
-      <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 py-4">
-        <div className="flex items-center justify-between mb-4">
-          <button 
-            onClick={() => navigate(-1)} 
-            className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 text-white" />
-          </button>
-          <h1 className="font-display font-bold text-xl text-white">Explore Jobs</h1>
+      <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 pt-12 pb-4">
+        <div className="flex items-center gap-3 mb-4">
+          <Link to="/more">
+            <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
+              <Menu className="h-5 w-5 text-white" />
+            </div>
+          </Link>
+          <h1 className="font-display font-bold text-xl text-white flex-1 text-center">Explore Jobs</h1>
           <Link to="/saved">
             <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors">
               <Bookmark className="h-5 w-5 text-white" />
