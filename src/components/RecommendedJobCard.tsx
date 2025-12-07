@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
-import { Building2 } from "lucide-react";
+import { Building2, Users } from "lucide-react";
 
 interface RecommendedJobCardProps {
   job: Job;
@@ -8,14 +8,10 @@ interface RecommendedJobCardProps {
 }
 
 export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
-  const formatSalary = (min: number | null, max: number | null) => {
-    if (max) {
-      return `₹${(max * 12 / 100000).toFixed(1)} LPA`;
-    }
-    if (min) {
-      return `₹${(min * 12 / 100000).toFixed(1)} LPA`;
-    }
-    return "Negotiable";
+  const formatVacancy = (vacancies: number | null, vacanciesDisplay: string | null) => {
+    if (vacanciesDisplay) return vacanciesDisplay;
+    if (vacancies) return `${vacancies} Vacancies`;
+    return "TBD";
   };
 
   return (
@@ -26,20 +22,16 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
           <Building2 className="h-6 w-6 text-white" />
         </div>
 
-        {/* Job Title */}
-        <h3 className="font-bold text-[#0A4174] text-base mb-1 line-clamp-1">
+        {/* Job Title - Full name, no department */}
+        <h3 className="font-bold text-[#0A4174] text-base mb-3 line-clamp-2">
           {job.title}
         </h3>
 
-        {/* Department */}
-        <p className="text-sm text-[#0A4174]/70 mb-3 line-clamp-1">
-          {job.department}
-        </p>
-
-        {/* Salary */}
-        <p className="text-sm font-semibold text-[#0A4174]">
-          {formatSalary(job.salary_min, job.salary_max)}
-        </p>
+        {/* Vacancy Count */}
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-[#0A4174]">
+          <Users className="h-4 w-4" />
+          {formatVacancy(job.vacancies, job.vacancies_display)}
+        </div>
       </div>
     </Link>
   );
