@@ -19,23 +19,23 @@ export function SearchWithFilter({
   return (
     <div className="px-5 pb-4">
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 bg-white/15 backdrop-blur-md border border-white/40 rounded-2xl shadow-sm">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#0A4174]/60" />
+        <div className="relative flex-1 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl shadow-lg">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/70" />
           <Input
             type="text"
             placeholder="Search a job or position"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-12 pr-4 h-14 rounded-2xl bg-transparent border-0 text-base placeholder:text-[#0A4174]/50 focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="pl-12 pr-4 h-14 rounded-2xl bg-transparent border-0 text-base text-white placeholder:text-white/60 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
         </div>
         <Button
           variant="default"
           size="icon"
           onClick={onFilterClick}
-          className="h-14 w-14 rounded-2xl bg-[#0A4174] hover:bg-[#0A4174]/90 shrink-0 relative shadow-lg shadow-[#0A4174]/30"
+          className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30 shrink-0 relative shadow-lg"
         >
-          <SlidersHorizontal className="h-5 w-5" />
+          <SlidersHorizontal className="h-5 w-5 text-white" />
           {filterCount > 0 && (
             <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 justify-center text-xs bg-destructive">
               {filterCount}

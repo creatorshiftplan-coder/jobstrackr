@@ -7,21 +7,7 @@ interface RecommendedJobCardProps {
   colorVariant?: "pink" | "blue" | "green" | "orange";
 }
 
-const colorVariants = {
-  pink: "bg-pink-100 dark:bg-pink-950/30",
-  blue: "bg-blue-100 dark:bg-blue-950/30",
-  green: "bg-green-100 dark:bg-green-950/30",
-  orange: "bg-orange-100 dark:bg-orange-950/30",
-};
-
-const iconVariants = {
-  pink: "bg-pink-500",
-  blue: "bg-blue-500",
-  green: "bg-green-500",
-  orange: "bg-orange-500",
-};
-
-export function RecommendedJobCard({ job, colorVariant = "pink" }: RecommendedJobCardProps) {
+export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
   const formatSalary = (min: number | null, max: number | null) => {
     if (max) {
       return `₹${(max * 12 / 100000).toFixed(1)} LPA`;
@@ -34,24 +20,24 @@ export function RecommendedJobCard({ job, colorVariant = "pink" }: RecommendedJo
 
   return (
     <Link to={`/job/${job.id}`} className="block">
-      <div className={`p-4 rounded-2xl ${colorVariants[colorVariant]} transition-transform hover:scale-[1.02]`}>
+      <div className="p-4 rounded-2xl bg-white/80 backdrop-blur-md shadow-lg border border-white/50 transition-all hover:bg-white/90 hover:scale-[1.02]">
         {/* Icon */}
-        <div className={`w-12 h-12 rounded-xl ${iconVariants[colorVariant]} flex items-center justify-center mb-3`}>
+        <div className="w-12 h-12 rounded-xl bg-[#0A4174] flex items-center justify-center mb-3">
           <Building2 className="h-6 w-6 text-white" />
         </div>
 
         {/* Job Title */}
-        <h3 className="font-bold text-foreground text-base mb-1 line-clamp-1">
+        <h3 className="font-bold text-[#0A4174] text-base mb-1 line-clamp-1">
           {job.title}
         </h3>
 
         {/* Department */}
-        <p className="text-sm text-muted-foreground mb-3 line-clamp-1">
+        <p className="text-sm text-[#0A4174]/70 mb-3 line-clamp-1">
           {job.department}
         </p>
 
         {/* Salary */}
-        <p className="text-sm font-semibold text-foreground">
+        <p className="text-sm font-semibold text-[#0A4174]">
           {formatSalary(job.salary_min, job.salary_max)}
         </p>
       </div>
