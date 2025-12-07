@@ -55,7 +55,7 @@ export function EmbeddedProfileProgress({ profile, education }: ProfileCompleten
 
   if (completionPercentage === 100) {
     return (
-      <div className="mt-4 mx-4 flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm">
+      <div className="mt-4 w-2/3 mx-auto flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm">
         <CheckCircle2 className="h-4 w-4 text-white" />
         <span className="text-sm font-medium text-white">Profile Complete</span>
       </div>
@@ -63,7 +63,7 @@ export function EmbeddedProfileProgress({ profile, education }: ProfileCompleten
   }
 
   return (
-    <div className="mt-4 mx-4 px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm">
+    <div className="mt-4 w-2/3 mx-auto px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm">
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium text-white/90">{completionPercentage}% Complete</span>
         <Link 
