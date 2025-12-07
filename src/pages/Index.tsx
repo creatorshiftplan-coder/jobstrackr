@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { WelcomeHeader } from "@/components/WelcomeHeader";
-import { SearchWithFilter } from "@/components/SearchWithFilter";
 import { SectionHeader } from "@/components/SectionHeader";
 import { FeaturedJobCard } from "@/components/FeaturedJobCard";
 import { RecommendedJobCard } from "@/components/RecommendedJobCard";
@@ -11,13 +10,9 @@ import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { AISearchResult } from "@/components/AISearchResult";
-import { Briefcase, Sparkles, Loader2, X, SearchX, MapPin, Building } from "lucide-react";
-import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
+import { Briefcase, Sparkles, Loader2, SearchX, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const colorVariants = ["pink", "blue", "green", "orange"] as const;
 
@@ -30,47 +25,16 @@ const Index = () => {
       navigate("/welcome", { replace: true });
     }
   }, [user, authLoading, navigate]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { data: jobs, isLoading, error } = useJobs();
   const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, dismissJob, clearAIResults } =
     useAIJobSearch();
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
-
-    let result = jobs;
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (job) =>
-          job.title.toLowerCase().includes(query) ||
-          job.department.toLowerCase().includes(query) ||
-          job.location.toLowerCase().includes(query),
-      );
-    }
-
-    if (selectedLocations.length > 0) {
-      result = result.filter((job) =>
-        selectedLocations.some((loc) => job.location.toLowerCase().includes(loc.toLowerCase())),
-      );
-    }
-
-    if (selectedSectors.length > 0) {
-      result = result.filter((job) =>
-        selectedSectors.some(
-          (sector) =>
-            job.title.toLowerCase().includes(sector.toLowerCase()) ||
-            job.department.toLowerCase().includes(sector.toLowerCase()),
-        ),
-      );
-    }
-
-    return result;
-  }, [jobs, searchQuery, selectedLocations, selectedSectors]);
+    return jobs;
+  }, [jobs]);
 
   // Show the 5 most recently uploaded jobs (already sorted by created_at DESC from useJobs)
   const newJobs = useMemo(() => {
@@ -82,116 +46,25 @@ const Index = () => {
     return filteredJobs.slice(5, 9);
   }, [filteredJobs]);
 
-  const toggleLocation = (location: string) => {
-    setSelectedLocations((prev) =>
-      prev.includes(location) ? prev.filter((l) => l !== location) : [...prev, location],
-    );
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const cardWidth = 300 + 16; // card width + gap
+    const index = Math.round(e.currentTarget.scrollLeft / cardWidth);
+    setActiveCardIndex(Math.min(index, newJobs.length - 1));
   };
 
-  const toggleSector = (sector: string) => {
-    setSelectedSectors((prev) => (prev.includes(sector) ? prev.filter((s) => s !== sector) : [...prev, sector]));
-  };
-
-  const handleAISearch = async () => {
-    if (searchQuery.length >= 3) {
-      await searchWithAI(searchQuery);
-    }
-  };
-
-  const clearAllFilters = () => {
-    setSelectedLocations([]);
-    setSelectedSectors([]);
-  };
-
-  const totalFilters = selectedLocations.length + selectedSectors.length;
   const showNoResults = !isLoading && filteredJobs.length === 0;
-  const canSearchAI = searchQuery.length >= 3 && !isSearching;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0A4174] via-[#1a5a9e] to-[#deeefe] pb-24">
       <WelcomeHeader />
-      <SearchWithFilter
-        searchQuery={searchQuery}
-        onSearchChange={(value) => {
-          setSearchQuery(value);
-          if (!value) clearAIResults();
-        }}
-        onFilterClick={() => setIsFilterOpen(true)}
-        filterCount={totalFilters}
-      />
-
-      {/* Filter Sheet */}
-      <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl h-[70vh]">
-          <SheetHeader>
-            <SheetTitle>Filter Jobs</SheetTitle>
-          </SheetHeader>
-          <Tabs defaultValue="location" className="mt-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="location" className="gap-1">
-                <MapPin className="h-4 w-4" />
-                Location
-                {selectedLocations.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
-                    {selectedLocations.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="sector" className="gap-1">
-                <Building className="h-4 w-4" />
-                Exam Sector
-                {selectedSectors.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
-                    {selectedSectors.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="location" className="mt-4">
-              <ScrollArea className="h-[40vh]">
-                <div className="flex flex-wrap gap-2 pr-4">
-                  {INDIAN_STATES.map((state) => (
-                    <Badge
-                      key={state}
-                      variant={selectedLocations.includes(state) ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => toggleLocation(state)}
-                    >
-                      {state}
-                      {selectedLocations.includes(state) && <X className="h-3 w-3 ml-1" />}
-                    </Badge>
-                  ))}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-
-            <TabsContent value="sector" className="mt-4">
-              <ScrollArea className="h-[40vh]">
-                <div className="flex flex-wrap gap-2 pr-4">
-                  {EXAM_SECTORS.map((sector) => (
-                    <Badge
-                      key={sector}
-                      variant={selectedSectors.includes(sector) ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => toggleSector(sector)}
-                    >
-                      {sector}
-                      {selectedSectors.includes(sector) && <X className="h-3 w-3 ml-1" />}
-                    </Badge>
-                  ))}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
-
-          {totalFilters > 0 && (
-            <Button variant="ghost" size="sm" className="mt-4" onClick={clearAllFilters}>
-              Clear all filters ({totalFilters})
-            </Button>
-          )}
-        </SheetContent>
-      </Sheet>
+      
+      {/* Clickable Search Bar - navigates to Explore page */}
+      <div className="px-5 pb-4" onClick={() => navigate("/search")}>
+        <div className="flex items-center gap-3 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl shadow-lg h-12 px-4 cursor-pointer">
+          <Search className="h-5 w-5 text-white/70" />
+          <span className="text-white/60 text-base">Search a job or position</span>
+        </div>
+      </div>
 
       <main>
         {isLoading ? (
@@ -244,7 +117,7 @@ const Index = () => {
               </div>
             )}
 
-            {/* No Results - Show AI Search Option */}
+            {/* No Results */}
             {showNoResults && aiResults.length === 0 && searchStatus !== "not_found" && !isSearching && (
               <div className="text-center py-12 px-5">
                 <div className="mx-auto h-16 w-16 rounded-full bg-secondary flex items-center justify-center mb-4">
@@ -252,17 +125,8 @@ const Index = () => {
                 </div>
                 <h3 className="font-bold text-foreground mb-2">No jobs found</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {searchQuery
-                    ? "Try a different search term or use AI search"
-                    : "Check back later for new opportunities"}
+                  Check back later for new opportunities
                 </p>
-
-                {canSearchAI && (
-                  <Button onClick={handleAISearch} disabled={isSearching}>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Search with AI
-                  </Button>
-                )}
               </div>
             )}
 
@@ -270,9 +134,25 @@ const Index = () => {
             {newJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
               <section className="mb-8">
                 <SectionHeader title="New Government Jobs" />
-                <div className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide">
+                <div 
+                  ref={scrollContainerRef}
+                  onScroll={handleScroll}
+                  className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide"
+                >
                   {newJobs.map((job) => (
                     <FeaturedJobCard key={job.id} job={job} />
+                  ))}
+                </div>
+                {/* Pagination dots */}
+                <div className="flex justify-center gap-2 mt-4 px-5">
+                  {newJobs.map((_, index) => (
+                    <div
+                      key={index}
+                      className={cn(
+                        "h-2 w-2 rounded-full transition-all",
+                        index === activeCardIndex ? "bg-white" : "bg-white/30"
+                      )}
+                    />
                   ))}
                 </div>
               </section>

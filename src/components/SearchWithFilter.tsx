@@ -26,14 +26,14 @@ export function SearchWithFilter({
             placeholder="Search a job or position"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-12 pr-4 h-14 rounded-2xl bg-transparent border-0 text-base text-white placeholder:text-white/60 focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="pl-12 pr-4 h-12 rounded-2xl bg-transparent border-0 text-base text-white placeholder:text-white/60 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
         </div>
         <Button
           variant="default"
           size="icon"
           onClick={onFilterClick}
-          className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30 shrink-0 relative shadow-lg"
+          className="h-12 w-12 rounded-2xl bg-white/20 backdrop-blur-sm hover:bg-white/30 border border-white/30 shrink-0 relative shadow-lg"
         >
           <SlidersHorizontal className="h-5 w-5 text-white" />
           {filterCount > 0 && (
