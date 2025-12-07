@@ -16,7 +16,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AISearchResult } from "@/components/AISearchResult";
-import { Briefcase, Sparkles, Loader2, X, SearchX, MapPin, Building } from "lucide-react";
+import { Briefcase, Sparkles, Loader2, X, SearchX, MapPin, Building, ArrowLeft, Bookmark } from "lucide-react";
+import { Link } from "react-router-dom";
 import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
 
 const colorVariants = ["pink", "blue", "green", "orange"] as const;
@@ -115,6 +116,23 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      {/* Header with Back Button */}
+      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-3">
+        <div className="flex items-center justify-between">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="h-10 w-10 rounded-full bg-[hsl(var(--blue-800))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 text-white" />
+          </button>
+          <h1 className="font-display font-bold text-lg text-foreground">Home</h1>
+          <Link to="/saved">
+            <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
+              <Bookmark className="h-5 w-5 text-foreground" />
+            </div>
+          </Link>
+        </div>
+      </header>
       <WelcomeHeader />
       <SearchWithFilter 
         searchQuery={searchQuery} 

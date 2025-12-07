@@ -5,7 +5,7 @@ import { TrackedJobCard } from "@/components/TrackedJobCard";
 import { ExamSearchSheet } from "@/components/ExamSearchSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Bookmark, Plus } from "lucide-react";
+import { GraduationCap, Bookmark, Plus, ArrowLeft } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function ExamTracker() {
@@ -33,19 +33,25 @@ export default function ExamTracker() {
       <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-700 pb-20">
         <header className="sticky top-0 z-40 bg-blue-600 px-4 py-4">
           <div className="flex items-center justify-between">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 text-white" />
+            </button>
             <h1 className="font-display font-bold text-xl text-white flex items-center gap-2">
               <GraduationCap className="h-5 w-5" />
               My Exams
             </h1>
             <div className="flex items-center gap-2">
-            <ExamSearchSheet 
-              trigger={
-                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/20 hover:bg-white/30 transition-all cursor-pointer backdrop-blur-sm border border-white/30 shadow-sm">
-                  <Plus className="h-4 w-4 text-white" />
-                  <span className="text-white text-sm font-medium">Add Exam</span>
-                </div>
-              }
-            />
+              <ExamSearchSheet 
+                trigger={
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/20 hover:bg-white/30 transition-all cursor-pointer backdrop-blur-sm border border-white/30 shadow-sm">
+                    <Plus className="h-4 w-4 text-white" />
+                    <span className="text-white text-sm font-medium">Add Exam</span>
+                  </div>
+                }
+              />
               <Link to="/saved">
                 <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
                   <Bookmark className="h-5 w-5 text-white" />
@@ -81,6 +87,12 @@ export default function ExamTracker() {
       {/* Blue Header */}
       <header className="sticky top-0 z-40 bg-blue-600 px-4 py-4">
         <div className="flex items-center justify-between">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 text-white" />
+          </button>
           <h1 className="font-display font-bold text-xl text-white flex items-center gap-2">
             <GraduationCap className="h-5 w-5" />
             My Exams
