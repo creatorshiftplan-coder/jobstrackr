@@ -36,6 +36,10 @@ export interface Profile {
   caste_issue_date: string | null;
   current_status: string | null;
   left_thumb_url: string | null;
+  // Decrypted sensitive fields (for display in FormMate)
+  decrypted_aadhar_number?: string | null;
+  decrypted_pan_number?: string | null;
+  decrypted_passport_number?: string | null;
 }
 
 export function useProfile() {
@@ -62,11 +66,12 @@ export function useProfile() {
         
         if (decryptedData && decryptedData.length > 0) {
           const decrypted = decryptedData[0];
-          // Merge decrypted values (for display when user needs full values)
+          // Merge decrypted values for display in FormMate
           return {
             ...data,
-            // Keep masked values in original fields for display
-            // Full decrypted values available via separate call if needed
+            decrypted_aadhar_number: decrypted.aadhar_number_decrypted,
+            decrypted_pan_number: decrypted.pan_number_decrypted,
+            decrypted_passport_number: decrypted.passport_number_decrypted,
           };
         }
       }

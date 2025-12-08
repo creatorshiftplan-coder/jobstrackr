@@ -59,15 +59,15 @@ export default function FormMate() {
 
   if (authLoading || profileLoading || educationLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#0A4174]" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground mb-4">Please login to access FormMate</p>
@@ -93,30 +93,27 @@ export default function FormMate() {
     }
   };
 
-  // Get highest education
-  const highestEducation = education?.[0];
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-8">
+    <div className="min-h-screen bg-background pb-8">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 py-4">
+      <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-4">
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
-            className="h-10 w-10 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors"
+            className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 text-white" />
+            <ArrowLeft className="h-5 w-5 text-primary-foreground dark:text-foreground" />
           </button>
-          <h1 className="font-display font-bold text-xl text-white">Online Application Guidance</h1>
+          <h1 className="font-display font-bold text-xl text-primary-foreground dark:text-foreground">Online Application Guidance</h1>
           <div className="w-10" />
         </div>
       </header>
 
       <main className="px-4 py-4 space-y-4">
         {/* Intro Card */}
-        <Card className="border-0 shadow-card bg-[hsl(var(--blue-100))]">
+        <Card className="border-0 shadow-card bg-primary/10 dark:bg-card">
           <CardContent className="p-4">
-            <p className="text-sm text-[hsl(var(--blue-700))]">
+            <p className="text-sm text-primary dark:text-foreground">
               No more searching documents or memorizing details — just tap copy and paste in the form.
             </p>
           </CardContent>
@@ -126,7 +123,7 @@ export default function FormMate() {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <User className="h-5 w-5 text-[hsl(var(--blue-700))]" />
+              <User className="h-5 w-5 text-primary" />
               Personal Details
             </CardTitle>
           </CardHeader>
@@ -140,18 +137,18 @@ export default function FormMate() {
           </CardContent>
         </Card>
 
-        {/* Identity Documents */}
+        {/* Identity Documents - Now shows full decrypted values */}
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Shield className="h-5 w-5 text-[hsl(var(--blue-700))]" />
+              <Shield className="h-5 w-5 text-primary" />
               Identity Documents
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CopyField label="Aadhaar Number" value={profile?.aadhar_number} />
-            <CopyField label="PAN Number" value={profile?.pan_number} />
-            <CopyField label="Passport Number" value={profile?.passport_number} />
+            <CopyField label="Aadhaar Number" value={profile?.decrypted_aadhar_number || profile?.aadhar_number} />
+            <CopyField label="PAN Number" value={profile?.decrypted_pan_number || profile?.pan_number} />
+            <CopyField label="Passport Number" value={profile?.decrypted_passport_number || profile?.passport_number} />
           </CardContent>
         </Card>
 
@@ -159,7 +156,7 @@ export default function FormMate() {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Phone className="h-5 w-5 text-[hsl(var(--blue-700))]" />
+              <Phone className="h-5 w-5 text-primary" />
               Contact Information
             </CardTitle>
           </CardHeader>
@@ -175,7 +172,7 @@ export default function FormMate() {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <GraduationCap className="h-5 w-5 text-[hsl(var(--blue-700))]" />
+              <GraduationCap className="h-5 w-5 text-primary" />
               Educational Qualifications
             </CardTitle>
           </CardHeader>
@@ -207,7 +204,7 @@ export default function FormMate() {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Briefcase className="h-5 w-5 text-[hsl(var(--blue-700))]" />
+              <Briefcase className="h-5 w-5 text-primary" />
               Category Details
             </CardTitle>
           </CardHeader>
@@ -228,7 +225,7 @@ export default function FormMate() {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Briefcase className="h-5 w-5 text-[hsl(var(--blue-700))]" />
+              <Briefcase className="h-5 w-5 text-primary" />
               Current Status
             </CardTitle>
           </CardHeader>
