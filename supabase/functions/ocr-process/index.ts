@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DAILY_LIMIT = 20;
+const DAILY_LIMIT = 7;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -44,24 +44,34 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check rate limit
-    const { data: rateLimitData, error: rateLimitError } = await supabase.rpc("check_user_rate_limit", {
+    // Check if user is admin (admins bypass rate limit)
+    const { data: isAdminData } = await supabase.rpc("has_role", {
       _user_id: user.id,
-      _daily_limit: DAILY_LIMIT,
+      _role: "admin"
     });
+    const isAdmin = isAdminData === true;
 
-    if (rateLimitError) {
-      console.error("Rate limit check error:", rateLimitError);
-    } else if (rateLimitData && !rateLimitData.allowed) {
-      return new Response(
-        JSON.stringify({
-          data: null,
-          error: `Daily limit of ${DAILY_LIMIT} API calls reached. Your limit resets at 00:01 IST. Please try again tomorrow.`,
-          rate_limit: rateLimitData,
-          success: false,
-        }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Check rate limit only for non-admin users
+    if (!isAdmin) {
+      const { data: rateLimitData, error: rateLimitError } = await supabase.rpc("check_user_rate_limit", {
+        _user_id: user.id,
+        _daily_limit: DAILY_LIMIT,
+      });
+
+      if (rateLimitError) {
+        console.error("Rate limit check error:", rateLimitError);
+      } else if (rateLimitData && !rateLimitData.allowed) {
+        console.log(`Rate limit exceeded for user ${user.id}: ${rateLimitData.used}/${rateLimitData.limit}`);
+        return new Response(
+          JSON.stringify({
+            data: null,
+            error: "AI limit reached! You've used all 7 daily requests. Your limit resets at 11:59 PM IST. Please try again tomorrow.",
+            rate_limit: rateLimitData,
+            success: false,
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     if (req.method !== "POST") {
@@ -110,6 +120,9 @@ Deno.serve(async (req) => {
       if (urlParts.length === 2) {
         filePath = decodeURIComponent(urlParts[1].split("?")[0]);
       }
+    } else if (file_url.startsWith("documents/")) {
+      // Handle internal path format: documents/user-id/filename
+      filePath = file_url.replace("documents/", "");
     } else {
       // Try to extract path from any URL format
       const match = file_url.match(/documents\/(.+?)(?:\?|$)/);
@@ -176,80 +189,125 @@ Deno.serve(async (req) => {
     
     console.log(`Converted to base64: ${base64.length} chars, MIME type: ${mimeType}`);
 
-    // Extraction prompts based on document type
+    // Extraction prompts based on document type (simplified to 5 types)
     const extractionPrompts: Record<string, string> = {
-      aadhar: `Extract from this Aadhaar card: Full Name, Date of Birth (YYYY-MM-DD), Gender, Aadhaar Number (12 digits), Address.
-Return ONLY JSON: { "full_name": "", "date_of_birth": "", "gender": "", "aadhar_number": "", "address": "" }`,
+      identity_card: `Extract from this Identity Card (Aadhaar/PAN/Passport):
+
+If AADHAAR CARD:
+- Full Name, Date of Birth (YYYY-MM-DD), Gender, Aadhaar Number (12 digits), Address
+
+If PAN CARD:
+- Full Name, Father's Name, Date of Birth (YYYY-MM-DD), PAN Number (10 chars)
+
+If PASSPORT:
+- Full Name, Date of Birth (YYYY-MM-DD), Gender, Passport Number, Father's Name, Mother's Name
+
+Return ONLY JSON with applicable fields:
+{
+  "full_name": "",
+  "father_name": "",
+  "mother_name": "",
+  "date_of_birth": "",
+  "gender": "",
+  "aadhar_number": "",
+  "pan_number": "",
+  "passport_number": "",
+  "address": ""
+}
+Use null for fields not found.`,
+
+      marksheet: `Extract from this Marksheet (any class/degree):
+- Full Name, Father's Name, Mother's Name, Date of Birth (YYYY-MM-DD)
+- Roll Number, Institute/School/College Name, Board/University Name
+- Qualification Type (determine: 10th, 12th, graduation, post_graduation, diploma)
+- Qualification Name (e.g., B.Tech, B.Sc, MBA, etc. if applicable)
+- Date/Year of Passing (YYYY-MM-DD or YYYY-01-01)
+- Marks Obtained, Maximum Marks, Percentage, CGPA
+
+Return ONLY JSON:
+{
+  "full_name": "",
+  "father_name": "",
+  "mother_name": "",
+  "date_of_birth": "",
+  "roll_number": "",
+  "institute_name": "",
+  "board_university": "",
+  "qualification_type": "",
+  "qualification_name": "",
+  "date_of_passing": "",
+  "marks_obtained": null,
+  "maximum_marks": null,
+  "percentage": null,
+  "cgpa": null
+}
+Use null for fields not found. qualification_type MUST be one of: 10th, 12th, graduation, post_graduation, diploma, other.`,
+
+      certificate: `Extract from this Certificate (any class/degree):
+- Full Name, Father's Name, Mother's Name, Date of Birth (YYYY-MM-DD)
+- Roll Number, Institute/School/College Name, Board/University Name
+- Qualification Type (determine: 10th, 12th, graduation, post_graduation, diploma)
+- Qualification Name (e.g., B.Tech, B.Sc, MBA, etc. if applicable)
+- Date/Year of Passing (YYYY-MM-DD or YYYY-01-01)
+
+Return ONLY JSON:
+{
+  "full_name": "",
+  "father_name": "",
+  "mother_name": "",
+  "date_of_birth": "",
+  "roll_number": "",
+  "institute_name": "",
+  "board_university": "",
+  "qualification_type": "",
+  "qualification_name": "",
+  "date_of_passing": ""
+}
+Use null for fields not found. qualification_type MUST be one of: 10th, 12th, graduation, post_graduation, diploma, other.`,
       
-      pan: `Extract from this PAN card: Full Name, Father's Name, Date of Birth (YYYY-MM-DD), PAN Number (10 chars).
-Return ONLY JSON: { "full_name": "", "father_name": "", "date_of_birth": "", "pan_number": "" }`,
-      
-      passport: `Extract from this passport: Full Name, Date of Birth (YYYY-MM-DD), Gender, Passport Number, Father's Name, Mother's Name, Place of Birth, Nationality.
-Return ONLY JSON: { "full_name": "", "date_of_birth": "", "gender": "", "passport_number": "", "father_name": "", "mother_name": "", "place_of_birth": "", "nationality": "" }`,
-      
-      class_10_certificate: `Extract from this Class 10 certificate: Full Name, Father's Name, Mother's Name, Date of Birth (YYYY-MM-DD), Roll Number, School/Institute Name, Board Name, Year of Passing.
-Return ONLY JSON: { "full_name": "", "father_name": "", "mother_name": "", "date_of_birth": "", "roll_number": "", "institute_name": "", "board_university": "", "qualification_type": "10th", "date_of_passing": "" }`,
-      
-      class_10_marksheet: `Extract from this Class 10 marksheet: Full Name, Father's Name, Mother's Name, Date of Birth, Roll Number, School Name, Board Name, Marks Obtained, Maximum Marks, Percentage, Year of Passing.
-Return ONLY JSON: { "full_name": "", "father_name": "", "mother_name": "", "date_of_birth": "", "roll_number": "", "institute_name": "", "board_university": "", "qualification_type": "10th", "marks_obtained": null, "maximum_marks": null, "percentage": null, "date_of_passing": "" }`,
-      
-      class_12_certificate: `Extract from this Class 12 certificate: Full Name, Father's Name, Mother's Name, Roll Number, School/Institute Name, Board Name, Stream/Subject, Year of Passing.
-Return ONLY JSON: { "full_name": "", "father_name": "", "mother_name": "", "roll_number": "", "institute_name": "", "board_university": "", "qualification_type": "12th", "qualification_name": "", "date_of_passing": "" }`,
-      
-      class_12_marksheet: `Extract from this Class 12 marksheet: Full Name, Father's Name, Roll Number, School Name, Board Name, Stream, Marks Obtained, Maximum Marks, Percentage, Year of Passing.
-Return ONLY JSON: { "full_name": "", "father_name": "", "roll_number": "", "institute_name": "", "board_university": "", "qualification_type": "12th", "qualification_name": "", "marks_obtained": null, "maximum_marks": null, "percentage": null, "date_of_passing": "" }`,
-      
-      graduation_degree: `Extract from this graduation degree: Full Name, Father's Name, Degree Name, University Name, College Name, Year of Passing.
-Return ONLY JSON: { "full_name": "", "father_name": "", "qualification_type": "graduation", "qualification_name": "", "board_university": "", "institute_name": "", "date_of_passing": "" }`,
-      
-      graduation_marksheet: `Extract from this graduation marksheet: Full Name, Roll Number, Degree Name, University Name, Semester/Year, Marks Obtained, Maximum Marks, Percentage/CGPA.
-Return ONLY JSON: { "full_name": "", "roll_number": "", "qualification_type": "graduation", "qualification_name": "", "board_university": "", "marks_obtained": null, "maximum_marks": null, "percentage": null, "cgpa": null, "date_of_passing": "" }`,
-      
-      post_graduation_degree: `Extract from this post graduation degree: Full Name, Degree Name (e.g., M.Tech, MBA), University Name, College Name, Year of Passing.
-Return ONLY JSON: { "full_name": "", "qualification_type": "post_graduation", "qualification_name": "", "board_university": "", "institute_name": "", "date_of_passing": "" }`,
-      
-      post_graduation_marksheet: `Extract from this post graduation marksheet: Full Name, Roll Number, Degree Name, University Name, Marks Obtained, Maximum Marks, Percentage/CGPA, Year.
-Return ONLY JSON: { "full_name": "", "roll_number": "", "qualification_type": "post_graduation", "qualification_name": "", "board_university": "", "marks_obtained": null, "maximum_marks": null, "percentage": null, "cgpa": null, "date_of_passing": "" }`,
-      
-      marksheet: `Extract from this marksheet: Full Name, Father's Name, Mother's Name, Date of Birth, Roll Number, Institute, Board/University, Qualification, Passing Date, Percentage/CGPA.
-Return ONLY JSON: { "full_name": "", "father_name": "", "mother_name": "", "date_of_birth": "", "roll_number": "", "institute_name": "", "board_university": "", "qualification_name": "", "date_of_passing": "", "percentage": null, "cgpa": null }`,
-      
-      caste_certificate: `Extract from this Caste Certificate: Full Name, Father's Name, Category (SC/ST/OBC/EWS), Caste Name, Sub-Caste (if mentioned), Certificate Number, Issuing Authority, Issue Date, Valid Until (if mentioned), Full Address.
-Return ONLY JSON: { "full_name": "", "father_name": "", "category": "", "caste_name": "", "sub_caste": "", "caste_certificate_number": "", "caste_issuing_authority": "", "caste_issue_date": "", "caste_valid_until": "", "address": "" }`,
-      
-      ews_certificate: `Extract from this EWS Certificate: Full Name, Father's Name, Certificate Number, Issuing Authority, Issue Date, Valid Until, Financial Year.
-Return ONLY JSON: { "full_name": "", "father_name": "", "category": "EWS", "ews_certificate_number": "", "ews_issuing_authority": "", "ews_issue_date": "", "ews_valid_until": "", "financial_year": "" }`,
-      
-      disability_certificate: `Extract from this Disability Certificate: Full Name, Father's Name, Disability Type, Disability Percentage, Certificate Number, Issuing Authority, Issue Date.
-Return ONLY JSON: { "full_name": "", "father_name": "", "disability_type": "", "disability_percentage": null, "disability_certificate_number": "", "sub_category": "PwBD" }`,
-      
-      job_application: `Extract ALL details from this Job Application Form/PDF. Look for any filled form fields, printed text, or handwritten entries.
+      caste_certificate: `Extract from this Caste Certificate:
+- Full Name, Father's Name
+- Category (SC/ST/OBC/EWS/General)
+- Caste Name (specific caste/community)
+- Sub-Caste (if mentioned separately)
+- Certificate Number
+- Issuing Authority
+- Issue Date (YYYY-MM-DD)
+- Valid Until (YYYY-MM-DD if mentioned)
+- Address
+
+Return ONLY JSON:
+{
+  "full_name": "",
+  "father_name": "",
+  "category": "",
+  "caste_name": "",
+  "sub_category": "",
+  "caste_certificate_number": "",
+  "caste_issuing_authority": "",
+  "caste_issue_date": "",
+  "address": ""
+}
+Use null for fields not found.`,
+
+      job_application: `Extract ALL details from this Job Application Form/PDF:
 
 PERSONAL DETAILS:
-- Full Name, Father's Name, Mother's Name, Date of Birth (YYYY-MM-DD format), Gender, Marital Status, Nationality, Religion, Category (General/OBC/SC/ST/EWS)
+- Full Name, Father's Name, Mother's Name, Date of Birth (YYYY-MM-DD), Gender, Marital Status, Category
 
 IDENTITY NUMBERS:
-- Aadhaar Number (12 digits), PAN Number (10 chars), Passport Number (if any)
+- Aadhaar Number (12 digits), PAN Number (10 chars), Passport Number
 
 CONTACT INFORMATION:
-- Mobile Number, Email Address, Permanent Address, Correspondence Address, PIN Code, State, District
+- Phone, Email, Address, PIN Code
 
 EDUCATIONAL QUALIFICATIONS:
-- Highest Qualification (10th/12th/Graduation/Post-Graduation), Degree/Course Name, Board/University Name, Year of Passing, Percentage/CGPA, Roll Number
+- Qualification Type (10th/12th/graduation/post_graduation), Qualification Name, Board/University, Date of Passing, Percentage/CGPA, Roll Number, Institute Name
 
-JOB APPLICATION DETAILS:
-- Post Applied For, Exam Name, Registration Number, Application Number, Roll Number, Application Date, Exam Center, Zone/Region
+CATEGORY DETAILS:
+- Caste Name, Sub-Category, Disability Type (if PwBD)
 
-CATEGORY/RESERVATION DETAILS:
-- Caste Name, Sub-Category (if applicable), Is PwBD (Yes/No), Disability Type (if PwBD), EWS Status
-
-EMPLOYMENT DETAILS (if any):
-- Currently Employed (Yes/No), Current Employer Name, Designation, Experience in Years
-
-PHYSICAL DETAILS (if mentioned):
-- Height (in cm), Weight (in kg), Eye Sight, Blood Group
-
-Return ONLY JSON with these exact keys (use null for fields not found):
+Return ONLY JSON:
 {
   "full_name": "",
   "father_name": "",
@@ -257,8 +315,6 @@ Return ONLY JSON with these exact keys (use null for fields not found):
   "date_of_birth": "",
   "gender": "",
   "marital_status": "",
-  "nationality": "",
-  "religion": "",
   "category": "",
   "aadhar_number": "",
   "pan_number": "",
@@ -266,44 +322,23 @@ Return ONLY JSON with these exact keys (use null for fields not found):
   "phone": "",
   "email": "",
   "address": "",
-  "correspondence_address": "",
   "pincode": "",
-  "state": "",
-  "district": "",
   "qualification_type": "",
   "qualification_name": "",
   "board_university": "",
+  "institute_name": "",
   "date_of_passing": "",
   "percentage": null,
   "cgpa": null,
   "roll_number": "",
-  "post_applied": "",
-  "exam_name": "",
-  "registration_number": "",
-  "application_number": "",
-  "application_date": "",
-  "exam_center": "",
-  "zone_region": "",
   "caste_name": "",
   "sub_category": "",
-  "is_pwd": "",
-  "disability_type": "",
-  "ews_status": "",
-  "currently_employed": "",
-  "current_employer": "",
-  "designation": "",
-  "experience_years": null,
-  "height_cm": null,
-  "weight_kg": null,
-  "blood_group": ""
-}`,
-      
-      photo: `Return ONLY JSON: { "photo_uploaded": true }`,
-      signature: `Return ONLY JSON: { "signature_uploaded": true }`,
-      thumb_impression: `Return ONLY JSON: { "thumb_impression_uploaded": true }`,
+  "disability_type": ""
+}
+Use null for fields not found.`,
     };
 
-    const prompt = extractionPrompts[document_type] || `Extract all personal information from this document. Return ONLY JSON with fields like: full_name, date_of_birth, gender, address, etc.`;
+    const prompt = extractionPrompts[document_type] || `Extract all personal information from this document. Return ONLY JSON with fields like: full_name, date_of_birth, gender, address, qualification_type, etc. Use null for missing fields.`;
 
     console.log(`Calling Gemini API for document type: ${document_type}`);
 
@@ -382,6 +417,11 @@ Return ONLY JSON with these exact keys (use null for fields not found):
       extractedFields = { raw_text: aiContent };
     }
 
+    // Count extracted fields (excluding nulls and empty strings)
+    const fieldCount = Object.entries(extractedFields).filter(
+      ([_, v]) => v !== null && v !== undefined && v !== ""
+    ).length;
+
     const ocrResult = {
       status: "completed",
       document_type,
@@ -393,7 +433,10 @@ Return ONLY JSON with these exact keys (use null for fields not found):
     // Update document with OCR result
     const { data, error } = await supabase
       .from("documents")
-      .update({ ocr_status: "completed", ocr_result: ocrResult })
+      .update({ 
+        ocr_status: "completed",
+        ocr_result: ocrResult 
+      })
       .eq("id", document_id)
       .eq("user_id", user.id)
       .select()
@@ -411,7 +454,7 @@ Return ONLY JSON with these exact keys (use null for fields not found):
       new_data: ocrResult,
     });
 
-    console.log(`OCR completed for document ${document_id}, extracted ${Object.keys(extractedFields).length} fields`);
+    console.log(`OCR completed for document ${document_id}, extracted ${fieldCount} fields`);
 
     return new Response(
       JSON.stringify({ data: { ...data, extracted_fields: extractedFields }, error: null, success: true }),
@@ -419,8 +462,9 @@ Return ONLY JSON with these exact keys (use null for fields not found):
     );
   } catch (error) {
     console.error("Error in ocr-process function:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ data: null, error: error instanceof Error ? error.message : "Unknown error", success: false }),
+      JSON.stringify({ data: null, error: errorMessage, success: false }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
