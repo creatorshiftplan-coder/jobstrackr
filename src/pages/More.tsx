@@ -3,7 +3,8 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { User, HelpCircle, LogOut, ChevronRight, Shield, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit } from "lucide-react";
+import { User, HelpCircle, LogOut, ChevronRight, Shield, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -12,15 +13,34 @@ import { useTheme } from "next-themes";
 import logoWhite from "@/assets/logo-white.png";
 
 export default function More() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, resetPassword } = useAuth();
   const { profile } = useProfile();
   const { isAdmin } = useAdminRole();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const handleLogout = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const handleResetPassword = async () => {
+    if (!user?.email) return;
+    
+    const { error } = await resetPassword(user.email);
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Email Sent",
+        description: "Check your inbox for the password reset link.",
+      });
+    }
   };
 
   if (loading) {
@@ -208,14 +228,25 @@ export default function More() {
         </Card>
 
         {user && (
-          <Button 
-            variant="outline" 
-            className="w-full text-destructive hover:text-destructive"
-            onClick={handleLogout}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+          <div className="space-y-3">
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={handleResetPassword}
+            >
+              <Key className="mr-2 h-4 w-4" />
+              Reset Password
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="w-full text-destructive hover:text-destructive"
+              onClick={handleLogout}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
         )}
       </main>
 

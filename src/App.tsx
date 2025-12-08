@@ -24,6 +24,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 const ExamTracker = lazy(() => import("./pages/ExamTracker"));
 const EditProfile = lazy(() => import("./pages/EditProfile"));
 const EditEducation = lazy(() => import("./pages/EditEducation"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const FormMate = lazy(() => import("./pages/FormMate"));
 const Documents = lazy(() => import("./pages/Documents"));
 const Help = lazy(() => import("./pages/Help"));
@@ -70,6 +71,7 @@ const App = () => (
                   <Route path="/help" element={<Help />} />
                   <Route path="/more" element={<More />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/tracker" element={<ExamTracker />} />
                   <Route path="*" element={<NotFound />} />
