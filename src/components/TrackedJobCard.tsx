@@ -104,7 +104,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   };
 
   return (
-    <Card className="bg-slate-50 border-slate-200 overflow-hidden">
+    <Card className="bg-card border-border overflow-hidden">
       {/* Clickable Area - Header + Collapsed Summary */}
       <div 
         className="cursor-pointer"
@@ -160,7 +160,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                     <span>Phase 1 Progress</span>
                     <span>{getProgress()}%</span>
                   </div>
-                  <Progress value={getProgress()} className="h-2 bg-slate-200" />
+                  <Progress value={getProgress()} className="h-2 bg-secondary" />
                 </div>
                 {lastUpdatedAt && (
                   <p className="text-xs text-muted-foreground mt-2">
@@ -187,8 +187,8 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               className={cn(
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 1 
-                  ? "bg-blue-600 text-white shadow-md" 
-                  : "bg-white text-slate-500 border border-slate-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
+                  ? "bg-primary text-primary-foreground shadow-md" 
+                  : "bg-secondary text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               )}
               onClick={() => setActivePhase(1)}
             >
@@ -198,8 +198,8 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               className={cn(
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 2 
-                  ? "bg-blue-600 text-white shadow-md" 
-                  : "bg-white text-slate-500 border border-slate-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
+                  ? "bg-primary text-primary-foreground shadow-md" 
+                  : "bg-secondary text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               )}
               onClick={() => setActivePhase(2)}
             >
@@ -216,9 +216,9 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
           ) : statusData ? (
             <>
               {/* Admit Card Section */}
-              <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200">
-                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <FileText className="h-4 w-4 text-blue-600" />
+              <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg border border-border">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-4 w-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -244,9 +244,9 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               </div>
 
               {/* Exam Date Section */}
-              <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200">
-                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <Calendar className="h-4 w-4 text-blue-600" />
+              <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg border border-border">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="h-4 w-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -268,9 +268,9 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               </div>
 
               {/* Result Section */}
-              <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200">
-                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <Clock className="h-4 w-4 text-blue-600" />
+              <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg border border-border">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Clock className="h-4 w-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -301,16 +301,16 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               <div className="space-y-2 pt-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Phase 1 Progress</span>
-                  <span className="font-medium text-blue-600">{getProgress()}%</span>
+                  <span className="font-medium text-primary">{getProgress()}%</span>
                 </div>
-                <Progress value={getProgress()} className="h-2.5 bg-slate-200" />
+                <Progress value={getProgress()} className="h-2.5 bg-secondary" />
               </div>
 
               {/* Recent News Section */}
               {(statusData?.predicted_events?.length > 0 || statusData?.summary) && (
-                <div className="pt-2 border-t border-slate-200">
+                <div className="pt-2 border-t border-border">
                   <div className="flex items-center gap-2 mb-3">
-                    <Newspaper className="h-4 w-4 text-blue-600" />
+                    <Newspaper className="h-4 w-4 text-primary" />
                     <span className="font-medium text-sm">Recent News for {exam?.name}</span>
                   </div>
                   <div className="space-y-2">
@@ -352,7 +352,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               size="default"
               onClick={fetchStatus}
               disabled={isLoadingStatus}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
             >
               <RefreshCw className={cn("h-4 w-4 mr-2", isLoadingStatus && "animate-spin")} />
               Refresh Status
@@ -360,10 +360,10 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
           </div>
 
           {/* Collapse Button at Bottom Center */}
-          <div className="flex justify-center pt-4 border-t border-slate-200 mt-4">
+          <div className="flex justify-center pt-4 border-t border-border mt-4">
             <button 
               onClick={() => setIsExpanded(false)}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground transition-colors"
             >
               <ChevronUp className="h-5 w-5" />
             </button>

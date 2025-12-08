@@ -30,18 +30,18 @@ export default function Profile() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-20">
-        <header className="sticky top-0 z-40 bg-[#E8F4FD] px-4 pt-12 pb-4">
+      <div className="min-h-screen bg-background pb-20">
+        <header className="sticky top-0 z-40 bg-card px-4 pt-12 pb-4">
           <div className="flex items-center gap-3">
             <Link to="/more">
-              <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
-                <Menu className="h-5 w-5 text-[#0A4174]" />
+              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
+                <Menu className="h-5 w-5 text-primary" />
               </div>
             </Link>
-            <h1 className="font-display font-bold text-xl text-[#0A4174] flex-1 text-center">Profile</h1>
+            <h1 className="font-display font-bold text-xl text-foreground flex-1 text-center">Profile</h1>
             <Link to="/saved">
-              <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
-                <Bookmark className="h-5 w-5 text-[#0A4174]" />
+              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
+                <Bookmark className="h-5 w-5 text-primary" />
               </div>
             </Link>
           </div>
@@ -89,23 +89,23 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-20">
-      {/* Header with Light Theme */}
-      <div className="bg-[#E8F4FD] pb-20">
+    <div className="min-h-screen bg-background pb-20">
+      {/* Header */}
+      <div className="bg-card pb-20">
         <header className="sticky top-0 z-40 px-4 pt-12 pb-4">
           <div className="flex items-center gap-3">
             <Link to="/more">
-              <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
-                <Menu className="h-5 w-5 text-[#0A4174]" />
+              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
+                <Menu className="h-5 w-5 text-primary" />
               </div>
             </Link>
             <div className="flex-1" />
             <Link to="/saved">
-              <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
-                <Bookmark className="h-5 w-5 text-[#0A4174]" />
+              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
+                <Bookmark className="h-5 w-5 text-primary" />
               </div>
             </Link>
-            <Link to="/edit-profile" className="flex items-center gap-2 text-[#0A4174] font-medium hover:text-[#0A4174]/80 transition-colors">
+            <Link to="/edit-profile" className="flex items-center gap-2 text-primary font-medium hover:text-primary/80 transition-colors">
               <Edit2 className="h-4 w-4" />
               Edit
             </Link>
@@ -114,19 +114,19 @@ export default function Profile() {
 
         {/* Profile Avatar & Name */}
         <div className="flex flex-col items-center text-center px-4 -mb-16">
-          <div className="h-24 w-24 rounded-full bg-gradient-to-br from-[#0A4174] to-[#1a5a9e] flex items-center justify-center mb-3 shadow-lg ring-4 ring-white">
+          <div className="h-24 w-24 rounded-full bg-primary flex items-center justify-center mb-3 shadow-lg ring-4 ring-background">
             {profile?.photo_url ? (
               <img src={profile.photo_url} alt={userName} className="h-24 w-24 rounded-full object-cover" />
             ) : (
-              <span className="text-3xl font-bold text-white">{userInitials}</span>
+              <span className="text-3xl font-bold text-primary-foreground">{userInitials}</span>
             )}
           </div>
-          <h2 className="font-display font-bold text-xl text-[#0A4174]">{userName}</h2>
+          <h2 className="font-display font-bold text-xl text-foreground">{userName}</h2>
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-sm text-[#0A4174]/70">
+            <span className="text-sm text-muted-foreground">
               {highestEducation ? getQualificationLabel(highestEducation.qualification_type) : "Add Education"}
             </span>
-            {highestEducation && <CheckCircle className="h-4 w-4 text-[#0A4174] fill-[#0A4174]/20" />}
+            {highestEducation && <CheckCircle className="h-4 w-4 text-primary fill-primary/20" />}
           </div>
           
           {/* Embedded Profile Progress */}
@@ -167,8 +167,8 @@ export default function Profile() {
           <Card className="border-0 shadow-card">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-100))] flex items-center justify-center flex-shrink-0">
-                  <User className="h-5 w-5 text-[hsl(var(--blue-800))]" />
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <User className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 grid grid-cols-2 gap-4">
                   <div>
@@ -182,8 +182,8 @@ export default function Profile() {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-100))] flex items-center justify-center flex-shrink-0">
-                  <Calendar className="h-5 w-5 text-[hsl(var(--blue-800))]" />
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 grid grid-cols-2 gap-4">
                   <div>
@@ -211,8 +211,8 @@ export default function Profile() {
           <Card className="border-0 shadow-card">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-100))] flex items-center justify-center flex-shrink-0">
-                  <Phone className="h-5 w-5 text-[hsl(var(--blue-800))]" />
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Phone className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 grid grid-cols-2 gap-4">
                   <div>
@@ -227,8 +227,8 @@ export default function Profile() {
               </div>
               {profile?.address && (
                 <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-100))] flex items-center justify-center flex-shrink-0">
-                    <MapPin className="h-5 w-5 text-[hsl(var(--blue-800))]" />
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <MapPin className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-muted-foreground mb-0.5">Address</p>
@@ -262,8 +262,8 @@ export default function Profile() {
                 <div className="space-y-3">
                   {education.slice(0, 2).map((edu) => (
                     <div key={edu.id} className="flex items-start gap-3">
-                      <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-100))] flex items-center justify-center flex-shrink-0">
-                        <GraduationCap className="h-5 w-5 text-[hsl(var(--blue-800))]" />
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <GraduationCap className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
@@ -272,7 +272,7 @@ export default function Profile() {
                         </div>
                         <p className="text-xs text-muted-foreground">{edu.board_university || edu.institute_name}</p>
                         {edu.date_of_passing && (
-                          <p className="text-xs text-muted-foreground">Passed: {new Date(edu.date_of_passing).getFullYear()}</p>
+                          <p className="text-xs text-muted-foreground">Passed: {edu.date_of_passing}</p>
                         )}
                       </div>
                     </div>
@@ -294,8 +294,8 @@ export default function Profile() {
           <Card className="border-0 shadow-card">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-100))] flex items-center justify-center flex-shrink-0">
-                  <Briefcase className="h-5 w-5 text-[hsl(var(--blue-800))]" />
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Briefcase className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 grid grid-cols-2 gap-4">
                   <div>
@@ -310,8 +310,8 @@ export default function Profile() {
               </div>
               {profile?.aadhar_number && (
                 <div className="flex items-start gap-3 mt-4">
-                  <div className="h-10 w-10 rounded-full bg-[hsl(var(--blue-100))] flex items-center justify-center flex-shrink-0">
-                    <FileText className="h-5 w-5 text-[hsl(var(--blue-800))]" />
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <FileText className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 grid grid-cols-2 gap-4">
                     <div>
