@@ -54,6 +54,23 @@ export function useProfile() {
         .maybeSingle();
 
       if (error) throw error;
+      
+      // If profile exists, also fetch decrypted sensitive fields
+      if (data) {
+        const { data: decryptedData } = await supabase
+          .rpc("get_my_decrypted_profile");
+        
+        if (decryptedData && decryptedData.length > 0) {
+          const decrypted = decryptedData[0];
+          // Merge decrypted values (for display when user needs full values)
+          return {
+            ...data,
+            // Keep masked values in original fields for display
+            // Full decrypted values available via separate call if needed
+          };
+        }
+      }
+      
       return data;
     },
     enabled: !!user?.id,

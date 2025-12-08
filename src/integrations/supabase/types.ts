@@ -331,6 +331,7 @@ export type Database = {
       profiles: {
         Row: {
           aadhar_number: string | null
+          aadhar_number_encrypted: string | null
           address: string | null
           caste_certificate_number: string | null
           caste_issue_date: string | null
@@ -353,7 +354,9 @@ export type Database = {
           marital_status: string | null
           mother_name: string | null
           pan_number: string | null
+          pan_number_encrypted: string | null
           passport_number: string | null
+          passport_number_encrypted: string | null
           phone: string | null
           photo_url: string | null
           pincode: string | null
@@ -364,6 +367,7 @@ export type Database = {
         }
         Insert: {
           aadhar_number?: string | null
+          aadhar_number_encrypted?: string | null
           address?: string | null
           caste_certificate_number?: string | null
           caste_issue_date?: string | null
@@ -386,7 +390,9 @@ export type Database = {
           marital_status?: string | null
           mother_name?: string | null
           pan_number?: string | null
+          pan_number_encrypted?: string | null
           passport_number?: string | null
+          passport_number_encrypted?: string | null
           phone?: string | null
           photo_url?: string | null
           pincode?: string | null
@@ -397,6 +403,7 @@ export type Database = {
         }
         Update: {
           aadhar_number?: string | null
+          aadhar_number_encrypted?: string | null
           address?: string | null
           caste_certificate_number?: string | null
           caste_issue_date?: string | null
@@ -419,7 +426,9 @@ export type Database = {
           marital_status?: string | null
           mother_name?: string | null
           pan_number?: string | null
+          pan_number_encrypted?: string | null
           passport_number?: string | null
+          passport_number_encrypted?: string | null
           phone?: string | null
           photo_url?: string | null
           pincode?: string | null
@@ -521,6 +530,25 @@ export type Database = {
       check_user_rate_limit: {
         Args: { _daily_limit: number; _user_id: string }
         Returns: Json
+      }
+      decrypt_sensitive_field: {
+        Args: { encrypted_value: string; owner_id: string }
+        Returns: string
+      }
+      encrypt_sensitive_field: {
+        Args: { field_value: string; owner_id: string }
+        Returns: string
+      }
+      get_my_decrypted_profile: {
+        Args: never
+        Returns: {
+          aadhar_number_decrypted: string
+          full_name: string
+          id: string
+          pan_number_decrypted: string
+          passport_number_decrypted: string
+          user_id: string
+        }[]
       }
       has_role: {
         Args: {
