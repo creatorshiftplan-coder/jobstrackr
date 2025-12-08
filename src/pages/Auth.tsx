@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Mail, Lock, User } from "lucide-react";
+import { ArrowLeft, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import logoColor from "@/assets/logo-color.png";
 
@@ -19,6 +19,8 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -69,8 +71,12 @@ export default function Auth() {
         if (error) throw error;
         toast({
           title: "Account created!",
-          description: "Please check your email to verify your account.",
+          description: "Please check your email to verify your account, then login.",
         });
+        setIsLogin(true);
+        setEmail("");
+        setPassword("");
+        setName("");
       }
     } catch (error: any) {
       let message = error.message;
@@ -147,17 +153,71 @@ export default function Auth() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  {isLogin && (
+                    <button
+                      type="button"
+                      disabled={forgotPasswordLoading}
+                      onClick={async () => {
+                        if (!email) {
+                          toast({
+                            title: "Enter your email",
+                            description: "Please enter your email address first.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        const emailResult = emailSchema.safeParse(email);
+                        if (!emailResult.success) {
+                          toast({
+                            title: "Invalid email",
+                            description: "Please enter a valid email address.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        setForgotPasswordLoading(true);
+                        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                          redirectTo: `${window.location.origin}/reset-password`,
+                        });
+                        setForgotPasswordLoading(false);
+                        if (error) {
+                          toast({
+                            title: "Error",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        } else {
+                          toast({
+                            title: "Reset email sent!",
+                            description: "Check your inbox for the password reset link.",
+                          });
+                        }
+                      }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {forgotPasswordLoading ? "Sending..." : "Forgot Password?"}
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 pr-10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
                 {errors.password && (
                   <p className="text-sm text-destructive">{errors.password}</p>
