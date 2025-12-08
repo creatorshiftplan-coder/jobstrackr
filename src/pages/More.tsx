@@ -2,7 +2,8 @@ import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2, Bookmark, ArrowLeft, FileText } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { User, Settings, Bell, HelpCircle, LogOut, ChevronRight, Shield, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -10,6 +11,7 @@ import { useEducation } from "@/hooks/useEducation";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { DocumentUploader } from "@/components/DocumentUploader";
 import { OCRResultModal } from "@/components/OCRResultModal";
+import { useTheme } from "next-themes";
 
 // Define which fields belong to profiles vs education
 const PROFILE_FIELDS = [
@@ -32,6 +34,7 @@ export default function More() {
   const { profile, upsertProfile } = useProfile();
   const { addEducation } = useEducation();
   const { isAdmin } = useAdminRole();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [ocrModalOpen, setOcrModalOpen] = useState(false);
   const [ocrData, setOcrData] = useState<Record<string, any>>({});
@@ -137,7 +140,7 @@ export default function More() {
               </CardContent>
             </Card>
 
-            {/* Application Guidance Link */}
+            {/* Online Application Guidance Link */}
             <Link to="/formmate" className="block mt-6">
               <Card className="border-0 shadow-card mb-4 hover:bg-secondary/30 transition-colors">
                 <CardContent className="p-4 flex items-center justify-between">
@@ -146,8 +149,8 @@ export default function More() {
                       <FileText className="h-5 w-5 text-[hsl(var(--blue-700))]" />
                     </div>
                     <div>
-                      <h4 className="font-medium text-foreground">Application Guidance</h4>
-                      <p className="text-xs text-muted-foreground">Quick copy your profile details</p>
+                      <h4 className="font-medium text-foreground">Online Application Guidance</h4>
+                      <p className="text-xs text-muted-foreground">No more searching documents or memorizing details — just tap copy and paste in the form.</p>
                     </div>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -156,6 +159,24 @@ export default function More() {
             </Link>
 
             <DocumentUploader onOCRComplete={handleOCRComplete} />
+
+            {/* Day/Night Mode Toggle */}
+            <Card className="border-0 shadow-card mt-4">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {theme === "dark" ? (
+                    <Moon className="h-5 w-5 text-[hsl(var(--blue-700))]" />
+                  ) : (
+                    <Sun className="h-5 w-5 text-[hsl(var(--blue-700))]" />
+                  )}
+                  <span className="font-medium text-foreground">Dark Mode</span>
+                </div>
+                <Switch
+                  checked={theme === "dark"}
+                  onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                />
+              </CardContent>
+            </Card>
           </>
         )}
 

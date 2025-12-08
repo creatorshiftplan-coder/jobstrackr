@@ -107,7 +107,7 @@ export default function FormMate() {
           >
             <ArrowLeft className="h-5 w-5 text-white" />
           </button>
-          <h1 className="font-display font-bold text-xl text-white">FormMate</h1>
+          <h1 className="font-display font-bold text-xl text-white">Online Application Guidance</h1>
           <div className="w-10" />
         </div>
       </header>
@@ -117,7 +117,7 @@ export default function FormMate() {
         <Card className="border-0 shadow-card bg-[hsl(var(--blue-100))]">
           <CardContent className="p-4">
             <p className="text-sm text-[hsl(var(--blue-700))]">
-              Quickly copy your profile information for filling job applications. Tap the copy icon beside any field.
+              No more searching documents or memorizing details — just tap copy and paste in the form.
             </p>
           </CardContent>
         </Card>

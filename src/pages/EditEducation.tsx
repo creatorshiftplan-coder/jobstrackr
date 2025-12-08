@@ -212,12 +212,13 @@ export default function EditEducation() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Date of Passing</Label>
+                <Label>Year/Date of Passing</Label>
                 <Input
-                  type="date"
                   value={formData.date_of_passing || ""}
                   onChange={(e) => setFormData((prev) => ({ ...prev, date_of_passing: e.target.value }))}
+                  placeholder="e.g., 2020, May 2020, 15-05-2020"
                 />
+                <p className="text-xs text-muted-foreground">Enter year only, month & year, or full date</p>
               </div>
               <div className="space-y-2">
                 <Label>Roll Number</Label>
