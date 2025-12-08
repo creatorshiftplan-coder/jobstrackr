@@ -19,6 +19,24 @@ export function useDocuments() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Helper to get signed URL from storage path
+  const getSignedUrl = async (storagePath: string): Promise<string | null> => {
+    // Extract bucket and path from stored path (e.g., "documents/user-id/timestamp.ext")
+    const pathParts = storagePath.split('/');
+    const bucket = pathParts[0];
+    const filePath = pathParts.slice(1).join('/');
+    
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(filePath, 900); // 15 min expiry
+    
+    if (error) {
+      console.error("Error creating signed URL:", error);
+      return null;
+    }
+    return data.signedUrl;
+  };
+
   const query = useQuery({
     queryKey: ["documents", user?.id],
     queryFn: async (): Promise<Document[]> => {
@@ -41,27 +59,32 @@ export function useDocuments() {
       if (!user?.id) throw new Error("Not authenticated");
 
       const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from("documents")
-        .upload(fileName, file);
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      // Get signed URL (15 min expiry) since bucket is now private
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from("documents")
-        .getPublicUrl(fileName);
+        .createSignedUrl(filePath, 900); // 15 minutes
 
-      // Create document record
+      if (signedUrlError) throw signedUrlError;
+
+      // Store the file path (not signed URL) for later signed URL generation
+      const storagePath = `documents/${filePath}`;
+
+      // Create document record with storage path
       const { data, error } = await supabase
         .from("documents")
         .insert({
           user_id: user.id,
           document_type: documentType,
-          file_url: publicUrl,
+          file_url: storagePath, // Store path, not signed URL
           file_name: file.name,
           ocr_status: "pending",
         })
@@ -69,7 +92,7 @@ export function useDocuments() {
         .single();
 
       if (error) throw error;
-      return data;
+      return { ...data, signedUrl: signedUrlData.signedUrl };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents", user?.id] });
@@ -134,5 +157,6 @@ export function useDocuments() {
     uploadDocument,
     processOCR,
     deleteDocument,
+    getSignedUrl,
   };
 }

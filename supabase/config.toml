@@ -38,4 +38,4 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.exams]
-verify_jwt = false
+verify_jwt = true
