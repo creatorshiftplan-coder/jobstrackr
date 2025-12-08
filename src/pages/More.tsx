@@ -56,21 +56,21 @@ export default function More() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-4">
+      <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-2">
         <div className="flex items-center justify-between">
           <button 
             onClick={() => navigate(-1)} 
-            className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
+            className="h-8 w-8 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 text-primary-foreground dark:text-foreground" />
+            <ArrowLeft className="h-4 w-4 text-primary-foreground dark:text-foreground" />
           </button>
-          <div className="flex items-center gap-3">
-            <img src={logoWhite} alt="JobsTrackr" className="h-10 sm:h-12 w-auto" />
-            <span className="font-display font-bold text-xl sm:text-2xl text-primary-foreground dark:text-foreground tracking-wider">JOBSTRACKR</span>
+          <div className="flex items-center gap-2">
+            <img src={logoWhite} alt="JobsTrackr" className="h-7 sm:h-8 w-auto" />
+            <span className="font-display font-bold text-base sm:text-lg text-primary-foreground dark:text-foreground tracking-wider">JOBSTRACKR</span>
           </div>
           <Link to="/saved">
-            <div className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors">
-              <Bookmark className="h-5 w-5 text-primary-foreground dark:text-foreground" />
+            <div className="h-8 w-8 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors">
+              <Bookmark className="h-4 w-4 text-primary-foreground dark:text-foreground" />
             </div>
           </Link>
         </div>
