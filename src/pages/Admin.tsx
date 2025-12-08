@@ -290,6 +290,40 @@ export default function Admin() {
   const [vacanciesFilter, setVacanciesFilter] = useState<string>("all");
   const [applyLinkFilter, setApplyLinkFilter] = useState<string>("all");
   
+  // Filter for users by qualification
+  const [qualificationFilter, setQualificationFilter] = useState<string>("all");
+
+  // Filter users by qualification
+  const filteredUsers = userStats.allUsers?.filter((user) => {
+    if (qualificationFilter === "all") return true;
+    if (qualificationFilter === "none") return !user.highest_qualification;
+    
+    const userQual = user.highest_qualification?.toLowerCase() || "";
+    const filterQual = qualificationFilter.toLowerCase();
+    
+    // Handle various qualification naming variants
+    if (filterQual === "8th pass") {
+      return userQual.includes("8th") || userQual === "8th pass";
+    }
+    if (filterQual === "10th pass") {
+      return userQual.includes("10th") || userQual === "10th pass" || userQual === "10th";
+    }
+    if (filterQual === "12th pass") {
+      return userQual.includes("12th") || userQual === "12th pass" || userQual === "12th";
+    }
+    if (filterQual === "graduate") {
+      return userQual === "graduate" || userQual === "graduation";
+    }
+    if (filterQual === "postgraduate") {
+      return userQual.includes("postgraduate") || userQual.includes("post-graduation");
+    }
+    if (filterQual === "diploma / iti") {
+      return userQual.includes("diploma") || userQual.includes("iti");
+    }
+    
+    return userQual.includes(filterQual);
+  }) || [];
+  
   // Sorting for jobs
   const [sortField, setSortField] = useState<"last_date" | "vacancies" | "title" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -800,8 +834,29 @@ export default function Admin() {
             </div>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Recent Registrations</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>All Registered Users</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <Select value={qualificationFilter} onValueChange={setQualificationFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filter by Qualification" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Qualifications</SelectItem>
+                      <SelectItem value="8th pass">8th Pass</SelectItem>
+                      <SelectItem value="10th pass">10th Pass</SelectItem>
+                      <SelectItem value="12th pass">12th Pass</SelectItem>
+                      <SelectItem value="graduate">Graduate</SelectItem>
+                      <SelectItem value="postgraduate">Postgraduate</SelectItem>
+                      <SelectItem value="diploma / iti">Diploma / ITI</SelectItem>
+                      <SelectItem value="engineering graduate (btech/be)">Engineering Graduate (BTech/BE)</SelectItem>
+                      <SelectItem value="medical/nursing/pharmacy">Medical/Nursing/Pharmacy</SelectItem>
+                      <SelectItem value="teaching qualified (bed/tet)">Teaching Qualified (BEd/TET)</SelectItem>
+                      <SelectItem value="none">No Qualification Set</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {statsLoading ? (
@@ -809,27 +864,41 @@ export default function Admin() {
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
                 ) : (
-                  <ScrollArea className="h-[400px]">
+                  <ScrollArea className="h-[500px]">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Name</TableHead>
                           <TableHead>Email</TableHead>
+                          <TableHead>Qualification</TableHead>
+                          <TableHead>API Calls</TableHead>
                           <TableHead>Joined</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {userStats.recentUsers.map((user) => (
+                        {filteredUsers.map((user) => (
                           <TableRow key={user.id}>
                             <TableCell className="font-medium">{user.full_name || "Not set"}</TableCell>
                             <TableCell>{user.email || "Not set"}</TableCell>
+                            <TableCell>
+                              {user.highest_qualification ? (
+                                <Badge variant="secondary">{user.highest_qualification}</Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={user.api_call_count > 0 ? "default" : "outline"}>
+                                {user.api_call_count}
+                              </Badge>
+                            </TableCell>
                             <TableCell>{format(new Date(user.created_at), "dd MMM yyyy")}</TableCell>
                           </TableRow>
                         ))}
-                        {userStats.recentUsers.length === 0 && (
+                        {filteredUsers.length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                              No users registered yet
+                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                              No users match the selected filter
                             </TableCell>
                           </TableRow>
                         )}
@@ -837,6 +906,9 @@ export default function Admin() {
                     </Table>
                   </ScrollArea>
                 )}
+                <div className="p-4 border-t text-sm text-muted-foreground">
+                  Showing {filteredUsers.length} of {userStats.allUsers.length} users
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
