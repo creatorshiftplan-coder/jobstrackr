@@ -290,24 +290,26 @@ Return ONLY JSON:
 }
 Use null for fields not found.`,
 
-      job_application: `Extract ALL details from this Job Application Form/PDF:
+      job_application: `This is a MULTI-PAGE Job Application Form PDF. Please CAREFULLY examine ALL PAGES of the document and extract information from EVERY page.
 
-PERSONAL DETAILS:
+IMPORTANT: This PDF may contain multiple pages. Extract data from ALL pages, not just the first page.
+
+PERSONAL DETAILS (usually on first pages):
 - Full Name, Father's Name, Mother's Name, Date of Birth (YYYY-MM-DD), Gender, Marital Status, Category
 
-IDENTITY NUMBERS:
+IDENTITY NUMBERS (check all pages):
 - Aadhaar Number (12 digits), PAN Number (10 chars), Passport Number
 
 CONTACT INFORMATION:
 - Phone, Email, Address, PIN Code
 
-EDUCATIONAL QUALIFICATIONS:
+EDUCATIONAL QUALIFICATIONS (may be on separate pages):
 - Qualification Type (10th/12th/graduation/post_graduation), Qualification Name, Board/University, Date of Passing, Percentage/CGPA, Roll Number, Institute Name
 
 CATEGORY DETAILS:
 - Caste Name, Sub-Category, Disability Type (if PwBD)
 
-Return ONLY JSON:
+Return ONLY JSON with ALL extracted data from ALL pages:
 {
   "full_name": "",
   "father_name": "",
@@ -335,7 +337,7 @@ Return ONLY JSON:
   "sub_category": "",
   "disability_type": ""
 }
-Use null for fields not found.`,
+Use null for fields not found. Check EVERY PAGE for information.`,
     };
 
     const prompt = extractionPrompts[document_type] || `Extract all personal information from this document. Return ONLY JSON with fields like: full_name, date_of_birth, gender, address, qualification_type, etc. Use null for missing fields.`;
@@ -356,7 +358,7 @@ Use null for fields not found.`,
               { inline_data: { mime_type: mimeType, data: base64 } },
             ],
           }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
         }),
       }
     );
