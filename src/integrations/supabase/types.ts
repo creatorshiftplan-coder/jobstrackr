@@ -127,6 +127,7 @@ export type Database = {
           is_verified: boolean | null
           marks_obtained: number | null
           maximum_marks: number | null
+          passing_year: number | null
           percentage: number | null
           qualification_name: string | null
           qualification_type: string
@@ -144,6 +145,7 @@ export type Database = {
           is_verified?: boolean | null
           marks_obtained?: number | null
           maximum_marks?: number | null
+          passing_year?: number | null
           percentage?: number | null
           qualification_name?: string | null
           qualification_type: string
@@ -161,6 +163,7 @@ export type Database = {
           is_verified?: boolean | null
           marks_obtained?: number | null
           maximum_marks?: number | null
+          passing_year?: number | null
           percentage?: number | null
           qualification_name?: string | null
           qualification_type?: string

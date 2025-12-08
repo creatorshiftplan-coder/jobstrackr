@@ -7,7 +7,6 @@ import { Upload, FileText, Loader2, Trash2, Scan, CheckCircle, XCircle, AlertTri
 import { Badge } from "@/components/ui/badge";
 
 const DOCUMENT_TYPES = [
-  { value: "job_application", label: "Online Application Pdf" },
   { value: "identity_card", label: "Identity Proof" },
   { value: "marksheet", label: "Educational Mark Sheets" },
   { value: "certificate", label: "Educational Certificates" },
