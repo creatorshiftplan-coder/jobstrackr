@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
-import { Job } from "@/types/job";
 
 export default function Saved() {
   const navigate = useNavigate();
@@ -56,9 +55,9 @@ export default function Saved() {
           </div>
         ) : savedJobs && savedJobs.length > 0 ? (
           <div className="space-y-4">
-            {savedJobs.map((saved) => (
-              <JobCard key={saved.job_id} job={saved.jobs as unknown as Job} />
-            ))}
+            {savedJobs.map((saved) => 
+              saved.jobs && <JobCard key={saved.job_id} job={saved.jobs} />
+            )}
           </div>
         ) : (
           <div className="text-center py-12">

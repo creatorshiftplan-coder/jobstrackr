@@ -2,13 +2,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useToast } from "./use-toast";
+import { Job } from "@/types/job";
+
+export interface SavedJob {
+  job_id: string;
+  created_at: string;
+  jobs: Job | null;
+}
 
 export function useSavedJobs() {
   const { user } = useAuth();
 
   return useQuery({
     queryKey: ["saved-jobs", user?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<SavedJob[]> => {
       if (!user) return [];
       
       const { data, error } = await supabase
@@ -18,7 +25,7 @@ export function useSavedJobs() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as SavedJob[];
     },
     enabled: !!user,
   });

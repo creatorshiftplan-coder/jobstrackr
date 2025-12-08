@@ -1,6 +1,6 @@
 import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent } from "@/components/ui/card";
-import { Menu, Edit2, Calendar, User, GraduationCap, Briefcase, CheckCircle, Phone, Mail, MapPin, FileText, ChevronRight, Bookmark } from "lucide-react";
+import { Menu, Edit2, Calendar, User, GraduationCap, Briefcase, CheckCircle, Phone, Mail, MapPin, FileText, ChevronRight, Bookmark, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -8,12 +8,8 @@ import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useExams } from "@/hooks/useExams";
 import { useEducation } from "@/hooks/useEducation";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { EmbeddedProfileProgress } from "@/components/ProfileCompleteness";
-import { useTheme } from "next-themes";
-import logoBlack from "@/assets/logo-black.png";
-import logoWhite from "@/assets/logo-white.png";
 
 export default function Profile() {
   const { user, loading } = useAuth();
@@ -22,8 +18,6 @@ export default function Profile() {
   const { userExams } = useExams();
   const { education, isLoading: educationLoading } = useEducation();
   const navigate = useNavigate();
-  const { theme } = useTheme();
-  const logoSrc = theme === "dark" ? logoWhite : logoBlack;
 
   if (loading || profileLoading || educationLoading) {
     return (
@@ -309,7 +303,7 @@ export default function Profile() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-0.5">Current Status</p>
-                    <p className="text-sm font-medium text-foreground">{(profile as any)?.current_status || "Job Seeker"}</p>
+                    <p className="text-sm font-medium text-foreground">{profile?.current_status || "Job Seeker"}</p>
                   </div>
                 </div>
               </div>

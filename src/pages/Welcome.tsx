@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,21 @@ import logoColor from "@/assets/logo-color.png";
 const Welcome = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
+  const originalThemeRef = useRef<string | undefined>(theme);
 
-  // Force light mode on Welcome page
+  // Force light mode on Welcome page, restore on unmount
   useEffect(() => {
+    originalThemeRef.current = theme;
     setTheme("light");
-  }, [setTheme]);
+    
+    return () => {
+      // Only restore if it was different
+      if (originalThemeRef.current && originalThemeRef.current !== "light") {
+        setTheme(originalThemeRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!loading && user) {
@@ -63,6 +72,7 @@ const Welcome = () => {
             src="/welcome-illustration.png"
             alt="Government job discovery illustration"
             className="w-full h-auto object-contain"
+            loading="lazy"
           />
         </div>
       </div>

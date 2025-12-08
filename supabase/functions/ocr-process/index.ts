@@ -290,6 +290,30 @@ Return ONLY JSON:
 }
 Use null for fields not found.`,
 
+      reservation_document: `Extract from this Reservation/Eligibility Certificate (EWS/Disability/Other):
+- Full Name, Father's Name
+- Category (EWS/PwD/Ex-Serviceman/etc.)
+- Certificate Number
+- Issuing Authority
+- Issue Date (YYYY-MM-DD)
+- Valid Until (YYYY-MM-DD if mentioned)
+- Disability Type & Percentage (if applicable)
+- Address
+
+Return ONLY JSON:
+{
+  "full_name": "",
+  "father_name": "",
+  "category": "",
+  "ews_certificate_number": "",
+  "ews_issuing_authority": "",
+  "disability_type": "",
+  "disability_certificate_number": "",
+  "issue_date": "",
+  "valid_until": "",
+  "address": ""
+}
+Use null for fields not found.`,
     };
 
     const prompt = extractionPrompts[document_type] || `Extract all personal information from this document. Return ONLY JSON with fields like: full_name, date_of_birth, gender, address, qualification_type, etc. Use null for missing fields.`;
