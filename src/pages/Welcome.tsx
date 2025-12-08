@@ -3,11 +3,18 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/logo.svg";
+import { useTheme } from "next-themes";
+import logoColor from "@/assets/logo-color.png";
 
 const Welcome = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { setTheme } = useTheme();
+
+  // Force light mode on Welcome page
+  useEffect(() => {
+    setTheme("light");
+  }, [setTheme]);
 
   useEffect(() => {
     if (!loading && user) {
@@ -41,7 +48,7 @@ const Welcome = () => {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         {/* Logo and Branding */}
         <div className="flex flex-col items-center mb-6">
-          <img src={logo} alt="JobsTrackr" className="h-20 w-auto mb-2" />
+          <img src={logoColor} alt="JobsTrackr" className="h-20 w-auto mb-2" />
           <h2 className="text-xl font-bold text-primary tracking-wider">JOBSTRACKR</h2>
         </div>
 
