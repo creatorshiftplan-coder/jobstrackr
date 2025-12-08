@@ -18,6 +18,7 @@ import ExamTracker from "./pages/ExamTracker";
 import EditProfile from "./pages/EditProfile";
 import EditEducation from "./pages/EditEducation";
 import FormMate from "./pages/FormMate";
+import Documents from "./pages/Documents";
 import Help from "./pages/Help";
 import NotFound from "./pages/NotFound";
 
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="/edit-profile" element={<EditProfile />} />
               <Route path="/edit-education" element={<EditEducation />} />
               <Route path="/formmate" element={<FormMate />} />
+              <Route path="/documents" element={<Documents />} />
               <Route path="/help" element={<Help />} />
               <Route path="/more" element={<More />} />
               <Route path="/auth" element={<Auth />} />
