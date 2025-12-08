@@ -10,7 +10,6 @@ import { useProfile } from "@/hooks/useProfile";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { useTheme } from "next-themes";
 import logoWhite from "@/assets/logo-white.png";
-import logoBlack from "@/assets/logo-black.png";
 
 export default function More() {
   const { user, loading, signOut } = useAuth();
@@ -46,7 +45,7 @@ export default function More() {
             <ArrowLeft className="h-5 w-5 text-primary-foreground dark:text-foreground" />
           </button>
           <div className="flex items-center gap-3">
-            <img src={theme === "dark" ? logoWhite : logoBlack} alt="JobsTrackr" className="h-14 sm:h-16 w-auto" />
+            <img src={logoWhite} alt="JobsTrackr" className="h-10 sm:h-12 w-auto" />
             <span className="font-display font-bold text-xl sm:text-2xl text-primary-foreground dark:text-foreground tracking-wider">JOBSTRACKR</span>
           </div>
           <Link to="/saved">
