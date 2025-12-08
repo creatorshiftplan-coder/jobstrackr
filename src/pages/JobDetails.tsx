@@ -16,11 +16,11 @@ import {
   GraduationCap,
   Briefcase,
   Share2,
-  Bookmark,
   ExternalLink,
   Loader2,
   CheckCircle,
 } from "lucide-react";
+import { SaveJobButton } from "@/components/SaveJobButton";
 import { format, differenceInDays } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -137,13 +137,34 @@ export default function JobDetails() {
           <Link to="/" className="p-2 -ml-2 rounded-full hover:bg-secondary transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <div className="flex gap-2">
-            <button className="p-2 rounded-full hover:bg-secondary transition-colors">
+          <div className="flex gap-1">
+            <button 
+              onClick={async () => {
+                const shareData = {
+                  title: job.title,
+                  text: `Check out this job: ${job.title} at ${job.department}`,
+                  url: window.location.href,
+                };
+                
+                if (navigator.share && navigator.canShare?.(shareData)) {
+                  try {
+                    await navigator.share(shareData);
+                  } catch (err) {
+                    if ((err as Error).name !== 'AbortError') {
+                      toast.error("Failed to share");
+                    }
+                  }
+                } else {
+                  await navigator.clipboard.writeText(window.location.href);
+                  toast.success("Link copied to clipboard!");
+                }
+              }}
+              className="p-2 rounded-full hover:bg-secondary transition-colors"
+              aria-label="Share job"
+            >
               <Share2 className="h-5 w-5 text-muted-foreground" />
             </button>
-            <button className="p-2 rounded-full hover:bg-secondary transition-colors">
-              <Bookmark className="h-5 w-5 text-muted-foreground" />
-            </button>
+            <SaveJobButton jobId={job.id} />
           </div>
         </div>
       </header>
