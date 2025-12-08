@@ -326,20 +326,12 @@ export default function EditProfile() {
 
                 <div className="space-y-2">
                   <Label htmlFor="sub_category">Sub-Category (if applicable)</Label>
-                  <Select
+                  <Input
+                    id="sub_category"
                     value={(currentData as any).sub_category || ""}
-                    onValueChange={(value) => handleInputChange("sub_category" as keyof Profile, value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select if applicable" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="None">None</SelectItem>
-                      <SelectItem value="PwBD">PwBD (Person with Benchmark Disability)</SelectItem>
-                      <SelectItem value="Ex-Serviceman">Ex-Serviceman</SelectItem>
-                      <SelectItem value="Freedom Fighter">Freedom Fighter Dependent</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    onChange={(e) => handleInputChange("sub_category" as keyof Profile, e.target.value)}
+                    placeholder="e.g., PwBD, Ex-Serviceman, etc."
+                  />
                 </div>
 
                 <div className="space-y-2">

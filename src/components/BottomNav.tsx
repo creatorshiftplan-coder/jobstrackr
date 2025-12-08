@@ -13,8 +13,8 @@ export function BottomNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card/90 backdrop-blur-xl border-t border-border shadow-lg z-50">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-2xl border-t border-border/50 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)] z-50">
+      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
         {navItems.map(({ icon: Icon, label, path }) => {
           const isActive = location.pathname === path;
           return (
@@ -22,14 +22,14 @@ export function BottomNav() {
               key={path}
               to={path}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 px-4 py-2 rounded-2xl transition-all min-w-0 flex-shrink-0",
+                "flex flex-col items-center justify-center gap-1 px-5 py-2 rounded-xl transition-all duration-200 min-w-0 flex-shrink-0",
                 isActive 
-                  ? "text-primary bg-primary/10" 
-                  : "text-muted-foreground hover:text-primary/70"
+                  ? "text-primary bg-primary/10 scale-105" 
+                  : "text-muted-foreground hover:text-primary/70 hover:bg-secondary/50"
               )}
             >
-              <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5px]")} />
-              <span className={cn("text-[10px] whitespace-nowrap", isActive ? "font-semibold" : "font-medium")}>{label}</span>
+              <Icon className={cn("h-5 w-5 transition-all", isActive && "stroke-[2.5px]")} />
+              <span className={cn("text-[10px] whitespace-nowrap tracking-wide", isActive ? "font-semibold" : "font-medium")}>{label}</span>
             </Link>
           );
         })}

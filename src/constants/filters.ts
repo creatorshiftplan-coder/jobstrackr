@@ -54,3 +54,15 @@ export const EXAM_SECTORS = [
   "Insurance",
   "Public Service Commissions"
 ];
+
+export const EDUCATION_QUALIFICATIONS = [
+  "8th Pass",
+  "10th Pass",
+  "12th Pass",
+  "Graduate",
+  "Postgraduate",
+  "Diploma / ITI",
+  "Engineering Graduate (BTech/BE)",
+  "Medical/Nursing/Pharmacy",
+  "Teaching Qualified (BEd/TET)"
+];
