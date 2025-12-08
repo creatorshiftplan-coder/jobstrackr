@@ -3,28 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDocuments } from "@/hooks/useDocuments";
-import { Upload, FileText, Loader2, Trash2, Scan, CheckCircle, XCircle } from "lucide-react";
+import { Upload, FileText, Loader2, Trash2, Scan, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const DOCUMENT_TYPES = [
-  { value: "job_application", label: "Job Application Form (PDF)" },
-  { value: "aadhar", label: "Aadhaar Card" },
-  { value: "pan", label: "PAN Card" },
-  { value: "passport", label: "Passport" },
-  { value: "class_10_certificate", label: "Class 10 Certificate" },
-  { value: "class_10_marksheet", label: "Class 10 Marksheet" },
-  { value: "class_12_certificate", label: "Class 12 Certificate" },
-  { value: "class_12_marksheet", label: "Class 12 Marksheet" },
-  { value: "graduation_degree", label: "Graduation Degree" },
-  { value: "graduation_marksheet", label: "Graduation Marksheet" },
-  { value: "post_graduation_degree", label: "Post Graduation Degree" },
-  { value: "post_graduation_marksheet", label: "Post Graduation Marksheet" },
+  { value: "job_application", label: "Job Application Form" },
+  { value: "identity_card", label: "Identity Card (Aadhaar/PAN/Passport)" },
+  { value: "marksheet", label: "Marksheet (Any Class/Degree)" },
+  { value: "certificate", label: "Certificate (Any Class/Degree)" },
   { value: "caste_certificate", label: "Caste Certificate" },
-  { value: "ews_certificate", label: "EWS Certificate" },
-  { value: "disability_certificate", label: "Disability Certificate" },
-  { value: "photo", label: "Passport Photo" },
-  { value: "signature", label: "Signature" },
-  { value: "thumb_impression", label: "Left Thumb Impression" },
 ];
 
 interface DocumentUploaderProps {
@@ -81,6 +68,12 @@ export function DocumentUploader({ onOCRComplete }: DocumentUploaderProps) {
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           With the help of AI, we'll auto-fill your profile information with your confirmation
         </p>
+        <div className="flex items-start gap-2 mt-2 p-2 rounded-md bg-amber-50 border border-amber-200">
+          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700">
+            AI helps you save time by filling details. But sometimes small mistakes can slip through — please double-check before applying!
+          </p>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2">

@@ -65,7 +65,12 @@ export default function More() {
     }
     
     // Add education record if there are education fields
+    // Ensure qualification_type is always set (required field)
     if (Object.keys(educationData).length > 0) {
+      if (!educationData.qualification_type) {
+        // Try to infer from qualification_name or default to 'other'
+        educationData.qualification_type = educationData.qualification_name || 'other';
+      }
       addEducation.mutate(educationData);
     }
   };

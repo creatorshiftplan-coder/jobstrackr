@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Pencil } from "lucide-react";
 
 interface OCRResultModalProps {
   isOpen: boolean;
@@ -53,16 +55,33 @@ const FIELD_LABELS: Record<string, string> = {
   disability_certificate_number: "Disability Certificate Number",
   disability_percentage: "Disability Percentage",
   current_status: "Current Status",
+  phone: "Phone Number",
+  email: "Email Address",
+  nationality: "Nationality",
+  religion: "Religion",
+  state: "State",
+  district: "District",
 };
 
 export function OCRResultModal({ isOpen, onClose, extractedData, onConfirm }: OCRResultModalProps) {
   const validFields = Object.entries(extractedData).filter(
-    ([key, value]) => value !== null && value !== undefined && !["photo_uploaded", "signature_uploaded", "raw_text"].includes(key)
+    ([key, value]) => value !== null && value !== undefined && value !== "" && !["photo_uploaded", "signature_uploaded", "raw_text"].includes(key)
   );
 
   const [selectedFields, setSelectedFields] = useState<Set<string>>(
     new Set(validFields.map(([key]) => key))
   );
+  
+  const [editedData, setEditedData] = useState<Record<string, any>>(extractedData);
+
+  // Reset state when extractedData changes
+  useEffect(() => {
+    setEditedData(extractedData);
+    const newValidFields = Object.entries(extractedData).filter(
+      ([key, value]) => value !== null && value !== undefined && value !== "" && !["photo_uploaded", "signature_uploaded", "raw_text"].includes(key)
+    );
+    setSelectedFields(new Set(newValidFields.map(([key]) => key)));
+  }, [extractedData]);
 
   const toggleField = (field: string) => {
     const newSelected = new Set(selectedFields);
@@ -72,6 +91,10 @@ export function OCRResultModal({ isOpen, onClose, extractedData, onConfirm }: OC
       newSelected.add(field);
     }
     setSelectedFields(newSelected);
+  };
+
+  const handleValueChange = (key: string, value: string) => {
+    setEditedData(prev => ({ ...prev, [key]: value }));
   };
 
   const allSelected = validFields.length > 0 && validFields.every(([key]) => selectedFields.has(key));
@@ -87,8 +110,9 @@ export function OCRResultModal({ isOpen, onClose, extractedData, onConfirm }: OC
   const handleConfirm = () => {
     const fieldsToUpdate: Record<string, any> = {};
     selectedFields.forEach((field) => {
-      if (extractedData[field] !== null && extractedData[field] !== undefined) {
-        fieldsToUpdate[field] = extractedData[field];
+      const value = editedData[field];
+      if (value !== null && value !== undefined && value !== "") {
+        fieldsToUpdate[field] = value;
       }
     });
     onConfirm(fieldsToUpdate);
@@ -101,7 +125,7 @@ export function OCRResultModal({ isOpen, onClose, extractedData, onConfirm }: OC
         <DialogHeader>
           <DialogTitle>OCR Results</DialogTitle>
           <DialogDescription>
-            Select the fields you want to update in your profile
+            Review and edit the extracted data before updating your profile
           </DialogDescription>
         </DialogHeader>
 
@@ -124,18 +148,25 @@ export function OCRResultModal({ isOpen, onClose, extractedData, onConfirm }: OC
             {validFields.length === 0 ? (
               <p className="text-sm text-muted-foreground">No extractable data found</p>
             ) : (
-              validFields.map(([key, value]) => (
-                <div key={key} className="flex items-start gap-3 p-2 rounded-lg bg-secondary">
+              validFields.map(([key]) => (
+                <div key={key} className="flex items-start gap-3 p-3 rounded-lg bg-secondary">
                   <Checkbox
                     id={key}
                     checked={selectedFields.has(key)}
                     onCheckedChange={() => toggleField(key)}
+                    className="mt-1"
                   />
                   <div className="flex-1 min-w-0">
-                    <Label htmlFor={key} className="text-sm font-medium">
+                    <Label htmlFor={key} className="text-sm font-medium flex items-center gap-1">
                       {FIELD_LABELS[key] || key.replace(/_/g, " ")}
+                      <Pencil className="h-3 w-3 text-muted-foreground" />
                     </Label>
-                    <p className="text-sm text-muted-foreground truncate">{String(value)}</p>
+                    <Input
+                      value={String(editedData[key] || "")}
+                      onChange={(e) => handleValueChange(key, e.target.value)}
+                      className="mt-1 h-8 text-sm"
+                      placeholder={`Enter ${FIELD_LABELS[key] || key}`}
+                    />
                   </div>
                 </div>
               ))
