@@ -363,10 +363,9 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
           <div className="flex justify-center pt-4 border-t border-slate-200 mt-4">
             <button 
               onClick={() => setIsExpanded(false)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
             >
-              <ChevronUp className="h-4 w-4" />
-              <span className="text-sm font-medium">Collapse</span>
+              <ChevronUp className="h-5 w-5" />
             </button>
           </div>
         </CardContent>

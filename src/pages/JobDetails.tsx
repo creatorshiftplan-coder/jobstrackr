@@ -272,49 +272,55 @@ export default function JobDetails() {
             </CardContent>
           </Card>
         )}
+
+        {/* Track This Exam Button - Below Eligibility */}
+        {user && (
+          <div className="mt-4 animate-slide-up" style={{ animationDelay: "0.5s" }}>
+            <Button
+              onClick={handleTrackExam}
+              variant="outline"
+              className="w-full h-11 border-[#0A4174] text-[#0A4174] hover:bg-[#0A4174]/10"
+              disabled={isTracking || isAlreadyTracked}
+            >
+              {isTracking ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : isAlreadyTracked ? (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Already Tracking
+                </>
+              ) : (
+                <>
+                  <Briefcase className="mr-2 h-4 w-4" />
+                  Track This Exam
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Blank space below Track button */}
+        <div className="h-24" />
       </main>
 
-      {/* Fixed Buttons */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card/95 backdrop-blur-md border-t border-border space-y-2">
-        {/* Track This Exam Button */}
-        {user && (
-          <Button
-            onClick={handleTrackExam}
-            variant="outline"
-            className="w-full h-11 border-[#0A4174] text-[#0A4174] hover:bg-[#0A4174]/10"
-            disabled={isTracking || isAlreadyTracked}
-          >
-            {isTracking ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Adding...
-              </>
-            ) : isAlreadyTracked ? (
-              <>
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Already Tracking
-              </>
-            ) : (
-              <>
-                <Briefcase className="mr-2 h-4 w-4" />
-                Track This Exam
-              </>
-            )}
-          </Button>
-        )}
-
-        {/* Apply Now Button */}
-        {job.apply_link && !isExpired ? (
-          <a href={job.apply_link} target="_blank" rel="noopener noreferrer" className="block">
-            <Button className="w-full gradient-primary text-primary-foreground font-semibold h-12">
-              Apply Now <ExternalLink className="ml-2 h-4 w-4" />
+      {/* Fixed Apply Now Button */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card/95 backdrop-blur-md border-t border-border">
+        <div className="flex justify-center">
+          {job.apply_link && !isExpired ? (
+            <a href={job.apply_link} target="_blank" rel="noopener noreferrer" className="w-1/2">
+              <Button className="w-full gradient-primary text-primary-foreground font-semibold h-12">
+                Apply Now <ExternalLink className="ml-2 h-4 w-4" />
+              </Button>
+            </a>
+          ) : (
+            <Button disabled className="w-1/2 h-12">
+              {isExpired && !isTBDDate ? "Application Closed" : "Apply Link Not Available"}
             </Button>
-          </a>
-        ) : (
-          <Button disabled className="w-full h-12">
-            {isExpired && !isTBDDate ? "Application Closed" : isTBDDate ? "Apply Link Not Available" : "Apply Link Not Available"}
-          </Button>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

@@ -7,11 +7,11 @@ import { Upload, FileText, Loader2, Trash2, Scan, CheckCircle, XCircle, AlertTri
 import { Badge } from "@/components/ui/badge";
 
 const DOCUMENT_TYPES = [
-  { value: "job_application", label: "Job Application Form" },
-  { value: "identity_card", label: "Identity Card (Aadhaar/PAN/Passport)" },
-  { value: "marksheet", label: "Marksheet (Any Class/Degree)" },
-  { value: "certificate", label: "Certificate (Any Class/Degree)" },
-  { value: "caste_certificate", label: "Caste Certificate" },
+  { value: "job_application", label: "Online Application Pdf" },
+  { value: "identity_card", label: "Identity Proof" },
+  { value: "marksheet", label: "Educational Mark Sheets" },
+  { value: "certificate", label: "Educational Certificates" },
+  { value: "caste_certificate", label: "Reservation / Eligibility Documents" },
 ];
 
 interface DocumentUploaderProps {
