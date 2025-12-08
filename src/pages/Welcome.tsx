@@ -48,8 +48,8 @@ const Welcome = () => {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         {/* Logo and Branding */}
         <div className="flex flex-col items-center mb-6">
-          <img src={logoColor} alt="JobsTrackr" className="h-20 w-auto mb-2" />
-          <h2 className="text-xl font-bold text-primary tracking-wider">JOBSTRACKR</h2>
+          <img src={logoColor} alt="JobsTrackr" className="h-28 sm:h-32 w-auto mb-3" />
+          <h2 className="text-2xl sm:text-3xl font-bold text-primary tracking-wider">JOBSTRACKR</h2>
         </div>
 
         {/* Headline */}

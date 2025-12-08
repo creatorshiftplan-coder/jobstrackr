@@ -1,8 +1,5 @@
 import { Menu, Search, Bookmark } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useTheme } from "next-themes";
-import logoBlack from "@/assets/logo-black.png";
-import logoWhite from "@/assets/logo-white.png";
 
 interface PageHeaderProps {
   showSearchBar?: boolean;
@@ -11,7 +8,6 @@ interface PageHeaderProps {
 
 export function PageHeader({ showSearchBar = true, variant = "transparent" }: PageHeaderProps) {
   const navigate = useNavigate();
-  const { theme } = useTheme();
   
   // Use theme-aware semantic tokens
   const iconColor = "text-primary";
@@ -20,18 +16,10 @@ export function PageHeader({ showSearchBar = true, variant = "transparent" }: Pa
   const searchBgClass = "bg-card/60 border-border";
   const searchTextColor = "text-muted-foreground";
   const placeholderColor = "text-muted-foreground";
-  
-  // Select logo based on theme
-  const logoSrc = theme === "dark" ? logoWhite : logoBlack;
 
   return (
     <header className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 pt-10 sm:pt-12 pb-3 sm:pb-4">
-      {/* Logo - Left */}
-      <Link to="/" className="flex-shrink-0">
-        <img src={logoSrc} alt="JobsTrackr" className="h-8 sm:h-9 w-auto" />
-      </Link>
-      
-      {/* More Button */}
+      {/* More Button - Left */}
       <Link to="/more">
         <div className={`h-9 w-9 sm:h-10 sm:w-10 rounded-full ${bgClass} backdrop-blur-sm flex items-center justify-center ${hoverClass} transition-colors`}>
           <Menu className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />

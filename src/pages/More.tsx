@@ -45,9 +45,9 @@ export default function More() {
           >
             <ArrowLeft className="h-5 w-5 text-primary-foreground dark:text-foreground" />
           </button>
-          <div className="flex items-center gap-2">
-            <img src={theme === "dark" ? logoBlack : logoWhite} alt="JobsTrackr" className="h-8 w-auto" />
-            <span className="font-display font-bold text-xl text-primary-foreground dark:text-foreground tracking-wider">JOBSTRACKR</span>
+          <div className="flex items-center gap-3">
+            <img src={theme === "dark" ? logoBlack : logoWhite} alt="JobsTrackr" className="h-10 sm:h-12 w-auto" />
+            <span className="font-display font-bold text-xl sm:text-2xl text-primary-foreground dark:text-foreground tracking-wider">JOBSTRACKR</span>
           </div>
           <Link to="/saved">
             <div className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors">

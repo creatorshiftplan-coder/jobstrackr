@@ -100,8 +100,8 @@ export default function Auth() {
         <Card className="w-full max-w-md border-0 shadow-card">
           <CardHeader className="text-center">
             <div className="flex flex-col items-center mb-4">
-              <img src={logoColor} alt="JobsTrackr" className="h-16 w-auto mb-2" />
-              <span className="text-sm font-bold text-primary tracking-wider">JOBSTRACKR</span>
+              <img src={logoColor} alt="JobsTrackr" className="h-20 sm:h-24 w-auto mb-2" />
+              <span className="text-base sm:text-lg font-bold text-primary tracking-wider">JOBSTRACKR</span>
             </div>
             <CardTitle className="font-display text-2xl">
               {isLogin ? "Welcome Back" : "Create Account"}
