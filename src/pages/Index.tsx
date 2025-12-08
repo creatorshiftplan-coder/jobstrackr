@@ -7,13 +7,10 @@ import { RecommendedJobCard } from "@/components/RecommendedJobCard";
 import { ActiveExamCard } from "@/components/ActiveExamCard";
 import { BottomNav } from "@/components/BottomNav";
 import { useJobs } from "@/hooks/useJobs";
-import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { useAuth } from "@/hooks/useAuth";
 import { useExams } from "@/hooks/useExams";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { AISearchResult } from "@/components/AISearchResult";
-import { Briefcase, Sparkles, Loader2, SearchX } from "lucide-react";
+import { Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const colorVariants = ["pink", "blue", "green", "orange"] as const;
@@ -31,8 +28,6 @@ const Index = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { data: jobs, isLoading, error } = useJobs();
   const { userExams } = useExams();
-  const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, dismissJob, clearAIResults } =
-    useAIJobSearch();
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
@@ -83,44 +78,8 @@ const Index = () => {
           </div>
         ) : (
           <>
-            {/* AI Search Results */}
-            {aiResults.length > 0 && (
-              <section className="px-5 mb-6 space-y-4">
-                <SectionHeader title="AI Found Jobs" variant="dark" />
-                {aiResults.map((job, index) => (
-                  <AISearchResult
-                    key={`${job.exam_name}-${index}`}
-                    job={job}
-                    onDismiss={() => dismissJob(job)}
-                    savedJobId={getSavedJobId(job.exam_name)}
-                  />
-                ))}
-              </section>
-            )}
-
-            {/* AI Search "Not Found" Status */}
-            {searchStatus === "not_found" && (
-              <div className="text-center py-8 px-5">
-                <div className="mx-auto h-16 w-16 rounded-full bg-secondary flex items-center justify-center mb-4">
-                  <SearchX className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="font-bold text-foreground mb-2">No exams found</h3>
-                <p className="text-sm text-muted-foreground">
-                  No exams found for this search. Try another category or keyword.
-                </p>
-              </div>
-            )}
-
-            {/* AI Searching State */}
-            {isSearching && (
-              <div className="text-center py-8 px-5">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-4" />
-                <p className="text-sm text-muted-foreground">Searching with AI...</p>
-              </div>
-            )}
-
             {/* No Results */}
-            {showNoResults && aiResults.length === 0 && searchStatus !== "not_found" && !isSearching && (
+            {showNoResults && (
               <div className="text-center py-12 px-5">
                 <div className="mx-auto h-16 w-16 rounded-full bg-secondary flex items-center justify-center mb-4">
                   <Briefcase className="h-8 w-8 text-muted-foreground" />
@@ -133,7 +92,7 @@ const Index = () => {
             )}
 
             {/* New Government Jobs Section - Latest uploaded jobs */}
-            {newJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
+            {newJobs.length > 0 && (
               <section className="mb-8">
                 <SectionHeader title="New Government Jobs" variant="dark" />
                 <div 
@@ -161,7 +120,7 @@ const Index = () => {
             )}
 
             {/* My Active Exams Section - Only show if user has tracked exams */}
-            {activeExams.length > 0 && !isSearching && searchStatus !== "not_found" && (
+            {activeExams.length > 0 && (
               <section className="mb-8">
                 <SectionHeader title="My Active Exams" variant="dark" />
                 <div className="flex gap-3 sm:gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide">
@@ -173,7 +132,7 @@ const Index = () => {
             )}
 
             {/* Recommended Jobs Section */}
-            {recommendedJobs.length > 0 && !isSearching && searchStatus !== "not_found" && (
+            {recommendedJobs.length > 0 && (
               <section>
                 <SectionHeader title="Recommended Jobs" variant="dark" />
                 <div className="grid grid-cols-2 gap-3 sm:gap-4 px-5">
@@ -191,9 +150,7 @@ const Index = () => {
             {/* Show all jobs if no featured/recommended split */}
             {newJobs.length === 0 &&
               recommendedJobs.length === 0 &&
-              filteredJobs.length > 0 &&
-              !isSearching &&
-              searchStatus !== "not_found" && (
+              filteredJobs.length > 0 && (
                 <section>
                   <SectionHeader title="All Jobs" variant="dark" />
                   <div className="grid grid-cols-2 gap-3 sm:gap-4 px-5">

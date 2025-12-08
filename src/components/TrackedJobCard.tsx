@@ -207,13 +207,22 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             </button>
           </div>
 
-          {isLoadingStatus ? (
+          {/* Phase 2 Content Placeholder */}
+          {activePhase === 2 && (
+            <div className="text-center py-8 text-muted-foreground bg-secondary/50 rounded-lg border border-border">
+              <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-medium">Phase 2 details coming soon</p>
+              <p className="text-xs mt-1">Phase 2 information will be available after Phase 1 completion</p>
+            </div>
+          )}
+
+          {activePhase === 1 && isLoadingStatus ? (
             <div className="space-y-3">
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
             </div>
-          ) : statusData ? (
+          ) : activePhase === 1 && statusData ? (
             <>
               {/* Admit Card Section */}
               <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg border border-border">
@@ -339,12 +348,12 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 </p>
               )}
             </>
-          ) : (
+          ) : activePhase === 1 ? (
             <div className="text-center py-8 text-muted-foreground">
               <p className="text-sm mb-1">No status data available</p>
               <p className="text-xs">Click "Refresh Status" below to fetch latest updates</p>
             </div>
-          )}
+          ) : null}
 
           {/* Refresh Button - Prominent styling */}
           <div className="flex justify-center pt-4">

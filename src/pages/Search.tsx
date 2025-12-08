@@ -14,10 +14,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, Menu } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
+import { useDebouncedValue } from "@/hooks/useDebounce";
 
 export default function Search() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 300);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -28,8 +30,8 @@ export default function Search() {
     if (!jobs) return [];
     let filtered = jobs;
 
-    if (query) {
-      const q = query.toLowerCase();
+    if (debouncedQuery) {
+      const q = debouncedQuery.toLowerCase();
       filtered = filtered.filter(
         (job) =>
           job.title.toLowerCase().includes(q) ||
@@ -67,7 +69,7 @@ export default function Search() {
     });
 
     return filtered;
-  }, [jobs, query, selectedLocations, selectedSectors]);
+  }, [jobs, debouncedQuery, selectedLocations, selectedSectors]);
 
   const toggleLocation = (location: string) => {
     setSelectedLocations((prev) =>
