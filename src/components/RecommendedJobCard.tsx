@@ -15,26 +15,26 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
   };
 
   return (
-    <Link to={`/job/${job.id}`} className="block group">
-      <div className="p-4 rounded-2xl bg-card border border-border/40 shadow-soft h-[140px] sm:h-[160px] flex flex-col transition-all duration-300 hover:shadow-soft-lg hover:-translate-y-0.5 hover:border-primary/20">
+    <Link to={`/job/${job.id}`} className="block">
+      <div className="p-3 sm:p-4 rounded-2xl bg-card/80 backdrop-blur-md shadow-lg border border-border h-[140px] sm:h-[160px] flex flex-col transition-all hover:bg-card hover:scale-[1.02]">
         {/* Icon + Job Title Row */}
-        <div className="flex items-start gap-3 mb-1.5">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0 group-hover:from-primary/30 group-hover:to-primary/20 transition-colors">
-            <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+        <div className="flex items-start gap-2 mb-1">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
+            <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
           </div>
-          <h3 className="font-semibold text-foreground text-xs sm:text-sm line-clamp-2 flex-1 group-hover:text-primary transition-colors">
+          <h3 className="font-bold text-foreground text-xs sm:text-sm line-clamp-2 flex-1">
             {job.title}
           </h3>
         </div>
 
         {/* Agency/Department Name */}
-        <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-1 mb-auto pl-12">
+        <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-1 mb-auto">
           {job.department}
         </p>
 
         {/* Vacancy Count */}
-        <div className="flex items-center gap-2 text-[10px] sm:text-xs font-semibold text-primary mt-auto bg-primary/5 rounded-lg px-2.5 py-1.5 w-fit">
-          <Users className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold text-primary mt-auto">
+          <Users className="h-3 w-3 sm:h-4 sm:w-4" />
           {formatVacancy(job.vacancies, job.vacancies_display)}
         </div>
       </div>
