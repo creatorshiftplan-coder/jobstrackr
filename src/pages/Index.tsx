@@ -65,7 +65,7 @@ const Index = () => {
   const showNoResults = !isLoading && filteredJobs.length === 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-24">
+    <div className="min-h-screen bg-background pb-24">
       <PageHeader variant="dark" />
 
       <main>
@@ -152,7 +152,7 @@ const Index = () => {
                       key={index}
                       className={cn(
                         "h-2 w-2 rounded-full transition-all",
-                        index === activeCardIndex ? "bg-[#0A4174]" : "bg-[#0A4174]/30"
+                        index === activeCardIndex ? "bg-primary" : "bg-primary/30"
                       )}
                     />
                   ))}

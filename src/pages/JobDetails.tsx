@@ -279,7 +279,7 @@ export default function JobDetails() {
             <Button
               onClick={handleTrackExam}
               variant="outline"
-              className="w-full h-11 border-[#0A4174] text-[#0A4174] hover:bg-[#0A4174]/10"
+              className="w-full h-11"
               disabled={isTracking || isAlreadyTracked}
             >
               {isTracking ? (

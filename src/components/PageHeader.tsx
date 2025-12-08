@@ -9,24 +9,13 @@ interface PageHeaderProps {
 export function PageHeader({ showSearchBar = true, variant = "transparent" }: PageHeaderProps) {
   const navigate = useNavigate();
   
-  // For dark variant (light background), use dark colors; for transparent (dark background), use white
-  const isDark = variant === "dark";
-  const iconColor = isDark ? "text-[#0A4174]" : "text-white";
-  const bgClass = isDark 
-    ? "bg-[#0A4174]/10" 
-    : "bg-white/20";
-  const hoverClass = isDark
-    ? "hover:bg-[#0A4174]/20"
-    : "hover:bg-white/30";
-  const searchBgClass = isDark
-    ? "bg-white/60 border-[#0A4174]/20"
-    : "bg-white/20 border-white/30";
-  const searchTextColor = isDark
-    ? "text-[#0A4174]/70"
-    : "text-white/70";
-  const placeholderColor = isDark
-    ? "text-[#0A4174]/50"
-    : "text-white/60";
+  // Use theme-aware semantic tokens
+  const iconColor = "text-primary";
+  const bgClass = "bg-secondary";
+  const hoverClass = "hover:bg-secondary/80";
+  const searchBgClass = "bg-card/60 border-border";
+  const searchTextColor = "text-muted-foreground";
+  const placeholderColor = "text-muted-foreground";
 
   return (
     <header className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 pt-10 sm:pt-12 pb-3 sm:pb-4">

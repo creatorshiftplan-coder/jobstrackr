@@ -102,24 +102,24 @@ export default function Search() {
   const showAISearch = query.length >= 3 && filteredJobs.length === 0 && aiResults.length === 0 && searchStatus !== "not_found";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E8F4FD] via-[#D6EEFF] to-[#F0F8FF] pb-20">
-      <header className="sticky top-0 z-40 bg-[#E8F4FD] px-4 pt-12 pb-4">
+    <div className="min-h-screen bg-background pb-20">
+      <header className="sticky top-0 z-40 bg-card px-4 pt-12 pb-4">
         <div className="flex items-center gap-3 mb-4">
           <Link to="/more">
-            <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
-              <Menu className="h-5 w-5 text-[#0A4174]" />
+            <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
+              <Menu className="h-5 w-5 text-primary" />
             </div>
           </Link>
-          <h1 className="font-display font-bold text-xl text-[#0A4174] flex-1 text-center">Explore Jobs</h1>
+          <h1 className="font-display font-bold text-xl text-foreground flex-1 text-center">Explore Jobs</h1>
           <Link to="/saved">
-            <div className="h-10 w-10 rounded-full bg-[#0A4174]/10 flex items-center justify-center hover:bg-[#0A4174]/20 transition-colors">
-              <Bookmark className="h-5 w-5 text-[#0A4174]" />
+            <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
+              <Bookmark className="h-5 w-5 text-primary" />
             </div>
           </Link>
         </div>
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#0A4174]/60" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Job title, department, location..."
               value={query}
@@ -128,18 +128,18 @@ export default function Search() {
                 if (!e.target.value) clearAIResults();
               }}
               onKeyDown={handleKeyDown}
-              className="pl-10 bg-white/80 border-[#0A4174]/20 text-[#0A4174] placeholder:text-[#0A4174]/50"
+              className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <Button 
-            variant="outline" 
+            variant="default" 
             size="icon" 
             onClick={() => setIsFilterOpen(true)} 
-            className="relative bg-[#0A4174] border-[#0A4174] hover:bg-[#0A4174]/90 text-white"
+            className="relative"
           >
             <Filter className="h-4 w-4" />
             {totalFilters > 0 && (
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 justify-center text-xs bg-[#A7EBF2] text-[#0A4174]">
+              <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 justify-center text-xs bg-accent text-accent-foreground">
                 {totalFilters}
               </Badge>
             )}
@@ -229,7 +229,7 @@ export default function Search() {
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-[#0A4174]/80">{filteredJobs.length} results</p>
+            <p className="text-sm text-muted-foreground">{filteredJobs.length} results</p>
 
             <div className="flex flex-col gap-6">
               {filteredJobs.map((job) => (
@@ -240,7 +240,7 @@ export default function Search() {
             {/* AI Search Results */}
             {aiResults.length > 0 && (
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-[#0A4174]/90">AI Found Results</h3>
+                <h3 className="font-semibold text-sm text-foreground">AI Found Results</h3>
                 {aiResults.map((job, index) => (
                   <AISearchResult
                     key={`${job.exam_name}-${index}`}
@@ -258,7 +258,7 @@ export default function Search() {
                 <div className="mx-auto h-16 w-16 rounded-full bg-secondary flex items-center justify-center">
                   <SearchX className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="font-semibold">No exams found</h3>
+                <h3 className="font-semibold text-foreground">No exams found</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto">
                   No exams found for this search. Try another category or keyword.
                 </p>
@@ -271,7 +271,7 @@ export default function Search() {
                 <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
                   <Sparkles className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="font-semibold">No jobs found in database</h3>
+                <h3 className="font-semibold text-foreground">No jobs found in database</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto">
                   Want to search with AI? We'll find information about this job and add it for you.
                 </p>
