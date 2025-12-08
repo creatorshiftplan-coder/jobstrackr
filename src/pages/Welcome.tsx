@@ -43,22 +43,22 @@ const Welcome = () => {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 flex flex-col">
+    <div className="min-h-screen max-h-screen bg-background flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+      <div className="flex-1 flex flex-col items-center justify-between px-6 py-4">
         {/* Logo and Branding */}
-        <div className="flex flex-col items-center mb-6">
-          <img src={logoColor} alt="JobsTrackr" className="h-28 sm:h-32 w-auto mb-3" />
-          <h2 className="text-2xl sm:text-3xl font-bold text-primary tracking-wider">JOBSTRACKR</h2>
+        <div className="flex flex-col items-center mt-4">
+          <img src={logoColor} alt="JobsTrackr" className="h-20 sm:h-24 w-auto mb-2" />
+          <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-wider">JOBSTRACKR</h2>
         </div>
 
         {/* Headline */}
-        <h1 className="text-3xl font-bold text-foreground text-center mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground text-center">
           Discover Your<br />Government Job
         </h1>
 
         {/* Illustration */}
-        <div className="w-full max-w-sm mb-12">
+        <div className="w-full max-w-[280px]">
           <img
             src="/welcome-illustration.png"
             alt="Government job discovery illustration"
@@ -68,11 +68,11 @@ const Welcome = () => {
       </div>
 
       {/* Bottom Section */}
-      <div className="px-6 pb-8 space-y-4">
+      <div className="px-6 pb-6 space-y-3">
         {/* Sign up Button */}
         <Button
           onClick={() => navigate("/auth?mode=signup")}
-          className="w-full h-14 text-lg font-semibold rounded-xl bg-primary hover:bg-primary/90"
+          className="w-full h-12 text-base font-semibold rounded-xl bg-primary hover:bg-primary/90"
         >
           Sign up
         </Button>
@@ -81,7 +81,7 @@ const Welcome = () => {
         <Button
           onClick={handleGoogleSignIn}
           variant="outline"
-          className="w-full h-14 text-lg font-medium rounded-xl bg-background border-border hover:bg-muted"
+          className="w-full h-12 text-base font-medium rounded-xl bg-card border-border hover:bg-muted"
         >
           <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
             <path
