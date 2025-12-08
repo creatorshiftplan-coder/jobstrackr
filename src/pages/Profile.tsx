@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { EmbeddedProfileProgress } from "@/components/ProfileCompleteness";
+import { useTheme } from "next-themes";
+import logoBlack from "@/assets/logo-black.png";
+import logoWhite from "@/assets/logo-white.png";
 
 export default function Profile() {
   const { user, loading } = useAuth();
@@ -19,6 +22,8 @@ export default function Profile() {
   const { userExams } = useExams();
   const { education, isLoading: educationLoading } = useEducation();
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const logoSrc = theme === "dark" ? logoWhite : logoBlack;
 
   if (loading || profileLoading || educationLoading) {
     return (
@@ -99,7 +104,10 @@ export default function Profile() {
                 <Menu className="h-5 w-5 text-primary" />
               </div>
             </Link>
-            <div className="flex-1" />
+            <div className="flex-1 flex items-center justify-center gap-2">
+              <img src={logoSrc} alt="JobsTrackr" className="h-10 sm:h-12 w-auto" />
+              <span className="font-display font-bold text-lg sm:text-xl text-foreground tracking-wider">JOBSTRACKR</span>
+            </div>
             <Link to="/saved">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
                 <Bookmark className="h-5 w-5 text-primary" />
