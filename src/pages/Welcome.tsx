@@ -4,14 +4,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
+import { CheckCircle } from "lucide-react";
 import logoColor from "@/assets/logo-color.png";
-import welcomeIllustrationDark from "@/assets/welcome-illustration-dark.png";
+import welcomeLight from "@/assets/welcome-light.png";
+import welcomeDark from "@/assets/welcome-dark.png";
 
 const Welcome = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { theme } = useTheme();
-
 
   useEffect(() => {
     if (!loading && user) {
@@ -39,29 +40,42 @@ const Welcome = () => {
     );
   }
 
+  const features = [
+    "We track the exams — you focus on studying",
+    "Upload documents once & fill forms hassle-free",
+    "Find jobs that match your qualification and goals",
+  ];
+
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-y-auto">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-between px-6 py-4 gap-4">
-        {/* Logo and Branding */}
-        <div className="flex flex-col items-center mt-2 sm:mt-4">
-          <img src={logoColor} alt="JobsTrackr" className="h-16 sm:h-20 w-auto mb-1" />
-          <h2 className="text-lg sm:text-2xl font-bold text-primary tracking-wider">JOBSTRACKR</h2>
-        </div>
+      <div className="flex-1 flex flex-col items-center px-6 py-6 gap-4">
+        {/* Logo */}
+        <img src={logoColor} alt="JobsTrackr" className="h-16 sm:h-20 w-auto" />
 
-        {/* Headline */}
-        <h1 className="text-xl sm:text-3xl font-bold text-foreground text-center">
-          Discover Your<br />Government Job
-        </h1>
+        {/* App Name */}
+        <h2 className="text-lg sm:text-2xl font-bold text-primary tracking-wider">
+          JOBSTRACKR
+        </h2>
 
         {/* Illustration */}
-        <div className="w-full max-w-[200px] sm:max-w-[280px]">
+        <div className="w-full max-w-[220px] sm:max-w-[280px]">
           <img
-            src={theme === "dark" ? welcomeIllustrationDark : "/welcome-illustration.png"}
-            alt="Government job discovery illustration"
+            src={theme === "dark" ? welcomeDark : welcomeLight}
+            alt="JobsTrackr illustration"
             className="w-full h-auto object-contain"
             loading="lazy"
           />
+        </div>
+
+        {/* Feature Lines with Green Checkmarks */}
+        <div className="w-full max-w-md space-y-3 px-2">
+          {features.map((feature, index) => (
+            <div key={index} className="flex items-start gap-3">
+              <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm sm:text-base text-foreground">{feature}</p>
+            </div>
+          ))}
         </div>
       </div>
 
