@@ -40,22 +40,22 @@ const Welcome = () => {
   }
 
   return (
-    <div className="min-h-screen max-h-screen bg-background flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-background flex flex-col overflow-y-auto">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-between px-6 py-4">
+      <div className="flex-1 flex flex-col items-center justify-between px-6 py-4 gap-4">
         {/* Logo and Branding */}
-        <div className="flex flex-col items-center mt-4">
-          <img src={logoColor} alt="JobsTrackr" className="h-20 sm:h-24 w-auto mb-2" />
-          <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-wider">JOBSTRACKR</h2>
+        <div className="flex flex-col items-center mt-2 sm:mt-4">
+          <img src={logoColor} alt="JobsTrackr" className="h-16 sm:h-20 w-auto mb-1" />
+          <h2 className="text-lg sm:text-2xl font-bold text-primary tracking-wider">JOBSTRACKR</h2>
         </div>
 
         {/* Headline */}
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground text-center">
+        <h1 className="text-xl sm:text-3xl font-bold text-foreground text-center">
           Discover Your<br />Government Job
         </h1>
 
         {/* Illustration */}
-        <div className="w-full max-w-[280px]">
+        <div className="w-full max-w-[200px] sm:max-w-[280px]">
           <img
             src={theme === "dark" ? welcomeIllustrationDark : "/welcome-illustration.png"}
             alt="Government job discovery illustration"
