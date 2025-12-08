@@ -8,21 +8,13 @@ interface PageHeaderProps {
 
 export function PageHeader({ showSearchBar = true, variant = "transparent" }: PageHeaderProps) {
   const navigate = useNavigate();
-  
-  // Use theme-aware semantic tokens
-  const iconColor = "text-primary";
-  const bgClass = "bg-secondary";
-  const hoverClass = "hover:bg-secondary/80";
-  const searchBgClass = "bg-card/60 border-border";
-  const searchTextColor = "text-muted-foreground";
-  const placeholderColor = "text-muted-foreground";
 
   return (
-    <header className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 pt-10 sm:pt-12 pb-3 sm:pb-4">
+    <header className="flex items-center gap-3 px-4 sm:px-5 pt-10 sm:pt-12 pb-3 sm:pb-4">
       {/* More Button - Left */}
       <Link to="/more">
-        <div className={`h-9 w-9 sm:h-10 sm:w-10 rounded-full ${bgClass} backdrop-blur-sm flex items-center justify-center ${hoverClass} transition-colors`}>
-          <Menu className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
+        <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-card/80 backdrop-blur-xl border border-border/30 flex items-center justify-center hover:bg-card hover:shadow-soft transition-all duration-200 group">
+          <Menu className="h-[18px] w-[18px] sm:h-5 sm:w-5 text-foreground/70 group-hover:text-foreground transition-colors" />
         </div>
       </Link>
       
@@ -30,17 +22,17 @@ export function PageHeader({ showSearchBar = true, variant = "transparent" }: Pa
       {showSearchBar && (
         <div 
           onClick={() => navigate("/search")}
-          className={`flex-1 flex items-center gap-2 sm:gap-3 ${searchBgClass} backdrop-blur-xl border rounded-xl sm:rounded-2xl shadow-lg h-9 sm:h-10 px-3 sm:px-4 cursor-pointer`}
+          className="flex-1 flex items-center gap-3 bg-card/80 backdrop-blur-xl border border-border/30 rounded-xl shadow-soft h-10 sm:h-11 px-4 cursor-pointer hover:bg-card hover:shadow-soft-lg transition-all duration-200 group"
         >
-          <Search className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${searchTextColor}`} />
-          <span className={`${placeholderColor} text-xs sm:text-sm truncate`}>Search a job...</span>
+          <Search className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          <span className="text-muted-foreground text-sm truncate">Search a job...</span>
         </div>
       )}
       
       {/* Saved Button - Right */}
       <Link to="/saved">
-        <div className={`h-9 w-9 sm:h-10 sm:w-10 rounded-full ${bgClass} backdrop-blur-sm flex items-center justify-center ${hoverClass} transition-colors`}>
-          <Bookmark className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
+        <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-card/80 backdrop-blur-xl border border-border/30 flex items-center justify-center hover:bg-card hover:shadow-soft transition-all duration-200 group">
+          <Bookmark className="h-[18px] w-[18px] sm:h-5 sm:w-5 text-foreground/70 group-hover:text-primary transition-colors" />
         </div>
       </Link>
     </header>
