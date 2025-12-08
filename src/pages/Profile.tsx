@@ -104,10 +104,7 @@ export default function Profile() {
                 <Menu className="h-5 w-5 text-primary" />
               </div>
             </Link>
-            <div className="flex-1 flex items-center justify-center gap-2">
-              <img src={logoSrc} alt="JobsTrackr" className="h-10 sm:h-12 w-auto" />
-              <span className="font-display font-bold text-lg sm:text-xl text-foreground tracking-wider">JOBSTRACKR</span>
-            </div>
+            <div className="flex-1" />
             <Link to="/saved">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
                 <Bookmark className="h-5 w-5 text-primary" />
