@@ -33,68 +33,76 @@ export function JobCard({ job }: JobCardProps) {
 
   return (
     <Link to={`/job/${job.id}`}>
-      <Card className="group shadow-md hover:shadow-lg transition-all duration-300 border border-border/50 rounded-xl overflow-hidden animate-slide-up">
+      <Card className="group shadow-sm hover:shadow-lg transition-all duration-300 border border-border/30 rounded-2xl overflow-hidden hover:-translate-y-0.5 bg-card/80 backdrop-blur-sm">
         <CardContent className="p-4">
           <div className="flex justify-between items-start gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 {job.is_featured && (
-                  <Badge className="bg-warning text-warning-foreground text-xs">
+                  <Badge className="bg-warning/90 text-warning-foreground text-xs font-medium px-2 py-0.5 rounded-md">
                     Featured
                   </Badge>
                 )}
                 {isTBDDate && (
-                  <Badge variant="outline" className="text-xs bg-muted">
+                  <Badge variant="outline" className="text-xs bg-muted/50 rounded-md px-2 py-0.5">
                     Date TBD
                   </Badge>
                 )}
                 {!isTBDDate && isUrgent && !isExpired && (
-                  <Badge variant="destructive" className="text-xs">
+                  <Badge variant="destructive" className="text-xs font-medium px-2 py-0.5 rounded-md">
                     {daysLeft} days left
                   </Badge>
                 )}
                 {!isTBDDate && isExpired && (
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-xs px-2 py-0.5 rounded-md">
                     Expired
                   </Badge>
                 )}
               </div>
-              <h3 className="font-display font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
+              <h3 className="font-display font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2 tracking-tight">
                 {job.title}
               </h3>
-              <p className="text-sm text-muted-foreground mt-1">{job.department}</p>
+              <p className="text-sm text-muted-foreground mt-1 font-medium">{job.department}</p>
             </div>
             <SaveJobButton jobId={job.id} />
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4 text-primary" />
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <MapPin className="h-3.5 w-3.5 text-primary" />
+              </div>
               <span className="truncate">{job.location}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <IndianRupee className="h-4 w-4 text-success" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-7 w-7 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
+                <IndianRupee className="h-3.5 w-3.5 text-success" />
+              </div>
               <span className="truncate">{formatSalary(job.salary_min, job.salary_max)}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4 text-warning" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-7 w-7 rounded-lg bg-warning/10 flex items-center justify-center flex-shrink-0">
+                <Calendar className="h-3.5 w-3.5 text-warning" />
+              </div>
               <span className="truncate">
                 {job.last_date_display || format(new Date(job.last_date), "dd MMM yyyy")}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Users className="h-4 w-4 text-info" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-7 w-7 rounded-lg bg-info/10 flex items-center justify-center flex-shrink-0">
+                <Users className="h-3.5 w-3.5 text-info" />
+              </div>
               <span className="truncate">
                 {job.vacancies_display || (job.vacancies ? `${job.vacancies} vacancies` : "TBD")}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
-            <span className="text-xs text-muted-foreground">
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
+            <span className="text-xs text-muted-foreground font-medium">
               Age: {job.age_min || 18} - {job.age_max || 65} yrs
             </span>
-            <span className="text-xs font-medium text-primary">
+            <span className="text-xs font-semibold text-primary">
               {job.application_fee ? `Fee: ₹${job.application_fee}` : "Free Apply"}
             </span>
           </div>
