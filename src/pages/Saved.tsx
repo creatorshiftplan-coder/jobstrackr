@@ -1,4 +1,4 @@
-import { BottomNav } from "@/components/BottomNav";
+
 import { JobCard } from "@/components/JobCard";
 import { ArrowLeft, Bookmark, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -76,8 +76,6 @@ export default function Saved() {
           </div>
         )}
       </main>
-
-      <BottomNav />
     </div>
   );
 }
