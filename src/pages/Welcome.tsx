@@ -1,29 +1,17 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import logoColor from "@/assets/logo-color.png";
+import welcomeIllustrationDark from "@/assets/welcome-illustration-dark.png";
 
 const Welcome = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const { theme, setTheme } = useTheme();
-  const originalThemeRef = useRef<string | undefined>(theme);
+  const { theme } = useTheme();
 
-  // Force light mode on Welcome page, restore on unmount
-  useEffect(() => {
-    originalThemeRef.current = theme;
-    setTheme("light");
-    
-    return () => {
-      // Only restore if it was different
-      if (originalThemeRef.current && originalThemeRef.current !== "light") {
-        setTheme(originalThemeRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!loading && user) {
@@ -69,7 +57,7 @@ const Welcome = () => {
         {/* Illustration */}
         <div className="w-full max-w-[280px]">
           <img
-            src="/welcome-illustration.png"
+            src={theme === "dark" ? welcomeIllustrationDark : "/welcome-illustration.png"}
             alt="Government job discovery illustration"
             className="w-full h-auto object-contain"
             loading="lazy"
