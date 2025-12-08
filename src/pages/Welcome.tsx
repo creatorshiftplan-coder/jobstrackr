@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import logo from "@/assets/logo.svg";
 
 const Welcome = () => {
   const navigate = useNavigate();
@@ -38,6 +39,12 @@ const Welcome = () => {
     <div className="min-h-screen bg-muted/30 flex flex-col">
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+        {/* Logo and Branding */}
+        <div className="flex flex-col items-center mb-6">
+          <img src={logo} alt="JobsTrackr" className="h-20 w-auto mb-2" />
+          <h2 className="text-xl font-bold text-primary tracking-wider">JOBSTRACKR</h2>
+        </div>
+
         {/* Headline */}
         <h1 className="text-3xl font-bold text-foreground text-center mb-8">
           Discover Your<br />Government Job

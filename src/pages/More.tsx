@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { useTheme } from "next-themes";
+import logo from "@/assets/logo.svg";
 
 export default function More() {
   const { user, loading, signOut } = useAuth();
@@ -43,7 +44,10 @@ export default function More() {
           >
             <ArrowLeft className="h-5 w-5 text-primary-foreground dark:text-foreground" />
           </button>
-          <h1 className="font-display font-bold text-xl text-primary-foreground dark:text-foreground">More</h1>
+          <div className="flex items-center gap-2">
+            <img src={logo} alt="JobsTrackr" className="h-8 w-auto brightness-0 invert dark:brightness-100 dark:invert-0" />
+            <span className="font-display font-bold text-xl text-primary-foreground dark:text-foreground tracking-wider">JOBSTRACKR</span>
+          </div>
           <Link to="/saved">
             <div className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors">
               <Bookmark className="h-5 w-5 text-primary-foreground dark:text-foreground" />
@@ -60,7 +64,7 @@ export default function More() {
                 <User className="h-10 w-10 text-muted-foreground" />
               </div>
               <h3 className="font-display font-semibold text-lg text-foreground mb-2">
-                Welcome to Govt Job Finder
+                Welcome to JobsTrackr
               </h3>
               <p className="text-sm text-muted-foreground mb-6">
                 Login to save jobs, track applications, and get personalized recommendations

@@ -113,8 +113,17 @@ export default function ExamTracker() {
       </header>
 
       {/* Subheader */}
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-2">
         <h2 className="text-muted-foreground text-sm font-medium">Your Tracked Exams</h2>
+      </div>
+
+      {/* Disclaimer */}
+      <div className="px-4 pb-4">
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+          <p className="text-xs text-amber-800 dark:text-amber-200">
+            ⚠️ We help you stay informed — but for the most accurate and final updates, always check the official website. JobsTrackr is not responsible for any update delays or changes.
+          </p>
+        </div>
       </div>
 
       {/* Content Area */}

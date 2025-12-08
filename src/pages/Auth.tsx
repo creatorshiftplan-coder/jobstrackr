@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Mail, Lock, User } from "lucide-react";
 import { z } from "zod";
+import logo from "@/assets/logo.svg";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -98,8 +99,9 @@ export default function Auth() {
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         <Card className="w-full max-w-md border-0 shadow-card">
           <CardHeader className="text-center">
-            <div className="mx-auto h-12 w-12 rounded-full gradient-primary flex items-center justify-center mb-4">
-              <span className="text-primary-foreground font-display font-bold">GJ</span>
+            <div className="flex flex-col items-center mb-4">
+              <img src={logo} alt="JobsTrackr" className="h-16 w-auto mb-2" />
+              <span className="text-sm font-bold text-primary tracking-wider">JOBSTRACKR</span>
             </div>
             <CardTitle className="font-display text-2xl">
               {isLogin ? "Welcome Back" : "Create Account"}
