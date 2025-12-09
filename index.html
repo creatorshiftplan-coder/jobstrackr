@@ -7,6 +7,17 @@
     <meta name="description" content="Track government job exams, manage applications, and stay updated with JobsTrackr - India's smartest government job tracking app" />
     <meta name="author" content="JobsTrackr" />
     <meta name="keywords" content="government jobs, sarkari naukri, exam tracker, UPSC, SSC, Railway jobs, banking exams, India jobs" />
+    
+    <!-- Robots & Indexing -->
+    <meta name="robots" content="index, follow" />
+    <meta name="googlebot" content="index, follow, max-video-preview:-1, max-image-preview:large, max-snippet:-1" />
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://jobstrackr.in" />
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#0A4174" />
+    <meta name="msapplication-TileColor" content="#0A4174" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/favicon.png" />
@@ -18,7 +29,10 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://jobstrackr.in" />
     <meta property="og:site_name" content="JobsTrackr" />
+    <meta property="og:locale" content="en_IN" />
     <meta property="og:image" content="https://jobstrackr.in/og-image.png" />
+    <meta property="og:image:secure_url" content="https://jobstrackr.in/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="JobsTrackr - Smart App for Smart Aspirants" />
@@ -33,18 +47,43 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "JobsTrackr",
-      "url": "https://jobstrackr.in",
-      "logo": "https://jobstrackr.in/logo.png",
-      "description": "Track government job exams, manage applications, and stay updated with JobsTrackr - India's smartest government job tracking app",
-      "applicationCategory": "UtilitiesApplication",
-      "operatingSystem": "Web",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "INR"
-      }
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "name": "JobsTrackr",
+          "url": "https://jobstrackr.in",
+          "logo": "https://jobstrackr.in/logo.png",
+          "description": "Track government job exams, manage applications, and stay updated with JobsTrackr - India's smartest government job tracking app",
+          "applicationCategory": "UtilitiesApplication",
+          "operatingSystem": "Web",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "INR"
+          }
+        },
+        {
+          "@type": "Organization",
+          "name": "JobsTrackr",
+          "url": "https://jobstrackr.in",
+          "logo": "https://jobstrackr.in/logo.png",
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "email": "contact@jobstrackr.in",
+            "contactType": "customer support"
+          }
+        },
+        {
+          "@type": "WebSite",
+          "name": "JobsTrackr",
+          "url": "https://jobstrackr.in",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://jobstrackr.in/search?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        }
+      ]
     }
     </script>
   </head>
