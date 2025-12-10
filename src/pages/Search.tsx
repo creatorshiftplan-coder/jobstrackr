@@ -110,14 +110,10 @@ export default function Search() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
-  };
-
   const totalFilters = selectedLocations.length + selectedSectors.length + selectedQualifications.length;
-  const showAISearch = query.length >= 3 && filteredJobs.length === 0 && aiResults.length === 0 && searchStatus !== "not_found";
+  
+  // Show AI button when query has 3+ chars and no AI results yet
+  const showAISearchButton = query.length >= 3 && !isSearching && searchStatus !== "not_found" && aiResults.length === 0;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -145,7 +141,7 @@ export default function Search() {
                 setQuery(e.target.value);
                 if (!e.target.value) clearAIResults();
               }}
-              onKeyDown={handleKeyDown}
+              
               className="pl-10 bg-secondary/50 border-border/50 text-foreground placeholder:text-muted-foreground rounded-xl h-11 focus:ring-2 focus:ring-primary/20 transition-all"
             />
           </div>
@@ -282,10 +278,33 @@ export default function Search() {
               ))}
             </div>
 
+            {/* Find more jobs with AI button - appears after search results */}
+            {showAISearchButton && (
+              <div className="text-center py-6 border-t border-border/30 mt-4">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Want to discover more jobs related to "{query}"?
+                </p>
+                <Button 
+                  onClick={handleSearch} 
+                  variant="outline"
+                  className="rounded-xl border-primary/30 text-primary hover:bg-primary/5"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Find more jobs with AI
+                </Button>
+              </div>
+            )}
+
             {/* AI Search Results */}
             {aiResults.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-foreground">AI Found Results</h3>
+              <div className="space-y-4 pt-4 border-t border-border/30">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-sm text-primary">AI Discovered Jobs</h3>
+                  <Badge variant="secondary" className="bg-primary/10 text-primary">
+                    {aiResults.length} found
+                  </Badge>
+                </div>
                 {aiResults.map((job, index) => (
                   <AISearchResult
                     key={`${job.exam_name}-${index}`}
@@ -307,23 +326,6 @@ export default function Search() {
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto">
                   No exams found for this search. Try another category or keyword.
                 </p>
-              </div>
-            )}
-
-            {/* AI Search Section */}
-            {showAISearch && !isSearching && (
-              <div className="text-center py-8 space-y-4">
-                <div className="mx-auto h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Sparkles className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="font-semibold text-foreground">No jobs found in database</h3>
-                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                  Want to search with AI? We'll find information about this job and add it for you.
-                </p>
-                <Button onClick={handleSearch} className="rounded-xl">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Search with AI
-                </Button>
               </div>
             )}
 
