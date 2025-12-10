@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       // Get user ID from auth header
       const authHeader = req.headers.get("Authorization");
       let authenticatedUserId = userId;
-      
+
       if (authHeader) {
         const token = authHeader.replace("Bearer ", "");
         const { data: { user } } = await supabase.auth.getUser(token);
@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
 
       // Add exam attempt for the user
       const attemptYear = year || new Date().getFullYear();
-      
+
       // Check if user already has this exam in tracker
       const { data: existingAttempt } = await supabase
         .from("exam_attempts")
@@ -205,9 +205,9 @@ Deno.serve(async (req) => {
     // Handle save job request
     if (saveJob && jobData) {
       console.log("Saving job to database:", jobData.exam_name);
-      
+
       const ages = parseAgeLimit(jobData.age_limit || "18-65 years");
-      
+
       const { data: savedJob, error: saveError } = await supabase.from("jobs").insert({
         title: jobData.exam_name,
         department: jobData.agency,
@@ -284,10 +284,10 @@ Deno.serve(async (req) => {
       if (rateLimitError) {
         console.error("Rate limit check error:", rateLimitError);
       } else if (rateLimitData && !rateLimitData.allowed) {
-        const errorMessage = rateLimitData.rate_limited 
+        const errorMessage = rateLimitData.rate_limited
           ? "Please wait a minute before making another AI request."
           : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
-        
+
         return new Response(
           JSON.stringify({
             error: errorMessage,
@@ -302,15 +302,15 @@ Deno.serve(async (req) => {
     console.log("Calling Gemini API with Google Search grounding for:", query);
 
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: JOB_DISCOVERY_PROMPT }] },
-          contents: [{ 
-            role: "user", 
-            parts: [{ 
+          contents: [{
+            role: "user",
+            parts: [{
               text: `Search for current Indian government jobs matching: "${query}"
 
 Please use Google Search to find:
@@ -319,14 +319,14 @@ Please use Google Search to find:
 3. Eligibility criteria and fees
 4. Any recent news about this exam/job
 
-Return structured JSON with the job details.` 
-            }] 
+Return structured JSON with the job details.`
+            }]
           }],
-          generationConfig: { 
-            temperature: 0.2, 
-            maxOutputTokens: 4096 
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 4096
           },
-          tools: [{ googleSearch: {} }],
+          tools: [{ google_search: {} }],
         }),
       }
     );
@@ -334,7 +334,7 @@ Return structured JSON with the job details.`
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
       console.error("Gemini API error:", geminiResponse.status, errorText);
-      
+
       // Handle rate limit from Gemini API
       if (geminiResponse.status === 429) {
         return new Response(
@@ -342,13 +342,13 @@ Return structured JSON with the job details.`
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      
+
       throw new Error(`AI API error: ${geminiResponse.status}`);
     }
 
     const geminiData = await geminiResponse.json();
     console.log("Gemini response candidates:", JSON.stringify(geminiData.candidates?.[0]?.content?.parts?.length || 0, null, 2));
-    
+
     // Extract text from all parts
     let aiContent = "";
     const parts = geminiData.candidates?.[0]?.content?.parts || [];
@@ -397,10 +397,10 @@ Return structured JSON with the job details.`
     if (!parseOk || jobs.length === 0) {
       console.log("No jobs found or parse failed, returning error");
       return new Response(
-        JSON.stringify({ 
-          status: "error", 
-          error: "No jobs found for this search. Try a different query.", 
-          raw: aiContent 
+        JSON.stringify({
+          status: "error",
+          error: "No jobs found for this search. Try a different query.",
+          raw: aiContent
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -408,12 +408,12 @@ Return structured JSON with the job details.`
 
     // Filter out very low confidence results
     const validJobs = jobs.filter((j: any) => (j.confidence || 0.5) >= 0.3);
-    
+
     if (validJobs.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          status: "error", 
-          error: "No reliable job information found. Try a more specific query." 
+        JSON.stringify({
+          status: "error",
+          error: "No reliable job information found. Try a more specific query."
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
