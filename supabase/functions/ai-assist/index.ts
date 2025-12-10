@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DAILY_LIMIT = 20;
+const DAILY_LIMIT = 7;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -50,17 +50,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check rate limit
+    // Check rate limit with per-minute limit
     const { data: rateLimitData } = await supabase.rpc("check_user_rate_limit", {
       _user_id: user.id,
       _daily_limit: DAILY_LIMIT,
+      _minute_limit: 1,
     });
 
     if (rateLimitData && !rateLimitData.allowed) {
+      const errorMessage = rateLimitData.rate_limited 
+        ? "Please wait a minute before making another AI request."
+        : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
+      
       return new Response(
         JSON.stringify({
           data: null,
-          error: `Daily limit of ${DAILY_LIMIT} API calls reached. Please try again tomorrow.`,
+          error: errorMessage,
           rate_limit: rateLimitData,
           success: false,
         }),
@@ -221,6 +226,15 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
       console.error("Gemini API error:", geminiResponse.status, errorText);
+      
+      // Handle rate limit from Gemini API
+      if (geminiResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ data: null, error: "AI service temporarily unavailable due to high demand. Please try again in a few minutes.", success: false }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       throw new Error(`AI API error: ${geminiResponse.status}`);
     }
 
