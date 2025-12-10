@@ -95,7 +95,12 @@ export function useAIJobSearch() {
       const result = await response.json();
 
       if (result.error) {
-        toast.error(result.error);
+        // Handle rate limit errors with user-friendly message
+        if (result.error.includes("429") || result.error.toLowerCase().includes("rate limit") || result.error.toLowerCase().includes("quota")) {
+          toast.error("AI search is temporarily unavailable due to high demand. Please try again in a few minutes.");
+        } else {
+          toast.error(result.error);
+        }
         setSearchStatus("error");
         return null;
       }
