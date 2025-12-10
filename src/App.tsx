@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AnalyticsProvider } from "@/components/AnalyticsProvider";
 import { Loader2 } from "lucide-react";
 
 // Eager load critical routes
@@ -56,27 +57,29 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/welcome" element={<Welcome />} />
-                  <Route path="/job/:id" element={<JobDetails />} />
-                  <Route path="/search" element={<Search />} />
-                  <Route path="/saved" element={<Saved />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/edit-profile" element={<EditProfile />} />
-                  <Route path="/edit-education" element={<EditEducation />} />
-                  <Route path="/formmate" element={<FormMate />} />
-                  <Route path="/documents" element={<Documents />} />
-                  <Route path="/help" element={<Help />} />
-                  <Route path="/more" element={<More />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="/tracker" element={<ExamTracker />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
+              <AnalyticsProvider>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/welcome" element={<Welcome />} />
+                    <Route path="/job/:id" element={<JobDetails />} />
+                    <Route path="/search" element={<Search />} />
+                    <Route path="/saved" element={<Saved />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/edit-profile" element={<EditProfile />} />
+                    <Route path="/edit-education" element={<EditEducation />} />
+                    <Route path="/formmate" element={<FormMate />} />
+                    <Route path="/documents" element={<Documents />} />
+                    <Route path="/help" element={<Help />} />
+                    <Route path="/more" element={<More />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/admin" element={<Admin />} />
+                    <Route path="/tracker" element={<ExamTracker />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </AnalyticsProvider>
             </BrowserRouter>
           </TooltipProvider>
         </AuthProvider>

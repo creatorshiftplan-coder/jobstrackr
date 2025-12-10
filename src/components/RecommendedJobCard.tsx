@@ -16,7 +16,7 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
 
   return (
     <Link to={`/job/${job.id}`} className="block">
-      <div className="p-3 sm:p-4 rounded-2xl bg-card/80 backdrop-blur-md shadow-lg border border-border h-[140px] sm:h-[160px] flex flex-col transition-all hover:bg-card hover:scale-[1.02]">
+      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 backdrop-blur-md shadow-lg border border-blue-200/50 dark:border-blue-800/30 h-[140px] sm:h-[160px] flex flex-col transition-all hover:from-blue-100 hover:to-sky-200 dark:hover:from-blue-900/50 dark:hover:to-sky-800/30 hover:scale-[1.02]">
         {/* Icon + Job Title Row */}
         <div className="flex items-start gap-2 mb-1">
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">

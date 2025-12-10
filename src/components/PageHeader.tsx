@@ -1,4 +1,5 @@
-import { Menu, Search, Bookmark } from "lucide-react";
+import { Search, Bookmark } from "lucide-react";
+import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { Link, useNavigate } from "react-router-dom";
 
 interface PageHeaderProps {
@@ -8,7 +9,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ showSearchBar = true, variant = "transparent" }: PageHeaderProps) {
   const navigate = useNavigate();
-  
+
   // Use theme-aware semantic tokens
   const iconColor = "text-primary";
   const bgClass = "bg-secondary";
@@ -22,13 +23,13 @@ export function PageHeader({ showSearchBar = true, variant = "transparent" }: Pa
       {/* More Button - Left */}
       <Link to="/more">
         <div className={`h-9 w-9 sm:h-10 sm:w-10 rounded-full ${bgClass} backdrop-blur-sm flex items-center justify-center ${hoverClass} transition-colors`}>
-          <Menu className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
+          <MenuBarsIcon className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
         </div>
       </Link>
-      
+
       {/* Search Bar - Center */}
       {showSearchBar && (
-        <div 
+        <div
           onClick={() => navigate("/search")}
           className={`flex-1 flex items-center gap-2 sm:gap-3 ${searchBgClass} backdrop-blur-xl border rounded-xl sm:rounded-2xl shadow-lg h-9 sm:h-10 px-3 sm:px-4 cursor-pointer`}
         >
@@ -36,7 +37,7 @@ export function PageHeader({ showSearchBar = true, variant = "transparent" }: Pa
           <span className={`${placeholderColor} text-xs sm:text-sm truncate`}>Search a job...</span>
         </div>
       )}
-      
+
       {/* Saved Button - Right */}
       <Link to="/saved">
         <div className={`h-9 w-9 sm:h-10 sm:w-10 rounded-full ${bgClass} backdrop-blur-sm flex items-center justify-center ${hoverClass} transition-colors`}>

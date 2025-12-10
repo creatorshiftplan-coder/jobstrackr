@@ -10,7 +10,7 @@ import { useJobs } from "@/hooks/useJobs";
 import { useAuth } from "@/hooks/useAuth";
 import { useExams } from "@/hooks/useExams";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Briefcase } from "lucide-react";
+import { Briefcase, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const colorVariants = ["pink", "blue", "green", "orange"] as const;
@@ -25,7 +25,21 @@ const Index = () => {
     }
   }, [user, authLoading, navigate]);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const [activeExamIndex, setActiveExamIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const examsScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollLeft = (ref: React.RefObject<HTMLDivElement>, cardWidth: number) => {
+    if (ref.current) {
+      ref.current.scrollBy({ left: -cardWidth, behavior: 'smooth' });
+    }
+  };
+
+  const scrollRight = (ref: React.RefObject<HTMLDivElement>, cardWidth: number) => {
+    if (ref.current) {
+      ref.current.scrollBy({ left: cardWidth, behavior: 'smooth' });
+    }
+  };
   const { data: jobs, isLoading, error } = useJobs();
   const { userExams } = useExams();
 
@@ -95,14 +109,32 @@ const Index = () => {
             {newJobs.length > 0 && (
               <section className="mb-8">
                 <SectionHeader title="New Government Jobs" variant="dark" />
-                <div 
-                  ref={scrollContainerRef}
-                  onScroll={handleScroll}
-                  className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide"
-                >
-                  {newJobs.map((job) => (
-                    <FeaturedJobCard key={job.id} job={job} />
-                  ))}
+                <div className="relative">
+                  {/* Left chevron */}
+                  <button
+                    onClick={() => scrollLeft(scrollContainerRef, 316)}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-full shadow-sm border border-border/30 opacity-60 hover:opacity-100 transition-opacity"
+                    aria-label="Scroll left"
+                  >
+                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  <div
+                    ref={scrollContainerRef}
+                    onScroll={handleScroll}
+                    className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide"
+                  >
+                    {newJobs.map((job) => (
+                      <FeaturedJobCard key={job.id} job={job} />
+                    ))}
+                  </div>
+                  {/* Right chevron */}
+                  <button
+                    onClick={() => scrollRight(scrollContainerRef, 316)}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-full shadow-sm border border-border/30 opacity-60 hover:opacity-100 transition-opacity"
+                    aria-label="Scroll right"
+                  >
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
                 </div>
                 {/* Pagination dots */}
                 <div className="flex justify-center gap-2 mt-4 px-5">
@@ -123,9 +155,47 @@ const Index = () => {
             {activeExams.length > 0 && (
               <section className="mb-8">
                 <SectionHeader title="My Active Exams" variant="dark" />
-                <div className="flex gap-3 sm:gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide">
-                  {activeExams.map((attempt) => (
-                    <ActiveExamCard key={attempt.id} attempt={attempt} />
+                <div className="relative">
+                  {/* Left chevron */}
+                  <button
+                    onClick={() => scrollLeft(examsScrollRef, 196)}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-full shadow-sm border border-border/30 opacity-60 hover:opacity-100 transition-opacity"
+                    aria-label="Scroll left"
+                  >
+                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  <div
+                    ref={examsScrollRef}
+                    className="flex gap-3 sm:gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide"
+                    onScroll={(e) => {
+                      const cardWidth = 180 + 16;
+                      const index = Math.round(e.currentTarget.scrollLeft / cardWidth);
+                      setActiveExamIndex(Math.min(index, activeExams.length - 1));
+                    }}
+                  >
+                    {activeExams.map((attempt) => (
+                      <ActiveExamCard key={attempt.id} attempt={attempt} />
+                    ))}
+                  </div>
+                  {/* Right chevron */}
+                  <button
+                    onClick={() => scrollRight(examsScrollRef, 196)}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-full shadow-sm border border-border/30 opacity-60 hover:opacity-100 transition-opacity"
+                    aria-label="Scroll right"
+                  >
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+                {/* Pagination dots */}
+                <div className="flex justify-center gap-2 mt-4 px-5">
+                  {activeExams.map((_, index) => (
+                    <div
+                      key={index}
+                      className={cn(
+                        "h-2 w-2 rounded-full transition-all",
+                        index === activeExamIndex ? "bg-primary" : "bg-primary/30"
+                      )}
+                    />
                   ))}
                 </div>
               </section>

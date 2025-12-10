@@ -1,6 +1,7 @@
 import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent } from "@/components/ui/card";
-import { Menu, Edit2, Calendar, User, GraduationCap, Briefcase, CheckCircle, Phone, Mail, MapPin, FileText, ChevronRight, Bookmark, Loader2 } from "lucide-react";
+import { Edit2, Calendar, User, Users, GraduationCap, Briefcase, CheckCircle, Phone, Mail, MapPin, FileText, ChevronRight, Bookmark, Loader2, CircleUser, Activity } from "lucide-react";
+import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -34,7 +35,7 @@ export default function Profile() {
           <div className="flex items-center gap-3">
             <Link to="/more">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
-                <Menu className="h-5 w-5 text-primary" />
+                <MenuBarsIcon className="h-5 w-5 text-primary" />
               </div>
             </Link>
             <h1 className="font-display font-bold text-xl text-foreground flex-1 text-center">Profile</h1>
@@ -65,7 +66,7 @@ export default function Profile() {
   const resultCount = userExams?.filter(e => e.status === "result")?.length || 0;
 
   // Format date of birth
-  const formattedDOB = profile?.date_of_birth 
+  const formattedDOB = profile?.date_of_birth
     ? format(new Date(profile.date_of_birth), "dd/MM/yyyy")
     : "Not set";
 
@@ -90,12 +91,12 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
-      <div className="bg-card pb-20">
-        <header className="sticky top-0 z-40 px-4 pt-12 pb-4">
+      <div className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 pb-12">
+        <header className="sticky top-0 z-40 px-4 pt-4 pb-4">
           <div className="flex items-center gap-3">
             <Link to="/more">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
-                <Menu className="h-5 w-5 text-primary" />
+                <MenuBarsIcon className="h-5 w-5 text-primary" />
               </div>
             </Link>
             <div className="flex-1" />
@@ -127,16 +128,16 @@ export default function Profile() {
             </span>
             {highestEducation && <CheckCircle className="h-4 w-4 text-primary fill-primary/20" />}
           </div>
-          
+
           {/* Embedded Profile Progress */}
           <EmbeddedProfileProgress profile={profile} education={education} />
         </div>
       </div>
 
-      <main className="px-4 py-6 space-y-6 -mt-12">
+      <main className="px-4 py-6 space-y-6 mt-2">
 
         {/* Stats Row */}
-        <Card className="border-0 shadow-card">
+        <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
           <CardContent className="p-4">
             <div className="grid grid-cols-3 divide-x divide-border">
               <div className="flex flex-col items-center">
@@ -163,36 +164,42 @@ export default function Profile() {
               See all <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <Card className="border-0 shadow-card">
+          <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <User className="h-5 w-5 text-primary" />
                 </div>
-                <div className="flex-1 grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Father's Name</p>
-                    <p className="text-sm font-medium text-foreground">{profile?.father_name || "Not set"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Mother's Name</p>
-                    <p className="text-sm font-medium text-foreground">{profile?.mother_name || "Not set"}</p>
-                  </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground mb-0.5">Father's Name</p>
+                  <p className="text-sm font-medium text-foreground">{profile?.father_name || "Not set"}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground mb-0.5">Mother's Name</p>
+                  <p className="text-sm font-medium text-foreground">{profile?.mother_name || "Not set"}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Calendar className="h-5 w-5 text-primary" />
                 </div>
-                <div className="flex-1 grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Date of Birth</p>
-                    <p className="text-sm font-medium text-foreground">{formattedDOB}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Gender</p>
-                    <p className="text-sm font-medium text-foreground">{profile?.gender || "Not set"}</p>
-                  </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground mb-0.5">Date of Birth</p>
+                  <p className="text-sm font-medium text-foreground">{formattedDOB}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <CircleUser className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground mb-0.5">Gender</p>
+                  <p className="text-sm font-medium text-foreground">{profile?.gender || "Not set"}</p>
                 </div>
               </div>
             </CardContent>
@@ -207,21 +214,24 @@ export default function Profile() {
               See all <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <Card className="border-0 shadow-card">
+          <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Phone className="h-5 w-5 text-primary" />
                 </div>
-                <div className="flex-1 grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Mobile</p>
-                    <p className="text-sm font-medium text-foreground">{profile?.phone || "Not set"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Email</p>
-                    <p className="text-sm font-medium text-foreground truncate">{profile?.email || user?.email || "Not set"}</p>
-                  </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground mb-0.5">Mobile</p>
+                  <p className="text-sm font-medium text-foreground">{profile?.phone || "Not set"}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Mail className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground mb-0.5">Email</p>
+                  <p className="text-sm font-medium text-foreground truncate">{profile?.email || user?.email || "Not set"}</p>
                 </div>
               </div>
               {profile?.address && (
@@ -247,7 +257,7 @@ export default function Profile() {
               See all <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <Card className="border-0 shadow-card">
+          <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
             <CardContent className="p-4">
               {education.length === 0 ? (
                 <div className="text-center py-4">
@@ -290,21 +300,24 @@ export default function Profile() {
               See all <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <Card className="border-0 shadow-card">
-            <CardContent className="p-4">
+          <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
+            <CardContent className="p-4 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Briefcase className="h-5 w-5 text-primary" />
                 </div>
-                <div className="flex-1 grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Category</p>
-                    <p className="text-sm font-medium text-foreground">{profile?.category || "General"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Current Status</p>
-                    <p className="text-sm font-medium text-foreground">{profile?.current_status || "Job Seeker"}</p>
-                  </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground mb-0.5">Category</p>
+                  <p className="text-sm font-medium text-foreground">{profile?.category || "General"}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Activity className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground mb-0.5">Current Status</p>
+                  <p className="text-sm font-medium text-foreground">{profile?.current_status || "Job Seeker"}</p>
                 </div>
               </div>
               {profile?.aadhar_number && (

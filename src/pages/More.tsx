@@ -27,7 +27,7 @@ export default function More() {
 
   const handleResetPassword = async () => {
     if (!user?.email) return;
-    
+
     const { error } = await resetPassword(user.email);
     if (error) {
       toast({
@@ -58,8 +58,8 @@ export default function More() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-2">
         <div className="flex items-center justify-between">
-          <button 
-            onClick={() => navigate(-1)} 
+          <button
+            onClick={() => navigate(-1)}
             className="h-8 w-8 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
           >
             <ArrowLeft className="h-4 w-4 text-primary-foreground dark:text-foreground" />
@@ -78,7 +78,7 @@ export default function More() {
 
       <main className="px-4 py-4 space-y-4">
         {!user ? (
-          <Card className="border-0 shadow-card">
+          <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
             <CardContent className="p-6 text-center">
               <div className="mx-auto h-20 w-20 rounded-full bg-secondary flex items-center justify-center mb-4">
                 <User className="h-10 w-10 text-muted-foreground" />
@@ -97,8 +97,8 @@ export default function More() {
         ) : (
           <>
             {/* Avatar Card - Clickable to Profile */}
-            <Card 
-              className="border-0 shadow-card cursor-pointer hover:bg-secondary/30 transition-colors"
+            <Card
+              className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
               onClick={() => navigate("/profile")}
             >
               <CardContent className="p-4 flex items-center gap-4">
@@ -108,7 +108,7 @@ export default function More() {
                 <div className="flex-1">
                   <h3 className="font-display font-semibold text-foreground">{userName}</h3>
                   <p className="text-sm text-muted-foreground">{user.email}</p>
-                  <button 
+                  <button
                     className="text-xs text-primary flex items-center gap-1 mt-1 hover:underline"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -125,8 +125,8 @@ export default function More() {
 
             {/* Quick Actions */}
             <div className="grid grid-cols-2 gap-3">
-              <Card 
-                className="border-0 shadow-card cursor-pointer hover:bg-secondary/30 transition-colors"
+              <Card
+                className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => navigate("/tracker")}
               >
                 <CardContent className="p-4 flex flex-col items-center text-center gap-2">
@@ -136,9 +136,9 @@ export default function More() {
                   <span className="text-sm font-medium text-foreground">Track an Exam</span>
                 </CardContent>
               </Card>
-              
-              <Card 
-                className="border-0 shadow-card cursor-pointer hover:bg-secondary/30 transition-colors"
+
+              <Card
+                className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => navigate("/search")}
               >
                 <CardContent className="p-4 flex flex-col items-center text-center gap-2">
@@ -152,7 +152,7 @@ export default function More() {
 
             {/* Online Application Guidance Link */}
             <Link to="/formmate" className="block">
-              <Card className="border-0 shadow-card hover:bg-secondary/30 transition-colors">
+              <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md hover:shadow-lg transition-shadow">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
@@ -160,7 +160,7 @@ export default function More() {
                     </div>
                     <div>
                       <h4 className="font-medium text-foreground">Online Application Guidance</h4>
-                      <p className="text-xs text-muted-foreground">Just tap copy and paste in the form</p>
+                      <p className="text-xs text-muted-foreground">Don't waste time searching or recalling — copy and paste what you need with a tap.</p>
                     </div>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -170,7 +170,7 @@ export default function More() {
 
             {/* Upload Documents Link */}
             <Link to="/documents" className="block">
-              <Card className="border-0 shadow-card hover:bg-secondary/30 transition-colors">
+              <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md hover:shadow-lg transition-shadow">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
@@ -187,26 +187,32 @@ export default function More() {
             </Link>
 
             {/* Day/Night Mode Toggle */}
-            <Card className="border-0 shadow-card">
+            <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {theme === "dark" ? (
-                    <Moon className="h-5 w-5 text-primary" />
-                  ) : (
-                    <Sun className="h-5 w-5 text-primary" />
-                  )}
-                  <span className="font-medium text-foreground">Dark Mode</span>
+                  <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                    {theme === "dark" ? (
+                      <Moon className="h-6 w-6 text-primary" />
+                    ) : (
+                      <Sun className="h-6 w-6 text-primary" />
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-foreground">Dark Mode</h4>
+                    <p className="text-xs text-muted-foreground">{theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}</p>
+                  </div>
                 </div>
                 <Switch
                   checked={theme === "dark"}
                   onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                  className="data-[state=checked]:bg-primary"
                 />
               </CardContent>
             </Card>
           </>
         )}
 
-        <Card className="border-0 shadow-card overflow-hidden">
+        <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md overflow-hidden">
           <CardContent className="p-0">
             {[
               { icon: HelpCircle, label: "Help & Support", path: "/help" },
@@ -229,17 +235,17 @@ export default function More() {
 
         {user && (
           <div className="space-y-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full"
               onClick={handleResetPassword}
             >
               <Key className="mr-2 h-4 w-4" />
               Reset Password
             </Button>
-            
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               className="w-full text-destructive hover:text-destructive"
               onClick={handleLogout}
             >

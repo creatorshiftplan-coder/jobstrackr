@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,8 @@ import { AISearchResult } from "@/components/AISearchResult";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search as SearchIcon, Filter, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, Menu, GraduationCap } from "lucide-react";
+import { Search as SearchIcon, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, GraduationCap } from "lucide-react";
+import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { Link, useNavigate } from "react-router-dom";
 import { INDIAN_STATES, EXAM_SECTORS, EDUCATION_QUALIFICATIONS } from "@/constants/filters";
 import { useDebouncedValue } from "@/hooks/useDebounce";
@@ -26,6 +27,35 @@ export default function Search() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { data: jobs, isLoading } = useJobs();
   const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, clearAIResults, dismissJob } = useAIJobSearch();
+
+  // Scroll detection for hiding/showing search bar
+  const [isSearchBarVisible, setIsSearchBarVisible] = useState(true);
+  const lastScrollY = useRef(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const scrollThreshold = 50; // Minimum scroll distance to trigger
+
+      if (Math.abs(currentScrollY - lastScrollY.current) < scrollThreshold) {
+        return; // Ignore small scroll movements
+      }
+
+      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+        // Scrolling down & past initial header
+        setIsSearchBarVisible(false);
+      } else {
+        // Scrolling up
+        setIsSearchBarVisible(true);
+      }
+
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
@@ -111,29 +141,29 @@ export default function Search() {
   };
 
   const totalFilters = selectedLocations.length + selectedSectors.length + selectedQualifications.length;
-  
+
   // Show AI button when query has 3+ chars and no AI results yet
   const showAISearchButton = query.length >= 3 && !isSearching && searchStatus !== "not_found" && aiResults.length === 0;
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-xl px-4 pt-12 pb-4 border-b border-border/50">
-        <div className="flex items-center gap-3 mb-4">
+      <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl px-4 py-2 border-b border-primary-foreground/10">
+        <div className="flex items-center gap-3">
           <Link to="/more">
             <div className="h-10 w-10 rounded-full bg-secondary/80 flex items-center justify-center hover:bg-secondary transition-colors">
-              <Menu className="h-5 w-5 text-primary" />
+              <MenuBarsIcon className="h-5 w-5 text-primary" />
             </div>
           </Link>
-          <h1 className="font-display font-bold text-xl text-foreground flex-1 text-center tracking-tight">Explore Jobs</h1>
+          <h1 className="font-display font-bold text-xl text-primary-foreground flex-1 text-center tracking-tight">Explore Jobs</h1>
           <Link to="/saved">
             <div className="h-10 w-10 rounded-full bg-secondary/80 flex items-center justify-center hover:bg-secondary transition-colors">
               <Bookmark className="h-5 w-5 text-primary" />
             </div>
           </Link>
         </div>
-        <div className="flex gap-2">
+        <div className={`flex gap-2 transition-all duration-300 ease-in-out overflow-hidden ${isSearchBarVisible ? 'max-h-20 opacity-100 mt-4' : 'max-h-0 opacity-0 mt-0'}`}>
           <div className="relative flex-1">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground/70" />
             <Input
               placeholder="Job title, department, location..."
               value={query}
@@ -141,17 +171,19 @@ export default function Search() {
                 setQuery(e.target.value);
                 if (!e.target.value) clearAIResults();
               }}
-              
-              className="pl-10 bg-secondary/50 border-border/50 text-foreground placeholder:text-muted-foreground rounded-xl h-11 focus:ring-2 focus:ring-primary/20 transition-all"
+
+              className="pl-10 bg-primary-foreground/20 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/70 rounded-xl h-11 focus:ring-2 focus:ring-primary-foreground/30 transition-all"
             />
           </div>
-          <Button 
-            variant="default" 
-            size="icon" 
-            onClick={() => setIsFilterOpen(true)} 
-            className="relative h-11 w-11 rounded-xl"
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => setIsFilterOpen(true)}
+            className="relative h-11 w-11 rounded-xl bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground border-0"
           >
-            <Filter className="h-4 w-4" />
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="h-7 w-7">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 4h9.75M10.5 4a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 4H7.5m3 16h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-8h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+            </svg>
             {totalFilters > 0 && (
               <Badge className="absolute -top-1.5 -right-1.5 h-5 w-5 p-0 justify-center text-xs bg-accent text-accent-foreground rounded-full">
                 {totalFilters}
@@ -284,8 +316,8 @@ export default function Search() {
                 <p className="text-sm text-muted-foreground mb-3">
                   Want to discover more jobs related to "{query}"?
                 </p>
-                <Button 
-                  onClick={handleSearch} 
+                <Button
+                  onClick={handleSearch}
                   variant="outline"
                   className="rounded-xl border-primary/30 text-primary hover:bg-primary/5"
                 >

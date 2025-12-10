@@ -50,6 +50,8 @@ Return ONLY a valid JSON object with this exact schema (no markdown, no extra te
       "last_date": "YYYY-MM-DD format for application deadline or null",
       "exam_date": "YYYY-MM-DD format for exam date or null",
       "age_limit": "Age range like '18-32 years'",
+      "vacancies": number of vacancies or null if not specified,
+      "eligibility": "Eligibility criteria summary (e.g., 'Bachelor's Degree from recognized university')",
       "application_fees": {
         "general": number or 0,
         "obc": number or 0,
@@ -72,6 +74,7 @@ CRITICAL RULES:
 - Use Google Search to find current, real job notifications
 - Be accurate with job titles - use the official name
 - For salary, provide monthly salary in INR
+- For vacancies, provide exact number if available, otherwise null
 - For confidence: 1.0 = verified from official source, 0.7 = from reliable news, 0.5 = estimated
 - Return ONLY the JSON, no other text
 - If unsure, still provide best effort results with appropriate confidence scores`;

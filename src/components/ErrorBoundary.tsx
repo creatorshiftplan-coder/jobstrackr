@@ -47,10 +47,15 @@ export class ErrorBoundary extends Component<Props, State> {
                 {this.state.error.message}
               </p>
             )}
-            <Button onClick={this.handleRetry} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Reload Page
-            </Button>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={this.handleRetry} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Reload Page
+              </Button>
+              <Button variant="outline" onClick={() => window.location.href = "/"} className="gap-2">
+                Go to Home
+              </Button>
+            </div>
           </div>
         </div>
       );

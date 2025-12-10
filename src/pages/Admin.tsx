@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { useJobs } from "@/hooks/useJobs";
 import { useAdminStats } from "@/hooks/useAdminStats";
+import { useAnalyticsData } from "@/hooks/useAnalyticsData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,12 +13,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -133,6 +135,106 @@ interface BulkUploadInput {
   apply_link?: string;
 }
 
+// Comprehensive JSON Schema Validation for Bulk Upload
+interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  validItems: BulkUploadInput[];
+  invalidIndices: number[];
+}
+
+const validateBulkUploadInput = (data: unknown): ValidationResult => {
+  const errors: string[] = [];
+  const validItems: BulkUploadInput[] = [];
+  const invalidIndices: number[] = [];
+
+  // Check if data is an object
+  if (typeof data !== 'object' || data === null) {
+    return { isValid: false, errors: ['Invalid JSON: Expected an object or array'], validItems: [], invalidIndices: [] };
+  }
+
+  // Extract jobs array from data
+  let jobsArray: unknown[];
+  if (Array.isArray(data)) {
+    jobsArray = data;
+  } else if ('jobs' in data && Array.isArray((data as { jobs: unknown }).jobs)) {
+    jobsArray = (data as { jobs: unknown[] }).jobs;
+  } else {
+    // Single job object
+    jobsArray = [data];
+  }
+
+  // Validate each job
+  jobsArray.forEach((item, index) => {
+    const itemErrors: string[] = [];
+
+    if (typeof item !== 'object' || item === null) {
+      errors.push(`Item ${index + 1}: Invalid format - expected an object`);
+      invalidIndices.push(index);
+      return;
+    }
+
+    const job = item as Record<string, unknown>;
+
+    // Required fields
+    if (!job.exam_name || typeof job.exam_name !== 'string' || job.exam_name.trim() === '') {
+      itemErrors.push('exam_name is required and must be a non-empty string');
+    }
+    if (!job.agency || typeof job.agency !== 'string' || job.agency.trim() === '') {
+      itemErrors.push('agency is required and must be a non-empty string');
+    }
+    if (!job.location || typeof job.location !== 'string' || job.location.trim() === '') {
+      itemErrors.push('location is required and must be a non-empty string');
+    }
+    if (!job.last_date || typeof job.last_date !== 'string' || job.last_date.trim() === '') {
+      itemErrors.push('last_date is required and must be a non-empty string');
+    }
+
+    // Optional field type validation
+    if (job.salary_min !== undefined && job.salary_min !== null && typeof job.salary_min !== 'number') {
+      itemErrors.push('salary_min must be a number');
+    }
+    if (job.salary_max !== undefined && job.salary_max !== null && typeof job.salary_max !== 'number') {
+      itemErrors.push('salary_max must be a number');
+    }
+    if (job.apply_link && typeof job.apply_link === 'string' && job.apply_link.trim() !== '') {
+      try {
+        new URL(job.apply_link);
+      } catch {
+        itemErrors.push('apply_link must be a valid URL');
+      }
+    }
+
+    // Validate application_fees structure if present
+    if (job.application_fees !== undefined && job.application_fees !== null) {
+      if (typeof job.application_fees !== 'object') {
+        itemErrors.push('application_fees must be an object');
+      } else {
+        const fees = job.application_fees as Record<string, unknown>;
+        ['general', 'obc', 'sc_st', 'female'].forEach(key => {
+          if (fees[key] !== undefined && typeof fees[key] !== 'number') {
+            itemErrors.push(`application_fees.${key} must be a number`);
+          }
+        });
+      }
+    }
+
+    if (itemErrors.length > 0) {
+      errors.push(`Item ${index + 1} (${(job.exam_name as string) || 'Unknown'}): ${itemErrors.join('; ')}`);
+      invalidIndices.push(index);
+    } else {
+      validItems.push(item as BulkUploadInput);
+    }
+  });
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    validItems,
+    invalidIndices
+  };
+};
+
 const JSON_FORMAT_EXAMPLE = `{
   "jobs": [
     {
@@ -175,22 +277,22 @@ const parseAgeLimit = (ageLimit?: string | null): { age_min: number; age_max: nu
 const calculateSimilarity = (str1: string, str2: string): number => {
   const s1 = str1.toLowerCase().trim();
   const s2 = str2.toLowerCase().trim();
-  
+
   // Exact match
   if (s1 === s2) return 100;
-  
+
   // Check if one contains the other
   if (s1.includes(s2) || s2.includes(s1)) return 85;
-  
+
   // Token-based matching (word overlap)
   const tokens1 = s1.split(/\s+/).filter(t => t.length > 2);
   const tokens2 = s2.split(/\s+/).filter(t => t.length > 2);
-  
+
   if (tokens1.length === 0 || tokens2.length === 0) return 0;
-  
+
   const commonTokens = tokens1.filter(t => tokens2.includes(t));
   const tokenScore = (commonTokens.length * 2) / (tokens1.length + tokens2.length) * 100;
-  
+
   return Math.round(tokenScore);
 };
 
@@ -198,25 +300,25 @@ const calculateSimilarity = (str1: string, str2: string): number => {
 const checkJobSimilarity = (newJob: JobFormData, existingJob: Job): { isSimilar: boolean; score: number; matchType: "exact" | "similar" | "none" } => {
   const titleSimilarity = calculateSimilarity(newJob.title, existingJob.title);
   const deptSimilarity = calculateSimilarity(newJob.department, existingJob.department);
-  
+
   // Exact match: both title and department match 100%
   if (titleSimilarity === 100 && deptSimilarity === 100) {
     return { isSimilar: true, score: 100, matchType: "exact" };
   }
-  
+
   // Similar match: high title similarity (>70%) AND same/similar department (>80%)
   if (titleSimilarity >= 70 && deptSimilarity >= 80) {
     const avgScore = Math.round((titleSimilarity + deptSimilarity) / 2);
     return { isSimilar: true, score: avgScore, matchType: "similar" };
   }
-  
+
   // Also check location + department for additional context
   const locationMatch = newJob.location?.toLowerCase() === existingJob.location?.toLowerCase();
   if (titleSimilarity >= 60 && deptSimilarity >= 60 && locationMatch) {
     const avgScore = Math.round((titleSimilarity + deptSimilarity) / 2);
     return { isSimilar: true, score: avgScore, matchType: "similar" };
   }
-  
+
   return { isSimilar: false, score: 0, matchType: "none" };
 };
 
@@ -224,7 +326,7 @@ const checkJobSimilarity = (newJob: JobFormData, existingJob: Job): { isSimilar:
 const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
   const { age_min, age_max } = parseAgeLimit(input.age_limit);
   const applicationFee = input.application_fees?.general || 0;
-  
+
   // Build description with job_type and highlights if provided
   let fullDescription = input.description || "";
   if (input.job_type && !fullDescription.includes(input.job_type)) {
@@ -233,18 +335,18 @@ const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
   if (input.highlights && !fullDescription.includes(input.highlights)) {
     fullDescription = `${fullDescription} | Highlights: ${input.highlights}`;
   }
-  
+
   // Determine display values for vacancies and last_date
   const isTBDVacancies = isTBDValue(input.vacancies);
-  const vacanciesDisplay = input.vacancies !== undefined && input.vacancies !== null 
-    ? String(input.vacancies) 
+  const vacanciesDisplay = input.vacancies !== undefined && input.vacancies !== null
+    ? String(input.vacancies)
     : null;
-  
+
   const isTBDDate = isTBDValue(input.last_date);
-  const lastDateDisplay = isTBDDate 
+  const lastDateDisplay = isTBDDate
     ? String(input.last_date)
     : input.last_date || null;
-  
+
   return {
     title: input.exam_name,
     department: input.agency,
@@ -272,6 +374,7 @@ export default function Admin() {
   const { isAdmin, isLoading: roleLoading } = useAdminRole();
   const { data: jobs, isLoading: jobsLoading } = useJobs();
   const { userStats, apiStats, isLoading: statsLoading } = useAdminStats();
+  const analyticsData = useAnalyticsData();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -284,12 +387,16 @@ export default function Admin() {
   const [bulkUploading, setBulkUploading] = useState(false);
   const [jsonText, setJsonText] = useState("");
   const [duplicateMode, setDuplicateMode] = useState<"skip" | "update" | "replace">("skip");
-  
+
+  // Delete confirmation dialog state
+  const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   // Filters for jobs
   const [lastDateFilter, setLastDateFilter] = useState<string>("all");
   const [vacanciesFilter, setVacanciesFilter] = useState<string>("all");
   const [applyLinkFilter, setApplyLinkFilter] = useState<string>("all");
-  
+
   // Filter for users by qualification
   const [qualificationFilter, setQualificationFilter] = useState<string>("all");
 
@@ -297,10 +404,10 @@ export default function Admin() {
   const filteredUsers = userStats.allUsers?.filter((user) => {
     if (qualificationFilter === "all") return true;
     if (qualificationFilter === "none") return !user.highest_qualification;
-    
+
     const userQual = user.highest_qualification?.toLowerCase() || "";
     const filterQual = qualificationFilter.toLowerCase();
-    
+
     // Handle various qualification naming variants
     if (filterQual === "8th pass") {
       return userQual.includes("8th") || userQual === "8th pass";
@@ -320,10 +427,10 @@ export default function Admin() {
     if (filterQual === "diploma / iti") {
       return userQual.includes("diploma") || userQual.includes("iti");
     }
-    
+
     return userQual.includes(filterQual);
   }) || [];
-  
+
   // Sorting for jobs
   const [sortField, setSortField] = useState<"last_date" | "vacancies" | "title" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -355,7 +462,7 @@ export default function Admin() {
     if (lastDateFilter !== "all") {
       const today = new Date();
       const lastDate = new Date(job.last_date);
-      
+
       if (lastDateFilter === "expired" && lastDate >= today) return false;
       if (lastDateFilter === "active" && lastDate < today) return false;
       if (lastDateFilter === "7days") {
@@ -367,7 +474,7 @@ export default function Admin() {
         if (lastDate < today || lastDate > thirtyDays) return false;
       }
     }
-    
+
     // Vacancies filter
     if (vacanciesFilter !== "all") {
       const vacancies = job.vacancies || 1;
@@ -376,36 +483,36 @@ export default function Admin() {
       if (vacanciesFilter === "51-100" && (vacancies < 51 || vacancies > 100)) return false;
       if (vacanciesFilter === "100+" && vacancies <= 100) return false;
     }
-    
+
     // Apply link filter
     if (applyLinkFilter === "missing") {
       if (job.apply_link && job.apply_link.trim() !== "") return false;
     } else if (applyLinkFilter === "present") {
       if (!job.apply_link || job.apply_link.trim() === "") return false;
     }
-    
+
     return true;
   }).sort((a, b) => {
     if (!sortField) return 0;
-    
+
     if (sortField === "last_date") {
       const dateA = new Date(a.last_date).getTime();
       const dateB = new Date(b.last_date).getTime();
       return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
     }
-    
+
     if (sortField === "vacancies") {
       const vacA = a.vacancies || 1;
       const vacB = b.vacancies || 1;
       return sortDirection === "asc" ? vacA - vacB : vacB - vacA;
     }
-    
+
     if (sortField === "title") {
-      return sortDirection === "asc" 
-        ? a.title.localeCompare(b.title) 
+      return sortDirection === "asc"
+        ? a.title.localeCompare(b.title)
         : b.title.localeCompare(a.title);
     }
-    
+
     return 0;
   });
 
@@ -463,15 +570,23 @@ export default function Admin() {
   };
 
   const handleDeleteJob = async (jobId: string) => {
-    if (!confirm("Are you sure you want to delete this job?")) return;
-    
+    setDeleteJobId(jobId);
+  };
+
+  const confirmDeleteJob = async () => {
+    if (!deleteJobId) return;
+
+    setDeleting(true);
     try {
-      const { error } = await supabase.from("jobs").delete().eq("id", jobId);
+      const { error } = await supabase.from("jobs").delete().eq("id", deleteJobId);
       if (error) throw error;
-      toast({ title: "Job deleted" });
+      toast({ title: "Job deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+      setDeleteJobId(null);
     }
   };
 
@@ -483,32 +598,44 @@ export default function Admin() {
 
     try {
       const json = JSON.parse(jsonText);
-      
-      // Support both { "jobs": [...] } wrapper and direct array
-      let jobsArray: BulkUploadInput[];
-      if (json.jobs && Array.isArray(json.jobs)) {
-        jobsArray = json.jobs;
-      } else if (Array.isArray(json)) {
-        jobsArray = json;
-      } else {
-        jobsArray = [json];
+
+      // Validate the JSON structure and content
+      const validation = validateBulkUploadInput(json);
+
+      if (validation.errors.length > 0 && validation.validItems.length === 0) {
+        // All items are invalid
+        toast({
+          title: "Validation Failed",
+          description: validation.errors.slice(0, 3).join('\n') + (validation.errors.length > 3 ? `\n...and ${validation.errors.length - 3} more errors` : ''),
+          variant: "destructive"
+        });
+        return;
       }
-      
-      const processedJobs: BulkUploadJob[] = jobsArray.map((input: BulkUploadInput) => {
+
+      if (validation.errors.length > 0) {
+        // Some items are invalid, warn user but continue with valid ones
+        toast({
+          title: "Partial Validation",
+          description: `${validation.validItems.length} valid, ${validation.invalidIndices.length} invalid items. Invalid items will be skipped.`,
+          variant: "default"
+        });
+      }
+
+      const processedJobs: BulkUploadJob[] = validation.validItems.map((input: BulkUploadInput) => {
         // Map the input format to JobFormData
         const jobData = mapBulkInputToJobForm(input);
-        
+
         // Find best matching existing job using similarity detection
-        let bestMatch: { job: Job | null; score: number; matchType: "exact" | "similar" | "none" } = 
+        let bestMatch: { job: Job | null; score: number; matchType: "exact" | "similar" | "none" } =
           { job: null, score: 0, matchType: "none" };
-        
+
         for (const existingJob of jobs || []) {
           const similarity = checkJobSimilarity(jobData, existingJob);
           if (similarity.isSimilar && similarity.score > bestMatch.score) {
             bestMatch = { job: existingJob, score: similarity.score, matchType: similarity.matchType };
           }
         }
-        
+
         return {
           ...jobData,
           isDuplicate: bestMatch.job !== null,
@@ -521,17 +648,17 @@ export default function Admin() {
       setBulkJobs(processedJobs);
       setShowBulkDialog(true);
     } catch (error) {
-      toast({ title: "Error", description: "Invalid JSON format. Please check the syntax.", variant: "destructive" });
+      toast({ title: "Error", description: "Invalid JSON syntax. Please check your input.", variant: "destructive" });
     }
   };
 
   const handleBulkUpload = async () => {
     const newJobs = bulkJobs.filter((job) => !job.isDuplicate);
     const duplicateJobs = bulkJobs.filter((job) => job.isDuplicate);
-    
+
     const hasNewJobs = newJobs.length > 0;
     const hasUpdates = (duplicateMode === "update" || duplicateMode === "replace") && duplicateJobs.length > 0;
-    
+
     if (!hasNewJobs && !hasUpdates) {
       toast({ title: "No jobs to upload or update", variant: "destructive" });
       return;
@@ -542,7 +669,7 @@ export default function Admin() {
       let insertedCount = 0;
       let updatedCount = 0;
       let replacedCount = 0;
-      
+
       // Insert new jobs
       if (newJobs.length > 0) {
         const cleanNewJobs = newJobs.map(({ isDuplicate, duplicateOf, matchType, similarityScore, ...job }) => job);
@@ -550,7 +677,7 @@ export default function Admin() {
         if (error) throw error;
         insertedCount = cleanNewJobs.length;
       }
-      
+
       // Update existing job records (keep ID)
       if (duplicateMode === "update" && duplicateJobs.length > 0) {
         for (const dupJob of duplicateJobs) {
@@ -562,7 +689,7 @@ export default function Admin() {
           }
         }
       }
-      
+
       // Replace: delete old, add new (new ID)
       if (duplicateMode === "replace" && duplicateJobs.length > 0) {
         for (const dupJob of duplicateJobs) {
@@ -577,7 +704,7 @@ export default function Admin() {
           }
         }
       }
-      
+
       const messages = [];
       if (insertedCount > 0) messages.push(`${insertedCount} jobs created`);
       if (updatedCount > 0) messages.push(`${updatedCount} jobs updated`);
@@ -585,7 +712,7 @@ export default function Admin() {
       if (duplicateMode === "skip" && duplicateJobs.length > 0) {
         messages.push(`${duplicateJobs.length} duplicates skipped`);
       }
-      
+
       toast({ title: messages.join(", ") + "!" });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       setShowBulkDialog(false);
@@ -637,7 +764,7 @@ export default function Admin() {
 
       <main className="p-4">
         <Tabs defaultValue="jobs" className="space-y-4">
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="jobs" className="gap-1">
               <Briefcase className="h-4 w-4" />
               <span className="hidden sm:inline">Jobs</span>
@@ -646,13 +773,17 @@ export default function Admin() {
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Users</span>
             </TabsTrigger>
+            <TabsTrigger value="user-analytics" className="gap-1">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
             <TabsTrigger value="analytics" className="gap-1">
               <Activity className="h-4 w-4" />
-              <span className="hidden sm:inline">API Usage</span>
+              <span className="hidden sm:inline">API</span>
             </TabsTrigger>
             <TabsTrigger value="bulk" className="gap-1">
               <FileJson className="h-4 w-4" />
-              <span className="hidden sm:inline">Bulk Upload</span>
+              <span className="hidden sm:inline">Bulk</span>
             </TabsTrigger>
           </TabsList>
 
@@ -670,14 +801,14 @@ export default function Admin() {
                     Add Job
                   </Button>
                 </div>
-                
+
                 {/* Filters */}
                 <div className="flex flex-wrap gap-3 items-center">
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Filters:</span>
                   </div>
-                  
+
                   <Select value={lastDateFilter} onValueChange={setLastDateFilter}>
                     <SelectTrigger className="w-[150px] h-9">
                       <SelectValue placeholder="Last Date" />
@@ -690,7 +821,7 @@ export default function Admin() {
                       <SelectItem value="30days">Next 30 Days</SelectItem>
                     </SelectContent>
                   </Select>
-                  
+
                   <Select value={vacanciesFilter} onValueChange={setVacanciesFilter}>
                     <SelectTrigger className="w-[150px] h-9">
                       <SelectValue placeholder="Vacancies" />
@@ -703,7 +834,7 @@ export default function Admin() {
                       <SelectItem value="100+">100+</SelectItem>
                     </SelectContent>
                   </Select>
-                  
+
                   <Select value={applyLinkFilter} onValueChange={setApplyLinkFilter}>
                     <SelectTrigger className="w-[150px] h-9">
                       <SelectValue placeholder="Apply Link" />
@@ -714,11 +845,11 @@ export default function Admin() {
                       <SelectItem value="present">Has Link</SelectItem>
                     </SelectContent>
                   </Select>
-                  
+
                   {(lastDateFilter !== "all" || vacanciesFilter !== "all" || applyLinkFilter !== "all") && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => { setLastDateFilter("all"); setVacanciesFilter("all"); setApplyLinkFilter("all"); }}
                       className="text-muted-foreground"
                     >
@@ -737,7 +868,7 @@ export default function Admin() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead 
+                          <TableHead
                             className="cursor-pointer hover:bg-muted/50 select-none"
                             onClick={() => handleSort("title")}
                           >
@@ -747,7 +878,7 @@ export default function Admin() {
                             </div>
                           </TableHead>
                           <TableHead>Department</TableHead>
-                          <TableHead 
+                          <TableHead
                             className="cursor-pointer hover:bg-muted/50 select-none"
                             onClick={() => handleSort("last_date")}
                           >
@@ -756,7 +887,7 @@ export default function Admin() {
                               {getSortIcon("last_date")}
                             </div>
                           </TableHead>
-                          <TableHead 
+                          <TableHead
                             className="cursor-pointer hover:bg-muted/50 select-none"
                             onClick={() => handleSort("vacancies")}
                           >
@@ -834,29 +965,8 @@ export default function Admin() {
             </div>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <CardTitle>All Registered Users</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <Select value={qualificationFilter} onValueChange={setQualificationFilter}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filter by Qualification" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Qualifications</SelectItem>
-                      <SelectItem value="8th pass">8th Pass</SelectItem>
-                      <SelectItem value="10th pass">10th Pass</SelectItem>
-                      <SelectItem value="12th pass">12th Pass</SelectItem>
-                      <SelectItem value="graduate">Graduate</SelectItem>
-                      <SelectItem value="postgraduate">Postgraduate</SelectItem>
-                      <SelectItem value="diploma / iti">Diploma / ITI</SelectItem>
-                      <SelectItem value="engineering graduate (btech/be)">Engineering Graduate (BTech/BE)</SelectItem>
-                      <SelectItem value="medical/nursing/pharmacy">Medical/Nursing/Pharmacy</SelectItem>
-                      <SelectItem value="teaching qualified (bed/tet)">Teaching Qualified (BEd/TET)</SelectItem>
-                      <SelectItem value="none">No Qualification Set</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {statsLoading ? (
@@ -876,7 +986,7 @@ export default function Admin() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredUsers.map((user) => (
+                        {userStats.allUsers.map((user) => (
                           <TableRow key={user.id}>
                             <TableCell className="font-medium">{user.full_name || "Not set"}</TableCell>
                             <TableCell>{user.email || "Not set"}</TableCell>
@@ -895,10 +1005,10 @@ export default function Admin() {
                             <TableCell>{format(new Date(user.created_at), "dd MMM yyyy")}</TableCell>
                           </TableRow>
                         ))}
-                        {filteredUsers.length === 0 && (
+                        {userStats.allUsers.length === 0 && (
                           <TableRow>
                             <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                              No users match the selected filter
+                              No registered users yet
                             </TableCell>
                           </TableRow>
                         )}
@@ -907,10 +1017,145 @@ export default function Admin() {
                   </ScrollArea>
                 )}
                 <div className="p-4 border-t text-sm text-muted-foreground">
-                  Showing {filteredUsers.length} of {userStats.allUsers.length} users
+                  Total: {userStats.allUsers.length} users
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* User Analytics Tab */}
+          <TabsContent value="user-analytics">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <Eye className="h-3 w-3" />
+                    Page Views
+                  </CardDescription>
+                  <CardTitle className="text-2xl">{analyticsData.isLoading ? "..." : analyticsData.totalPageViews}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <MousePointerClick className="h-3 w-3" />
+                    Interactions
+                  </CardDescription>
+                  <CardTitle className="text-2xl">{analyticsData.isLoading ? "..." : analyticsData.totalFeatureUsage}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" />
+                    Top Page
+                  </CardDescription>
+                  <CardTitle className="text-lg truncate">{analyticsData.isLoading ? "..." : (analyticsData.pageViewsByPage[0]?.page_name || "N/A")}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1">
+                    <BarChart3 className="h-3 w-3" />
+                    Days Active
+                  </CardDescription>
+                  <CardTitle className="text-2xl">{analyticsData.isLoading ? "..." : analyticsData.dailyActivity.length}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Page Views by Page */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Eye className="h-4 w-4" />
+                    Page Views
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {analyticsData.isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : analyticsData.pageViewsByPage.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">No page views recorded yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {analyticsData.pageViewsByPage.map((page) => (
+                        <div key={page.page_name} className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{page.page_name}</span>
+                          <Badge variant="secondary">{page.view_count}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Feature Usage */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MousePointerClick className="h-4 w-4" />
+                    Feature Usage
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {analyticsData.isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : analyticsData.featureUsage.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">No feature interactions recorded yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {analyticsData.featureUsage.map((feature) => (
+                        <div key={feature.feature_name} className="flex items-center justify-between">
+                          <span className="text-sm font-medium truncate max-w-[150px]">{feature.feature_name}</span>
+                          <Badge variant="secondary">{feature.usage_count}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Daily Activity */}
+            {analyticsData.dailyActivity.length > 0 && (
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Daily Activity (Last 14 Days)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-end gap-1 h-20">
+                    {analyticsData.dailyActivity.map((day) => {
+                      const maxCount = Math.max(...analyticsData.dailyActivity.map(d => d.count));
+                      const height = maxCount > 0 ? (day.count / maxCount) * 100 : 0;
+                      return (
+                        <div
+                          key={day.date}
+                          className="flex-1 bg-primary/20 hover:bg-primary/40 rounded-t transition-colors relative group"
+                          style={{ height: `${Math.max(height, 5)}%` }}
+                        >
+                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 hidden group-hover:block bg-foreground text-background text-xs px-1 rounded">
+                            {day.count}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                    <span>{analyticsData.dailyActivity[0]?.date.slice(5)}</span>
+                    <span>{analyticsData.dailyActivity[analyticsData.dailyActivity.length - 1]?.date.slice(5)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* API Analytics Tab */}
@@ -1128,7 +1373,7 @@ export default function Admin() {
               Review jobs before uploading. Duplicates are detected by matching title & department.
             </DialogDescription>
           </DialogHeader>
-          
+
           {/* Duplicate & Similar Job Handling Options */}
           {bulkJobs.some(j => j.isDuplicate) && (
             <div className="bg-muted/50 rounded-lg p-4 border border-border">
@@ -1155,7 +1400,7 @@ export default function Admin() {
               </RadioGroup>
             </div>
           )}
-          
+
           <ScrollArea className="h-[350px]">
             <Table>
               <TableHeader>
@@ -1169,12 +1414,12 @@ export default function Admin() {
               </TableHeader>
               <TableBody>
                 {bulkJobs.map((job, index) => (
-                  <TableRow 
-                    key={index} 
+                  <TableRow
+                    key={index}
                     className={
-                      job.isDuplicate 
-                        ? duplicateMode === "skip" 
-                          ? "opacity-50" 
+                      job.isDuplicate
+                        ? duplicateMode === "skip"
+                          ? "opacity-50"
                           : duplicateMode === "update"
                             ? "bg-amber-50 dark:bg-amber-950/20"
                             : "bg-blue-50 dark:bg-blue-950/20"
@@ -1223,7 +1468,7 @@ export default function Admin() {
               </TableBody>
             </Table>
           </ScrollArea>
-          
+
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <div className="text-sm text-muted-foreground flex-1">
               {bulkJobs.filter(j => !j.isDuplicate).length} new
@@ -1240,12 +1485,12 @@ export default function Admin() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Cancel</Button>
-              <Button 
-                onClick={handleBulkUpload} 
+              <Button
+                onClick={handleBulkUpload}
                 disabled={bulkUploading || (bulkJobs.filter(j => !j.isDuplicate).length === 0 && duplicateMode === "skip")}
               >
                 {bulkUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {duplicateMode === "skip" 
+                {duplicateMode === "skip"
                   ? `Upload ${bulkJobs.filter(j => !j.isDuplicate).length} Jobs`
                   : `Process ${bulkJobs.length} Jobs`
                 }
@@ -1254,6 +1499,29 @@ export default function Admin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation AlertDialog */}
+      <AlertDialog open={!!deleteJobId} onOpenChange={(open) => !open && setDeleteJobId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this job? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteJob}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

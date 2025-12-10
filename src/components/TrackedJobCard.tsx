@@ -31,7 +31,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activePhase, setActivePhase] = useState(1);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
-  
+
   // Initialize from cached response in database - no auto-fetch
   const [statusData, setStatusData] = useState<any>(() => {
     return attempt.exams?.ai_cached_response || null;
@@ -79,8 +79,8 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
     if (!statusData) return false;
     const status = statusData.current_status;
     if (phase === "admit_card") {
-      return status === "admit_card_available" || status === "exam_scheduled" || 
-             status === "exam_completed" || status === "result_declared";
+      return status === "admit_card_available" || status === "exam_scheduled" ||
+        status === "exam_completed" || status === "result_declared";
     }
     if (phase === "exam") {
       return status === "exam_completed" || status === "result_declared";
@@ -104,9 +104,9 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   };
 
   return (
-    <Card className="bg-card border-border overflow-hidden">
+    <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 overflow-hidden shadow-md hover:shadow-lg transition-shadow">
       {/* Clickable Area - Header + Collapsed Summary */}
-      <div 
+      <div
         className="cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -160,7 +160,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                     <span>Phase 1 Progress</span>
                     <span>{getProgress()}%</span>
                   </div>
-                  <Progress value={getProgress()} className="h-2 bg-secondary" />
+                  <Progress value={getProgress()} className="h-2.5 bg-white/50 shadow-sm [&>div]:bg-primary" />
                 </div>
                 {lastUpdatedAt && (
                   <p className="text-xs text-muted-foreground mt-2">
@@ -186,8 +186,8 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             <button
               className={cn(
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                activePhase === 1 
-                  ? "bg-primary text-primary-foreground shadow-md" 
+                activePhase === 1
+                  ? "bg-primary text-primary-foreground shadow-md"
                   : "bg-secondary text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               )}
               onClick={() => setActivePhase(1)}
@@ -197,8 +197,8 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             <button
               className={cn(
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                activePhase === 2 
-                  ? "bg-primary text-primary-foreground shadow-md" 
+                activePhase === 2
+                  ? "bg-primary text-primary-foreground shadow-md"
                   : "bg-secondary text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               )}
               onClick={() => setActivePhase(2)}
@@ -235,14 +235,14 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                     {getStatusBadge(isPhaseComplete("admit_card"))}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {isPhaseComplete("admit_card") 
-                      ? "Download from the official website." 
+                    {isPhaseComplete("admit_card")
+                      ? "Download from the official website."
                       : "Will be available soon."}
                   </p>
                   {statusData?.admit_card_link && isPhaseComplete("admit_card") && (
-                    <a 
-                      href={statusData.admit_card_link} 
-                      target="_blank" 
+                    <a
+                      href={statusData.admit_card_link}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-blue-600 hover:underline mt-1 inline-block"
                     >
@@ -287,16 +287,16 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                     {getStatusBadge(isPhaseComplete("result"))}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {isPhaseComplete("result") 
-                      ? "Results have been declared." 
-                      : statusData?.expected_result_date 
-                        ? `Expected in ${statusData.expected_result_date}` 
+                    {isPhaseComplete("result")
+                      ? "Results have been declared."
+                      : statusData?.expected_result_date
+                        ? `Expected in ${statusData.expected_result_date}`
                         : "Result date will be announced."}
                   </p>
                   {statusData?.result_link && isPhaseComplete("result") && (
-                    <a 
-                      href={statusData.result_link} 
-                      target="_blank" 
+                    <a
+                      href={statusData.result_link}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-blue-600 hover:underline mt-1 inline-block"
                     >
@@ -312,7 +312,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                   <span className="text-muted-foreground">Phase 1 Progress</span>
                   <span className="font-medium text-primary">{getProgress()}%</span>
                 </div>
-                <Progress value={getProgress()} className="h-2.5 bg-secondary" />
+                <Progress value={getProgress()} className="h-3 bg-white/50 shadow-sm [&>div]:bg-primary" />
               </div>
 
               {/* Recent News Section */}
@@ -370,7 +370,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
 
           {/* Collapse Button at Bottom Center */}
           <div className="flex justify-center pt-4 border-t border-border mt-4">
-            <button 
+            <button
               onClick={() => setIsExpanded(false)}
               className="flex items-center justify-center w-10 h-10 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground transition-colors"
             >
