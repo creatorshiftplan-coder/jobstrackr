@@ -530,10 +530,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_user_rate_limit: {
-        Args: { _daily_limit: number; _user_id: string }
-        Returns: Json
-      }
+      check_user_rate_limit:
+        | { Args: { _daily_limit: number; _user_id: string }; Returns: Json }
+        | {
+            Args: {
+              _daily_limit: number
+              _minute_limit?: number
+              _user_id: string
+            }
+            Returns: Json
+          }
       decrypt_sensitive_field: {
         Args: { encrypted_value: string; owner_id: string }
         Returns: string

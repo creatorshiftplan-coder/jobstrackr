@@ -51,21 +51,26 @@ Deno.serve(async (req) => {
     });
     const isAdmin = isAdminData === true;
 
-    // Check rate limit only for non-admin users
+    // Check rate limit only for non-admin users (with per-minute limit)
     if (!isAdmin) {
       const { data: rateLimitData, error: rateLimitError } = await supabase.rpc("check_user_rate_limit", {
         _user_id: user.id,
         _daily_limit: DAILY_LIMIT,
+        _minute_limit: 1,
       });
 
       if (rateLimitError) {
         console.error("Rate limit check error:", rateLimitError);
       } else if (rateLimitData && !rateLimitData.allowed) {
+        const errorMessage = rateLimitData.rate_limited 
+          ? "Please wait a minute before making another AI request."
+          : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
+        
         console.log(`Rate limit exceeded for user ${user.id}: ${rateLimitData.used}/${rateLimitData.limit}`);
         return new Response(
           JSON.stringify({
             data: null,
-            error: "AI limit reached! You've used all 7 daily requests. Your limit resets at 11:59 PM IST. Please try again tomorrow.",
+            error: errorMessage,
             rate_limit: rateLimitData,
             success: false,
           }),
@@ -366,7 +371,7 @@ Use null for fields not found.`,
           .eq("user_id", user.id);
           
         return new Response(
-          JSON.stringify({ data: null, error: "AI service rate limit exceeded. Please try again in a few minutes.", success: false }),
+          JSON.stringify({ data: null, error: "AI service temporarily unavailable due to high demand. Please try again in a few minutes.", success: false }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
