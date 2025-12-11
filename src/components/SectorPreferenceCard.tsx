@@ -41,7 +41,7 @@ export function SectorPreferenceCard({ onComplete, onSkip }: SectorPreferenceCar
     };
 
     return (
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-primary/5 to-primary/10 animate-slide-up">
+        <Card className="border-0 shadow-lg bg-white dark:bg-card animate-slide-up">
             <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -68,8 +68,8 @@ export function SectorPreferenceCard({ onComplete, onSkip }: SectorPreferenceCar
                             key={sector}
                             variant={selectedSectors.includes(sector) ? "default" : "outline"}
                             className={`cursor-pointer transition-all px-3 py-1.5 text-sm ${selectedSectors.includes(sector)
-                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                    : "hover:bg-secondary"
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "hover:bg-secondary"
                                 }`}
                             onClick={() => toggleSector(sector)}
                         >

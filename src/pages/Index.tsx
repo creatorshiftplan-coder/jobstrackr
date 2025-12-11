@@ -32,6 +32,7 @@ const Index = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const examsScrollRef = useRef<HTMLDivElement>(null);
   const [sectorCardSkipped, setSectorCardSkipped] = useState(false);
+  const [preferencesSaved, setPreferencesSaved] = useState(false);
 
   const scrollLeft = (ref: React.RefObject<HTMLDivElement>, cardWidth: number) => {
     if (ref.current) {
@@ -83,10 +84,11 @@ const Index = () => {
       .slice(0, 6);
   }, [filteredJobs, profile?.preferred_sectors, userExams]);
 
-  // Show sector card if user is logged in, hasn't set preferences, and hasn't skipped
+  // Show sector card if user is logged in, hasn't set preferences, hasn't skipped, and hasn't saved this session
   const showSectorCard = user && !profileLoading &&
     (!profile?.preferred_sectors || profile.preferred_sectors.length === 0) &&
-    !sectorCardSkipped;
+    !sectorCardSkipped &&
+    !preferencesSaved;
 
   // Active exams from user's tracked exams (top 4)
   const activeExams = useMemo(() => {
@@ -124,7 +126,7 @@ const Index = () => {
             {showSectorCard && (
               <div className="px-5 mb-6">
                 <SectorPreferenceCard
-                  onComplete={() => setSectorCardSkipped(false)}
+                  onComplete={() => setPreferencesSaved(true)}
                   onSkip={() => setSectorCardSkipped(true)}
                 />
               </div>
