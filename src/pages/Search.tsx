@@ -16,6 +16,8 @@ import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { Link, useNavigate } from "react-router-dom";
 import { INDIAN_STATES, EXAM_SECTORS, EDUCATION_QUALIFICATIONS } from "@/constants/filters";
 import { useDebouncedValue } from "@/hooks/useDebounce";
+import { useAuth } from "@/hooks/useAuth";
+import { useAuthRequired } from "@/components/AuthRequiredDialog";
 
 export default function Search() {
   const navigate = useNavigate();
@@ -27,6 +29,8 @@ export default function Search() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { data: jobs, isLoading } = useJobs();
   const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, clearAIResults, dismissJob } = useAIJobSearch();
+  const { user } = useAuth();
+  const { showAuthRequired } = useAuthRequired();
 
   // Scroll detection for hiding/showing search bar
   const [isSearchBarVisible, setIsSearchBarVisible] = useState(true);
@@ -135,6 +139,10 @@ export default function Search() {
   };
 
   const handleSearch = () => {
+    if (!user) {
+      showAuthRequired("Login to use AI-powered job search");
+      return;
+    }
     if (query.length >= 3) {
       searchWithAI(query);
     }

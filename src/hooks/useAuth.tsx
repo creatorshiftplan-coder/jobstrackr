@@ -39,6 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Auto-exit guest mode when user logs in
+        if (session?.user) {
+          localStorage.removeItem("guestMode");
+          setIsGuestMode(false);
+        }
       }
     );
 

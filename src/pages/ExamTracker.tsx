@@ -8,11 +8,19 @@ import { Button } from "@/components/ui/button";
 import { GraduationCap, Bookmark, Plus, CalendarDays } from "lucide-react";
 import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuthRequired } from "@/components/AuthRequiredDialog";
 
 export default function ExamTracker() {
   const { user, loading: authLoading } = useAuth();
   const { userExams, isLoading } = useExams();
   const navigate = useNavigate();
+  const { showAuthRequired } = useAuthRequired();
+
+  const handleAddExamClick = () => {
+    if (!user) {
+      showAuthRequired("Login to track exams and get AI-powered updates");
+    }
+  };
 
   if (authLoading) {
     return (
@@ -44,14 +52,13 @@ export default function ExamTracker() {
               My Exams
             </h1>
             <div className="flex items-center gap-2">
-              <ExamSearchSheet
-                trigger={
-                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-primary hover:bg-primary/90 transition-all cursor-pointer backdrop-blur-sm shadow-sm">
-                    <Plus className="h-4 w-4 text-primary-foreground" />
-                    <span className="text-primary-foreground text-sm font-medium">Add Exam</span>
-                  </div>
-                }
-              />
+              <div
+                onClick={handleAddExamClick}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-primary hover:bg-primary/90 transition-all cursor-pointer backdrop-blur-sm shadow-sm"
+              >
+                <Plus className="h-4 w-4 text-primary-foreground" />
+                <span className="text-primary-foreground text-sm font-medium">Add Exam</span>
+              </div>
               <Link to="/saved">
                 <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
                   <Bookmark className="h-5 w-5 text-primary" />

@@ -11,6 +11,8 @@ import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAuth } from "@/hooks/useAuth";
+import { useAuthRequired } from "@/components/AuthRequiredDialog";
 
 interface ExamSearchSheetProps {
   trigger?: React.ReactNode;
@@ -29,6 +31,8 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   const { data: jobs = [] } = useJobs();
   const { isSearching, aiResults, searchWithAI, clearAIResults } = useAIJobSearch();
   const { trackExamTracked, trackAISearchUsed } = useAnalytics();
+  const { user } = useAuth();
+  const { showAuthRequired } = useAuthRequired();
 
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear + 1];
@@ -150,6 +154,10 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   };
 
   const handleAISearch = async () => {
+    if (!user) {
+      showAuthRequired("Login to use AI-powered job search");
+      return;
+    }
     if (!searchQuery.trim()) {
       toast.error("Please enter an exam name to search");
       return;
@@ -263,8 +271,8 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
                   key={exam.id}
                   onClick={() => handleSelectExam(exam.id)}
                   className={`w-full p-4 rounded-xl text-left transition-colors ${selectedExamId === exam.id
-                      ? "bg-blue-100 border-2 border-blue-500"
-                      : "bg-muted/30 hover:bg-muted/50"
+                    ? "bg-blue-100 border-2 border-blue-500"
+                    : "bg-muted/30 hover:bg-muted/50"
                     }`}
                 >
                   <div className="flex items-start gap-3">
@@ -290,8 +298,8 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
                   key={job.id}
                   onClick={() => handleSelectJob(job.id)}
                   className={`w-full p-4 rounded-xl text-left transition-colors ${selectedJobId === job.id
-                      ? "bg-green-100 border-2 border-green-500"
-                      : "bg-muted/30 hover:bg-muted/50"
+                    ? "bg-green-100 border-2 border-green-500"
+                    : "bg-muted/30 hover:bg-muted/50"
                     }`}
                 >
                   <div className="flex items-start gap-3">

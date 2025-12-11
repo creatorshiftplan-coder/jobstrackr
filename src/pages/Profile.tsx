@@ -42,7 +42,7 @@ export default function Profile() {
     }
   };
 
-  if (!user && !isGuestMode) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card px-4 pt-12 pb-4">
@@ -60,10 +60,21 @@ export default function Profile() {
             </Link>
           </div>
         </header>
-        <main className="px-4 py-8 text-center">
-          <p className="text-muted-foreground mb-4">Please login to view your profile</p>
+        <main className="px-4 py-8 flex flex-col items-center justify-center min-h-[60vh]">
+          <div className="mx-auto h-20 w-20 rounded-full bg-secondary flex items-center justify-center mb-4">
+            <User className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h3 className="font-display font-semibold text-lg text-foreground mb-2">
+            Welcome to JobsTrackr
+          </h3>
+          <p className="text-sm text-muted-foreground mb-2 text-center max-w-xs">
+            Login to save jobs, track applications, and get personalized recommendations
+          </p>
+          <p className="text-xs text-muted-foreground/70 mb-6 text-center">
+            To access this page, please login or sign up
+          </p>
           <Link to="/auth">
-            <Button>Login / Sign Up</Button>
+            <Button className="w-full">Login / Sign Up</Button>
           </Link>
         </main>
         <BottomNav />

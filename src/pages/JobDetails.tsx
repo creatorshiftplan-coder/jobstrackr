@@ -202,7 +202,7 @@ export default function JobDetails() {
 
         {/* Quick Info Cards */}
         <div className="grid grid-cols-2 gap-3 animate-slide-up" style={{ animationDelay: "0.1s" }}>
-          <Card className="border-0 shadow-card">
+          <Card className="border-0 shadow-md">
             <CardContent className="p-3 flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <MapPin className="h-5 w-5 text-primary" />
@@ -213,7 +213,7 @@ export default function JobDetails() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-card">
+          <Card className="border-0 shadow-md">
             <CardContent className="p-3 flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
                 <IndianRupee className="h-5 w-5 text-success" />
@@ -224,7 +224,7 @@ export default function JobDetails() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-card">
+          <Card className="border-0 shadow-md">
             <CardContent className="p-3 flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center">
                 <Calendar className="h-5 w-5 text-warning" />
@@ -237,7 +237,7 @@ export default function JobDetails() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-card">
+          <Card className="border-0 shadow-md">
             <CardContent className="p-3 flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-info/10 flex items-center justify-center">
                 <Users className="h-5 w-5 text-info" />
@@ -253,7 +253,7 @@ export default function JobDetails() {
         </div>
 
         {/* Details Section */}
-        <Card className="border-0 shadow-card animate-slide-up" style={{ animationDelay: "0.2s" }}>
+        <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.2s" }}>
           <CardContent className="p-4 space-y-4">
             <div className="flex items-start gap-3">
               <GraduationCap className="h-5 w-5 text-primary mt-0.5" />
@@ -288,7 +288,7 @@ export default function JobDetails() {
 
         {/* Description */}
         {job.description && (
-          <Card className="border-0 shadow-card animate-slide-up" style={{ animationDelay: "0.3s" }}>
+          <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.3s" }}>
             <CardContent className="p-4">
               <h3 className="font-display font-semibold text-foreground mb-2">About this Job</h3>
               <p className="text-sm text-muted-foreground whitespace-pre-line">{job.description}</p>
@@ -298,7 +298,7 @@ export default function JobDetails() {
 
         {/* Eligibility */}
         {job.eligibility && (
-          <Card className="border-0 shadow-card animate-slide-up" style={{ animationDelay: "0.4s" }}>
+          <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.4s" }}>
             <CardContent className="p-4">
               <h3 className="font-display font-semibold text-foreground mb-2">Eligibility Criteria</h3>
               <p className="text-sm text-muted-foreground whitespace-pre-line">{job.eligibility}</p>
@@ -312,7 +312,7 @@ export default function JobDetails() {
             <Button
               onClick={handleTrackExam}
               variant="outline"
-              className="w-full h-11"
+              className="w-full h-11 shadow-md bg-white dark:bg-card"
               disabled={isTracking || isAlreadyTracked}
             >
               {isTracking ? (
