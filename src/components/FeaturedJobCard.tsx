@@ -1,21 +1,35 @@
-import { MapPin } from "lucide-react";
+import { MapPin, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
 import { Badge } from "@/components/ui/badge";
 import { SaveJobButton } from "@/components/SaveJobButton";
 
+import { format, differenceInDays } from "date-fns";
+
 interface FeaturedJobCardProps {
   job: Job;
 }
 
+// Check if last_date_display contains TBD-like values
+const isTBDDateDisplay = (displayValue: string | null): boolean => {
+  if (!displayValue) return false;
+  const tbdPatterns = ['tbd', 'to be announced', 'walk in', 'walk-in', 'walkin', 'n/a', 'not available'];
+  const lowerValue = displayValue.toLowerCase().trim();
+  return tbdPatterns.some(pattern => lowerValue.includes(pattern));
+};
+
 export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
-  const formatSalary = (min: number | null, max: number | null) => {
-    if (min && max) {
-      return `₹${(min / 1000).toFixed(0)}k - ₹${(max / 1000).toFixed(0)}k/month`;
-    }
-    if (min) return `₹${(min / 1000).toFixed(0)}k/month`;
-    if (max) return `₹${(max / 1000).toFixed(0)}k/month`;
-    return "Salary negotiable";
+  const daysLeft = differenceInDays(new Date(job.last_date), new Date());
+  const isUrgent = daysLeft <= 7 && daysLeft >= 0;
+  const isExpired = daysLeft < 0;
+  const isTBDDate = isTBDDateDisplay(job.last_date_display);
+
+  const formatLastDate = () => {
+    if (isTBDDate) return 'Date TBD';
+    if (isExpired) return 'Expired';
+    if (daysLeft === 0) return 'Last day!';
+    if (daysLeft <= 7) return `${daysLeft} days left`;
+    return format(new Date(job.last_date), "dd MMM yyyy");
   };
 
   return (
@@ -24,10 +38,10 @@ export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
         {/* Background decorative elements */}
         <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-primary-foreground/10 rounded-full -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-20 sm:w-24 h-20 sm:h-24 bg-primary-foreground/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-        
+
         {/* Save button */}
-        <div 
-          className="absolute top-3 sm:top-4 right-3 sm:right-4 z-10" 
+        <div
+          className="absolute top-3 sm:top-4 right-3 sm:right-4 z-10"
           onClick={(e) => e.preventDefault()}
         >
           <SaveJobButton jobId={job.id} variant="light" />
@@ -53,11 +67,14 @@ export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
             </Badge>
           </div>
 
-          {/* Salary and Location */}
+          {/* Last Date and Location */}
           <div className="flex items-center justify-between mt-auto">
-            <p className="text-xs sm:text-sm font-semibold truncate max-w-[120px] sm:max-w-[140px]">
-              {formatSalary(job.salary_min, job.salary_max)}
-            </p>
+            <div className={`flex items-center gap-1 text-xs sm:text-sm font-semibold ${isUrgent && !isExpired ? 'text-yellow-200' : isExpired ? 'text-primary-foreground/60' : 'text-primary-foreground'}`}>
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate max-w-[100px] sm:max-w-[120px]">
+                {formatLastDate()}
+              </span>
+            </div>
             <div className="flex items-center gap-1 text-xs sm:text-sm text-primary-foreground/80">
               <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               <span className="truncate max-w-[60px] sm:max-w-[80px]">{job.location}</span>

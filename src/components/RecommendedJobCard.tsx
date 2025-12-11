@@ -1,17 +1,39 @@
 import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
-import { Building2, Users } from "lucide-react";
+import { Building2, Users, Calendar } from "lucide-react";
+import { format, differenceInDays } from "date-fns";
 
 interface RecommendedJobCardProps {
   job: Job;
   colorVariant?: "pink" | "blue" | "green" | "orange";
 }
 
+// Check if last_date_display contains TBD-like values
+const isTBDDateDisplay = (displayValue: string | null): boolean => {
+  if (!displayValue) return false;
+  const tbdPatterns = ['tbd', 'to be announced', 'walk in', 'walk-in', 'walkin', 'n/a', 'not available'];
+  const lowerValue = displayValue.toLowerCase().trim();
+  return tbdPatterns.some(pattern => lowerValue.includes(pattern));
+};
+
 export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
+  const daysLeft = differenceInDays(new Date(job.last_date), new Date());
+  const isUrgent = daysLeft <= 7 && daysLeft >= 0;
+  const isExpired = daysLeft < 0;
+  const isTBDDate = isTBDDateDisplay(job.last_date_display);
+
   const formatVacancy = (vacancies: number | null, vacanciesDisplay: string | null) => {
     if (vacanciesDisplay) return vacanciesDisplay;
     if (vacancies) return `${vacancies} Vacancies`;
     return "TBD";
+  };
+
+  const formatLastDate = () => {
+    if (isTBDDate) return 'TBD';
+    if (isExpired) return 'Expired';
+    if (daysLeft === 0) return 'Last day!';
+    if (daysLeft <= 7) return `${daysLeft}d left`;
+    return format(new Date(job.last_date), "dd MMM");
   };
 
   return (
@@ -32,10 +54,16 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
           {job.department}
         </p>
 
-        {/* Vacancy Count */}
-        <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold text-primary mt-auto">
-          <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-          {formatVacancy(job.vacancies, job.vacancies_display)}
+        {/* Last Date and Vacancy Count */}
+        <div className="flex items-center justify-between mt-auto">
+          <div className={`flex items-center gap-1 text-[10px] sm:text-xs font-medium ${isUrgent && !isExpired ? 'text-destructive' : isExpired ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+            <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span>{formatLastDate()}</span>
+          </div>
+          <div className="flex items-center gap-1 text-[10px] sm:text-xs font-semibold text-primary">
+            <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+            {formatVacancy(job.vacancies, job.vacancies_display)}
+          </div>
         </div>
       </div>
     </Link>
