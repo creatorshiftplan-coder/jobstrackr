@@ -10,6 +10,7 @@ import { useJobs } from "@/hooks/useJobs";
 import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface ExamSearchSheetProps {
   trigger?: React.ReactNode;
@@ -23,30 +24,31 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [isAddingAIResult, setIsAddingAIResult] = useState(false);
   const [isAddingJob, setIsAddingJob] = useState(false);
-  
+
   const { exams, addExamAttempt } = useExams();
   const { data: jobs = [] } = useJobs();
   const { isSearching, aiResults, searchWithAI, clearAIResults } = useAIJobSearch();
+  const { trackExamTracked, trackAISearchUsed } = useAnalytics();
 
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear + 1];
 
   // Filter exams based on search query
-  const filteredExams = searchQuery.trim() 
-    ? exams.filter(exam => 
-        exam.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (exam.conducting_body?.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
+  const filteredExams = searchQuery.trim()
+    ? exams.filter(exam =>
+      exam.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (exam.conducting_body?.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
     : [];
 
   // Filter jobs based on search query
   const filteredJobs = searchQuery.trim()
     ? jobs.filter(job =>
-        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.department?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.description?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.department?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : [];
 
   const hasResults = filteredExams.length > 0 || filteredJobs.length > 0;
@@ -74,6 +76,8 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
       });
 
       toast.success("Exam added to tracker!");
+      const exam = exams.find(e => e.id === selectedExamId);
+      trackExamTracked(selectedExamId, exam?.name || "");
       setOpen(false);
       resetState();
     } catch (error) {
@@ -130,6 +134,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
       });
 
       toast.success("Job added to tracker!");
+      trackExamTracked(examId, selectedJob.title);
       setOpen(false);
       resetState();
     } catch (error: any) {
@@ -150,13 +155,14 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
       return;
     }
     await searchWithAI(searchQuery);
+    trackAISearchUsed(searchQuery, aiResults.length);
   };
 
   const handleAddAIResult = async (result: any) => {
     setIsAddingAIResult(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       const response = await fetch(
         `https://fdxksytpdfgmbkttipdf.supabase.co/functions/v1/ai-job-search`,
         {
@@ -180,7 +186,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
       );
 
       const data = await response.json();
-      
+
       if (data.error) {
         throw new Error(data.error);
       }
@@ -256,11 +262,10 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
                 <button
                   key={exam.id}
                   onClick={() => handleSelectExam(exam.id)}
-                  className={`w-full p-4 rounded-xl text-left transition-colors ${
-                    selectedExamId === exam.id 
-                      ? "bg-blue-100 border-2 border-blue-500" 
+                  className={`w-full p-4 rounded-xl text-left transition-colors ${selectedExamId === exam.id
+                      ? "bg-blue-100 border-2 border-blue-500"
                       : "bg-muted/30 hover:bg-muted/50"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
@@ -284,11 +289,10 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
                 <button
                   key={job.id}
                   onClick={() => handleSelectJob(job.id)}
-                  className={`w-full p-4 rounded-xl text-left transition-colors ${
-                    selectedJobId === job.id 
-                      ? "bg-green-100 border-2 border-green-500" 
+                  className={`w-full p-4 rounded-xl text-left transition-colors ${selectedJobId === job.id
+                      ? "bg-green-100 border-2 border-green-500"
                       : "bg-muted/30 hover:bg-muted/50"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
@@ -320,7 +324,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
           {/* AI Search Button */}
           {searchQuery && !isSearching && aiResults.length === 0 && (
             <div className="flex justify-center py-4 border-t border-dashed">
-              <Button 
+              <Button
                 onClick={handleAISearch}
                 variant="outline"
                 className="gap-2"
@@ -388,7 +392,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
                 </SelectContent>
               </Select>
             </div>
-            <Button 
+            <Button
               onClick={selectedExamId ? handleAddExam : handleAddJob}
               className="w-full h-12 bg-blue-600 hover:bg-blue-700"
               disabled={addExamAttempt.isPending || isAddingJob}

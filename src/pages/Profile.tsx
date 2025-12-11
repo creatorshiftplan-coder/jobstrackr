@@ -137,7 +137,7 @@ export default function Profile() {
       <main className="px-4 py-6 space-y-6 mt-2">
 
         {/* Stats Row */}
-        <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
+        <Card className="bg-white dark:bg-card border-border/50 shadow-md">
           <CardContent className="p-4">
             <div className="grid grid-cols-3 divide-x divide-border">
               <div className="flex flex-col items-center">
@@ -164,7 +164,7 @@ export default function Profile() {
               See all <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
+          <Card className="bg-white dark:bg-card border-border/50 shadow-md">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -214,7 +214,7 @@ export default function Profile() {
               See all <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
+          <Card className="bg-white dark:bg-card border-border/50 shadow-md">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -257,7 +257,7 @@ export default function Profile() {
               See all <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
+          <Card className="bg-white dark:bg-card border-border/50 shadow-md">
             <CardContent className="p-4">
               {education.length === 0 ? (
                 <div className="text-center py-4">
@@ -300,7 +300,7 @@ export default function Profile() {
               See all <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
+          <Card className="bg-white dark:bg-card border-border/50 shadow-md">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">

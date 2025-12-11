@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useJob } from "@/hooks/useJobs";
 import { useExams } from "@/hooks/useExams";
@@ -24,6 +24,7 @@ import { SaveJobButton } from "@/components/SaveJobButton";
 import { format, differenceInDays } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 // Check if last_date_display contains TBD-like values
 const isTBDDateDisplay = (displayValue: string | null): boolean => {
@@ -39,6 +40,14 @@ export default function JobDetails() {
   const { user } = useAuth();
   const { userExams, addExamAttempt } = useExams();
   const [isTracking, setIsTracking] = useState(false);
+  const { trackJobViewed, trackExamTracked } = useAnalytics();
+
+  // Track job view when page loads
+  useEffect(() => {
+    if (job) {
+      trackJobViewed(job.id, job.title);
+    }
+  }, [job, trackJobViewed]);
 
   // Check if this job is already tracked
   const isAlreadyTracked = userExams.some(
@@ -88,6 +97,7 @@ export default function JobDetails() {
       });
 
       toast.success("Exam added to your tracker!");
+      trackExamTracked(examId, job.title);
     } catch (error: any) {
       toast.error("Failed to track exam: " + error.message);
     } finally {
@@ -138,14 +148,14 @@ export default function JobDetails() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="flex gap-1">
-            <button 
+            <button
               onClick={async () => {
                 const shareData = {
                   title: job.title,
                   text: `Check out this job: ${job.title} at ${job.department}`,
                   url: window.location.href,
                 };
-                
+
                 if (navigator.share && navigator.canShare?.(shareData)) {
                   try {
                     await navigator.share(shareData);

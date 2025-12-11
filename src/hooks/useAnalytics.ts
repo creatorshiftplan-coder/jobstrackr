@@ -20,6 +20,99 @@ interface AnalyticsEvent {
     page_path?: string;
 }
 
+interface QueuedEvent {
+    user_id: string;
+    endpoint: string;
+    request_data: Record<string, unknown>;
+    response_status: number;
+}
+
+// Singleton class to batch analytics events
+class AnalyticsBatcher {
+    private static instance: AnalyticsBatcher;
+    private queue: QueuedEvent[] = [];
+    private flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    private readonly FLUSH_INTERVAL = 5000; // 5 seconds
+    private readonly MAX_QUEUE_SIZE = 20;
+
+    private constructor() {
+        // Flush on page unload
+        if (typeof window !== "undefined") {
+            window.addEventListener("beforeunload", () => {
+                this.flush();
+            });
+
+            // Also flush on visibility change (when user switches tabs)
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "hidden") {
+                    this.flush();
+                }
+            });
+        }
+    }
+
+    static getInstance(): AnalyticsBatcher {
+        if (!AnalyticsBatcher.instance) {
+            AnalyticsBatcher.instance = new AnalyticsBatcher();
+        }
+        return AnalyticsBatcher.instance;
+    }
+
+    queueEvent(event: QueuedEvent): void {
+        this.queue.push(event);
+
+        if (process.env.NODE_ENV === "development") {
+            console.log(`[Analytics] Queued event (${this.queue.length}/${this.MAX_QUEUE_SIZE})`);
+        }
+
+        // Flush if queue is full
+        if (this.queue.length >= this.MAX_QUEUE_SIZE) {
+            this.flush();
+            return;
+        }
+
+        // Start timer if not already running
+        if (!this.flushTimer) {
+            this.flushTimer = setTimeout(() => {
+                this.flush();
+            }, this.FLUSH_INTERVAL);
+        }
+    }
+
+    private async flush(): Promise<void> {
+        // Clear timer
+        if (this.flushTimer) {
+            clearTimeout(this.flushTimer);
+            this.flushTimer = null;
+        }
+
+        // Nothing to flush
+        if (this.queue.length === 0) return;
+
+        // Take all queued events
+        const eventsToFlush = [...this.queue];
+        this.queue = [];
+
+        try {
+            if (process.env.NODE_ENV === "development") {
+                console.log(`[Analytics] Flushing ${eventsToFlush.length} events to DB`);
+            }
+
+            // Batch insert all events
+            await (supabase as any).from("api_usage_logs").insert(eventsToFlush);
+
+            if (process.env.NODE_ENV === "development") {
+                console.log(`[Analytics] Successfully flushed ${eventsToFlush.length} events`);
+            }
+        } catch (error) {
+            // Silently fail - analytics should never break the app
+            console.warn("[Analytics] Failed to flush events:", error);
+            // Don't re-queue failed events to avoid infinite loops
+        }
+    }
+}
+
 export function useAnalytics() {
     const { user } = useAuth();
 
@@ -34,9 +127,8 @@ export function useAnalytics() {
                 // Only track for logged-in users (can be changed to track all users)
                 if (!user) return;
 
-                // Store in api_usage_logs table (reusing existing infrastructure)
-                // Using type assertion as api_usage_logs may not be in typed schema
-                await (supabase as any).from("api_usage_logs").insert({
+                // Queue event for batched insert
+                const queuedEvent: QueuedEvent = {
                     user_id: user.id,
                     endpoint: `analytics/${event_type}`,
                     request_data: {
@@ -48,7 +140,9 @@ export function useAnalytics() {
                         timestamp: new Date().toISOString(),
                     },
                     response_status: 200,
-                });
+                };
+
+                AnalyticsBatcher.getInstance().queueEvent(queuedEvent);
             } catch (error) {
                 // Silently fail - analytics should never break the app
                 console.warn("[Analytics] Failed to track event:", error);

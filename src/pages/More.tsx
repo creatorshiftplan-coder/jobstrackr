@@ -78,7 +78,7 @@ export default function More() {
 
       <main className="px-4 py-4 space-y-4">
         {!user ? (
-          <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
+          <Card className="bg-white dark:bg-card border-border/50 shadow-md">
             <CardContent className="p-6 text-center">
               <div className="mx-auto h-20 w-20 rounded-full bg-secondary flex items-center justify-center mb-4">
                 <User className="h-10 w-10 text-muted-foreground" />
@@ -98,7 +98,7 @@ export default function More() {
           <>
             {/* Avatar Card - Clickable to Profile */}
             <Card
-              className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+              className="bg-white dark:bg-card border-border/50 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
               onClick={() => navigate("/profile")}
             >
               <CardContent className="p-4 flex items-center gap-4">
@@ -126,7 +126,7 @@ export default function More() {
             {/* Quick Actions */}
             <div className="grid grid-cols-2 gap-3">
               <Card
-                className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+                className="bg-white dark:bg-card border-border/50 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => navigate("/tracker")}
               >
                 <CardContent className="p-4 flex flex-col items-center text-center gap-2">
@@ -138,7 +138,7 @@ export default function More() {
               </Card>
 
               <Card
-                className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+                className="bg-white dark:bg-card border-border/50 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => navigate("/search")}
               >
                 <CardContent className="p-4 flex flex-col items-center text-center gap-2">
@@ -152,7 +152,7 @@ export default function More() {
 
             {/* Online Application Guidance Link */}
             <Link to="/formmate" className="block">
-              <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md hover:shadow-lg transition-shadow">
+              <Card className="bg-white dark:bg-card border-border/50 shadow-md hover:shadow-lg transition-shadow">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
@@ -170,7 +170,7 @@ export default function More() {
 
             {/* Upload Documents Link */}
             <Link to="/documents" className="block">
-              <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md hover:shadow-lg transition-shadow">
+              <Card className="bg-white dark:bg-card border-border/50 shadow-md hover:shadow-lg transition-shadow">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
@@ -187,7 +187,7 @@ export default function More() {
             </Link>
 
             {/* Day/Night Mode Toggle */}
-            <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md">
+            <Card className="bg-white dark:bg-card border-border/50 shadow-md">
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
@@ -212,7 +212,7 @@ export default function More() {
           </>
         )}
 
-        <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 shadow-md overflow-hidden">
+        <Card className="bg-white dark:bg-card border-border/50 shadow-md overflow-hidden">
           <CardContent className="p-0">
             {[
               { icon: HelpCircle, label: "Help & Support", path: "/help" },

@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSavedJobs, useSaveJob, useUnsaveJob } from "@/hooks/useSavedJobs";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface SaveJobButtonProps {
   jobId: string;
@@ -16,6 +17,7 @@ export function SaveJobButton({ jobId, className, variant = "default" }: SaveJob
   const { data: savedJobs } = useSavedJobs();
   const saveJob = useSaveJob();
   const unsaveJob = useUnsaveJob();
+  const { trackJobSaved } = useAnalytics();
 
   const isSaved = savedJobs?.some((saved) => saved.job_id === jobId) ?? false;
 
@@ -32,15 +34,16 @@ export function SaveJobButton({ jobId, className, variant = "default" }: SaveJob
       unsaveJob.mutate(jobId);
     } else {
       saveJob.mutate(jobId);
+      trackJobSaved(jobId, ""); // Note: job title not available in this component
     }
   };
 
   const iconStyles = variant === "light"
-    ? isSaved 
-      ? "fill-white text-white" 
+    ? isSaved
+      ? "fill-white text-white"
       : "fill-white/30 text-white"
-    : isSaved 
-      ? "fill-primary text-primary" 
+    : isSaved
+      ? "fill-primary text-primary"
       : "text-muted-foreground";
 
   return (
