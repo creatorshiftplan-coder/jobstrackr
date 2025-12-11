@@ -25,6 +25,7 @@ import { format, differenceInDays } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAuthRequired } from "@/components/AuthRequiredDialog";
 
 // Check if last_date_display contains TBD-like values
 const isTBDDateDisplay = (displayValue: string | null): boolean => {
@@ -41,6 +42,7 @@ export default function JobDetails() {
   const { userExams, addExamAttempt } = useExams();
   const [isTracking, setIsTracking] = useState(false);
   const { trackJobViewed, trackExamTracked } = useAnalytics();
+  const { showAuthRequired } = useAuthRequired();
 
   // Track job view when page loads
   useEffect(() => {
@@ -56,7 +58,7 @@ export default function JobDetails() {
 
   const handleTrackExam = async () => {
     if (!user) {
-      toast.error("Please sign in to track exams");
+      showAuthRequired("Login to track exams and get status updates");
       return;
     }
 

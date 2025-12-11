@@ -11,16 +11,23 @@ import { useEducation } from "@/hooks/useEducation";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { EmbeddedProfileProgress } from "@/components/ProfileCompleteness";
+import { GUEST_PROFILE, GUEST_EDUCATION } from "@/lib/guestData";
+import { useAuthRequired } from "@/components/AuthRequiredDialog";
 
 export default function Profile() {
-  const { user, loading } = useAuth();
+  const { user, loading, isGuestMode } = useAuth();
   const { profile, isLoading: profileLoading } = useProfile();
   const { data: savedJobs } = useSavedJobs();
   const { userExams } = useExams();
   const { education, isLoading: educationLoading } = useEducation();
   const navigate = useNavigate();
+  const { showAuthRequired } = useAuthRequired();
 
-  if (loading || profileLoading || educationLoading) {
+  // Use guest data when in guest mode
+  const displayProfile = isGuestMode ? GUEST_PROFILE : profile;
+  const displayEducation = isGuestMode ? GUEST_EDUCATION : education;
+
+  if (loading || (!isGuestMode && (profileLoading || educationLoading))) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -28,7 +35,14 @@ export default function Profile() {
     );
   }
 
-  if (!user) {
+  const handleEditClick = (e: React.MouseEvent) => {
+    if (isGuestMode) {
+      e.preventDefault();
+      showAuthRequired("Login to edit your profile");
+    }
+  };
+
+  if (!user && !isGuestMode) {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-card px-4 pt-12 pb-4">
@@ -57,7 +71,7 @@ export default function Profile() {
     );
   }
 
-  const userName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
+  const userName = displayProfile?.full_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Guest User";
   const userInitials = userName.substring(0, 2).toUpperCase();
 
   // Stats calculations
@@ -66,8 +80,9 @@ export default function Profile() {
   const resultCount = userExams?.filter(e => e.status === "result")?.length || 0;
 
   // Format date of birth
-  const formattedDOB = profile?.date_of_birth
-    ? format(new Date(profile.date_of_birth), "dd/MM/yyyy")
+  const dobValue = isGuestMode ? GUEST_PROFILE.date_of_birth : profile?.date_of_birth;
+  const formattedDOB = dobValue
+    ? format(new Date(dobValue), "dd/MM/yyyy")
     : "Not set";
 
   // Get highest education

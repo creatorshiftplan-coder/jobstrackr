@@ -4,6 +4,7 @@ import { useSavedJobs, useSaveJob, useUnsaveJob } from "@/hooks/useSavedJobs";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAuthRequired } from "@/components/AuthRequiredDialog";
 
 interface SaveJobButtonProps {
   jobId: string;
@@ -18,6 +19,7 @@ export function SaveJobButton({ jobId, className, variant = "default" }: SaveJob
   const saveJob = useSaveJob();
   const unsaveJob = useUnsaveJob();
   const { trackJobSaved } = useAnalytics();
+  const { showAuthRequired } = useAuthRequired();
 
   const isSaved = savedJobs?.some((saved) => saved.job_id === jobId) ?? false;
 
@@ -26,7 +28,7 @@ export function SaveJobButton({ jobId, className, variant = "default" }: SaveJob
     e.stopPropagation();
 
     if (!user) {
-      navigate("/auth");
+      showAuthRequired("Login to save jobs and track your applications");
       return;
     }
 

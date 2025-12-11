@@ -8,6 +8,8 @@ import { useEducation } from "@/hooks/useEducation";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { GUEST_PROFILE, GUEST_EDUCATION } from "@/lib/guestData";
+import { useAuthRequired } from "@/components/AuthRequiredDialog";
 
 interface CopyFieldProps {
   label: string;
@@ -53,11 +55,16 @@ function CopyField({ label, value }: CopyFieldProps) {
 
 export default function FormMate() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isGuestMode } = useAuth();
   const { profile, isLoading: profileLoading } = useProfile();
   const { education, isLoading: educationLoading } = useEducation();
+  const { showAuthRequired } = useAuthRequired();
 
-  if (authLoading || profileLoading || educationLoading) {
+  // Use guest data when in guest mode
+  const displayProfile = isGuestMode ? GUEST_PROFILE : profile;
+  const displayEducation = isGuestMode ? GUEST_EDUCATION : education;
+
+  if (authLoading || (!isGuestMode && (profileLoading || educationLoading))) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -65,7 +72,7 @@ export default function FormMate() {
     );
   }
 
-  if (!user) {
+  if (!user && !isGuestMode) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
@@ -79,6 +86,14 @@ export default function FormMate() {
       </div>
     );
   }
+
+  const handleEditClick = () => {
+    if (isGuestMode) {
+      showAuthRequired("Login to edit your profile");
+    } else {
+      navigate("/edit-profile");
+    }
+  };
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
@@ -128,12 +143,12 @@ export default function FormMate() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CopyField label="Full Name" value={profile?.full_name} />
-            <CopyField label="Father's Name" value={profile?.father_name} />
-            <CopyField label="Mother's Name" value={profile?.mother_name} />
-            <CopyField label="Date of Birth" value={formatDate(profile?.date_of_birth)} />
-            <CopyField label="Gender" value={profile?.gender} />
-            <CopyField label="Marital Status" value={profile?.marital_status} />
+            <CopyField label="Full Name" value={displayProfile?.full_name} />
+            <CopyField label="Father's Name" value={displayProfile?.father_name} />
+            <CopyField label="Mother's Name" value={displayProfile?.mother_name} />
+            <CopyField label="Date of Birth" value={formatDate(displayProfile?.date_of_birth)} />
+            <CopyField label="Gender" value={displayProfile?.gender} />
+            <CopyField label="Marital Status" value={isGuestMode ? "Single" : profile?.marital_status} />
           </CardContent>
         </Card>
 
@@ -146,9 +161,9 @@ export default function FormMate() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CopyField label="Aadhaar Number" value={profile?.decrypted_aadhar_number || profile?.aadhar_number} />
-            <CopyField label="PAN Number" value={profile?.decrypted_pan_number || profile?.pan_number} />
-            <CopyField label="Passport Number" value={profile?.decrypted_passport_number || profile?.passport_number} />
+            <CopyField label="Aadhaar Number" value={displayProfile?.aadhar_number} />
+            <CopyField label="PAN Number" value={displayProfile?.pan_number} />
+            <CopyField label="Passport Number" value={isGuestMode ? "J1234567" : (profile?.decrypted_passport_number || profile?.passport_number)} />
           </CardContent>
         </Card>
 
@@ -161,10 +176,10 @@ export default function FormMate() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CopyField label="Phone Number" value={profile?.phone} />
-            <CopyField label="Email" value={profile?.email} />
-            <CopyField label="Address" value={profile?.address} />
-            <CopyField label="PIN Code" value={profile?.pincode} />
+            <CopyField label="Phone Number" value={displayProfile?.phone} />
+            <CopyField label="Email" value={displayProfile?.email} />
+            <CopyField label="Address" value={displayProfile?.address} />
+            <CopyField label="PIN Code" value={displayProfile?.pincode} />
           </CardContent>
         </Card>
 
@@ -177,19 +192,19 @@ export default function FormMate() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            {education && education.length > 0 ? (
-              education.map((edu, index) => (
+            {displayEducation && displayEducation.length > 0 ? (
+              displayEducation.map((edu, index) => (
                 <div key={edu.id} className={index > 0 ? "mt-4 pt-4 border-t-2 border-border" : ""}>
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                     {edu.qualification_type}
                   </p>
-                  <CopyField label="Qualification" value={edu.qualification_name} />
+                  <CopyField label="Qualification" value={edu.specialization || edu.qualification_name} />
                   <CopyField label="Board/University" value={edu.board_university} />
-                  <CopyField label="Institute" value={edu.institute_name} />
-                  <CopyField label="Roll Number" value={edu.roll_number} />
-                  <CopyField label="Year of Passing" value={edu.date_of_passing} />
+                  <CopyField label="Institute" value={edu.institution_name || edu.institute_name} />
+                  <CopyField label="Roll Number" value={isGuestMode ? "12345678" : edu.roll_number} />
+                  <CopyField label="Year of Passing" value={edu.passing_year?.toString() || edu.date_of_passing} />
                   <CopyField label="Percentage" value={edu.percentage?.toString()} />
-                  <CopyField label="CGPA" value={edu.cgpa?.toString()} />
+                  <CopyField label="CGPA" value={isGuestMode ? "7.5" : edu.cgpa?.toString()} />
                 </div>
               ))
             ) : (
@@ -209,15 +224,15 @@ export default function FormMate() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CopyField label="Category" value={profile?.category} />
-            <CopyField label="Caste Name" value={profile?.caste_name} />
-            <CopyField label="Sub-Category" value={profile?.sub_category} />
-            <CopyField label="Caste Certificate No." value={profile?.caste_certificate_number} />
-            <CopyField label="Caste Issuing Authority" value={profile?.caste_issuing_authority} />
-            <CopyField label="EWS Certificate No." value={profile?.ews_certificate_number} />
-            <CopyField label="EWS Issuing Authority" value={profile?.ews_issuing_authority} />
-            <CopyField label="Disability Type" value={profile?.disability_type} />
-            <CopyField label="Disability Certificate No." value={profile?.disability_certificate_number} />
+            <CopyField label="Category" value={displayProfile?.category} />
+            <CopyField label="Caste Name" value={isGuestMode ? "N/A" : profile?.caste_name} />
+            <CopyField label="Sub-Category" value={isGuestMode ? "N/A" : profile?.sub_category} />
+            <CopyField label="Caste Certificate No." value={isGuestMode ? "N/A" : profile?.caste_certificate_number} />
+            <CopyField label="Caste Issuing Authority" value={isGuestMode ? "N/A" : profile?.caste_issuing_authority} />
+            <CopyField label="EWS Certificate No." value={isGuestMode ? "N/A" : profile?.ews_certificate_number} />
+            <CopyField label="EWS Issuing Authority" value={isGuestMode ? "N/A" : profile?.ews_issuing_authority} />
+            <CopyField label="Disability Type" value={isGuestMode ? "None" : profile?.disability_type} />
+            <CopyField label="Disability Certificate No." value={isGuestMode ? "N/A" : profile?.disability_certificate_number} />
           </CardContent>
         </Card>
 
@@ -230,16 +245,18 @@ export default function FormMate() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CopyField label="Current Status" value={profile?.current_status} />
+            <CopyField label="Current Status" value={isGuestMode ? "Job Seeker" : profile?.current_status} />
           </CardContent>
         </Card>
 
         {/* Edit Profile Link */}
-        <Link to="/edit-profile">
-          <Button variant="outline" className="w-full">
-            Edit Profile Details
-          </Button>
-        </Link>
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={handleEditClick}
+        >
+          Edit Profile Details
+        </Button>
       </main>
     </div>
   );

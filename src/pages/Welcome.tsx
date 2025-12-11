@@ -4,14 +4,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, ChevronRight } from "lucide-react";
 import logoColor from "@/assets/logo-color.png";
 import welcomeLight from "@/assets/welcome-light.png";
 import welcomeDark from "@/assets/welcome-dark.png";
 
 const Welcome = () => {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, enterGuestMode } = useAuth();
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -48,6 +48,20 @@ const Welcome = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-y-auto">
+      {/* Skip Button */}
+      <div className="absolute top-4 right-4">
+        <button
+          onClick={() => {
+            enterGuestMode();
+            navigate("/", { replace: true });
+          }}
+          className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+        >
+          Skip for now
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center px-6 py-6 gap-4">
         {/* Logo */}

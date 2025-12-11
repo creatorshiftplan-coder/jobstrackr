@@ -17,13 +17,14 @@ const colorVariants = ["pink", "blue", "green", "orange"] as const;
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isGuestMode } = useAuth();
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    // Allow access if user is logged in OR is in guest mode
+    if (!authLoading && !user && !isGuestMode) {
       navigate("/welcome", { replace: true });
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, isGuestMode, navigate]);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [activeExamIndex, setActiveExamIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
