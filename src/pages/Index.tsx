@@ -6,9 +6,11 @@ import { FeaturedJobCard } from "@/components/FeaturedJobCard";
 import { RecommendedJobCard } from "@/components/RecommendedJobCard";
 import { ActiveExamCard } from "@/components/ActiveExamCard";
 import { BottomNav } from "@/components/BottomNav";
+import { SectorPreferenceCard } from "@/components/SectorPreferenceCard";
 import { useJobs } from "@/hooks/useJobs";
 import { useAuth } from "@/hooks/useAuth";
 import { useExams } from "@/hooks/useExams";
+import { useProfile } from "@/hooks/useProfile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Briefcase, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +31,7 @@ const Index = () => {
   const [activeExamIndex, setActiveExamIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const examsScrollRef = useRef<HTMLDivElement>(null);
+  const [sectorCardSkipped, setSectorCardSkipped] = useState(false);
 
   const scrollLeft = (ref: React.RefObject<HTMLDivElement>, cardWidth: number) => {
     if (ref.current) {
@@ -43,6 +46,7 @@ const Index = () => {
   };
   const { data: jobs, isLoading, error } = useJobs();
   const { userExams } = useExams();
+  const { profile, isLoading: profileLoading } = useProfile();
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
@@ -54,12 +58,35 @@ const Index = () => {
     return filteredJobs.slice(0, 7);
   }, [filteredJobs]);
 
-  // Show 6 jobs sorted by highest vacancy for recommended section
+  // Show 6 jobs sorted by highest vacancy, filtered by user preferences
   const recommendedJobs = useMemo(() => {
-    return [...filteredJobs]
+    let filtered = [...filteredJobs];
+
+    // Filter by user's preferred sectors if they have set preferences
+    if (profile?.preferred_sectors && profile.preferred_sectors.length > 0) {
+      filtered = filtered.filter((job) =>
+        profile.preferred_sectors!.some((sector) =>
+          job.title.toLowerCase().includes(sector.toLowerCase()) ||
+          job.department.toLowerCase().includes(sector.toLowerCase())
+        )
+      );
+    }
+
+    // Exclude already tracked exams
+    const trackedJobTitles = userExams.map((exam) => exam.exams?.name?.toLowerCase());
+    filtered = filtered.filter(
+      (job) => !trackedJobTitles.includes(job.title.toLowerCase())
+    );
+
+    return filtered
       .sort((a, b) => (b.vacancies || 0) - (a.vacancies || 0))
       .slice(0, 6);
-  }, [filteredJobs]);
+  }, [filteredJobs, profile?.preferred_sectors, userExams]);
+
+  // Show sector card if user is logged in, hasn't set preferences, and hasn't skipped
+  const showSectorCard = user && !profileLoading &&
+    (!profile?.preferred_sectors || profile.preferred_sectors.length === 0) &&
+    !sectorCardSkipped;
 
   // Active exams from user's tracked exams (top 4)
   const activeExams = useMemo(() => {
@@ -93,6 +120,16 @@ const Index = () => {
           </div>
         ) : (
           <>
+            {/* Sector Preference Card for first-time users */}
+            {showSectorCard && (
+              <div className="px-5 mb-6">
+                <SectorPreferenceCard
+                  onComplete={() => setSectorCardSkipped(false)}
+                  onSkip={() => setSectorCardSkipped(true)}
+                />
+              </div>
+            )}
+
             {/* No Results */}
             {showNoResults && (
               <div className="text-center py-12 px-5">

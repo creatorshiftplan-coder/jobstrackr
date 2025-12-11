@@ -36,6 +36,7 @@ export interface Profile {
   caste_issue_date: string | null;
   current_status: string | null;
   left_thumb_url: string | null;
+  preferred_sectors: string[] | null;
   // Decrypted sensitive fields (for display in FormMate)
   decrypted_aadhar_number?: string | null;
   decrypted_pan_number?: string | null;
@@ -58,12 +59,12 @@ export function useProfile() {
         .maybeSingle();
 
       if (error) throw error;
-      
+
       // If profile exists, also fetch decrypted sensitive fields
       if (data) {
         const { data: decryptedData } = await supabase
           .rpc("get_my_decrypted_profile");
-        
+
         if (decryptedData && decryptedData.length > 0) {
           const decrypted = decryptedData[0];
           // Merge decrypted values for display in FormMate
@@ -75,7 +76,7 @@ export function useProfile() {
           };
         }
       }
-      
+
       return data;
     },
     enabled: !!user?.id,
