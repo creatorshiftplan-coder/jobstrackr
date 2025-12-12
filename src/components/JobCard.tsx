@@ -98,7 +98,8 @@ export function JobCard({ job }: JobCardProps) {
                 <Calendar className="h-3.5 w-3.5 text-warning" />
               </div>
               <span className="truncate">
-                Last date: {job.last_date_display || format(new Date(job.last_date), "dd MMM yyyy")}
+                <span className="hidden sm:inline">Last date: </span>
+                {job.last_date_display || format(new Date(job.last_date), "dd MMM yyyy")}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
