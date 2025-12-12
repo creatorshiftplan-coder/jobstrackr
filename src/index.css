@@ -45,13 +45,20 @@
     --info-foreground: 0 0% 100%;
 
     /* Blue theme palette */
-    --blue-900: 209 100% 11%;   /* #001D39 */
-    --blue-800: 209 82% 25%;    /* #0A4174 */
-    --blue-600: 209 37% 46%;    /* #49769F */
-    --blue-500: 191 36% 47%;    /* #4E8EA2 */
-    --blue-400: 191 33% 57%;    /* #6EA2B3 */
-    --blue-300: 204 70% 70%;    /* #7BBDE8 */
-    --blue-100: 204 54% 83%;    /* #BDD8E9 */
+    --blue-900: 209 100% 11%;
+    /* #001D39 */
+    --blue-800: 209 82% 25%;
+    /* #0A4174 */
+    --blue-600: 209 37% 46%;
+    /* #49769F */
+    --blue-500: 191 36% 47%;
+    /* #4E8EA2 */
+    --blue-400: 191 33% 57%;
+    /* #6EA2B3 */
+    --blue-300: 204 70% 70%;
+    /* #7BBDE8 */
+    --blue-100: 204 54% 83%;
+    /* #BDD8E9 */
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -132,7 +139,12 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-display tracking-tight;
   }
 }
@@ -177,4 +189,35 @@
   .input-modern {
     @apply rounded-xl border-border/50 bg-secondary/50 focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all;
   }
+
+  /* Fade in animation for trending cards */
+  .animate-fadeIn {
+    animation: fadeIn 0.4s ease-out forwards;
+  }
+}
+
+/* Keyframe animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari, Opera */
 }

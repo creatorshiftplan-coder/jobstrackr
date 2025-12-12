@@ -1,10 +1,11 @@
 import { Job } from "@/types/job";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { MapPin, Calendar, IndianRupee, Users } from "lucide-react";
+import { MapPin, Calendar, IndianRupee, Users, Building2 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { Link } from "react-router-dom";
 import { SaveJobButton } from "./SaveJobButton";
+import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 
 interface JobCardProps {
   job: Job;
@@ -19,6 +20,9 @@ const isTBDDateDisplay = (displayValue: string | null): boolean => {
 };
 
 export function JobCard({ job }: JobCardProps) {
+  const { getLogoByName } = useConductingBodyLogos();
+  const logoUrl = getLogoByName(job.department);
+
   const daysLeft = differenceInDays(new Date(job.last_date), new Date());
   const isUrgent = daysLeft <= 7 && daysLeft >= 0;
   const isExpired = daysLeft < 0;
@@ -36,6 +40,15 @@ export function JobCard({ job }: JobCardProps) {
       <Card className="group shadow-md hover:shadow-xl transition-all duration-300 border border-border/50 rounded-2xl overflow-hidden hover:-translate-y-0.5 bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-card/90 backdrop-blur-sm">
         <CardContent className="p-4">
           <div className="flex justify-between items-start gap-3">
+            {/* Logo */}
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="w-7 h-7 sm:w-9 sm:h-9 object-contain" />
+              ) : (
+                <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              )}
+            </div>
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 {job.is_featured && (

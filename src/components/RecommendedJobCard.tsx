@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
 import { Building2, Users, Calendar } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
+import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
+import { SaveJobButton } from "@/components/SaveJobButton";
 
 interface RecommendedJobCardProps {
   job: Job;
@@ -17,6 +19,9 @@ const isTBDDateDisplay = (displayValue: string | null): boolean => {
 };
 
 export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
+  const { getLogoByName } = useConductingBodyLogos();
+  const logoUrl = getLogoByName(job.department);
+
   const daysLeft = differenceInDays(new Date(job.last_date), new Date());
   const isUrgent = daysLeft <= 7 && daysLeft >= 0;
   const isExpired = daysLeft < 0;
@@ -38,11 +43,20 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
 
   return (
     <Link to={`/job/${job.id}`} className="block w-full">
-      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg border border-border/50 min-h-[180px] sm:min-h-[200px] flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.01] hover:shadow-xl">
+      <div className="relative p-4 sm:p-5 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg border border-border/50 min-h-[180px] sm:min-h-[200px] flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.01] hover:shadow-xl">
+        {/* Save Button - Top Right */}
+        <div className="absolute top-2 right-2">
+          <SaveJobButton jobId={job.id} />
+        </div>
+
         {/* Icon + Job Title Row */}
-        <div className="flex items-start gap-3 mb-2">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-md">
-            <Building2 className="h-6 w-6 sm:h-7 sm:w-7 text-primary-foreground" />
+        <div className="flex items-start gap-3 mb-2 pr-8">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden">
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+            ) : (
+              <Building2 className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-bold text-foreground text-sm sm:text-base leading-tight line-clamp-2">
@@ -73,3 +87,5 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
     </Link>
   );
 }
+
+

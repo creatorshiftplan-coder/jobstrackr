@@ -31,6 +31,7 @@ const FormMate = lazy(() => import("./pages/FormMate"));
 const Documents = lazy(() => import("./pages/Documents"));
 const Help = lazy(() => import("./pages/Help"));
 const EditSectorPreferences = lazy(() => import("./pages/EditSectorPreferences"));
+const Trending = lazy(() => import("./pages/Trending"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Page loader component
@@ -79,6 +80,7 @@ const App = () => (
                       <Route path="/reset-password" element={<ResetPassword />} />
                       <Route path="/admin" element={<Admin />} />
                       <Route path="/tracker" element={<ExamTracker />} />
+                      <Route path="/trending" element={<Trending />} />
                       <Route path="/edit-sector-preferences" element={<EditSectorPreferences />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>

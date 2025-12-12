@@ -19,11 +19,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { Job } from "@/types/job";
+import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 
 interface JobFormData {
   title: string;
@@ -387,6 +388,11 @@ export default function Admin() {
   const [bulkUploading, setBulkUploading] = useState(false);
   const [jsonText, setJsonText] = useState("");
   const [duplicateMode, setDuplicateMode] = useState<"skip" | "update" | "replace">("skip");
+
+  // Logo management
+  const { logos, isLoading: logosLoading, uploadLogo, deleteLogo, refetch: refetchLogos } = useConductingBodyLogos();
+  const [logoName, setLogoName] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   // Delete confirmation dialog state
   const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
@@ -764,7 +770,7 @@ export default function Admin() {
 
       <main className="p-4">
         <Tabs defaultValue="jobs" className="space-y-4">
-          <TabsList className="grid grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-6 w-full">
             <TabsTrigger value="jobs" className="gap-1">
               <Briefcase className="h-4 w-4" />
               <span className="hidden sm:inline">Jobs</span>
@@ -784,6 +790,10 @@ export default function Admin() {
             <TabsTrigger value="bulk" className="gap-1">
               <FileJson className="h-4 w-4" />
               <span className="hidden sm:inline">Bulk</span>
+            </TabsTrigger>
+            <TabsTrigger value="logos" className="gap-1">
+              <Image className="h-4 w-4" />
+              <span className="hidden sm:inline">Logos</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1274,6 +1284,120 @@ export default function Admin() {
                   <FileJson className="h-4 w-4 mr-2" />
                   Preview Jobs
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Logos Tab */}
+          <TabsContent value="logos">
+            <Card>
+              <CardHeader>
+                <CardTitle>Conducting Body Logos</CardTitle>
+                <CardDescription>
+                  Upload logos for conducting bodies. Use the exact name as it appears in exams (e.g., "Staff Selection Commission").
+                  Recommended size: 128×128px or 256×256px PNG with transparent background.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Upload Form */}
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                  <div className="flex-1">
+                    <Label htmlFor="logoName" className="text-sm font-medium mb-2 block">
+                      Conducting Body Name
+                    </Label>
+                    <Input
+                      id="logoName"
+                      placeholder="e.g., Staff Selection Commission"
+                      value={logoName}
+                      onChange={(e) => setLogoName(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="logoFile" className="text-sm font-medium mb-2 block">
+                      Logo File (PNG/JPG)
+                    </Label>
+                    <Input
+                      id="logoFile"
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (logoName && logoFile) {
+                        uploadLogo.mutate({ name: logoName, file: logoFile });
+                        setLogoName("");
+                        setLogoFile(null);
+                        // Reset file input
+                        const input = document.getElementById("logoFile") as HTMLInputElement;
+                        if (input) input.value = "";
+                      } else {
+                        toast({ title: "Missing fields", description: "Please enter a name and select a file", variant: "destructive" });
+                      }
+                    }}
+                    disabled={!logoName || !logoFile || uploadLogo.isPending}
+                  >
+                    {uploadLogo.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4 mr-2" />
+                    )}
+                    Upload
+                  </Button>
+                </div>
+
+                {/* Logo Grid */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium">
+                      Existing Logos ({logos.length})
+                    </h3>
+                    <Button variant="ghost" size="sm" onClick={() => refetchLogos()}>
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Refresh
+                    </Button>
+                  </div>
+
+                  {logosLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : logos.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Image className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>No logos uploaded yet.</p>
+                      <p className="text-xs mt-1">Upload logos above to display them on Trending cards.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                      {logos.map((logo) => (
+                        <div
+                          key={logo.id}
+                          className="group relative bg-secondary rounded-xl p-4 flex flex-col items-center"
+                        >
+                          <img
+                            src={logo.logo_url}
+                            alt={logo.name}
+                            className="h-16 w-16 object-contain mb-2"
+                          />
+                          <p className="text-xs text-center font-medium truncate w-full">
+                            {logo.name}
+                          </p>
+                          <button
+                            onClick={() => {
+                              const fileName = logo.logo_url.split("/").pop();
+                              if (fileName) deleteLogo.mutate(fileName);
+                            }}
+                            className="absolute top-1 right-1 p-1 rounded-full bg-destructive/10 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

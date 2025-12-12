@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { BookOpen, Calendar } from "lucide-react";
+import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 
 interface ActiveExamCardProps {
   attempt: {
@@ -15,13 +16,19 @@ interface ActiveExamCardProps {
 
 export function ActiveExamCard({ attempt }: ActiveExamCardProps) {
   const exam = attempt.exams;
+  const { getLogoByName } = useConductingBodyLogos();
+  const logoUrl = getLogoByName(exam?.conducting_body || null);
 
   return (
     <Link to="/tracker" className="block flex-shrink-0">
       <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg border border-border/50 w-[150px] sm:w-[180px] h-[120px] sm:h-[140px] flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.02]">
         <div className="flex items-center mb-2">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center">
-            <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden">
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
+            ) : (
+              <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            )}
           </div>
         </div>
         <h3 className="font-bold text-foreground text-xs sm:text-sm mb-auto line-clamp-2">
@@ -35,3 +42,4 @@ export function ActiveExamCard({ attempt }: ActiveExamCardProps) {
     </Link>
   );
 }
+
