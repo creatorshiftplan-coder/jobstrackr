@@ -41,23 +41,23 @@ export default function ExamTracker() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl px-4 py-2 border-b border-primary-foreground/10">
-          <div className="flex items-center gap-3">
-            <Link to="/more">
+          <div className="flex items-center justify-between gap-2">
+            <Link to="/more" className="flex-shrink-0">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
                 <MenuBarsIcon className="h-5 w-5 text-primary" />
               </div>
             </Link>
-            <h1 className="font-display font-bold text-xl text-primary-foreground flex items-center justify-center gap-2 flex-1 text-center">
-              <CalendarDays className="h-5 w-5" />
-              My Exams
+            <h1 className="font-display font-bold text-lg sm:text-xl text-primary-foreground flex items-center gap-2 min-w-0">
+              <CalendarDays className="h-5 w-5 flex-shrink-0" />
+              <span className="truncate">My Exams</span>
             </h1>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <div
                 onClick={handleAddExamClick}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-primary hover:bg-primary/90 transition-all cursor-pointer backdrop-blur-sm shadow-sm"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-full bg-primary hover:bg-primary/90 transition-all cursor-pointer backdrop-blur-sm shadow-sm"
               >
                 <Plus className="h-4 w-4 text-primary-foreground" />
-                <span className="text-primary-foreground text-sm font-medium">Add Exam</span>
+                <span className="text-primary-foreground text-xs sm:text-sm font-medium hidden xs:inline">Add Exam</span>
               </div>
               <Link to="/saved">
                 <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
@@ -92,22 +92,22 @@ export default function ExamTracker() {
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl px-4 py-2 border-b border-primary-foreground/10">
-        <div className="flex items-center justify-between">
-          <Link to="/more">
+        <div className="flex items-center justify-between gap-2">
+          <Link to="/more" className="flex-shrink-0">
             <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
               <MenuBarsIcon className="h-5 w-5 text-primary" />
             </div>
           </Link>
-          <h1 className="font-display font-bold text-xl text-primary-foreground flex items-center gap-2 absolute left-1/2 transform -translate-x-1/2">
-            <CalendarDays className="h-5 w-5" />
-            My Exams
+          <h1 className="font-display font-bold text-lg sm:text-xl text-primary-foreground flex items-center gap-2 min-w-0">
+            <CalendarDays className="h-5 w-5 flex-shrink-0" />
+            <span className="truncate">My Exams</span>
           </h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <ExamSearchSheet
               trigger={
-                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-all cursor-pointer backdrop-blur-sm shadow-sm">
+                <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-full bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-all cursor-pointer backdrop-blur-sm shadow-sm">
                   <Plus className="h-4 w-4 text-primary-foreground" />
-                  <span className="text-primary-foreground text-sm font-medium">Add Exam</span>
+                  <span className="text-primary-foreground text-xs sm:text-sm font-medium">Add Exam</span>
                 </div>
               }
             />
