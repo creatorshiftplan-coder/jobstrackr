@@ -65,6 +65,12 @@ const Index = () => {
   const recommendedJobs = useMemo(() => {
     let filtered = [...filteredJobs];
 
+    // Filter out expired jobs (last_date is in the past)
+    filtered = filtered.filter((job) => {
+      const lastDate = new Date(job.last_date);
+      return lastDate >= new Date();
+    });
+
     // Filter by user's preferred sectors if they have set preferences
     if (profile?.preferred_sectors && profile.preferred_sectors.length > 0) {
       filtered = filtered.filter((job) =>
