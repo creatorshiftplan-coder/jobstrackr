@@ -22,6 +22,8 @@ export class ErrorBoundary extends Component<Props, State> {
     isChunkError: false,
   };
 
+  private hmrHandler: (() => void) | null = null;
+
   // Check if the error is a chunk loading failure
   private static isChunkLoadError(error: Error): boolean {
     const message = error.message?.toLowerCase() || "";
@@ -42,6 +44,61 @@ export class ErrorBoundary extends Component<Props, State> {
     const isChunkError = ErrorBoundary.isChunkLoadError(error);
     return { hasError: true, error, isChunkError };
   }
+
+  public componentDidMount() {
+    // Listen for HMR updates to reset error state
+    if (import.meta.hot) {
+      this.hmrHandler = () => {
+        if (this.state.hasError) {
+          console.log("HMR update detected, resetting error boundary...");
+          this.setState({ hasError: false, error: null, isChunkError: false });
+        }
+      };
+
+      import.meta.hot.on("vite:beforeUpdate", this.hmrHandler);
+    }
+
+    // Global error handler for unhandled chunk errors
+    window.addEventListener("error", this.handleGlobalError);
+    window.addEventListener("unhandledrejection", this.handleUnhandledRejection);
+  }
+
+  public componentWillUnmount() {
+    // Clean up HMR listener
+    if (import.meta.hot && this.hmrHandler) {
+      import.meta.hot.off("vite:beforeUpdate", this.hmrHandler);
+    }
+
+    window.removeEventListener("error", this.handleGlobalError);
+    window.removeEventListener("unhandledrejection", this.handleUnhandledRejection);
+  }
+
+  private handleGlobalError = (event: ErrorEvent) => {
+    if (event.error && ErrorBoundary.isChunkLoadError(event.error)) {
+      event.preventDefault();
+      this.handleChunkError(event.error);
+    }
+  };
+
+  private handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+    const error = event.reason;
+    if (error instanceof Error && ErrorBoundary.isChunkLoadError(error)) {
+      event.preventDefault();
+      this.handleChunkError(error);
+    }
+  };
+
+  private handleChunkError = (error: Error) => {
+    const hasAttemptedReload = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+
+    if (!hasAttemptedReload) {
+      console.log("Chunk load error detected, attempting auto-reload...");
+      sessionStorage.setItem(CHUNK_RELOAD_KEY, "true");
+      window.location.reload();
+    } else {
+      this.setState({ hasError: true, error, isChunkError: true });
+    }
+  };
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Error caught by boundary:", error, errorInfo);
@@ -146,3 +203,4 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+

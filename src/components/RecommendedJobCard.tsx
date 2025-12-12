@@ -32,36 +32,40 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
     if (isTBDDate) return 'TBD';
     if (isExpired) return 'Expired';
     if (daysLeft === 0) return 'Last day!';
-    if (daysLeft <= 7) return `${daysLeft}d left`;
-    return format(new Date(job.last_date), "dd MMM");
+    // Show full date format
+    return format(new Date(job.last_date), "dd MMM yyyy");
   };
 
   return (
-    <Link to={`/job/${job.id}`} className="block">
-      <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg border border-border/50 h-[140px] sm:h-[160px] flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.02]">
+    <Link to={`/job/${job.id}`} className="block w-full">
+      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg border border-border/50 min-h-[180px] sm:min-h-[200px] flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.01] hover:shadow-xl">
         {/* Icon + Job Title Row */}
-        <div className="flex items-start gap-2 mb-1">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
-            <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
+        <div className="flex items-start gap-3 mb-2">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-md">
+            <Building2 className="h-6 w-6 sm:h-7 sm:w-7 text-primary-foreground" />
           </div>
-          <h3 className="font-bold text-foreground text-xs sm:text-sm line-clamp-2 flex-1">
-            {job.title}
-          </h3>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-foreground text-sm sm:text-base leading-tight line-clamp-2">
+              {job.title}
+            </h3>
+            {/* Agency/Department Name */}
+            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1 mt-1">
+              {job.department}
+            </p>
+          </div>
         </div>
 
-        {/* Agency/Department Name */}
-        <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-1 mb-auto">
-          {job.department}
-        </p>
+        {/* Spacer */}
+        <div className="flex-1" />
 
         {/* Last Date and Vacancy Count */}
-        <div className="flex items-center justify-between mt-auto">
-          <div className={`flex items-center gap-1 text-[10px] sm:text-xs font-medium ${isUrgent && !isExpired ? 'text-destructive' : isExpired ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-            <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+        <div className="flex items-center justify-between pt-3 border-t border-border/30">
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-destructive">
+            <Calendar className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
             <span>{formatLastDate()}</span>
           </div>
-          <div className="flex items-center gap-1 text-[10px] sm:text-xs font-semibold text-primary">
-            <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-primary">
+            <Users className="h-4 w-4 sm:h-5 sm:w-5" />
             {formatVacancy(job.vacancies, job.vacancies_display)}
           </div>
         </div>

@@ -138,7 +138,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   };
 
   return (
-    <Card className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 border-blue-200/50 dark:border-blue-800/30 overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+    <Card className="bg-gradient-to-br from-cyan-50/80 via-sky-50/90 to-blue-100/80 dark:from-cyan-950/40 dark:via-sky-900/30 dark:to-blue-950/40 border border-cyan-200/60 dark:border-cyan-700/30 overflow-hidden shadow-lg hover:shadow-xl transition-all backdrop-blur-sm ring-1 ring-white/50 dark:ring-white/10">
       {/* Clickable Area - Header + Collapsed Summary */}
       <div
         className="cursor-pointer"
@@ -196,6 +196,21 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                   </div>
                   <Progress value={getProgress()} className="h-2.5 bg-white/50 shadow-sm [&>div]:bg-primary" />
                 </div>
+                {/* AI Summary Preview */}
+                {statusData?.summary && (
+                  <div className="mt-3 p-2 bg-white/60 rounded-lg border border-blue-100">
+                    <p className="text-xs text-foreground line-clamp-2">{statusData.summary}</p>
+                  </div>
+                )}
+                {/* AI Recommendation Preview */}
+                {statusData?.recommendations?.length > 0 && (
+                  <div className="mt-2 flex items-start gap-1.5">
+                    <span className="text-xs text-primary font-medium">💡</span>
+                    <p className="text-xs text-muted-foreground line-clamp-1">
+                      {statusData.recommendations[0]}
+                    </p>
+                  </div>
+                )}
                 {lastUpdatedAt && (
                   <p className="text-xs text-muted-foreground mt-2">
                     Updated {formatDistanceToNow(new Date(lastUpdatedAt))} ago
@@ -372,6 +387,24 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* AI Recommendations Section */}
+              {statusData?.recommendations?.length > 0 && (
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-900/20 rounded-lg p-3 border border-amber-200/50 dark:border-amber-800/30">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">💡</span>
+                    <span className="font-medium text-sm text-amber-800 dark:text-amber-200">AI Recommendations</span>
+                  </div>
+                  <ul className="space-y-2">
+                    {statusData.recommendations.map((recommendation: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-xs">
+                        <CheckCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                        <span className="text-amber-900 dark:text-amber-100">{recommendation}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
 

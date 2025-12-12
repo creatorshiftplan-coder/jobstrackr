@@ -29,8 +29,10 @@ const Index = () => {
   }, [user, authLoading, isGuestMode, navigate]);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [activeExamIndex, setActiveExamIndex] = useState(0);
+  const [activeRecommendedIndex, setActiveRecommendedIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const examsScrollRef = useRef<HTMLDivElement>(null);
+  const recommendedScrollRef = useRef<HTMLDivElement>(null);
   const [sectorCardSkipped, setSectorCardSkipped] = useState(false);
   const [preferencesSaved, setPreferencesSaved] = useState(false);
 
@@ -243,9 +245,9 @@ const Index = () => {
 
             {/* Recommended Jobs Section */}
             {recommendedJobs.length > 0 && (
-              <section>
+              <section className="mb-8">
                 <SectionHeader title="Recommended Jobs" variant="dark" />
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 px-5">
+                <div className="flex flex-col gap-4 px-5">
                   {recommendedJobs.map((job, index) => (
                     <RecommendedJobCard
                       key={job.id}
