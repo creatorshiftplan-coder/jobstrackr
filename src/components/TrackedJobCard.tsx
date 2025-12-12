@@ -14,23 +14,33 @@ import {
   Newspaper,
   Trash2,
   RefreshCw,
+  User,
+  Eye,
+  EyeOff,
+  Edit2,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
+import { ExamCredentialsModal } from "@/components/ExamCredentialsModal";
 
 interface TrackedJobCardProps {
   attempt: ExamAttempt;
 }
 
 export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
-  const { removeExamAttempt, getExamStatus } = useExams();
+  const { removeExamAttempt, getExamStatus, decryptPassword } = useExams();
   const queryClient = useQueryClient();
   const [isExpanded, setIsExpanded] = useState(false);
   const [activePhase, setActivePhase] = useState(1);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [decryptedPassword, setDecryptedPassword] = useState<string | null>(null);
+  const [isDecrypting, setIsDecrypting] = useState(false);
 
   // Initialize from cached response in database - no auto-fetch
   const [statusData, setStatusData] = useState<any>(() => {
@@ -101,6 +111,30 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
         Pending
       </Badge>
     );
+  };
+
+  const hasCredentials = attempt.application_number || attempt.roll_number || attempt.password_encrypted;
+
+  const handleTogglePassword = async () => {
+    if (showPassword) {
+      setShowPassword(false);
+      setDecryptedPassword(null);
+    } else {
+      if (attempt.password_encrypted && !decryptedPassword) {
+        setIsDecrypting(true);
+        try {
+          const password = await decryptPassword(attempt.password_encrypted);
+          setDecryptedPassword(password);
+          setShowPassword(true);
+        } catch (error) {
+          toast.error("Failed to decrypt password");
+        } finally {
+          setIsDecrypting(false);
+        }
+      } else {
+        setShowPassword(true);
+      }
+    }
   };
 
   return (
@@ -188,7 +222,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 1
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : "bg-secondary text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
+                  : "bg-white text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               )}
               onClick={() => setActivePhase(1)}
             >
@@ -199,7 +233,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 2
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : "bg-secondary text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
+                  : "bg-white text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               )}
               onClick={() => setActivePhase(2)}
             >
@@ -209,7 +243,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
 
           {/* Phase 2 Content Placeholder */}
           {activePhase === 2 && (
-            <div className="text-center py-8 text-muted-foreground bg-secondary/50 rounded-lg border border-border">
+            <div className="text-center py-8 text-muted-foreground bg-white rounded-lg border border-border">
               <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm font-medium">Phase 2 details coming soon</p>
               <p className="text-xs mt-1">Phase 2 information will be available after Phase 1 completion</p>
@@ -225,7 +259,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
           ) : activePhase === 1 && statusData ? (
             <>
               {/* Admit Card Section */}
-              <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg border border-border">
+              <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <FileText className="h-4 w-4 text-primary" />
                 </div>
@@ -253,7 +287,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               </div>
 
               {/* Exam Date Section */}
-              <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg border border-border">
+              <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Calendar className="h-4 w-4 text-primary" />
                 </div>
@@ -277,7 +311,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               </div>
 
               {/* Result Section */}
-              <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg border border-border">
+              <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Clock className="h-4 w-4 text-primary" />
                 </div>
@@ -317,7 +351,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
 
               {/* Recent News Section */}
               {(statusData?.predicted_events?.length > 0 || statusData?.summary) && (
-                <div className="pt-2 border-t border-border">
+                <div className="pt-2 border-t border-border bg-white rounded-lg p-3 mt-2">
                   <div className="flex items-center gap-2 mb-3">
                     <Newspaper className="h-4 w-4 text-primary" />
                     <span className="font-medium text-sm">Recent News for {exam?.name}</span>
@@ -355,6 +389,82 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             </div>
           ) : null}
 
+          {/* My Application Section */}
+          <div className="pt-2 border-t border-border">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                <span className="font-medium text-sm">My Application Credentials</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCredentialsModal(true)}
+                className="h-8 px-2 text-xs"
+              >
+                {hasCredentials ? (
+                  <>
+                    <Edit2 className="h-3 w-3 mr-1" />
+                    Edit
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Details
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {hasCredentials ? (
+              <div className="space-y-2 bg-white rounded-lg p-3 border border-border">
+                {attempt.application_number && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Application No.</span>
+                    <span className="font-medium">{attempt.application_number}</span>
+                  </div>
+                )}
+                {attempt.roll_number && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Roll Number</span>
+                    <span className="font-medium">{attempt.roll_number}</span>
+                  </div>
+                )}
+                {attempt.password_encrypted && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Password</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium font-mono">
+                        {showPassword && decryptedPassword
+                          ? decryptedPassword
+                          : "••••••••"}
+                      </span>
+                      <button
+                        onClick={handleTogglePassword}
+                        disabled={isDecrypting}
+                        className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                      >
+                        {isDecrypting ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-3 bg-white rounded-lg border border-border">
+                <p className="text-xs text-muted-foreground">
+                  Add your application number, roll number & password
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Refresh Button - Prominent styling */}
           <div className="flex justify-center pt-4">
             <Button
@@ -379,6 +489,19 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
           </div>
         </CardContent>
       )}
+
+      {/* Credentials Modal */}
+      <ExamCredentialsModal
+        open={showCredentialsModal}
+        onOpenChange={setShowCredentialsModal}
+        attemptId={attempt.id}
+        examName={`${exam?.name || "Exam"} ${attempt.year}`}
+        existingCredentials={{
+          applicationNumber: attempt.application_number,
+          rollNumber: attempt.roll_number,
+          hasPassword: !!attempt.password_encrypted,
+        }}
+      />
     </Card>
   );
 }

@@ -24,9 +24,18 @@ export interface ExamAttempt {
   year: number;
   status: string | null;
   notes: string | null;
+  application_number: string | null;
+  roll_number: string | null;
+  password_encrypted: string | null;
   created_at: string;
   updated_at: string;
   exams?: Exam;
+}
+
+export interface ExamCredentials {
+  applicationNumber: string;
+  rollNumber: string;
+  password: string;
 }
 
 export function useExams() {
@@ -105,6 +114,58 @@ export function useExams() {
     },
   });
 
+  const updateExamCredentials = useMutation({
+    mutationFn: async ({ attemptId, credentials }: { attemptId: string; credentials: ExamCredentials }) => {
+      if (!user?.id) throw new Error("Not authenticated");
+
+      // Encrypt password if provided
+      let encryptedPassword: string | null = null;
+      if (credentials.password) {
+        const { data: encrypted, error: encryptError } = await supabase.rpc(
+          "encrypt_sensitive_field",
+          { field_value: credentials.password, owner_id: user.id }
+        );
+        if (encryptError) throw encryptError;
+        encryptedPassword = encrypted;
+      }
+
+      const { data, error } = await supabase
+        .from("exam_attempts")
+        .update({
+          application_number: credentials.applicationNumber || null,
+          roll_number: credentials.rollNumber || null,
+          password_encrypted: encryptedPassword,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", attemptId)
+        .eq("user_id", user.id)
+        .select("*, exams(*)")
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exam_attempts", user?.id] });
+      toast.success("Application details saved");
+    },
+    onError: (error) => {
+      toast.error("Failed to save details: " + error.message);
+    },
+  });
+
+  const decryptPassword = async (encryptedPassword: string): Promise<string> => {
+    if (!user?.id) throw new Error("Not authenticated");
+
+    const { data, error } = await supabase.rpc("decrypt_sensitive_field", {
+      encrypted_value: encryptedPassword,
+      owner_id: user.id,
+    });
+
+    if (error) throw error;
+    return data || "";
+  };
+
   const createExam = useMutation({
     mutationFn: async (examData: { name: string; conducting_body?: string; category?: string; description?: string; official_website?: string }) => {
       const { data, error } = await supabase
@@ -158,7 +219,10 @@ export function useExams() {
     isLoading: examsQuery.isLoading || userExamsQuery.isLoading,
     addExamAttempt,
     removeExamAttempt,
+    updateExamCredentials,
+    decryptPassword,
     createExam,
     getExamStatus,
   };
 }
+
