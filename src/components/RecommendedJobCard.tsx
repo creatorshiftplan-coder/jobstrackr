@@ -76,7 +76,7 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
         <div className="flex items-center justify-between pt-3 border-t border-border/30">
           <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-destructive">
             <Calendar className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-            <span>{formatLastDate()}</span>
+            <span>Last date: {formatLastDate()}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-primary">
             <Users className="h-4 w-4 sm:h-5 sm:w-5" />
