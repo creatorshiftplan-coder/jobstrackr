@@ -62,7 +62,8 @@ Return ONLY a valid JSON object with this exact schema (no markdown, no extra te
       "description": "Brief description of the job (max 300 chars)",
       "requirements": "Required qualification (e.g., Graduate, 10+2, B.Tech)",
       "highlights": "Key highlights like vacancies, benefits (max 200 chars)",
-      "apply_link": "Official application URL or null",
+      "apply_link": "Direct URL to apply online (e.g., ibpsonline.ibps.in/...) or null",
+      "official_website": "Official website URL of the organization or null",
       "confidence": 0.0 to 1.0 indicating confidence level
     }
   ]
@@ -76,6 +77,7 @@ CRITICAL RULES:
 - For salary, provide monthly salary in INR
 - For vacancies, provide exact number if available, otherwise null
 - For confidence: 1.0 = verified from official source, 0.7 = from reliable news, 0.5 = estimated
+- PRIORITY: Try to find the DIRECT "Apply Online" link. If not found, provide the official website.
 - Return ONLY the JSON, no other text
 - If unsure, still provide best effort results with appropriate confidence scores`;
 
@@ -211,6 +213,9 @@ Deno.serve(async (req) => {
 
       const ages = parseAgeLimit(jobData.age_limit || "18-65 years");
 
+      // Use apply_link if available, otherwise fallback to official_website
+      const applyLink = jobData.apply_link || jobData.official_website || null;
+
       const { data: savedJob, error: saveError } = await supabase.from("jobs").insert({
         title: jobData.exam_name,
         department: jobData.agency,
@@ -226,7 +231,7 @@ Deno.serve(async (req) => {
         application_fee: jobData.application_fees?.general || 0,
         vacancies: 1,
         last_date: jobData.last_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        apply_link: jobData.apply_link,
+        apply_link: applyLink,
         is_featured: false,
       }).select().single();
 
@@ -321,6 +326,7 @@ Please use Google Search to find:
 2. Current application dates and deadlines
 3. Eligibility criteria and fees
 4. Any recent news about this exam/job
+5. The DIRECT official application link
 
 Return structured JSON with the job details.`
             }]

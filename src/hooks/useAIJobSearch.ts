@@ -25,6 +25,7 @@ export interface AIJobResult {
   description: string | null;
   highlights: string | null;
   apply_link: string | null;
+  official_website: string | null;
   confidence: number;
 }
 
@@ -120,18 +121,18 @@ export function useAIJobSearch() {
       if (result.jobs && result.jobs.length > 0) {
         // Filter only high-confidence results (>= 70%)
         const validJobs = result.jobs.filter((j: AIJobResult) => (j.confidence || 0) >= 0.7);
-        
+
         if (validJobs.length > 0) {
           // Auto-save all high confidence jobs
           const savedIds = new Map<string, string>();
-          
+
           for (const job of validJobs) {
             const savedJob = await autoSaveJobSilently(job);
             if (savedJob?.id) {
               savedIds.set(job.exam_name, savedJob.id);
             }
           }
-          
+
           setAutoSavedJobIds(savedIds);
           setAiResults(validJobs);
           setSearchStatus("new");
