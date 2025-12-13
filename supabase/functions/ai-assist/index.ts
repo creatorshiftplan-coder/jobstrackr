@@ -34,12 +34,12 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    
+
     // Create a client with the user's token to validate authentication
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     });
-    
+
     const { data: { user }, error: authError } = await userClient.auth.getUser();
 
     if (authError || !user) {
@@ -58,10 +58,10 @@ Deno.serve(async (req) => {
     });
 
     if (rateLimitData && !rateLimitData.allowed) {
-      const errorMessage = rateLimitData.rate_limited 
+      const errorMessage = rateLimitData.rate_limited
         ? "Please wait a minute before making another AI request."
         : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
-      
+
       return new Response(
         JSON.stringify({
           data: null,
@@ -155,7 +155,8 @@ Return ONLY a JSON object:
         }
 
         systemPrompt = `You are an AI assistant that searches for government exam information from official websites and job aggregator sites.
-IMPORTANT: Use Google Search to find CURRENT information. Return ONLY valid JSON.`;
+IMPORTANT: Use Google Search to find CURRENT information. Return ONLY valid JSON.
+Many government exams have multiple phases/stages (e.g., Prelims + Mains, Tier 1 + Tier 2). Search for information about ALL phases.`;
 
         userPrompt = `Search for the latest information about:
 - Exam Name: ${examName}
@@ -163,16 +164,42 @@ IMPORTANT: Use Google Search to find CURRENT information. Return ONLY valid JSON
 - Conducting Body: ${conductingBody || "Not specified"}
 - Official Website: ${officialWebsite || "Not specified"}
 
+IMPORTANT: Many exams have multiple phases (Prelims/Tier-1 and Mains/Tier-2). Search for BOTH phases.
+
 Return ONLY this JSON format:
 {
-  "summary": "Brief status summary",
+  "summary": "Brief overall status summary",
   "current_status": "not_yet_notified|registration_open|registration_closed|admit_card_available|exam_scheduled|exam_completed|result_declared",
+  "phases": {
+    "phase1": {
+      "name": "Prelims/Tier-1/CBT/Stage-1 (use official name)",
+      "status": "not_applicable|not_notified|registration_open|admit_card_available|exam_scheduled|exam_completed|result_declared",
+      "admit_card_available": true/false,
+      "admit_card_link": "URL or null",
+      "exam_date": "YYYY-MM-DD or null",
+      "exam_details": "Exam timing, centers info",
+      "result_available": true/false,
+      "result_link": "URL or null",
+      "result_date": "YYYY-MM-DD or null"
+    },
+    "phase2": {
+      "name": "Mains/Tier-2/Stage-2 (use official name, or null if single-phase exam)",
+      "status": "not_applicable|not_notified|registration_open|admit_card_available|exam_scheduled|exam_completed|result_declared",
+      "admit_card_available": true/false,
+      "admit_card_link": "URL or null",
+      "exam_date": "YYYY-MM-DD or null",
+      "exam_details": "Exam timing, centers info",
+      "result_available": true/false,
+      "result_link": "URL or null",
+      "result_date": "YYYY-MM-DD or null"
+    }
+  },
   "admit_card_available": true/false,
   "admit_card_link": "URL or null",
   "result_available": true/false,
   "result_link": "URL or null",
   "predicted_events": [
-    { "event_type": "application_open|application_close|admit_card|exam_date|result", "predicted_date": "YYYY-MM-DD or null", "confidence": "high|medium|low", "notes": "details" }
+    { "event_type": "application_open|application_close|admit_card|exam_date|result", "phase": 1/2, "predicted_date": "YYYY-MM-DD or null", "confidence": "high|medium|low", "notes": "details" }
   ],
   "latest_updates": ["list of recent news"],
   "recommendations": ["suggestions"]
@@ -226,7 +253,7 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
       console.error("Gemini API error:", geminiResponse.status, errorText);
-      
+
       // Handle rate limit from Gemini API
       if (geminiResponse.status === 429) {
         return new Response(
@@ -234,7 +261,7 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      
+
       throw new Error(`AI API error: ${geminiResponse.status}`);
     }
 

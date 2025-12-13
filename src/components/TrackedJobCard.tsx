@@ -21,11 +21,164 @@ import {
   Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExamCredentialsModal } from "@/components/ExamCredentialsModal";
+
+// Helper function to get phase-specific data from AI response
+const getPhaseData = (statusData: any, phaseNumber: 1 | 2): any => {
+  const phaseKey = phaseNumber === 1 ? "phase1" : "phase2";
+  const phase = statusData?.phases?.[phaseKey];
+
+  // Return phase data if available, otherwise return null for Phase 2
+  // For Phase 1, fall back to root-level data for backward compatibility
+  if (phase) return phase;
+
+  if (phaseNumber === 1) {
+    // Backward compatibility: use root-level data as Phase 1
+    return {
+      name: "Phase 1",
+      status: statusData?.current_status,
+      admit_card_available: statusData?.admit_card_available,
+      admit_card_link: statusData?.admit_card_link,
+      exam_date: null,
+      exam_details: statusData?.exam_details,
+      result_available: statusData?.result_available,
+      result_link: statusData?.result_link,
+      result_date: null,
+    };
+  }
+
+  return null; // No Phase 2 data available
+};
+
+// Helper function to check if Phase 2 is applicable
+const isPhase2Available = (statusData: any): boolean => {
+  const phase2 = statusData?.phases?.phase2;
+  return !!(phase2 && phase2.status !== "not_applicable" && phase2.name !== null);
+};
+
+// Helper function to extract exam date from AI response (phase-aware)
+const getExamDateFromResponse = (statusData: any, phaseNumber: 1 | 2 = 1): string | null => {
+  const phaseData = getPhaseData(statusData, phaseNumber);
+
+  // Check phase-specific exam_date
+  if (phaseData?.exam_date) return phaseData.exam_date;
+
+  // For Phase 1, also check predicted_events
+  if (phaseNumber === 1) {
+    // Check direct exam_dates field (backward compat)
+    if (statusData?.exam_dates) return statusData.exam_dates;
+
+    // Check predicted_events array for exam_date event
+    const examDateEvent = statusData?.predicted_events?.find(
+      (e: any) => (e.event_type === "exam_date" || e.event_type === "exam") &&
+        (e.phase === phaseNumber || !e.phase)
+    );
+    if (examDateEvent?.predicted_date) return examDateEvent.predicted_date;
+  } else {
+    // Phase 2 predicted events
+    const examDateEvent = statusData?.predicted_events?.find(
+      (e: any) => (e.event_type === "exam_date" || e.event_type === "exam") && e.phase === 2
+    );
+    if (examDateEvent?.predicted_date) return examDateEvent.predicted_date;
+  }
+
+  return null;
+};
+
+// Helper function to extract result info from AI response (phase-aware)
+const getResultInfoFromResponse = (statusData: any, phaseNumber: 1 | 2 = 1): { date: string | null; isReleased: boolean } => {
+  const phaseData = getPhaseData(statusData, phaseNumber);
+
+  // Check phase-specific result data
+  if (phaseData?.result_available === true || phaseData?.status === "result_declared") {
+    return { date: phaseData?.result_date || "Released", isReleased: true };
+  }
+
+  if (phaseData?.result_date) {
+    return { date: phaseData.result_date, isReleased: false };
+  }
+
+  // For Phase 1, fall back to root-level data
+  if (phaseNumber === 1) {
+    if (statusData?.current_status === "result_declared" || statusData?.result_available === true) {
+      return { date: "Released", isReleased: true };
+    }
+
+    if (statusData?.expected_result_date) {
+      return { date: statusData.expected_result_date, isReleased: false };
+    }
+
+    // Check predicted_events array
+    const resultEvent = statusData?.predicted_events?.find(
+      (e: any) => e.event_type === "result" && (e.phase === 1 || !e.phase)
+    );
+    if (resultEvent?.predicted_date) {
+      return { date: resultEvent.predicted_date, isReleased: false };
+    }
+  } else {
+    // Phase 2 predicted events
+    const resultEvent = statusData?.predicted_events?.find(
+      (e: any) => e.event_type === "result" && e.phase === 2
+    );
+    if (resultEvent?.predicted_date) {
+      return { date: resultEvent.predicted_date, isReleased: false };
+    }
+  }
+
+  return { date: null, isReleased: false };
+};
+
+// Helper function to get exam details text (phase-aware)
+const getExamDetailsText = (statusData: any, phaseNumber: 1 | 2 = 1): string => {
+  const phaseData = getPhaseData(statusData, phaseNumber);
+
+  if (phaseData?.exam_details) return phaseData.exam_details;
+
+  // Fall back to predicted_events
+  const examDateEvent = statusData?.predicted_events?.find(
+    (e: any) => (e.event_type === "exam_date" || e.event_type === "exam") &&
+      (e.phase === phaseNumber || !e.phase)
+  );
+  if (examDateEvent?.notes) return examDateEvent.notes;
+
+  return "Exam schedule will be announced.";
+};
+
+// Helper function to check if admit card is available (phase-aware)
+const isAdmitCardAvailable = (statusData: any, phaseNumber: 1 | 2 = 1): boolean => {
+  const phaseData = getPhaseData(statusData, phaseNumber);
+  if (phaseData?.admit_card_available) return true;
+
+  // Backward compat for Phase 1
+  if (phaseNumber === 1) {
+    const status = statusData?.current_status;
+    return status === "admit_card_available" || status === "exam_scheduled" ||
+      status === "exam_completed" || status === "result_declared";
+  }
+
+  return false;
+};
+
+// Helper function to get phase name
+const getPhaseName = (statusData: any, phaseNumber: 1 | 2): string => {
+  const phaseData = getPhaseData(statusData, phaseNumber);
+  return phaseData?.name || `Phase ${phaseNumber}`;
+};
 
 interface TrackedJobCardProps {
   attempt: ExamAttempt;
@@ -126,6 +279,11 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
           const password = await decryptPassword(attempt.password_encrypted);
           setDecryptedPassword(password);
           setShowPassword(true);
+          // Auto-hide password after 30 seconds for security
+          setTimeout(() => {
+            setShowPassword(false);
+            setDecryptedPassword(null);
+          }, 30000);
         } catch (error) {
           toast.error("Failed to decrypt password");
         } finally {
@@ -155,17 +313,36 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeExamAttempt.mutate(attempt.id);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove Exam?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to remove "{exam?.name}" from your tracker?
+                    This will delete all your saved credentials and notes for this exam.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => removeExamAttempt.mutate(attempt.id)}
+                  >
+                    Remove
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             {isExpanded ? (
               <ChevronUp className="h-5 w-5 text-muted-foreground" />
             ) : (
@@ -241,28 +418,154 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               )}
               onClick={() => setActivePhase(1)}
             >
-              Phase 1
+              {getPhaseName(statusData, 1)}
             </button>
             <button
               className={cn(
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 2
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : "bg-white text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
+                  : "bg-white text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20",
+                !isPhase2Available(statusData) && "opacity-50"
               )}
               onClick={() => setActivePhase(2)}
             >
-              Phase 2
+              {getPhaseName(statusData, 2)}
             </button>
           </div>
 
-          {/* Phase 2 Content Placeholder */}
+          {/* Phase 2 Content */}
           {activePhase === 2 && (
-            <div className="text-center py-8 text-muted-foreground bg-white rounded-lg border border-border">
-              <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm font-medium">Phase 2 details coming soon</p>
-              <p className="text-xs mt-1">Phase 2 information will be available after Phase 1 completion</p>
-            </div>
+            isPhase2Available(statusData) ? (
+              <>
+                {/* Admit Card Section for Phase 2 */}
+                <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <FileText className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-sm">Admit Card</span>
+                      {isAdmitCardAvailable(statusData, 2) ? (
+                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-0 text-xs">
+                          Released
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 text-xs">
+                          Pending
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {isAdmitCardAvailable(statusData, 2)
+                        ? "Download from the official website."
+                        : "Will be available after Phase 1 result."}
+                    </p>
+                    {getPhaseData(statusData, 2)?.admit_card_link && isAdmitCardAvailable(statusData, 2) && (
+                      <a
+                        href={getPhaseData(statusData, 2).admit_card_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                      >
+                        Download →
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Exam Date Section for Phase 2 */}
+                {(() => {
+                  const examDate = getExamDateFromResponse(statusData, 2);
+                  const examDetails = getExamDetailsText(statusData, 2);
+                  return (
+                    <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Calendar className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">Exam Date</span>
+                          {examDate ? (
+                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-0 text-xs">
+                              {examDate}
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 border-0 text-xs">
+                              TBD
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {examDetails}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Result Section for Phase 2 */}
+                {(() => {
+                  const resultInfo = getResultInfoFromResponse(statusData, 2);
+                  return (
+                    <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Clock className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">Result</span>
+                          {resultInfo.isReleased ? (
+                            <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-0 text-xs">
+                              Released
+                            </Badge>
+                          ) : resultInfo.date ? (
+                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-0 text-xs">
+                              {resultInfo.date}
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 text-xs">
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {resultInfo.isReleased
+                            ? "Results have been declared."
+                            : resultInfo.date
+                              ? `Expected on ${resultInfo.date}`
+                              : "Result date will be announced."}
+                        </p>
+                        {getPhaseData(statusData, 2)?.result_link && resultInfo.isReleased && (
+                          <a
+                            href={getPhaseData(statusData, 2).result_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                          >
+                            Check Result →
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground bg-white rounded-lg border border-border">
+                <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm font-medium">
+                  {statusData?.phases?.phase2?.status === "not_applicable"
+                    ? "This exam has only one phase"
+                    : "Phase 2 details coming soon"}
+                </p>
+                <p className="text-xs mt-1">
+                  {statusData?.phases?.phase2?.status === "not_applicable"
+                    ? "No additional stages for this exam."
+                    : "Phase 2 information will be available after Phase 1 completion"}
+                </p>
+              </div>
+            )
           )}
 
           {activePhase === 1 && isLoadingStatus ? (
@@ -302,58 +605,81 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               </div>
 
               {/* Exam Date Section */}
-              <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Calendar className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm">Exam Date</span>
-                    {statusData?.exam_dates ? (
-                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-0 text-xs">
-                        {statusData.exam_dates}
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 border-0 text-xs">
-                        TBD
-                      </Badge>
-                    )}
+              {(() => {
+                const examDate = getExamDateFromResponse(statusData);
+                const examDetails = getExamDetailsText(statusData);
+                return (
+                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Calendar className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm">Exam Date</span>
+                        {examDate ? (
+                          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-0 text-xs">
+                            {examDate}
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 border-0 text-xs">
+                            TBD
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {examDetails}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {statusData?.exam_details || "Exam schedule will be announced."}
-                  </p>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Result Section */}
-              <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Clock className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm">Result</span>
-                    {getStatusBadge(isPhaseComplete("result"))}
+              {(() => {
+                const resultInfo = getResultInfoFromResponse(statusData);
+                return (
+                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Clock className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm">Result</span>
+                        {resultInfo.isReleased ? (
+                          <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-0 text-xs">
+                            Released
+                          </Badge>
+                        ) : resultInfo.date ? (
+                          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-0 text-xs">
+                            {resultInfo.date}
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 text-xs">
+                            Pending
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {resultInfo.isReleased
+                          ? "Results have been declared."
+                          : resultInfo.date
+                            ? `Expected on ${resultInfo.date}`
+                            : "Result date will be announced."}
+                      </p>
+                      {statusData?.result_link && resultInfo.isReleased && (
+                        <a
+                          href={statusData.result_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                        >
+                          Check Result →
+                        </a>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {isPhaseComplete("result")
-                      ? "Results have been declared."
-                      : statusData?.expected_result_date
-                        ? `Expected in ${statusData.expected_result_date}`
-                        : "Result date will be announced."}
-                  </p>
-                  {statusData?.result_link && isPhaseComplete("result") && (
-                    <a
-                      href={statusData.result_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline mt-1 inline-block"
-                    >
-                      Check Result →
-                    </a>
-                  )}
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Progress Bar */}
               <div className="space-y-2 pt-2">

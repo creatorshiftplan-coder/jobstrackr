@@ -102,15 +102,20 @@ export function useExams() {
 
   const removeExamAttempt = useMutation({
     mutationFn: async (attemptId: string) => {
+      if (!user?.id) throw new Error("Not authenticated");
       const { error } = await supabase
         .from("exam_attempts")
         .delete()
-        .eq("id", attemptId);
+        .eq("id", attemptId)
+        .eq("user_id", user.id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exam_attempts", user?.id] });
       toast.success("Exam removed from tracker");
+    },
+    onError: (error) => {
+      toast.error("Failed to remove exam: " + error.message);
     },
   });
 
@@ -186,31 +191,42 @@ export function useExams() {
       queryClient.invalidateQueries({ queryKey: ["exams"] });
       toast.success("Exam created");
     },
+    onError: (error) => {
+      toast.error("Failed to create exam: " + error.message);
+    },
   });
 
   const getExamStatus = async (attemptId: string, forceRefresh = false) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error("Not authenticated");
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-assist`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          action: "status_update",
-          exam_attempt_id: attemptId,
-          force_refresh: forceRefresh,
-        }),
-      }
-    );
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-assist`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "status_update",
+            exam_attempt_id: attemptId,
+            force_refresh: forceRefresh,
+          }),
+        }
+      );
 
-    const result = await response.json();
-    if (!result.success) throw new Error(result.error);
-    return result.data;
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || "Unknown error");
+      return result.data;
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("Network error. Please check your connection.");
+    }
   };
 
   return {
