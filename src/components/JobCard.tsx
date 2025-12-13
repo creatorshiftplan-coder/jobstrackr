@@ -1,7 +1,7 @@
 import { Job } from "@/types/job";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { MapPin, Calendar, IndianRupee, Users, Building2 } from "lucide-react";
+import { MapPin, Calendar, IndianRupee, Users, Building2, CheckCircle } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { Link } from "react-router-dom";
 import { SaveJobButton } from "./SaveJobButton";
@@ -69,6 +69,11 @@ export function JobCard({ job }: JobCardProps) {
                 {!isTBDDate && isExpired && (
                   <Badge variant="secondary" className="text-xs px-2 py-0.5 rounded-md">
                     Expired
+                  </Badge>
+                )}
+                {job.admin_refreshed_at && (
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 px-2 py-0.5 rounded-md">
+                    <CheckCircle className="h-3 w-3 mr-1" /> Verified
                   </Badge>
                 )}
               </div>

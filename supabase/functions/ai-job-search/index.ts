@@ -282,27 +282,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check rate limit if userId is provided
+    // Check rate limit if userId is provided (skip for admins)
     if (userId) {
-      const { data: rateLimitData, error: rateLimitError } = await supabase.rpc(
-        "check_user_rate_limit",
-        { _user_id: userId, _daily_limit: DAILY_LIMIT, _minute_limit: 1 }
-      );
+      // Check if user is admin (admins bypass rate limit)
+      const { data: isAdminData } = await supabase.rpc("has_role", {
+        _user_id: userId,
+        _role: "admin"
+      });
+      const isAdmin = isAdminData === true;
 
-      if (rateLimitError) {
-        console.error("Rate limit check error:", rateLimitError);
-      } else if (rateLimitData && !rateLimitData.allowed) {
-        const errorMessage = rateLimitData.rate_limited
-          ? "Please wait a minute before making another AI request."
-          : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
-
-        return new Response(
-          JSON.stringify({
-            error: errorMessage,
-            rate_limit: rateLimitData,
-          }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      if (!isAdmin) {
+        const { data: rateLimitData, error: rateLimitError } = await supabase.rpc(
+          "check_user_rate_limit",
+          { _user_id: userId, _daily_limit: DAILY_LIMIT, _minute_limit: 1 }
         );
+
+        if (rateLimitError) {
+          console.error("Rate limit check error:", rateLimitError);
+        } else if (rateLimitData && !rateLimitData.allowed) {
+          const errorMessage = rateLimitData.rate_limited
+            ? "Please wait a minute before making another AI request."
+            : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
+
+          return new Response(
+            JSON.stringify({
+              error: errorMessage,
+              rate_limit: rateLimitData,
+            }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
     }
 

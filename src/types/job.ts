@@ -12,12 +12,15 @@ export interface Job {
   experience: string | null;
   vacancies: number | null;
   vacancies_display: string | null;
+  application_start_date: string | null;
   last_date: string;
   last_date_display: string | null;
   description: string | null;
   eligibility: string | null;
   apply_link: string | null;
   is_featured: boolean | null;
+  admin_refreshed_at: string | null;
   created_at: string;
   updated_at: string;
 }
+

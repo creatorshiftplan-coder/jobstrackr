@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -398,6 +398,17 @@ export default function Admin() {
   const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Refresh job data state
+  const [refreshingJobId, setRefreshingJobId] = useState<string | null>(null);
+  const [showRefreshPreview, setShowRefreshPreview] = useState(false);
+  const [refreshPreviewData, setRefreshPreviewData] = useState<{
+    jobId: string;
+    jobTitle: string;
+    current: Record<string, any>;
+    new: Record<string, any>;
+  } | null>(null);
+  const [applyingRefresh, setApplyingRefresh] = useState(false);
+
   // Filters for jobs
   const [lastDateFilter, setLastDateFilter] = useState<string>("all");
   const [vacanciesFilter, setVacanciesFilter] = useState<string>("all");
@@ -593,6 +604,84 @@ export default function Admin() {
     } finally {
       setDeleting(false);
       setDeleteJobId(null);
+    }
+  };
+
+  // Refresh job data handler - fetches preview
+  const handleRefreshJobData = async (job: Job) => {
+    setRefreshingJobId(job.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/refresh-job-data`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ jobId: job.id }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to fetch data");
+
+      if (result.status === "preview") {
+        setRefreshPreviewData({
+          jobId: job.id,
+          jobTitle: job.title,
+          current: result.current,
+          new: result.new,
+        });
+        setShowRefreshPreview(true);
+      }
+    } catch (error: any) {
+      toast({ title: "Refresh failed", description: error.message, variant: "destructive" });
+    } finally {
+      setRefreshingJobId(null);
+    }
+  };
+
+  // Apply refresh changes
+  const applyRefreshChanges = async () => {
+    if (!refreshPreviewData) return;
+
+    setApplyingRefresh(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/refresh-job-data`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            jobId: refreshPreviewData.jobId,
+            applyData: refreshPreviewData.new,
+          }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to apply changes");
+
+      toast({ title: "Job updated!", description: `${result.fieldsUpdated} fields updated. Verified badge added.` });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      setShowRefreshPreview(false);
+      setRefreshPreviewData(null);
+    } catch (error: any) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    } finally {
+      setApplyingRefresh(false);
     }
   };
 
@@ -906,7 +995,7 @@ export default function Admin() {
                               {getSortIcon("vacancies")}
                             </div>
                           </TableHead>
-                          <TableHead>Featured</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -922,10 +1011,30 @@ export default function Admin() {
                             </TableCell>
                             <TableCell>{job.vacancies || 1}</TableCell>
                             <TableCell>
-                              {job.is_featured && <Badge className="bg-warning text-warning-foreground">Featured</Badge>}
+                              <div className="flex gap-1 flex-wrap">
+                                {job.is_featured && <Badge className="bg-warning text-warning-foreground">Featured</Badge>}
+                                {job.admin_refreshed_at && (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    <CheckCircle className="h-3 w-3 mr-1" /> Verified
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRefreshJobData(job)}
+                                  disabled={refreshingJobId === job.id}
+                                  title="Refresh job data via AI"
+                                >
+                                  {refreshingJobId === job.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="h-4 w-4 text-blue-500" />
+                                  )}
+                                </Button>
                                 <Button variant="ghost" size="icon" onClick={() => openEditDialog(job)}>
                                   <Edit className="h-4 w-4" />
                                 </Button>
@@ -1646,6 +1755,83 @@ export default function Admin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Refresh Preview Dialog */}
+      <Dialog open={showRefreshPreview} onOpenChange={(open) => !open && setShowRefreshPreview(false)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Preview Job Data Refresh</DialogTitle>
+            <DialogDescription>
+              Review the changes before applying. Green indicates updated values.
+            </DialogDescription>
+          </DialogHeader>
+          {refreshPreviewData && (
+            <div className="space-y-4">
+              <div className="text-sm font-medium">{refreshPreviewData.jobTitle}</div>
+              <ScrollArea className="h-[400px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[140px]">Field</TableHead>
+                      <TableHead>Current</TableHead>
+                      <TableHead>New</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[
+                      { key: "location", label: "Location" },
+                      { key: "vacancies", label: "Vacancies" },
+                      { key: "eligibility", label: "Eligibility" },
+                      { key: "application_start_date", label: "Start Date" },
+                      { key: "last_date", label: "Last Date" },
+                      { key: "age_min", label: "Min Age" },
+                      { key: "age_max", label: "Max Age" },
+                      { key: "apply_link", label: "Apply Link" },
+                    ].map(({ key, label }) => {
+                      const currentVal = refreshPreviewData.current[key];
+                      const newVal = refreshPreviewData.new[key];
+                      const hasChange = newVal !== undefined && newVal !== null && String(newVal) !== String(currentVal || "");
+
+                      return (
+                        <TableRow key={key}>
+                          <TableCell className="font-medium">{label}</TableCell>
+                          <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                            {currentVal || <span className="italic">Not set</span>}
+                          </TableCell>
+                          <TableCell className={`max-w-[200px] truncate ${hasChange ? "text-green-600 font-medium" : "text-muted-foreground"}`}>
+                            {newVal !== undefined && newVal !== null ? (
+                              <>
+                                {hasChange && <Check className="h-3 w-3 inline mr-1" />}
+                                {String(newVal)}
+                              </>
+                            ) : (
+                              <span className="italic">No update</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+              {refreshPreviewData.new.confidence !== undefined && (
+                <div className="text-sm text-muted-foreground">
+                  AI Confidence: {Math.round((refreshPreviewData.new.confidence || 0) * 100)}%
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRefreshPreview(false)} disabled={applyingRefresh}>
+              Cancel
+            </Button>
+            <Button onClick={applyRefreshChanges} disabled={applyingRefresh}>
+              {applyingRefresh ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Apply Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

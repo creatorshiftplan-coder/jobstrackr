@@ -50,27 +50,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check rate limit with per-minute limit
-    const { data: rateLimitData } = await supabase.rpc("check_user_rate_limit", {
+    // Check if user is admin (admins bypass rate limit)
+    const { data: isAdminData } = await supabase.rpc("has_role", {
       _user_id: user.id,
-      _daily_limit: DAILY_LIMIT,
-      _minute_limit: 1,
+      _role: "admin"
     });
+    const isAdmin = isAdminData === true;
 
-    if (rateLimitData && !rateLimitData.allowed) {
-      const errorMessage = rateLimitData.rate_limited
-        ? "Please wait a minute before making another AI request."
-        : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
+    // Check rate limit only for non-admin users
+    if (!isAdmin) {
+      const { data: rateLimitData } = await supabase.rpc("check_user_rate_limit", {
+        _user_id: user.id,
+        _daily_limit: DAILY_LIMIT,
+        _minute_limit: 1,
+      });
 
-      return new Response(
-        JSON.stringify({
-          data: null,
-          error: errorMessage,
-          rate_limit: rateLimitData,
-          success: false,
-        }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (rateLimitData && !rateLimitData.allowed) {
+        const errorMessage = rateLimitData.rate_limited
+          ? "Please wait a minute before making another AI request."
+          : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
+
+        return new Response(
+          JSON.stringify({
+            data: null,
+            error: errorMessage,
+            rate_limit: rateLimitData,
+            success: false,
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     if (req.method !== "POST") {
