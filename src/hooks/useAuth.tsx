@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AuthContextType {
   user: User | null;
@@ -32,6 +33,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem("guestMode") === "true";
   });
 
+  // Get QueryClient to clear cache on logout
+  const queryClient = useQueryClient();
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -45,6 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem("guestMode");
           setIsGuestMode(false);
         }
+
+        // Clear all cached queries when user signs out
+        // This prevents stale data from previous user showing up
+        if (event === "SIGNED_OUT") {
+          queryClient.clear();
+        }
       }
     );
 
@@ -56,10 +66,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [queryClient]);
 
   const signOut = async () => {
     try {
+      // Clear React Query cache BEFORE signing out
+      // This ensures clean state when logging in with different account
+      queryClient.clear();
+
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error("Sign out error:", error);
@@ -73,6 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Force clear state even on error
       setUser(null);
       setSession(null);
+      // Also clear cache on error to ensure clean state
+      queryClient.clear();
     }
   };
 

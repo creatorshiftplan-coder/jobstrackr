@@ -218,6 +218,10 @@ export function useExams() {
       );
 
       if (!response.ok) {
+        // Handle rate limiting with user-friendly message
+        if (response.status === 429) {
+          throw new Error("Too many requests. Please wait a moment and try again.");
+        }
         throw new Error(`Request failed: ${response.status}`);
       }
 

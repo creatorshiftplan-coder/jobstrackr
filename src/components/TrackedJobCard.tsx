@@ -194,6 +194,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [decryptedPassword, setDecryptedPassword] = useState<string | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);
+  const [refreshCooldown, setRefreshCooldown] = useState(0); // Seconds remaining in cooldown
 
   // Initialize from cached response in database - no auto-fetch
   const [statusData, setStatusData] = useState<any>(() => {
@@ -205,6 +206,8 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
 
   // Only called when user clicks "Refresh Status"
   const fetchStatus = async () => {
+    if (refreshCooldown > 0) return; // Prevent refresh during cooldown
+
     setIsLoadingStatus(true);
     try {
       const data = await getExamStatus(attempt.id, true); // Always force refresh
@@ -212,8 +215,31 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
       toast.success("Status updated successfully");
       // Invalidate query to refresh cached data for all cards
       queryClient.invalidateQueries({ queryKey: ["exam_attempts"] });
+
+      // Start 60-second cooldown after successful refresh
+      setRefreshCooldown(60);
+      const interval = setInterval(() => {
+        setRefreshCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } catch (error: any) {
       toast.error(error.message || "Failed to refresh status");
+      // Shorter cooldown on error (10 seconds)
+      setRefreshCooldown(10);
+      const interval = setInterval(() => {
+        setRefreshCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } finally {
       setIsLoadingStatus(false);
     }
@@ -824,16 +850,18 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             )}
           </div>
 
-          {/* Refresh Button - Prominent styling */}
+          {/* Refresh Button - Prominent styling with throttle */}
           <div className="flex justify-center pt-4">
             <Button
               size="default"
               onClick={fetchStatus}
-              disabled={isLoadingStatus}
+              disabled={isLoadingStatus || refreshCooldown > 0}
               className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
             >
               <RefreshCw className={cn("h-4 w-4 mr-2", isLoadingStatus && "animate-spin")} />
-              Refresh Status
+              {refreshCooldown > 0
+                ? `Wait ${refreshCooldown}s`
+                : "Refresh Status"}
             </Button>
           </div>
 
