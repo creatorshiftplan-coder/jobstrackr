@@ -152,7 +152,7 @@ export default function FormMate() {
           </CardContent>
         </Card>
 
-        {/* Identity Documents - Now shows full decrypted values */}
+        {/* Identity Documents - Shows full decrypted values for easy copying */}
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -161,8 +161,8 @@ export default function FormMate() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CopyField label="Aadhaar Number" value={displayProfile?.aadhar_number} />
-            <CopyField label="PAN Number" value={displayProfile?.pan_number} />
+            <CopyField label="Aadhaar Number" value={isGuestMode ? displayProfile?.aadhar_number : (profile?.decrypted_aadhar_number || profile?.aadhar_number)} />
+            <CopyField label="PAN Number" value={isGuestMode ? displayProfile?.pan_number : (profile?.decrypted_pan_number || profile?.pan_number)} />
             <CopyField label="Passport Number" value={isGuestMode ? "J1234567" : (profile?.decrypted_passport_number || profile?.passport_number)} />
           </CardContent>
         </Card>
