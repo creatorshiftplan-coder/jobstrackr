@@ -1558,11 +1558,11 @@ export default function Admin() {
               </div>
               <div>
                 <Label htmlFor="age_min">Age Min</Label>
-                <Input id="age_min" type="number" value={formData.age_min} onChange={(e) => setFormData({ ...formData, age_min: parseInt(e.target.value) || 18 })} />
+                <Input id="age_min" type="number" step="0.1" value={formData.age_min} onChange={(e) => setFormData({ ...formData, age_min: parseFloat(e.target.value) || 18 })} />
               </div>
               <div>
                 <Label htmlFor="age_max">Age Max</Label>
-                <Input id="age_max" type="number" value={formData.age_max} onChange={(e) => setFormData({ ...formData, age_max: parseInt(e.target.value) || 65 })} />
+                <Input id="age_max" type="number" step="0.1" value={formData.age_max} onChange={(e) => setFormData({ ...formData, age_max: parseFloat(e.target.value) || 65 })} />
               </div>
               <div>
                 <Label htmlFor="application_fee">Application Fee</Label>

@@ -53,7 +53,6 @@ Search for OFFICIAL, CURRENT information about the specified job/exam. Return ON
 
 Return ONLY a valid JSON object (no markdown, no extra text):
 {
-  "location": "Actual location or 'All India'",
   "vacancies": number or null if unknown,
   "eligibility": "Actual eligibility criteria from official notification",
   "application_start_date": "YYYY-MM-DD format or null",
@@ -129,9 +128,6 @@ Deno.serve(async (req) => {
             };
 
             // Only update fields that have valid, non-demo values
-            if (applyData.location && !isDemoValue(applyData.location)) {
-                updateData.location = applyData.location;
-            }
             if (applyData.vacancies !== null && applyData.vacancies !== undefined) {
                 updateData.vacancies = applyData.vacancies;
             }
@@ -287,9 +283,6 @@ Return verified data only.`
         // Filter out demo values
         const cleanData: Record<string, any> = {};
 
-        if (newData.location && !isDemoValue(newData.location)) {
-            cleanData.location = newData.location;
-        }
         if (newData.vacancies !== null && newData.vacancies !== undefined && typeof newData.vacancies === "number") {
             cleanData.vacancies = newData.vacancies;
         }
@@ -320,7 +313,6 @@ Return verified data only.`
             JSON.stringify({
                 status: "preview",
                 current: {
-                    location: job.location,
                     vacancies: job.vacancies,
                     eligibility: job.eligibility,
                     application_start_date: job.application_start_date,

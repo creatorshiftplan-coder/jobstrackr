@@ -15,10 +15,19 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+
+    // Support multiple API keys for rotation
+    const geminiApiKeys = [
+      Deno.env.get("GEMINI_API_KEY"),
+      Deno.env.get("GEMINI_API_KEY_2"),
+      Deno.env.get("GEMINI_API_KEY_3"),
+      Deno.env.get("GEMINI_API_KEY_4"),
+      Deno.env.get("GEMINI_API_KEY_5"),
+    ].filter(Boolean) as string[];
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    if (!geminiApiKey) {
+    if (geminiApiKeys.length === 0) {
       return new Response(
         JSON.stringify({ data: null, error: "AI service not configured", success: false }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -235,7 +244,7 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
         );
     }
 
-    // Call Gemini API with optional Google Search grounding
+    // Call Gemini API with optional Google Search grounding - with key rotation
     const today = new Date();
     const formattedDate = today.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     const dateAwarePrompt = `Current Date: ${formattedDate}.\n\n${userPrompt}`;
@@ -250,28 +259,52 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
       requestBody.tools = [{ google_search: {} }];
     }
 
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
+    let geminiResponse: Response | null = null;
+    let lastError = "";
+
+    for (let i = 0; i < geminiApiKeys.length; i++) {
+      const apiKey = geminiApiKeys[i];
+      console.log(`Trying API key ${i + 1} of ${geminiApiKeys.length}`);
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (response.ok) {
+        geminiResponse = response;
+        console.log(`API key ${i + 1} succeeded`);
+        break;
       }
-    );
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error("Gemini API error:", geminiResponse.status, errorText);
-
-      // Handle rate limit from Gemini API
-      if (geminiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ data: null, error: "AI service temporarily unavailable due to high demand. Please try again in a few minutes.", success: false }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      if (response.status === 429) {
+        console.log(`API key ${i + 1} rate limited, trying next...`);
+        lastError = "All API keys rate limited";
+        continue;
       }
 
-      throw new Error(`AI API error: ${geminiResponse.status}`);
+      if (response.status >= 500) {
+        console.log(`API key ${i + 1} server error ${response.status}, trying next...`);
+        lastError = `Server error: ${response.status}`;
+        continue;
+      }
+
+      // Client error - stop trying
+      const errorText = await response.text();
+      console.error(`API key ${i + 1} error:`, response.status, errorText);
+      lastError = `AI API error: ${response.status}`;
+      break;
+    }
+
+    if (!geminiResponse) {
+      return new Response(
+        JSON.stringify({ data: null, error: lastError || "AI service temporarily unavailable", success: false }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const geminiData = await geminiResponse.json();

@@ -15,11 +15,20 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+
+    // Support multiple API keys for rotation
+    const geminiApiKeys = [
+      Deno.env.get("GEMINI_API_KEY"),
+      Deno.env.get("GEMINI_API_KEY_2"),
+      Deno.env.get("GEMINI_API_KEY_3"),
+      Deno.env.get("GEMINI_API_KEY_4"),
+      Deno.env.get("GEMINI_API_KEY_5"),
+    ].filter(Boolean) as string[];
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    if (!geminiApiKey) {
-      console.error("GEMINI_API_KEY not configured");
+    if (geminiApiKeys.length === 0) {
+      console.error("No GEMINI_API_KEY configured");
       return new Response(
         JSON.stringify({ data: null, error: "AI service not configured", success: false }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -62,10 +71,10 @@ Deno.serve(async (req) => {
       if (rateLimitError) {
         console.error("Rate limit check error:", rateLimitError);
       } else if (rateLimitData && !rateLimitData.allowed) {
-        const errorMessage = rateLimitData.rate_limited 
+        const errorMessage = rateLimitData.rate_limited
           ? "Please wait a minute before making another AI request."
           : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
-        
+
         console.log(`Rate limit exceeded for user ${user.id}: ${rateLimitData.used}/${rateLimitData.limit}`);
         return new Response(
           JSON.stringify({
@@ -112,7 +121,7 @@ Deno.serve(async (req) => {
 
     // Download the file - handle different URL formats
     let filePath = "";
-    
+
     // Check for different URL patterns
     if (file_url.includes("/storage/v1/object/public/documents/")) {
       const urlParts = file_url.split("/storage/v1/object/public/documents/");
@@ -161,7 +170,7 @@ Deno.serve(async (req) => {
         .eq("user_id", user.id);
       throw new Error(`Failed to download file: ${downloadError.message}`);
     }
-    
+
     if (!fileData) {
       console.error("No file data returned");
       await supabase
@@ -175,7 +184,7 @@ Deno.serve(async (req) => {
     // Convert to base64
     const arrayBuffer = await fileData.arrayBuffer();
     console.log(`File downloaded: ${filePath}, size: ${arrayBuffer.byteLength} bytes`);
-    
+
     const uint8Array = new Uint8Array(arrayBuffer);
     let binary = "";
     const chunkSize = 8192;
@@ -191,7 +200,7 @@ Deno.serve(async (req) => {
       gif: "image/gif", webp: "image/webp", pdf: "application/pdf",
     };
     const mimeType = mimeTypes[extension] || "image/jpeg";
-    
+
     console.log(`Converted to base64: ${base64.length} chars, MIME type: ${mimeType}`);
 
     // Extraction prompts based on document type (simplified to 5 types)
@@ -269,7 +278,7 @@ Return ONLY JSON:
   "date_of_passing": ""
 }
 Use null for fields not found. qualification_type MUST be one of: 10th, 12th, graduation, post_graduation, diploma, other.`,
-      
+
       caste_certificate: `Extract from this Caste Certificate:
 - Full Name, Father's Name
 - Category (SC/ST/OBC/EWS/General)
@@ -325,58 +334,68 @@ Use null for fields not found.`,
 
     console.log(`Calling Gemini API for document type: ${document_type}`);
 
-    // Call Gemini Vision API directly
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            role: "user",
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: mimeType, data: base64 } },
-            ],
-          }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
-        }),
-      }
-    );
+    // Call Gemini Vision API with key rotation
+    let geminiResponse: Response | null = null;
+    let lastError = "";
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error("Gemini API error:", geminiResponse.status, errorText);
+    for (let i = 0; i < geminiApiKeys.length; i++) {
+      const apiKey = geminiApiKeys[i];
+      console.log(`Trying API key ${i + 1} of ${geminiApiKeys.length}`);
 
-      // Handle 402 Credit Exhaustion
-      if (geminiResponse.status === 402) {
-        await supabase
-          .from("documents")
-          .update({ ocr_status: "failed" })
-          .eq("id", document_id)
-          .eq("user_id", user.id);
-          
-        return new Response(
-          JSON.stringify({ data: null, error: "AI service credits exhausted. Please contact support.", success: false }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: [
+                { text: prompt },
+                { inline_data: { mime_type: mimeType, data: base64 } },
+              ],
+            }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
+          }),
+        }
+      );
+
+      if (response.ok) {
+        geminiResponse = response;
+        console.log(`API key ${i + 1} succeeded`);
+        break;
       }
 
-      // Handle 429 Rate Limit
-      if (geminiResponse.status === 429) {
-        await supabase
-          .from("documents")
-          .update({ ocr_status: "failed" })
-          .eq("id", document_id)
-          .eq("user_id", user.id);
-          
-        return new Response(
-          JSON.stringify({ data: null, error: "AI service temporarily unavailable due to high demand. Please try again in a few minutes.", success: false }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      if (response.status === 429) {
+        console.log(`API key ${i + 1} rate limited, trying next...`);
+        lastError = "All API keys rate limited";
+        continue;
       }
 
-      throw new Error(`AI API error: ${geminiResponse.status}`);
+      if (response.status >= 500) {
+        console.log(`API key ${i + 1} server error ${response.status}, trying next...`);
+        lastError = `Server error: ${response.status}`;
+        continue;
+      }
+
+      // Client error - stop trying
+      const errorText = await response.text();
+      console.error(`API key ${i + 1} error:`, response.status, errorText);
+      lastError = `AI API error: ${response.status}`;
+      break;
+    }
+
+    if (!geminiResponse) {
+      await supabase
+        .from("documents")
+        .update({ ocr_status: "failed" })
+        .eq("id", document_id)
+        .eq("user_id", user.id);
+
+      return new Response(
+        JSON.stringify({ data: null, error: lastError || "AI service temporarily unavailable", success: false }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const geminiData = await geminiResponse.json();
@@ -416,9 +435,9 @@ Use null for fields not found.`,
     // Update document with OCR result
     const { data, error } = await supabase
       .from("documents")
-      .update({ 
+      .update({
         ocr_status: "completed",
-        ocr_result: ocrResult 
+        ocr_result: ocrResult
       })
       .eq("id", document_id)
       .eq("user_id", user.id)
