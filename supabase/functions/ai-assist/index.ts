@@ -24,6 +24,7 @@ Deno.serve(async (req) => {
       Deno.env.get("GEMINI_API_KEY_4"),
       Deno.env.get("GEMINI_API_KEY_5"),
       Deno.env.get("GEMINI_API_KEY_6"),
+      Deno.env.get("GEMINI_API_KEY_7"),
     ].filter(Boolean) as string[];
 
     const supabase = createClient(supabaseUrl, supabaseKey);
