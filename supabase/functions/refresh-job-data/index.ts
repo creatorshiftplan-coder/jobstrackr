@@ -88,13 +88,14 @@ Deno.serve(async (req) => {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-        // Support multiple API keys for rotation (up to 5)
+        // Support multiple API keys for rotation (up to 6)
         const geminiApiKeys = [
             Deno.env.get("GEMINI_API_KEY"),
             Deno.env.get("GEMINI_API_KEY_2"),
             Deno.env.get("GEMINI_API_KEY_3"),
             Deno.env.get("GEMINI_API_KEY_4"),
             Deno.env.get("GEMINI_API_KEY_5"),
+            Deno.env.get("GEMINI_API_KEY_6"),
         ].filter(Boolean) as string[];
 
         if (geminiApiKeys.length === 0) {
