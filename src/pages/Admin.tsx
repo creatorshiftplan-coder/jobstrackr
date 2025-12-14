@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -963,97 +963,100 @@ export default function Admin() {
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
                 ) : (
-                  <ScrollArea className="h-[500px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead
-                            className="cursor-pointer hover:bg-muted/50 select-none"
-                            onClick={() => handleSort("title")}
-                          >
-                            <div className="flex items-center">
-                              Title
-                              {getSortIcon("title")}
-                            </div>
-                          </TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead
-                            className="cursor-pointer hover:bg-muted/50 select-none"
-                            onClick={() => handleSort("last_date")}
-                          >
-                            <div className="flex items-center">
-                              Last Date
-                              {getSortIcon("last_date")}
-                            </div>
-                          </TableHead>
-                          <TableHead
-                            className="cursor-pointer hover:bg-muted/50 select-none"
-                            onClick={() => handleSort("vacancies")}
-                          >
-                            <div className="flex items-center">
-                              Vacancies
-                              {getSortIcon("vacancies")}
-                            </div>
-                          </TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredJobs?.map((job) => (
-                          <TableRow key={job.id}>
-                            <TableCell className="font-medium max-w-[200px] truncate">{job.title}</TableCell>
-                            <TableCell className="max-w-[150px] truncate">{job.department}</TableCell>
-                            <TableCell>
-                              <span className={new Date(job.last_date) < new Date() ? "text-destructive" : ""}>
-                                {format(new Date(job.last_date), "dd MMM yyyy")}
-                              </span>
-                            </TableCell>
-                            <TableCell>{job.vacancies || 1}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-1 flex-wrap">
-                                {job.is_featured && <Badge className="bg-warning text-warning-foreground">Featured</Badge>}
-                                {job.admin_refreshed_at && (
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                    <CheckCircle className="h-3 w-3 mr-1" /> Verified
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleRefreshJobData(job)}
-                                  disabled={refreshingJobId === job.id}
-                                  title="Refresh job data via AI"
-                                >
-                                  {refreshingJobId === job.id ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <RefreshCw className="h-4 w-4 text-blue-500" />
-                                  )}
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={() => openEditDialog(job)}>
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleDeleteJob(job.id)}>
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {filteredJobs?.length === 0 && (
+                  <ScrollArea className="h-[500px] w-full">
+                    <div className="min-w-[800px]">
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                              No jobs match the selected filters
-                            </TableCell>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleSort("title")}
+                            >
+                              <div className="flex items-center">
+                                Title
+                                {getSortIcon("title")}
+                              </div>
+                            </TableHead>
+                            <TableHead>Department</TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleSort("last_date")}
+                            >
+                              <div className="flex items-center">
+                                Last Date
+                                {getSortIcon("last_date")}
+                              </div>
+                            </TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleSort("vacancies")}
+                            >
+                              <div className="flex items-center">
+                                Vacancies
+                                {getSortIcon("vacancies")}
+                              </div>
+                            </TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredJobs?.map((job) => (
+                            <TableRow key={job.id}>
+                              <TableCell className="font-medium max-w-[200px] truncate">{job.title}</TableCell>
+                              <TableCell className="max-w-[150px] truncate">{job.department}</TableCell>
+                              <TableCell>
+                                <span className={new Date(job.last_date) < new Date() ? "text-destructive" : ""}>
+                                  {format(new Date(job.last_date), "dd MMM yyyy")}
+                                </span>
+                              </TableCell>
+                              <TableCell>{job.vacancies || 1}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-1 flex-wrap">
+                                  {job.is_featured && <Badge className="bg-warning text-warning-foreground">Featured</Badge>}
+                                  {job.admin_refreshed_at && (
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                      <CheckCircle className="h-3 w-3 mr-1" /> Verified
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRefreshJobData(job)}
+                                    disabled={refreshingJobId === job.id}
+                                    title="Refresh job data via AI"
+                                  >
+                                    {refreshingJobId === job.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="h-4 w-4 text-blue-500" />
+                                    )}
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => openEditDialog(job)}>
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleDeleteJob(job.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {filteredJobs?.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                No jobs match the selected filters
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <ScrollBar orientation="horizontal" />
                   </ScrollArea>
                 )}
               </CardContent>

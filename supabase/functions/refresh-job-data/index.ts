@@ -88,7 +88,22 @@ Deno.serve(async (req) => {
 
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-        const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+
+        // Support multiple API keys for rotation (up to 5)
+        const geminiApiKeys = [
+            Deno.env.get("GEMINI_API_KEY"),
+            Deno.env.get("GEMINI_API_KEY_2"),
+            Deno.env.get("GEMINI_API_KEY_3"),
+            Deno.env.get("GEMINI_API_KEY_4"),
+            Deno.env.get("GEMINI_API_KEY_5"),
+        ].filter(Boolean) as string[];
+
+        if (geminiApiKeys.length === 0) {
+            return new Response(
+                JSON.stringify({ error: "AI service not configured" }),
+                { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
 
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -165,26 +180,27 @@ Deno.serve(async (req) => {
         }
 
         // Preview mode: fetch data from AI
-        if (!geminiApiKey) {
-            return new Response(
-                JSON.stringify({ error: "AI service not configured" }),
-                { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-        }
-
         console.log(`Refreshing job data for: ${job.title} (${job.department})`);
 
-        const geminiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    systemInstruction: { parts: [{ text: JOB_REFRESH_PROMPT }] },
-                    contents: [{
-                        role: "user",
-                        parts: [{
-                            text: `Search for the latest official information about:
+        // Try each API key until one works
+        let geminiResponse: Response | null = null;
+        let lastError = "";
+
+        for (let i = 0; i < geminiApiKeys.length; i++) {
+            const apiKey = geminiApiKeys[i];
+            console.log(`Trying API key ${i + 1} of ${geminiApiKeys.length}`);
+
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: JOB_REFRESH_PROMPT }] },
+                        contents: [{
+                            role: "user",
+                            parts: [{
+                                text: `Search for the latest official information about:
 Job/Exam: "${job.title}"
 Department/Agency: "${job.department}"
 
@@ -196,29 +212,48 @@ Find the current:
 5. Official application link
 
 Return verified data only.`
-                        }]
-                    }],
-                    generationConfig: {
-                        temperature: 0.1,
-                        maxOutputTokens: 2048
-                    },
-                    tools: [{ google_search: {} }],
-                }),
-            }
-        );
+                            }]
+                        }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 2048
+                        },
+                        tools: [{ google_search: {} }],
+                    }),
+                }
+            );
 
-        if (!geminiResponse.ok) {
-            const errorText = await geminiResponse.text();
-            console.error("Gemini API error:", geminiResponse.status, errorText);
-
-            if (geminiResponse.status === 429) {
-                return new Response(
-                    JSON.stringify({ error: "AI service temporarily unavailable. Please try again later." }),
-                    { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                );
+            if (response.ok) {
+                geminiResponse = response;
+                console.log(`API key ${i + 1} succeeded`);
+                break;
             }
 
-            throw new Error(`AI API error: ${geminiResponse.status}`);
+            if (response.status === 429) {
+                console.log(`API key ${i + 1} rate limited, trying next...`);
+                lastError = "All API keys rate limited";
+                continue;
+            }
+
+            // Also retry on server errors (500, 502, 503, etc.)
+            if (response.status >= 500) {
+                console.log(`API key ${i + 1} server error ${response.status}, trying next...`);
+                lastError = `Server error: ${response.status}`;
+                continue;
+            }
+
+            // Other client errors (400, 401, 403) - don't try more keys
+            const errorText = await response.text();
+            console.error(`API key ${i + 1} error:`, response.status, errorText);
+            lastError = `AI API error: ${response.status}`;
+            break;
+        }
+
+        if (!geminiResponse) {
+            return new Response(
+                JSON.stringify({ error: lastError || "All API keys failed" }),
+                { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
         }
 
         const geminiData = await geminiResponse.json();
