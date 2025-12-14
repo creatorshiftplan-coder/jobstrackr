@@ -56,9 +56,11 @@ const Index = () => {
     return jobs;
   }, [jobs]);
 
-  // Show the 7 most recently uploaded jobs (already sorted by created_at DESC from useJobs)
+  // Show the 7 most recently uploaded jobs that haven't expired (already sorted by created_at DESC from useJobs)
   const newJobs = useMemo(() => {
-    return filteredJobs.slice(0, 7);
+    return filteredJobs
+      .filter((job) => new Date(job.last_date) >= new Date())
+      .slice(0, 7);
   }, [filteredJobs]);
 
   // Show 6 jobs sorted by highest vacancy, filtered by user preferences
