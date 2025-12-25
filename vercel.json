@@ -1,10 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/api/share/:id",
-      "destination": "/api/share/:id"
-    },
-    {
       "source": "/sitemap.xml",
       "destination": "/sitemap.xml"
     },
@@ -13,7 +9,11 @@
       "destination": "/robots.txt"
     },
     {
-      "source": "/(.*)",
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/:path((?!api/).*)",
       "destination": "/"
     }
   ],
@@ -36,5 +36,10 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/share/[id].ts": {
+      "runtime": "@vercel/node@3"
+    }
+  }
 }
