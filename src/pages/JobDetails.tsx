@@ -51,6 +51,17 @@ export default function JobDetails() {
     }
   }, [job, trackJobViewed]);
 
+  // Update document title with job name
+  useEffect(() => {
+    if (job) {
+      document.title = `${job.title} | JobsTrackr`;
+    }
+    // Restore default title on unmount
+    return () => {
+      document.title = 'JobsTrackr - Your Government Job Tracker';
+    };
+  }, [job]);
+
   // Check if this job is already tracked
   const isAlreadyTracked = userExams.some(
     (attempt) => attempt.exams?.name?.toLowerCase() === job?.title?.toLowerCase()
@@ -152,10 +163,12 @@ export default function JobDetails() {
           <div className="flex gap-1">
             <button
               onClick={async () => {
+                // Use the share API URL which provides proper OG meta tags for social media
+                const shareUrl = `${window.location.origin}/api/share/${job.id}`;
                 const shareData = {
                   title: job.title,
                   text: `Check out this job: ${job.title} at ${job.department}`,
-                  url: window.location.href,
+                  url: shareUrl,
                 };
 
                 if (navigator.share && navigator.canShare?.(shareData)) {
@@ -167,8 +180,27 @@ export default function JobDetails() {
                     }
                   }
                 } else {
-                  await navigator.clipboard.writeText(window.location.href);
-                  toast.success("Link copied to clipboard!");
+                  try {
+                    await navigator.clipboard.writeText(shareUrl);
+                    toast.success("Link copied to clipboard!");
+                  } catch (err) {
+                    // Fallback for browsers without clipboard API
+                    const textArea = document.createElement("textarea");
+                    textArea.value = shareUrl;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-999999px";
+                    textArea.style.top = "-999999px";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    try {
+                      document.execCommand("copy");
+                      toast.success("Link copied to clipboard!");
+                    } catch {
+                      toast.error("Failed to copy link");
+                    }
+                    document.body.removeChild(textArea);
+                  }
                 }
               }}
               className="p-2 rounded-full hover:bg-secondary transition-colors"
