@@ -1,4 +1,6 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+export const config = {
+  runtime: 'edge',
+};
 
 // Bot user agents that need pre-rendered HTML with OG tags
 const BOT_USER_AGENTS = [
@@ -13,10 +15,6 @@ const BOT_USER_AGENTS = [
   'Discordbot',
   'Googlebot',
   'bingbot',
-  'Baiduspider',
-  'DuckDuckBot',
-  'Yahoo',
-  'Yandex',
 ];
 
 // UUID v4 validation regex
@@ -36,20 +34,22 @@ function isValidUUID(id: string): boolean {
   return UUID_REGEX.test(id);
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { id } = req.query;
+export default async function handler(request: Request) {
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const id = pathParts[pathParts.length - 1];
 
-  // Validate ID exists and is a string
-  if (!id || typeof id !== 'string') {
-    return res.redirect(302, '/');
+  // Validate ID exists
+  if (!id) {
+    return Response.redirect(new URL('/', url.origin).toString(), 302);
   }
 
   // Validate UUID format to prevent injection attacks
   if (!isValidUUID(id)) {
-    return res.redirect(302, '/');
+    return Response.redirect(new URL('/', url.origin).toString(), 302);
   }
 
-  const userAgent = req.headers['user-agent'] || '';
+  const userAgent = request.headers.get('user-agent') || '';
 
   // Check if this is a bot/crawler
   const isBot = BOT_USER_AGENTS.some(bot =>
@@ -58,15 +58,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // If not a bot, redirect to the SPA immediately
   if (!isBot) {
-    return res.redirect(302, `/job/${id}`);
+    return Response.redirect(new URL(`/job/${id}`, url.origin).toString(), 302);
   }
 
   try {
     // Fetch job data from Supabase
-    // Note: VITE_ prefixed env vars are for client-side only
-    // For serverless functions, use SUPABASE_URL and SUPABASE_ANON_KEY, or fallback to public values
-    const supabaseUrl = process.env.SUPABASE_URL || 'https://fdxksytpdfgmbkttipdf.supabase.co';
-    const supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkeGtzeXRwZGZnbWJrdHRpcGRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTM1MTYsImV4cCI6MjA4MDQyOTUxNn0.NocVE7TCJIQgIhbHkxhHWraBRxyCkLIdgUQ3ERCHuKQ';
+    const supabaseUrl = 'https://fdxksytpdfgmbkttipdf.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkeGtzeXRwZGZnbWJrdHRpcGRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTM1MTYsImV4cCI6MjA4MDQyOTUxNn0.NocVE7TCJIQgIhbHkxhHWraBRxyCkLIdgUQ3ERCHuKQ';
 
     const response = await fetch(
       `${supabaseUrl}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=id,title,department,location,qualification,vacancies_display,last_date_display`,
@@ -81,14 +79,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!response.ok) {
       console.error('Supabase API error:', response.status, response.statusText);
-      return res.redirect(302, `/job/${id}`);
+      return Response.redirect(new URL(`/job/${id}`, url.origin).toString(), 302);
     }
 
     const jobs = await response.json();
     const job = jobs[0];
 
     if (!job) {
-      return res.redirect(302, `/job/${id}`);
+      return Response.redirect(new URL(`/job/${id}`, url.origin).toString(), 302);
     }
 
     // Generate HTML with proper OG tags for bots
@@ -189,8 +187,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     <p><a href="${escapeHtml(jobUrl)}">Click here if not redirected</a></p>
   </div>
   <script>
-    // Delay redirect slightly to ensure bots can read meta tags
-    // Regular users get 302 redirect before this, so this is mainly for edge cases
     setTimeout(function() {
       window.location.replace("${escapeHtml(jobUrl)}");
     }, 100);
@@ -198,11 +194,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 </body>
 </html>`;
 
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
-    return res.status(200).send(html);
+    return new Response(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    });
   } catch (error) {
     console.error('OG handler error:', error);
-    return res.redirect(302, `/job/${id}`);
+    return Response.redirect(new URL(`/job/${id}`, url.origin).toString(), 302);
   }
 }
