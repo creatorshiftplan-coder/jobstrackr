@@ -1,4 +1,7 @@
 {
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/sitemap.xml",
@@ -9,12 +12,8 @@
       "destination": "/robots.txt"
     },
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    },
-    {
-      "source": "/:path((?!api/).*)",
-      "destination": "/"
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
@@ -38,7 +37,7 @@
     }
   ],
   "functions": {
-    "api/share/[id].ts": {
+    "api/**/*.ts": {
       "runtime": "@vercel/node@3"
     }
   }
