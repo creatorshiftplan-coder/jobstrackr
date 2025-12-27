@@ -5,6 +5,7 @@ import { useAdminRole } from "@/hooks/useAdminRole";
 import { useJobs } from "@/hooks/useJobs";
 import { useAdminStats } from "@/hooks/useAdminStats";
 import { useAnalyticsData } from "@/hooks/useAnalyticsData";
+import { useAutoDiscover } from "@/hooks/useAutoDiscover";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -376,8 +377,15 @@ export default function Admin() {
   const { data: jobs, isLoading: jobsLoading } = useJobs();
   const { userStats, apiStats, isLoading: statsLoading } = useAdminStats();
   const analyticsData = useAnalyticsData();
+  const { unreviewedCount, logs: autoDiscoverLogs, logsLoading: autoDiscoverLoading, markAsReviewed, discoverByCategory, scrapeUrl, addDiscoveredJobs } = useAutoDiscover();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // URL scraping state
+  const [scrapeUrlInput, setScrapeUrlInput] = useState("");
+  const [scrapedJobs, setScrapedJobs] = useState<any[]>([]);
+  const [showScrapedJobs, setShowScrapedJobs] = useState(false);
+  const [discoveringCategory, setDiscoveringCategory] = useState<string | null>(null);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
@@ -558,6 +566,68 @@ export default function Admin() {
     );
   }
 
+  // TypeScript interface for auto-verification response
+  interface AutoVerifyResponse {
+    status: "applied" | "already_verified" | "preview" | "error";
+    fieldsUpdated?: number;
+    message?: string;
+    error?: string;
+  }
+
+  // Auto-verify a newly added job (runs in background, doesn't block UI)
+  const autoVerifyJob = async (jobId: string, showToast = true): Promise<boolean> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return false;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/refresh-job-data`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ jobId, autoApply: true }),
+        }
+      );
+
+      const result: AutoVerifyResponse = await response.json();
+      if (response.ok && result.status === "applied") {
+        // Refresh jobs list to show verified badge
+        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        if (showToast) {
+          toast({
+            title: "Job verified!",
+            description: result.message || "AI verification completed successfully.",
+          });
+        }
+        return true;
+      } else if (result.status === "already_verified") {
+        return true; // Already verified is a success
+      } else if (result.error) {
+        console.error("Auto-verification error:", result.error);
+        if (showToast) {
+          toast({
+            title: "Verification pending",
+            description: "Will be verified later.",
+          });
+        }
+        return false;
+      }
+      return false;
+    } catch (error) {
+      console.error("Auto-verification failed for job:", jobId, error);
+      if (showToast) {
+        toast({
+          title: "Verification pending",
+          description: "Will be verified later.",
+        });
+      }
+      return false;
+    }
+  };
+
   const handleSaveJob = async () => {
     if (!formData.title || !formData.department || !formData.location || !formData.qualification || !formData.last_date) {
       toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
@@ -571,9 +641,19 @@ export default function Admin() {
         if (error) throw error;
         toast({ title: "Job updated successfully!" });
       } else {
-        const { error } = await supabase.from("jobs").insert(formData);
+        // Insert and get the new job ID for auto-verification
+        const { data: newJob, error } = await supabase
+          .from("jobs")
+          .insert(formData)
+          .select("id")
+          .single();
         if (error) throw error;
-        toast({ title: "Job created successfully!" });
+        toast({ title: "Job created!", description: "Verifying in background..." });
+
+        // Trigger auto-verification in background (non-blocking)
+        if (newJob?.id) {
+          autoVerifyJob(newJob.id);
+        }
       }
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       setShowAddDialog(false);
@@ -764,13 +844,22 @@ export default function Admin() {
       let insertedCount = 0;
       let updatedCount = 0;
       let replacedCount = 0;
+      const newJobIds: string[] = []; // Collect IDs for auto-verification
 
-      // Insert new jobs
+      // Insert new jobs and get their IDs
       if (newJobs.length > 0) {
         const cleanNewJobs = newJobs.map(({ isDuplicate, duplicateOf, matchType, similarityScore, ...job }) => job);
-        const { error } = await supabase.from("jobs").insert(cleanNewJobs);
+        const { data: insertedJobs, error } = await supabase
+          .from("jobs")
+          .insert(cleanNewJobs)
+          .select("id");
         if (error) throw error;
         insertedCount = cleanNewJobs.length;
+
+        // Collect IDs for auto-verification
+        if (insertedJobs) {
+          newJobIds.push(...insertedJobs.map(j => j.id));
+        }
       }
 
       // Update existing job records (keep ID)
@@ -792,10 +881,19 @@ export default function Admin() {
           if (duplicateOf) {
             // Delete old job
             await supabase.from("jobs").delete().eq("id", duplicateOf);
-            // Insert as new
-            const { error } = await supabase.from("jobs").insert(jobData);
+            // Insert as new and get ID
+            const { data: replacedJob, error } = await supabase
+              .from("jobs")
+              .insert(jobData)
+              .select("id")
+              .single();
             if (error) throw error;
             replacedCount++;
+
+            // Collect ID for auto-verification
+            if (replacedJob?.id) {
+              newJobIds.push(replacedJob.id);
+            }
           }
         }
       }
@@ -808,12 +906,37 @@ export default function Admin() {
         messages.push(`${duplicateJobs.length} duplicates skipped`);
       }
 
-      toast({ title: messages.join(", ") + "!" });
+      // Show toast with verification info
+      const verifyingText = newJobIds.length > 0 ? `. Verifying ${newJobIds.length} job(s) in background...` : "";
+      toast({ title: messages.join(", ") + "!" + verifyingText });
+
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       setShowBulkDialog(false);
       setBulkJobs([]);
       setJsonText("");
       setDuplicateMode("skip");
+
+      // Trigger auto-verification with staggered delays (2s between each) to prevent rate limiting
+      const VERIFY_DELAY_MS = 2000;
+      let successCount = 0;
+      let pendingCount = newJobIds.length;
+
+      for (let i = 0; i < newJobIds.length; i++) {
+        setTimeout(async () => {
+          const success = await autoVerifyJob(newJobIds[i], false);
+          if (success) successCount++;
+          pendingCount--;
+
+          // Show final summary when all complete
+          if (pendingCount === 0) {
+            queryClient.invalidateQueries({ queryKey: ["jobs"] });
+            toast({
+              title: `Verification complete`,
+              description: `${successCount}/${newJobIds.length} jobs verified successfully.`,
+            });
+          }
+        }, i * VERIFY_DELAY_MS);
+      }
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -859,43 +982,54 @@ export default function Admin() {
 
       <main className="p-4">
         <Tabs defaultValue="jobs" className="space-y-4">
-          <TabsList className="grid grid-cols-6 w-full">
-            <TabsTrigger value="jobs" className="gap-1">
-              <Briefcase className="h-4 w-4" />
-              <span className="hidden sm:inline">Jobs</span>
-            </TabsTrigger>
-            <TabsTrigger value="users" className="gap-1">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Users</span>
-            </TabsTrigger>
-            <TabsTrigger value="user-analytics" className="gap-1">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-1">
-              <Activity className="h-4 w-4" />
-              <span className="hidden sm:inline">API</span>
-            </TabsTrigger>
-            <TabsTrigger value="bulk" className="gap-1">
-              <FileJson className="h-4 w-4" />
-              <span className="hidden sm:inline">Bulk</span>
-            </TabsTrigger>
-            <TabsTrigger value="logos" className="gap-1">
-              <Image className="h-4 w-4" />
-              <span className="hidden sm:inline">Logos</span>
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto pb-2 -mb-2">
+            <TabsList className="inline-flex w-max min-w-full gap-1 p-1">
+              <TabsTrigger value="jobs" className="gap-1 min-w-[44px] h-10">
+                <Briefcase className="h-4 w-4" />
+                <span className="hidden sm:inline">Jobs</span>
+              </TabsTrigger>
+              <TabsTrigger value="users" className="gap-1 min-w-[44px] h-10">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Users</span>
+              </TabsTrigger>
+              <TabsTrigger value="user-analytics" className="gap-1 min-w-[44px] h-10">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Analytics</span>
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="gap-1 min-w-[44px] h-10">
+                <Activity className="h-4 w-4" />
+                <span className="hidden sm:inline">API</span>
+              </TabsTrigger>
+              <TabsTrigger value="bulk" className="gap-1 min-w-[44px] h-10">
+                <FileJson className="h-4 w-4" />
+                <span className="hidden sm:inline">Bulk</span>
+              </TabsTrigger>
+              <TabsTrigger value="logos" className="gap-1 min-w-[44px] h-10">
+                <Image className="h-4 w-4" />
+                <span className="hidden sm:inline">Logos</span>
+              </TabsTrigger>
+              <TabsTrigger value="auto-discover" className="gap-1 min-w-[44px] h-10 relative">
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline">Auto</span>
+                {unreviewedCount > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]">
+                    {unreviewedCount > 99 ? '99+' : unreviewedCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Jobs Tab */}
           <TabsContent value="jobs">
             <Card className="border-0 shadow-card">
               <CardHeader className="space-y-4">
-                <div className="flex flex-row items-center justify-between">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                   <div>
                     <CardTitle>Jobs ({filteredJobs?.length || 0} of {jobs?.length || 0})</CardTitle>
                     <CardDescription>Manage government job listings</CardDescription>
                   </div>
-                  <Button size="sm" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
+                  <Button size="sm" className="w-full sm:w-auto" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Job
                   </Button>
@@ -1513,6 +1647,189 @@ export default function Admin() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Auto Discovery Tab */}
+          <TabsContent value="auto-discover">
+            <Card className="border-0 shadow-card">
+              <CardHeader>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    Job Discovery
+                  </CardTitle>
+                  <CardDescription>
+                    Discover jobs by category or scrape from URL
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Category Buttons */}
+                <div>
+                  <h3 className="text-sm font-medium mb-3">Discover by Category</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {["SSC", "UPSC", "Banking", "Railways", "State PSC", "Defence", "Government Jobs"].map((category) => (
+                      <Button
+                        key={category}
+                        variant={discoveringCategory === category ? "default" : "outline"}
+                        className="h-auto py-3"
+                        disabled={discoverByCategory.isPending}
+                        onClick={() => {
+                          setDiscoveringCategory(category);
+                          discoverByCategory.mutate(category, {
+                            onSuccess: (result) => {
+                              setDiscoveringCategory(null);
+                              toast({
+                                title: `${category} Discovery Complete!`,
+                                description: `Found: ${result.result.jobs_found}, Added: ${result.result.jobs_inserted}, Duplicates: ${result.result.jobs_duplicate}`,
+                              });
+                            },
+                            onError: (e) => {
+                              setDiscoveringCategory(null);
+                              toast({ title: "Discovery failed", description: e.message, variant: "destructive" });
+                            },
+                          });
+                        }}
+                      >
+                        {discoveringCategory === category ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : null}
+                        {category}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* URL Scraper */}
+                <div>
+                  <h3 className="text-sm font-medium mb-3">Scrape from URL</h3>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="https://ssc.nic.in/noticeboards/notices"
+                      value={scrapeUrlInput}
+                      onChange={(e) => setScrapeUrlInput(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      disabled={!scrapeUrlInput || scrapeUrl.isPending}
+                      onClick={() => {
+                        scrapeUrl.mutate(scrapeUrlInput, {
+                          onSuccess: (result) => {
+                            setScrapedJobs(result.result.jobs);
+                            setShowScrapedJobs(true);
+                            toast({
+                              title: "URL Scraped!",
+                              description: `Found ${result.result.jobs_found} jobs (${result.result.jobs_duplicate} duplicates)`,
+                            });
+                          },
+                          onError: (e) => toast({ title: "Scrape failed", description: e.message, variant: "destructive" }),
+                        });
+                      }}
+                    >
+                      {scrapeUrl.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Scrape"}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <Card className="bg-secondary/50">
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-primary">{autoDiscoverLogs.length}</div>
+                      <div className="text-xs text-muted-foreground">Total Runs</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-secondary/50">
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {autoDiscoverLogs.reduce((acc, l) => acc + l.jobs_inserted, 0)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Jobs Added</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-secondary/50">
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {autoDiscoverLogs.reduce((acc, l) => acc + l.jobs_duplicate, 0)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Duplicates</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-secondary/50">
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-red-600">
+                        {autoDiscoverLogs.filter(l => l.error).length}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Errors</div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Recent Logs */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium">Recent Runs</h3>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const unreviewed = autoDiscoverLogs.filter(l => !l.reviewed).map(l => l.id);
+                        if (unreviewed.length > 0) {
+                          markAsReviewed.mutate(unreviewed);
+                        }
+                      }}
+                      disabled={markAsReviewed.isPending || autoDiscoverLogs.filter(l => !l.reviewed).length === 0}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Mark Reviewed
+                    </Button>
+                  </div>
+                  {autoDiscoverLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : autoDiscoverLogs.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Sparkles className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>No discovery runs yet.</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[300px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Time</TableHead>
+                            <TableHead>Found</TableHead>
+                            <TableHead>Added</TableHead>
+                            <TableHead>Dups</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {autoDiscoverLogs.map((log) => (
+                            <TableRow key={log.id} className={!log.reviewed ? "bg-primary/5" : ""}>
+                              <TableCell className="whitespace-nowrap text-xs">
+                                {format(new Date(log.run_at), "MMM d, HH:mm")}
+                              </TableCell>
+                              <TableCell>{log.jobs_found}</TableCell>
+                              <TableCell className="text-green-600">{log.jobs_inserted}</TableCell>
+                              <TableCell className="text-muted-foreground">{log.jobs_duplicate}</TableCell>
+                              <TableCell>
+                                {log.error ? (
+                                  <Badge variant="destructive" className="text-xs">Error</Badge>
+                                ) : (
+                                  <Badge className="bg-green-600 text-xs">OK</Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -1832,6 +2149,98 @@ export default function Admin() {
               {applyingRefresh ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Apply Changes
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scraped Jobs Preview Dialog */}
+      <Dialog open={showScrapedJobs} onOpenChange={setShowScrapedJobs}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Scraped Jobs</DialogTitle>
+            <DialogDescription>
+              Found {scrapedJobs.length} jobs. Select which ones to add.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            {scrapedJobs.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No jobs found from the URL
+              </div>
+            ) : (
+              scrapedJobs.map((job, index) => (
+                <div
+                  key={index}
+                  className={`p-4 rounded-lg border ${job.isDuplicate ? "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20" : "bg-secondary/30"
+                    }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={job.selected || false}
+                      disabled={job.isDuplicate}
+                      onChange={(e) => {
+                        const updated = [...scrapedJobs];
+                        updated[index] = { ...job, selected: e.target.checked };
+                        setScrapedJobs(updated);
+                      }}
+                      className="mt-1 h-4 w-4"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-medium text-sm">{job.title || "Untitled"}</h4>
+                        {job.isDuplicate && (
+                          <Badge variant="outline" className="text-yellow-600 border-yellow-600 text-xs">
+                            Duplicate
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{job.company || "Unknown Department"}</p>
+                      {job.last_date && (
+                        <p className="text-xs text-red-500 mt-1">Last Date: {job.last_date}</p>
+                      )}
+                      {job.eligibility && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{job.eligibility}</p>
+                      )}
+                      {job.isDuplicate && job.duplicateOf && (
+                        <p className="text-xs text-yellow-600 mt-1">Similar to: {job.duplicateOf}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <div className="text-sm text-muted-foreground">
+              {scrapedJobs.filter(j => j.selected && !j.isDuplicate).length} selected to add
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowScrapedJobs(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={scrapedJobs.filter(j => j.selected && !j.isDuplicate).length === 0 || addDiscoveredJobs.isPending}
+                onClick={() => {
+                  const jobsToAdd = scrapedJobs.filter(j => j.selected && !j.isDuplicate);
+                  addDiscoveredJobs.mutate(jobsToAdd, {
+                    onSuccess: (result) => {
+                      toast({
+                        title: "Jobs Added!",
+                        description: `Successfully added ${result.inserted} jobs`,
+                      });
+                      setShowScrapedJobs(false);
+                      setScrapedJobs([]);
+                      setScrapeUrlInput("");
+                    },
+                    onError: (e) => toast({ title: "Failed to add jobs", description: e.message, variant: "destructive" }),
+                  });
+                }}
+              >
+                {addDiscoveredJobs.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Add Selected
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

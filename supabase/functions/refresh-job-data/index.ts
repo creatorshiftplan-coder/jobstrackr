@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const { jobId, applyData } = await req.json();
+        const { jobId, applyData, autoApply } = await req.json();
 
         if (!jobId) {
             return new Response(
@@ -122,7 +122,16 @@ Deno.serve(async (req) => {
             );
         }
 
-        // If applyData is provided, apply the changes (phase 2)
+        // For autoApply mode: check if job is already verified to prevent duplicate verifications
+        if (autoApply && job.admin_refreshed_at) {
+            console.log(`Job ${jobId} already verified at ${job.admin_refreshed_at}, skipping auto-verification`);
+            return new Response(
+                JSON.stringify({ status: "already_verified", message: "Job already verified" }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        // If applyData is provided, apply the changes (phase 2 - manual apply from preview)
         if (applyData) {
             const updateData: Record<string, any> = {
                 admin_refreshed_at: new Date().toISOString(),
@@ -310,7 +319,51 @@ Return verified data only.`
             cleanData.confidence = newData.confidence;
         }
 
-        // Return preview data with current values for comparison
+        // For autoApply mode: directly apply the AI-fetched data and always mark as verified
+        if (autoApply) {
+            const updateData: Record<string, any> = {
+                admin_refreshed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+
+            // Copy clean data fields to update (if any)
+            if (cleanData.vacancies !== undefined) updateData.vacancies = cleanData.vacancies;
+            if (cleanData.eligibility) updateData.eligibility = cleanData.eligibility;
+            if (cleanData.application_start_date) updateData.application_start_date = cleanData.application_start_date;
+            if (cleanData.last_date) updateData.last_date = cleanData.last_date;
+            if (cleanData.age_min !== undefined) updateData.age_min = cleanData.age_min;
+            if (cleanData.age_max !== undefined) updateData.age_max = cleanData.age_max;
+            if (cleanData.apply_link) updateData.apply_link = cleanData.apply_link;
+
+            const { error: updateError } = await supabase
+                .from("jobs")
+                .update(updateData)
+                .eq("id", jobId);
+
+            if (updateError) {
+                console.error("Auto-apply update error:", updateError);
+                return new Response(
+                    JSON.stringify({ error: "Failed to auto-update job", details: updateError.message }),
+                    { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+            }
+
+            const fieldsUpdated = Object.keys(updateData).length - 2; // Exclude timestamps
+            console.log(`Auto-verified job ${jobId}: ${fieldsUpdated} fields updated`);
+
+            return new Response(
+                JSON.stringify({
+                    status: "applied",
+                    fieldsUpdated,
+                    message: fieldsUpdated > 0
+                        ? `Auto-verified: ${fieldsUpdated} fields updated`
+                        : "Verified (no additional data found)"
+                }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        // Return preview data with current values for comparison (default mode)
         return new Response(
             JSON.stringify({
                 status: "preview",

@@ -253,6 +253,25 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Trigger auto-verification for the newly saved job (non-blocking)
+      if (savedJob?.id) {
+        console.log("Triggering auto-verification for job:", savedJob.id);
+        // Call refresh-job-data edge function with autoApply flag
+        fetch(`${supabaseUrl}/functions/v1/refresh-job-data`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ jobId: savedJob.id, autoApply: true }),
+        })
+          .then((res) => {
+            if (!res.ok) console.error(`Auto-verify failed for job ${savedJob.id}: ${res.status}`);
+            else console.log(`Auto-verify triggered successfully for job ${savedJob.id}`);
+          })
+          .catch((err) => console.error("Auto-verify trigger error:", err));
+      }
+
       // Fix: Update log to mark job as created - first get the latest log ID
       if (userId) {
         const { data: latestLog } = await supabase
