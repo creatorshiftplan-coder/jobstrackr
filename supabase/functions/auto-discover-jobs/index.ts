@@ -10,18 +10,174 @@ const JOB_CATEGORIES = ["SSC", "UPSC", "Banking", "Railways", "State PSC", "Defe
 const JOBS_PER_CATEGORY = 5;
 
 function normalizeText(text: string): string {
-    return text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+    if (!text || typeof text !== 'string') return "";
+    return text
+        .toLowerCase()
+        .replace(/[^\w\s]/g, " ")  // Replace special chars with space (not remove)
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
-function calculateSimilarity(str1: string, str2: string): number {
+// Extract year from text (e.g., "SSC CGL 2024" -> "2024")
+function extractYear(text: string): string | null {
+    const match = text.match(/\b(20\d{2})\b/);
+    return match ? match[1] : null;
+}
+
+// Levenshtein distance for short string comparison
+function levenshteinDistance(s1: string, s2: string): number {
+    const m = s1.length, n = s2.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+
+    const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+            dp[i][j] = Math.min(
+                dp[i - 1][j] + 1,
+                dp[i][j - 1] + 1,
+                dp[i - 1][j - 1] + cost
+            );
+        }
+    }
+    return dp[m][n];
+}
+
+// Jaccard similarity (word-based)
+function jaccardSimilarity(str1: string, str2: string): number {
     const s1 = normalizeText(str1);
     const s2 = normalizeText(str2);
     if (s1 === s2) return 1.0;
-    const words1 = new Set(s1.split(" "));
-    const words2 = new Set(s2.split(" "));
+    if (!s1 || !s2) return 0.0;
+
+    const words1 = new Set(s1.split(" ").filter(w => w.length > 0));
+    const words2 = new Set(s2.split(" ").filter(w => w.length > 0));
+
+    if (words1.size === 0 || words2.size === 0) return 0.0;
+
     const intersection = new Set([...words1].filter((x) => words2.has(x)));
     const union = new Set([...words1, ...words2]);
     return intersection.size / union.size;
+}
+
+// Levenshtein-based similarity (0-1 scale)
+function levenshteinSimilarity(str1: string, str2: string): number {
+    const s1 = normalizeText(str1);
+    const s2 = normalizeText(str2);
+    if (s1 === s2) return 1.0;
+    if (!s1 || !s2) return 0.0;
+
+    const maxLen = Math.max(s1.length, s2.length);
+    if (maxLen === 0) return 1.0;
+
+    const distance = levenshteinDistance(s1, s2);
+    return 1 - (distance / maxLen);
+}
+
+interface DuplicateCheckResult {
+    isDuplicate: boolean;
+    duplicateOf: string | null;
+    similarity: number;
+    matchType: 'exact' | 'title' | 'title_dept' | 'none';
+}
+
+// Enhanced duplicate checking with multiple strategies
+function checkDuplicate(
+    newTitle: string,
+    newDepartment: string,
+    existingJobs: { id: string; title: string; department: string }[]
+): DuplicateCheckResult {
+    const result: DuplicateCheckResult = {
+        isDuplicate: false,
+        duplicateOf: null,
+        similarity: 0,
+        matchType: 'none'
+    };
+
+    // Handle empty/null titles
+    if (!newTitle || newTitle.trim().length === 0) {
+        return result;
+    }
+
+    const normalizedNewTitle = normalizeText(newTitle);
+    const normalizedNewDept = normalizeText(newDepartment || "");
+    const newYear = extractYear(newTitle);
+
+    // Dynamic threshold based on title length (shorter titles need higher confidence)
+    const wordCount = normalizedNewTitle.split(" ").filter(w => w.length > 0).length;
+    const baseThreshold = wordCount <= 3 ? 0.85 : 0.75;
+
+    for (const existingJob of existingJobs) {
+        const existingYear = extractYear(existingJob.title);
+
+        // RULE 1: Different years = NOT duplicate (e.g., "SSC CGL 2023" vs "SSC CGL 2024")
+        if (newYear && existingYear && newYear !== existingYear) {
+            continue;
+        }
+
+        // Calculate title similarity using both algorithms
+        const jaccardSim = jaccardSimilarity(newTitle, existingJob.title);
+        const levenshteinSim = levenshteinSimilarity(newTitle, existingJob.title);
+
+        // Use higher of the two for short titles, Jaccard for longer ones
+        const titleSimilarity = wordCount <= 4
+            ? Math.max(jaccardSim, levenshteinSim)
+            : jaccardSim;
+
+        // RULE 2: Exact match
+        if (normalizedNewTitle === normalizeText(existingJob.title)) {
+            result.isDuplicate = true;
+            result.duplicateOf = existingJob.title;
+            result.similarity = 1.0;
+            result.matchType = 'exact';
+            console.log(`[Duplicate:Exact] "${newTitle}" === "${existingJob.title}"`);
+            return result;
+        }
+
+        // RULE 3: High title similarity
+        if (titleSimilarity > baseThreshold) {
+            result.isDuplicate = true;
+            result.duplicateOf = existingJob.title;
+            result.similarity = titleSimilarity;
+            result.matchType = 'title';
+            console.log(`[Duplicate:Title] "${newTitle}" ~ "${existingJob.title}" (sim=${titleSimilarity.toFixed(2)})`);
+            return result;
+        }
+
+        // RULE 4: Combined title + department check (lower threshold if both match)
+        if (titleSimilarity > 0.6) {
+            const deptSimilarity = jaccardSimilarity(newDepartment || "", existingJob.department || "");
+            const combinedSim = (titleSimilarity * 0.7) + (deptSimilarity * 0.3);
+
+            if (combinedSim > 0.75) {
+                result.isDuplicate = true;
+                result.duplicateOf = existingJob.title;
+                result.similarity = combinedSim;
+                result.matchType = 'title_dept';
+                console.log(`[Duplicate:TitleDept] "${newTitle}" + "${newDepartment}" ~ "${existingJob.title}" + "${existingJob.department}" (combined=${combinedSim.toFixed(2)})`);
+                return result;
+            }
+        }
+
+        // Track highest similarity for logging near-misses
+        if (titleSimilarity > result.similarity) {
+            result.similarity = titleSimilarity;
+            result.duplicateOf = existingJob.title; // For debugging
+        }
+    }
+
+    // Log near-misses for debugging
+    if (result.similarity > 0.5) {
+        console.log(`[Near-miss] "${newTitle}" closest to "${result.duplicateOf}" (sim=${result.similarity.toFixed(2)}, threshold=${baseThreshold})`);
+        result.duplicateOf = null; // Clear since it's not a duplicate
+    }
+
+    return result;
 }
 
 function parseAgeLimit(ageLimit: string): { min: number; max: number } {
@@ -183,26 +339,19 @@ Return structured JSON.`
 
         // Check duplicates and optionally insert
         for (const job of jobs) {
-            let isDuplicate = false;
-            let duplicateOf = null;
-
-            for (const existingJob of existingJobs) {
-                const similarity = calculateSimilarity(job.title || "", existingJob.title);
-                if (similarity > 0.8) {
-                    isDuplicate = true;
-                    duplicateOf = existingJob.title;
-                    break;
-                }
-            }
+            // Use enhanced duplicate checking
+            const duplicateCheck = checkDuplicate(job.title || "", job.company || "", existingJobs);
 
             const jobWithStatus = {
                 ...job,
-                isDuplicate,
-                duplicateOf,
+                isDuplicate: duplicateCheck.isDuplicate,
+                duplicateOf: duplicateCheck.duplicateOf,
+                similarity: duplicateCheck.similarity,
+                matchType: duplicateCheck.matchType,
             };
             result.jobs.push(jobWithStatus as any);
 
-            if (isDuplicate) {
+            if (duplicateCheck.isDuplicate) {
                 result.jobs_duplicate++;
                 continue;
             }
@@ -341,25 +490,18 @@ Return structured JSON with job details.`
 
         // Check duplicates (don't auto-insert for URL scrape - let admin decide)
         for (const job of jobs) {
-            let isDuplicate = false;
-            let duplicateOf = null;
-
-            for (const existingJob of existingJobs) {
-                const similarity = calculateSimilarity(job.title || "", existingJob.title);
-                if (similarity > 0.8) {
-                    isDuplicate = true;
-                    duplicateOf = existingJob.title;
-                    break;
-                }
-            }
+            // Use enhanced duplicate checking
+            const duplicateCheck = checkDuplicate(job.title || "", job.company || "", existingJobs);
 
             result.jobs.push({
                 ...job,
-                isDuplicate,
-                duplicateOf,
+                isDuplicate: duplicateCheck.isDuplicate,
+                duplicateOf: duplicateCheck.duplicateOf,
+                similarity: duplicateCheck.similarity,
+                matchType: duplicateCheck.matchType,
             } as any);
 
-            if (isDuplicate) {
+            if (duplicateCheck.isDuplicate) {
                 result.jobs_duplicate++;
             }
         }

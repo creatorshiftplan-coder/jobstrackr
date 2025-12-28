@@ -11,7 +11,7 @@ import { AISearchResult } from "@/components/AISearchResult";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search as SearchIcon, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, GraduationCap } from "lucide-react";
+import { Search as SearchIcon, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, GraduationCap, Check } from "lucide-react";
 import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { Link, useNavigate } from "react-router-dom";
 import { INDIAN_STATES, EXAM_SECTORS, EDUCATION_QUALIFICATIONS } from "@/constants/filters";
@@ -240,54 +240,84 @@ export default function Search() {
 
             <TabsContent value="location" className="mt-4">
               <ScrollArea className="h-[45vh]">
-                <div className="flex flex-wrap gap-2 pr-4">
-                  {INDIAN_STATES.map((state) => (
-                    <Badge
-                      key={state}
-                      variant={selectedLocations.includes(state) ? "default" : "outline"}
-                      className="cursor-pointer hover:scale-105 transition-transform px-3 py-1.5"
-                      onClick={() => toggleLocation(state)}
-                    >
-                      {state}
-                      {selectedLocations.includes(state) && <X className="h-3 w-3 ml-1" />}
-                    </Badge>
-                  ))}
+                <div className="flex flex-col gap-2 pr-4">
+                  {INDIAN_STATES.map((state) => {
+                    const isSelected = selectedLocations.includes(state);
+                    return (
+                      <div
+                        key={state}
+                        onClick={() => toggleLocation(state)}
+                        className={`flex items-center gap-3 px-4 py-3.5 rounded-xl cursor-pointer transition-all border ${isSelected
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-card border-border hover:border-primary/50 hover:bg-secondary/30"
+                          }`}
+                      >
+                        <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${isSelected
+                          ? "bg-primary-foreground border-primary-foreground"
+                          : "border-muted-foreground/40"
+                          }`}>
+                          {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}
+                        </div>
+                        <span className="font-medium">{state}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </TabsContent>
 
             <TabsContent value="sector" className="mt-4">
               <ScrollArea className="h-[45vh]">
-                <div className="flex flex-wrap gap-2 pr-4">
-                  {EXAM_SECTORS.map((sector) => (
-                    <Badge
-                      key={sector}
-                      variant={selectedSectors.includes(sector) ? "default" : "outline"}
-                      className="cursor-pointer hover:scale-105 transition-transform px-3 py-1.5"
-                      onClick={() => toggleSector(sector)}
-                    >
-                      {sector}
-                      {selectedSectors.includes(sector) && <X className="h-3 w-3 ml-1" />}
-                    </Badge>
-                  ))}
+                <div className="flex flex-col gap-2 pr-4">
+                  {EXAM_SECTORS.map((sector) => {
+                    const isSelected = selectedSectors.includes(sector);
+                    return (
+                      <div
+                        key={sector}
+                        onClick={() => toggleSector(sector)}
+                        className={`flex items-center gap-3 px-4 py-3.5 rounded-xl cursor-pointer transition-all border ${isSelected
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-card border-border hover:border-primary/50 hover:bg-secondary/30"
+                          }`}
+                      >
+                        <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${isSelected
+                          ? "bg-primary-foreground border-primary-foreground"
+                          : "border-muted-foreground/40"
+                          }`}>
+                          {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}
+                        </div>
+                        <span className="font-medium">{sector}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </TabsContent>
 
             <TabsContent value="qualification" className="mt-4">
               <ScrollArea className="h-[45vh]">
-                <div className="flex flex-wrap gap-2 pr-4">
-                  {EDUCATION_QUALIFICATIONS.map((qual) => (
-                    <Badge
-                      key={qual}
-                      variant={selectedQualifications.includes(qual) ? "default" : "outline"}
-                      className="cursor-pointer hover:scale-105 transition-transform px-3 py-1.5"
-                      onClick={() => toggleQualification(qual)}
-                    >
-                      {qual}
-                      {selectedQualifications.includes(qual) && <X className="h-3 w-3 ml-1" />}
-                    </Badge>
-                  ))}
+                <div className="flex flex-col gap-2 pr-4">
+                  {EDUCATION_QUALIFICATIONS.map((qual) => {
+                    const isSelected = selectedQualifications.includes(qual);
+                    return (
+                      <div
+                        key={qual}
+                        onClick={() => toggleQualification(qual)}
+                        className={`flex items-center gap-3 px-4 py-3.5 rounded-xl cursor-pointer transition-all border ${isSelected
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-card border-border hover:border-primary/50 hover:bg-secondary/30"
+                          }`}
+                      >
+                        <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${isSelected
+                          ? "bg-primary-foreground border-primary-foreground"
+                          : "border-muted-foreground/40"
+                          }`}>
+                          {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}
+                        </div>
+                        <span className="font-medium">{qual}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </TabsContent>

@@ -256,11 +256,10 @@ const Index = () => {
               <section className="mb-8">
                 <SectionHeader title="Recommended Jobs" variant="dark" />
                 <div className="flex flex-col gap-4 px-5">
-                  {recommendedJobs.map((job, index) => (
+                  {recommendedJobs.map((job) => (
                     <RecommendedJobCard
                       key={job.id}
                       job={job}
-                      colorVariant={colorVariants[index % colorVariants.length]}
                     />
                   ))}
                 </div>
@@ -274,11 +273,10 @@ const Index = () => {
                 <section>
                   <SectionHeader title="All Jobs" variant="dark" />
                   <div className="grid grid-cols-2 gap-3 sm:gap-4 px-5">
-                    {filteredJobs.slice(0, 6).map((job, index) => (
+                    {filteredJobs.slice(0, 6).map((job) => (
                       <RecommendedJobCard
                         key={job.id}
                         job={job}
-                        colorVariant={colorVariants[index % colorVariants.length]}
                       />
                     ))}
                   </div>

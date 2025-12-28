@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -180,6 +180,32 @@ const getPhaseName = (statusData: any, phaseNumber: 1 | 2): string => {
   return phaseData?.name || `Phase ${phaseNumber}`;
 };
 
+// Helper function to format exam title with year (avoids duplication)
+const formatExamTitle = (examName: string | undefined, attemptYear: number): string => {
+  if (!examName) return `Exam ${attemptYear}`;
+
+  // Check if exam name already contains ANY year (20xx pattern)
+  const yearPattern = /\b20\d{2}\b/;
+  if (yearPattern.test(examName)) {
+    // Exam name already has a year, don't append another
+    return examName;
+  }
+
+  // No year in exam name, append the attempt year
+  return `${examName} ${attemptYear}`;
+};
+
+// Helper function to validate external URLs
+const isValidUrl = (url: string | null | undefined): boolean => {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
 interface TrackedJobCardProps {
   attempt: ExamAttempt;
 }
@@ -195,6 +221,16 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   const [decryptedPassword, setDecryptedPassword] = useState<string | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(0); // Seconds remaining in cooldown
+  const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Initialize from cached response in database - no auto-fetch
   const [statusData, setStatusData] = useState<any>(() => {
@@ -203,6 +239,28 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
 
   const exam = attempt.exams;
   const lastUpdatedAt = attempt.exams?.ai_last_updated_at;
+
+  // Helper to start cooldown timer
+  const startCooldown = (seconds: number) => {
+    // Clear existing interval
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+    }
+
+    setRefreshCooldown(seconds);
+    cooldownIntervalRef.current = setInterval(() => {
+      setRefreshCooldown((prev) => {
+        if (prev <= 1) {
+          if (cooldownIntervalRef.current) {
+            clearInterval(cooldownIntervalRef.current);
+            cooldownIntervalRef.current = null;
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   // Only called when user clicks "Refresh Status"
   const fetchStatus = async () => {
@@ -217,29 +275,11 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
       queryClient.invalidateQueries({ queryKey: ["exam_attempts"] });
 
       // Start 60-second cooldown after successful refresh
-      setRefreshCooldown(60);
-      const interval = setInterval(() => {
-        setRefreshCooldown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+      startCooldown(60);
     } catch (error: any) {
       toast.error(error.message || "Failed to refresh status");
       // Shorter cooldown on error (10 seconds)
-      setRefreshCooldown(10);
-      const interval = setInterval(() => {
-        setRefreshCooldown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+      startCooldown(10);
     } finally {
       setIsLoadingStatus(false);
     }
@@ -332,7 +372,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
         <div className="flex items-center justify-between p-4">
           <div className="flex-1">
             <h3 className="font-semibold text-foreground">
-              {exam?.name} {attempt.year}
+              {formatExamTitle(exam?.name, attempt.year)}
             </h3>
             {exam?.conducting_body && (
               <p className="text-xs text-muted-foreground mt-0.5">{exam.conducting_body}</p>
@@ -487,7 +527,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                         ? "Download from the official website."
                         : "Will be available after Phase 1 result."}
                     </p>
-                    {getPhaseData(statusData, 2)?.admit_card_link && isAdmitCardAvailable(statusData, 2) && (
+                    {isValidUrl(getPhaseData(statusData, 2)?.admit_card_link) && isAdmitCardAvailable(statusData, 2) && (
                       <a
                         href={getPhaseData(statusData, 2).admit_card_link}
                         target="_blank"
@@ -562,7 +602,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                               ? `Expected on ${resultInfo.date}`
                               : "Result date will be announced."}
                         </p>
-                        {getPhaseData(statusData, 2)?.result_link && resultInfo.isReleased && (
+                        {isValidUrl(getPhaseData(statusData, 2)?.result_link) && resultInfo.isReleased && (
                           <a
                             href={getPhaseData(statusData, 2).result_link}
                             target="_blank"
@@ -617,7 +657,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                       ? "Download from the official website."
                       : "Will be available soon."}
                   </p>
-                  {statusData?.admit_card_link && isPhaseComplete("admit_card") && (
+                  {isValidUrl(statusData?.admit_card_link) && isPhaseComplete("admit_card") && (
                     <a
                       href={statusData.admit_card_link}
                       target="_blank"
@@ -692,7 +732,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                             ? `Expected on ${resultInfo.date}`
                             : "Result date will be announced."}
                       </p>
-                      {statusData?.result_link && resultInfo.isReleased && (
+                      {isValidUrl(statusData?.result_link) && resultInfo.isReleased && (
                         <a
                           href={statusData.result_link}
                           target="_blank"

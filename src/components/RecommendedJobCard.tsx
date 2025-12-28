@@ -1,31 +1,26 @@
 import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
-import { Building2, Users, Calendar } from "lucide-react";
+import { Building2, Users, Calendar, GraduationCap, Tag } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { SaveJobButton } from "@/components/SaveJobButton";
+import { Badge } from "@/components/ui/badge";
+import { isTBDDateDisplay, inferCategory, shortenQualification } from "@/lib/jobUtils";
 
 interface RecommendedJobCardProps {
   job: Job;
-  colorVariant?: "pink" | "blue" | "green" | "orange";
 }
-
-// Check if last_date_display contains TBD-like values
-const isTBDDateDisplay = (displayValue: string | null): boolean => {
-  if (!displayValue) return false;
-  const tbdPatterns = ['tbd', 'to be announced', 'walk in', 'walk-in', 'walkin', 'n/a', 'not available'];
-  const lowerValue = displayValue.toLowerCase().trim();
-  return tbdPatterns.some(pattern => lowerValue.includes(pattern));
-};
 
 export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
   const { getLogoByName } = useConductingBodyLogos();
   const logoUrl = getLogoByName(job.department);
 
   const daysLeft = differenceInDays(new Date(job.last_date), new Date());
-  const isUrgent = daysLeft <= 7 && daysLeft >= 0;
   const isExpired = daysLeft < 0;
   const isTBDDate = isTBDDateDisplay(job.last_date_display);
+
+  const category = inferCategory(job.department, job.title);
+  const shortQualification = shortenQualification(job.qualification);
 
   const formatVacancy = (vacancies: number | null, vacanciesDisplay: string | null) => {
     if (vacanciesDisplay) return vacanciesDisplay;
@@ -67,6 +62,18 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
               {job.department}
             </p>
           </div>
+        </div>
+
+        {/* Category & Qualification Tags */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          <Badge variant="secondary" className="bg-primary/10 text-primary border-0 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1">
+            <Tag className="h-3 w-3" />
+            {category}
+          </Badge>
+          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1">
+            <GraduationCap className="h-3 w-3" />
+            {shortQualification}
+          </Badge>
         </div>
 
         {/* Spacer */}
