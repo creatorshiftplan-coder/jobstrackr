@@ -12,11 +12,11 @@ import { AuthRequiredProvider } from "@/components/AuthRequiredDialog";
 import { Loader2 } from "lucide-react";
 
 // Eager load critical routes
-import Index from "./pages/Index";
 import Welcome from "./pages/Welcome";
 import Auth from "./pages/Auth";
 
 // Lazy load secondary routes
+const Index = lazy(() => import("./pages/Index"));
 const JobDetails = lazy(() => import("./pages/JobDetails"));
 const Search = lazy(() => import("./pages/Search"));
 const Saved = lazy(() => import("./pages/Saved"));

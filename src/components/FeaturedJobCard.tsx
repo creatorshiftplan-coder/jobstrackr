@@ -60,9 +60,6 @@ export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
               </Badge>
             )}
             <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0 rounded-full text-[10px] sm:text-xs flex-shrink-0">
-              Full-Time
-            </Badge>
-            <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0 rounded-full text-[10px] sm:text-xs flex-shrink-0">
               Govt
             </Badge>
           </div>

@@ -120,7 +120,7 @@ export function JobCard({ job }: JobCardProps) {
               <div className="h-7 w-7 rounded-lg bg-warning/10 flex items-center justify-center flex-shrink-0">
                 <Calendar className="h-3.5 w-3.5 text-warning" />
               </div>
-              <span className="truncate">
+              <span className="truncate text-red-500 dark:text-red-400 font-medium">
                 <span className="hidden sm:inline">Last date: </span>
                 {job.last_date_display || format(new Date(job.last_date), "dd MMM yyyy")}
               </span>

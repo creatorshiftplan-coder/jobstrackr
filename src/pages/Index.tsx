@@ -100,9 +100,9 @@ const Index = () => {
     !sectorCardSkipped &&
     !preferencesSaved;
 
-  // Active exams from user's tracked exams (top 4)
+  // Active exams from user's tracked exams (show all)
   const activeExams = useMemo(() => {
-    return userExams.slice(0, 4);
+    return userExams;
   }, [userExams]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {

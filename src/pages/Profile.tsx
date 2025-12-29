@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { EmbeddedProfileProgress } from "@/components/ProfileCompleteness";
 import { GUEST_PROFILE, GUEST_EDUCATION } from "@/lib/guestData";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
+import { isAdmitCardReleased, isResultReleased } from "@/lib/examStatusUtils";
 
 export default function Profile() {
   const { user, loading, isGuestMode } = useAuth();
@@ -87,8 +88,8 @@ export default function Profile() {
 
   // Stats calculations
   const savedExamsCount = savedJobs?.length || 0;
-  const admitCardAwaitedCount = userExams?.filter(e => e.status === "tracking" || e.status === "applied")?.length || 0;
-  const resultCount = userExams?.filter(e => e.status === "result")?.length || 0;
+  const admitCardAwaitedCount = userExams?.filter(e => isAdmitCardReleased(e as any))?.length || 0;
+  const resultCount = userExams?.filter(e => isResultReleased(e as any))?.length || 0;
 
   // Format date of birth
   const dobValue = isGuestMode ? GUEST_PROFILE.date_of_birth : profile?.date_of_birth;
@@ -172,7 +173,7 @@ export default function Profile() {
               </div>
               <div className="flex flex-col items-center">
                 <span className="text-2xl font-bold text-foreground">{admitCardAwaitedCount}</span>
-                <span className="text-xs text-muted-foreground text-center">Admit card Awaited</span>
+                <span className="text-xs text-muted-foreground text-center">Admit Card Released</span>
               </div>
               <div className="flex flex-col items-center">
                 <span className="text-2xl font-bold text-foreground">{resultCount}</span>
