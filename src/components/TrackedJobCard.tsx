@@ -162,12 +162,21 @@ const getExamDetailsText = (statusData: any, phaseNumber: 1 | 2 = 1): string => 
 // Helper function to check if admit card is available (phase-aware)
 const isAdmitCardAvailable = (statusData: any, phaseNumber: 1 | 2 = 1): boolean => {
   const phaseData = getPhaseData(statusData, phaseNumber);
-  if (phaseData?.admit_card_available) return true;
+  // CRITICAL: Use strict boolean check - must be explicitly true, not just truthy
+  // This prevents false positives when AI returns strings like "February 7 expected"
+  if (phaseData?.admit_card_available === true) return true;
+
+  // CRITICAL: If explicit flag is FALSE, trust it over status string and return false immediately
+  if (phaseData?.admit_card_available === false) return false;
 
   // Backward compat for Phase 1
   if (phaseNumber === 1) {
     const status = statusData?.current_status;
-    return status === "admit_card_available" || status === "exam_scheduled" ||
+    // If we have a global flag capable of saying no, check it too
+    if (statusData?.admit_card_available === false) return false;
+
+    // Note: Removed "exam_scheduled" - being scheduled doesn't mean admit card is released
+    return status === "admit_card_available" ||
       status === "exam_completed" || status === "result_declared";
   }
 
@@ -308,7 +317,18 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
     if (!statusData) return false;
     const status = statusData.current_status;
     if (phase === "admit_card") {
-      return status === "admit_card_available" || status === "exam_scheduled" ||
+      // Check both status AND the explicit admit_card_available flag for accuracy
+      const admitCardFlag = statusData?.admit_card_available === true ||
+        statusData?.phases?.phase1?.admit_card_available === true;
+
+      // CRITICAL: If explicit flag says FALSE, trust it over status string (which might be hallucinated)
+      if (statusData?.admit_card_available === false ||
+        statusData?.phases?.phase1?.admit_card_available === false) {
+        return false;
+      }
+
+      // Note: Removed "exam_scheduled" - being scheduled doesn't mean admit card is released
+      return admitCardFlag || status === "admit_card_available" ||
         status === "exam_completed" || status === "result_declared";
     }
     if (phase === "exam") {

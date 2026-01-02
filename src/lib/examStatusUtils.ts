@@ -28,6 +28,30 @@ export interface AIExamResponse {
         predicted_date?: string;
         phase?: number;
     }>;
+    phases?: {
+        phase1?: {
+            name?: string;
+            status?: string;
+            admit_card_available?: boolean;
+            admit_card_link?: string;
+            exam_date?: string;
+            exam_details?: string;
+            result_available?: boolean;
+            result_link?: string;
+            result_date?: string;
+        };
+        phase2?: {
+            name?: string;
+            status?: string;
+            admit_card_available?: boolean;
+            admit_card_link?: string;
+            exam_date?: string;
+            exam_details?: string;
+            result_available?: boolean;
+            result_link?: string;
+            result_date?: string;
+        };
+    };
 }
 
 export interface ExamAttempt {
@@ -62,6 +86,7 @@ export function isResultReleased(attempt: ExamAttempt): boolean {
     }
 
     // Check AI cached response for result_available
+    // CRITICAL: Use strict boolean check to avoid truthy string values
     if (aiResponse?.result_available === true) {
         return true;
     }
@@ -69,11 +94,18 @@ export function isResultReleased(attempt: ExamAttempt): boolean {
         return true;
     }
 
-    // Check phase 1 data
+    // Check phase 1 data (also check phases.phase1 for new format)
     if (aiResponse?.phase_1?.result_available === true) {
         return true;
     }
     if (aiResponse?.phase_1?.status === "result_declared") {
+        return true;
+    }
+    // New phases format
+    if (aiResponse?.phases?.phase1?.result_available === true) {
+        return true;
+    }
+    if (aiResponse?.phases?.phase1?.status === "result_declared") {
         return true;
     }
 
@@ -83,28 +115,49 @@ export function isResultReleased(attempt: ExamAttempt): boolean {
 /**
  * Check if the admit card has been released for an exam
  */
+// Helper function to check if admit card is released
 export function isAdmitCardReleased(attempt: ExamAttempt): boolean {
     const status = attempt.status;
     const aiResponse = attempt.exams?.ai_cached_response;
 
+    // CRITICAL: If explicit flag is FALSE, trust it over status string and return false immediately
+    if (aiResponse?.admit_card_available === false) {
+        return false;
+    }
+    // Check new phases format for explicit false
+    if (aiResponse?.phases?.phase1?.admit_card_available === false) {
+        return false;
+    }
+
     // Check attempt status
-    if (status === "admit_card_available" || status === "exam_scheduled") {
+    // Note: Removed "exam_scheduled" - being scheduled doesn't mean admit card is released
+    if (status === "admit_card_available") {
         return true;
     }
 
-    // Check AI cached response for admit_card_available
+    // Check AI cached response for verifyable true flag
     if (aiResponse?.admit_card_available === true) {
         return true;
     }
-    if (aiResponse?.current_status === "admit_card_available" || aiResponse?.current_status === "exam_scheduled") {
+
+    // Note: Removed "exam_scheduled" from status check
+    if (aiResponse?.current_status === "admit_card_available") {
         return true;
     }
 
-    // Check phase 1 data
+    // Check phase 1 data (old format)
     if (aiResponse?.phase_1?.admit_card_available === true) {
         return true;
     }
-    if (aiResponse?.phase_1?.status === "admit_card_available" || aiResponse?.phase_1?.status === "exam_scheduled") {
+    if (aiResponse?.phase_1?.status === "admit_card_available") {
+        return true;
+    }
+
+    // Check phases.phase1 (new format from AI)
+    if (aiResponse?.phases?.phase1?.admit_card_available === true) {
+        return true;
+    }
+    if (aiResponse?.phases?.phase1?.status === "admit_card_available") {
         return true;
     }
 

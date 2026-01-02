@@ -194,7 +194,7 @@ Return ONLY this JSON format:
     "phase1": {
       "name": "Prelims/Tier-1/CBT/Stage-1 (use official name)",
       "status": "not_applicable|not_notified|registration_open|admit_card_available|exam_scheduled|exam_completed|result_declared",
-      "admit_card_available": true/false,
+      "admit_card_available": true/false (MUST be false if admit card is only announced/expected. Only set true if candidates can download it NOW),
       "admit_card_link": "URL or null",
       "exam_date": "YYYY-MM-DD or null",
       "exam_details": "Exam timing, centers info",
@@ -322,6 +322,48 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
       if (jsonStr.startsWith("```")) jsonStr = jsonStr.slice(3);
       if (jsonStr.endsWith("```")) jsonStr = jsonStr.slice(0, -3);
       result = JSON.parse(jsonStr.trim());
+
+      // Validate and normalize boolean fields in AI response
+      if (result && typeof result === 'object') {
+        const res = result as Record<string, any>;
+        // Normalize admit_card_available to strict boolean
+        if ('admit_card_available' in res) {
+          res.admit_card_available = res.admit_card_available === true;
+        }
+        // Normalize phases
+        if (res.phases?.phase1?.admit_card_available !== undefined) {
+          res.phases.phase1.admit_card_available =
+            res.phases.phase1.admit_card_available === true;
+        }
+        if (res.phases?.phase2?.admit_card_available !== undefined) {
+          res.phases.phase2.admit_card_available =
+            res.phases.phase2.admit_card_available === true;
+        }
+        // Same for result_available
+        if ('result_available' in res) {
+          res.result_available = res.result_available === true;
+        }
+
+        // Ensure future dates don't have "available" flags set to true
+        // This is a defensive check against AI hallucinations
+        const today = new Date();
+        if (res.phases?.phase1?.admit_card_available === true && res.phases?.phase1?.exam_date) {
+          // If exam is more than 30 days away, admit card is unlikely to be available
+          // This is a heuristic, but helps prevent obvious errors
+          try {
+            const examDate = new Date(res.phases.phase1.exam_date);
+            const diffTime = examDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays > 30) {
+              console.log("Defensive check: Unsetting admit_card_available because exam is > 30 days away");
+              res.phases.phase1.admit_card_available = false;
+              if ('admit_card_available' in res) res.admit_card_available = false;
+            }
+          } catch (e) {
+            // Ignore date parsing errors
+          }
+        }
+      }
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError);
       result = { raw_response: aiContent };
