@@ -25,8 +25,10 @@ export default function ExamTracker() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-card px-4 py-4">
-          <Skeleton className="h-6 w-32" />
+        <header className="sticky top-0 z-40 bg-card">
+          <div className="px-4 h-14 flex items-center">
+            <Skeleton className="h-6 w-32" />
+          </div>
         </header>
         <main className="px-4 py-4 space-y-4">
           <Skeleton className="h-40 w-full rounded-lg" />
@@ -40,14 +42,14 @@ export default function ExamTracker() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl px-4 py-2 border-b border-primary-foreground/10">
-          <div className="flex items-center justify-between gap-2">
+        <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl border-b border-primary-foreground/10">
+          <div className="flex items-center justify-between gap-2 px-4 h-14">
             <Link to="/more" className="flex-shrink-0">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
                 <MenuBarsIcon className="h-5 w-5 text-primary" />
               </div>
             </Link>
-            <h1 className="font-display font-bold text-lg sm:text-xl text-primary-foreground flex items-center gap-2 min-w-0">
+            <h1 className="font-display font-bold text-lg text-primary-foreground flex items-center gap-2 min-w-0">
               <CalendarDays className="h-5 w-5 flex-shrink-0" />
               <span className="truncate">My Exams</span>
             </h1>
@@ -91,14 +93,14 @@ export default function ExamTracker() {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl px-4 py-2 border-b border-primary-foreground/10">
-        <div className="flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl border-b border-primary-foreground/10">
+        <div className="flex items-center justify-between gap-2 px-4 h-14">
           <Link to="/more" className="flex-shrink-0">
             <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
               <MenuBarsIcon className="h-5 w-5 text-primary" />
             </div>
           </Link>
-          <h1 className="font-display font-bold text-lg sm:text-xl text-primary-foreground flex items-center gap-2 min-w-0">
+          <h1 className="font-display font-bold text-lg text-primary-foreground flex items-center gap-2 min-w-0">
             <CalendarDays className="h-5 w-5 flex-shrink-0" />
             <span className="truncate">My Exams</span>
           </h1>

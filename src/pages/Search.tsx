@@ -155,23 +155,23 @@ export default function Search() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl px-4 py-2 border-b border-primary-foreground/10">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl border-b border-primary-foreground/10">
+        <div className="flex items-center gap-3 px-4 h-14">
           <Link to="/more">
-            <div className="h-10 w-10 rounded-full bg-secondary/80 flex items-center justify-center hover:bg-secondary transition-colors">
+            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center hover:bg-white/90 transition-colors shadow-sm">
               <MenuBarsIcon className="h-5 w-5 text-primary" />
             </div>
           </Link>
-          <h1 className="font-display font-bold text-xl text-primary-foreground flex-1 text-center tracking-tight">Explore Jobs</h1>
+          <h1 className="font-display font-bold text-lg text-primary-foreground flex-1 text-center tracking-tight">Explore Jobs</h1>
           <Link to="/saved">
-            <div className="h-10 w-10 rounded-full bg-secondary/80 flex items-center justify-center hover:bg-secondary transition-colors">
+            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center hover:bg-white/90 transition-colors shadow-sm">
               <Bookmark className="h-5 w-5 text-primary" />
             </div>
           </Link>
         </div>
-        <div className={`flex gap-2 transition-all duration-300 ease-in-out overflow-hidden ${isSearchBarVisible ? 'max-h-20 opacity-100 mt-4' : 'max-h-0 opacity-0 mt-0'}`}>
+        <div className={`flex gap-2 px-4 transition-all duration-300 ease-in-out overflow-hidden ${isSearchBarVisible ? 'max-h-16 opacity-100 py-2' : 'max-h-0 opacity-0 py-0'}`}>
           <div className="relative flex-1">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground/70" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Job title, department, location..."
               value={query}
@@ -180,16 +180,16 @@ export default function Search() {
                 if (!e.target.value) clearAIResults();
               }}
 
-              className="pl-10 bg-primary-foreground/20 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/70 rounded-xl h-11 focus:ring-2 focus:ring-primary-foreground/30 transition-all"
+              className="pl-10 bg-white border-white/50 text-foreground placeholder:text-muted-foreground rounded-xl h-11 focus:ring-2 focus:ring-white/50 transition-all shadow-sm"
             />
           </div>
           <Button
             variant="secondary"
             size="icon"
             onClick={() => setIsFilterOpen(true)}
-            className="relative h-11 w-11 rounded-xl bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground border-0"
+            className="relative h-11 w-11 rounded-xl bg-white hover:bg-white/90 text-primary border-0 shadow-sm"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="h-7 w-7">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="h-6 w-6">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 4h9.75M10.5 4a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 4H7.5m3 16h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-8h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
             </svg>
             {totalFilters > 0 && (

@@ -18,6 +18,8 @@ export interface TrendingExam {
             predicted_date: string;
         }>;
         last_date_to_apply?: string;
+        latest_updates?: Array<string | { title?: string; description?: string }>;
+        eligibility?: string;
     } | null;
     ai_last_updated_at: string | null;
     tracking_count: number;

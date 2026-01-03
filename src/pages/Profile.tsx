@@ -46,14 +46,14 @@ export default function Profile() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-card px-4 pt-12 pb-4">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-40 bg-card">
+          <div className="flex items-center gap-3 px-4 h-14">
             <Link to="/more">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
                 <MenuBarsIcon className="h-5 w-5 text-primary" />
               </div>
             </Link>
-            <h1 className="font-display font-bold text-xl text-foreground flex-1 text-center">Profile</h1>
+            <h1 className="font-display font-bold text-lg text-foreground flex-1 text-center">Profile</h1>
             <Link to="/saved">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
                 <Bookmark className="h-5 w-5 text-primary" />
@@ -119,8 +119,8 @@ export default function Profile() {
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 pb-12">
-        <header className="sticky top-0 z-40 px-4 pt-4 pb-4">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-40">
+          <div className="flex items-center gap-3 px-4 h-14">
             <Link to="/more">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
                 <MenuBarsIcon className="h-5 w-5 text-primary" />
