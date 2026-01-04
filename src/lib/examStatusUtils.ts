@@ -120,7 +120,7 @@ export function isAdmitCardReleased(attempt: ExamAttempt): boolean {
     const status = attempt.status;
     const aiResponse = attempt.exams?.ai_cached_response;
 
-    // CRITICAL: If explicit flag is FALSE, trust it over status string and return false immediately
+    // CRITICAL: If explicit flag is FALSE, trust it over everything else and return false immediately
     if (aiResponse?.admit_card_available === false) {
         return false;
     }
@@ -135,7 +135,7 @@ export function isAdmitCardReleased(attempt: ExamAttempt): boolean {
         return true;
     }
 
-    // Check AI cached response for verifyable true flag
+    // Check AI cached response for verifiable true flag
     if (aiResponse?.admit_card_available === true) {
         return true;
     }
@@ -158,6 +158,31 @@ export function isAdmitCardReleased(attempt: ExamAttempt): boolean {
         return true;
     }
     if (aiResponse?.phases?.phase1?.status === "admit_card_available") {
+        return true;
+    }
+
+    // Text-based keyword matching (matches examStatus.ts logic used by TrendingExamCard)
+    // This ensures consistency between Trending page and TrackedJobCard
+    const statusText = (aiResponse?.current_status || "").toLowerCase();
+    const summaryText = ((aiResponse as any)?.summary || "").toLowerCase();
+    const combinedText = `${statusText} ${summaryText}`;
+
+    const admitReleasedKeywords = [
+        "admit card released", "admit cards released", "admit cards out",
+        "admit card out", "admit card available", "hall ticket released",
+        "hall ticket available", "download admit card", "e-admit card"
+    ];
+
+    // Check for exact keyword matches
+    if (admitReleasedKeywords.some(kw => combinedText.includes(kw))) {
+        return true;
+    }
+
+    // Check for "admit/hall ticket" + "released/out/available/download" combination
+    const hasAdmitWords = combinedText.includes("admit") || combinedText.includes("hall ticket");
+    const hasReleasedWords = combinedText.includes("released") || combinedText.includes("out") ||
+        combinedText.includes("available") || combinedText.includes("download");
+    if (hasAdmitWords && hasReleasedWords) {
         return true;
     }
 

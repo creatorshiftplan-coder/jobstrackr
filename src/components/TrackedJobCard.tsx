@@ -162,19 +162,39 @@ const getExamDetailsText = (statusData: any, phaseNumber: 1 | 2 = 1): string => 
 // Helper function to check if admit card is available (phase-aware)
 const isAdmitCardAvailable = (statusData: any, phaseNumber: 1 | 2 = 1): boolean => {
   const phaseData = getPhaseData(statusData, phaseNumber);
+
+  // CRITICAL: If explicit flag is FALSE, trust it over everything else and return false immediately
+  if (phaseData?.admit_card_available === false) return false;
+  if (phaseNumber === 1 && statusData?.admit_card_available === false) return false;
+
   // CRITICAL: Use strict boolean check - must be explicitly true, not just truthy
   // This prevents false positives when AI returns strings like "February 7 expected"
   if (phaseData?.admit_card_available === true) return true;
 
-  // CRITICAL: If explicit flag is FALSE, trust it over status string and return false immediately
-  if (phaseData?.admit_card_available === false) return false;
+  // Text-based keyword matching (matches examStatus.ts logic used by TrendingExamCard)
+  // This ensures consistency between Trending page and TrackedJobCard
+  const statusText = (statusData?.current_status || "").toLowerCase();
+  const summaryText = (statusData?.summary || "").toLowerCase();
+  const combinedText = `${statusText} ${summaryText}`;
 
-  // Backward compat for Phase 1
+  const admitReleasedKeywords = [
+    "admit card released", "admit cards released", "admit cards out",
+    "admit card out", "admit card available", "hall ticket released",
+    "hall ticket available", "download admit card", "e-admit card"
+  ];
+
+  // Check for exact keyword matches
+  if (admitReleasedKeywords.some(kw => combinedText.includes(kw))) return true;
+
+  // Check for "admit/hall ticket" + "released/out/available/download" combination
+  const hasAdmitWords = combinedText.includes("admit") || combinedText.includes("hall ticket");
+  const hasReleasedWords = combinedText.includes("released") || combinedText.includes("out") ||
+    combinedText.includes("available") || combinedText.includes("download");
+  if (hasAdmitWords && hasReleasedWords) return true;
+
+  // Backward compat for Phase 1 status checks
   if (phaseNumber === 1) {
     const status = statusData?.current_status;
-    // If we have a global flag capable of saying no, check it too
-    if (statusData?.admit_card_available === false) return false;
-
     // Note: Removed "exam_scheduled" - being scheduled doesn't mean admit card is released
     return status === "admit_card_available" ||
       status === "exam_completed" || status === "result_declared";
@@ -317,19 +337,8 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
     if (!statusData) return false;
     const status = statusData.current_status;
     if (phase === "admit_card") {
-      // Check both status AND the explicit admit_card_available flag for accuracy
-      const admitCardFlag = statusData?.admit_card_available === true ||
-        statusData?.phases?.phase1?.admit_card_available === true;
-
-      // CRITICAL: If explicit flag says FALSE, trust it over status string (which might be hallucinated)
-      if (statusData?.admit_card_available === false ||
-        statusData?.phases?.phase1?.admit_card_available === false) {
-        return false;
-      }
-
-      // Note: Removed "exam_scheduled" - being scheduled doesn't mean admit card is released
-      return admitCardFlag || status === "admit_card_available" ||
-        status === "exam_completed" || status === "result_declared";
+      // Use the shared isAdmitCardAvailable helper for consistent detection
+      return isAdmitCardAvailable(statusData, 1);
     }
     if (phase === "exam") {
       return status === "exam_completed" || status === "result_declared";
