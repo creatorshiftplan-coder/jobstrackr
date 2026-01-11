@@ -35,7 +35,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   const { showAuthRequired } = useAuthRequired();
 
   const currentYear = new Date().getFullYear();
-  const years = [currentYear, currentYear + 1];
+  const years = [currentYear - 1, currentYear, currentYear + 1];
 
   // Filter exams based on search query
   const filteredExams = searchQuery.trim()
@@ -74,18 +74,35 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
     }
 
     try {
+      // Check if user already tracks this exam for this year
+      const { data: existingAttempt } = await supabase
+        .from("exam_attempts")
+        .select("id")
+        .eq("exam_id", selectedExamId)
+        .eq("year", parseInt(selectedYear))
+        .maybeSingle();
+
+      if (existingAttempt) {
+        toast.error("You're already tracking this exam for " + selectedYear);
+        return;
+      }
+
       await addExamAttempt.mutateAsync({
         examId: selectedExamId,
         year: parseInt(selectedYear),
       });
 
-      toast.success("Exam added to tracker!");
       const exam = exams.find(e => e.id === selectedExamId);
+      toast.success("Exam added to tracker!");
       trackExamTracked(selectedExamId, exam?.name || "");
       setOpen(false);
       resetState();
-    } catch (error) {
-      toast.error("Failed to add exam");
+    } catch (error: any) {
+      if (error.message?.includes("duplicate") || error.code === "23505") {
+        toast.error("This exam is already in your tracker");
+      } else {
+        toast.error("Failed to add exam");
+      }
     }
   };
 
@@ -162,8 +179,9 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
       toast.error("Please enter an exam name to search");
       return;
     }
-    await searchWithAI(searchQuery);
-    trackAISearchUsed(searchQuery, aiResults.length);
+    const results = await searchWithAI(searchQuery);
+    // Track after search completes with actual result count
+    trackAISearchUsed(searchQuery, results?.length || 0);
   };
 
   const handleAddAIResult = async (result: any) => {
@@ -172,7 +190,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
       const { data: { session } } = await supabase.auth.getSession();
 
       const response = await fetch(
-        `https://fdxksytpdfgmbkttipdf.supabase.co/functions/v1/ai-job-search`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-job-search`,
         {
           method: "POST",
           headers: {

@@ -222,7 +222,8 @@ Return ONLY this JSON format:
     { "event_type": "application_open|application_close|admit_card|exam_date|result", "phase": 1/2, "predicted_date": "YYYY-MM-DD or null", "confidence": "high|medium|low", "notes": "details" }
   ],
   "latest_updates": ["list of recent news"],
-  "recommendations": ["suggestions"]
+  "recommendations": ["suggestions"],
+  "confidence_score": 0-100 (your overall confidence in the accuracy of this entire response, based on how recent and reliable the sources are)
 }`;
         break;
       }
@@ -369,23 +370,50 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
       result = { raw_response: aiContent };
     }
 
-    // Cache status_update results
-    if (action === "status_update" && exam_attempt_id) {
-      const { data: attemptData } = await supabase
-        .from("exam_attempts")
-        .select("exam_id")
-        .eq("id", exam_attempt_id)
-        .single();
+    // Helper function to validate AI response before caching
+    const isValidStatusResponse = (res: Record<string, unknown>): boolean => {
+      // Must be an object
+      if (!res || typeof res !== 'object') return false;
 
-      if (attemptData?.exam_id) {
-        await supabase
-          .from("exams")
-          .update({
-            ai_cached_response: result,
-            ai_last_updated_at: new Date().toISOString(),
-            ai_updated_by: "gemini",
-          })
-          .eq("id", attemptData.exam_id);
+      // Must not be just a raw_response fallback (parse failure)
+      if ('raw_response' in res && Object.keys(res).length === 1) return false;
+
+      // Check confidence threshold (skip if < 70)
+      const confidence = typeof res.confidence_score === 'number' ? res.confidence_score : 100;
+      if (confidence < 70) {
+        console.warn(`Skipping cache update: confidence score ${confidence} < 70`);
+        return false;
+      }
+
+      // Must contain at least one meaningful field
+      const hasStatus = 'current_status' in res && res.current_status;
+      const hasSummary = 'summary' in res && res.summary;
+      const hasPhases = 'phases' in res && res.phases;
+
+      return !!(hasStatus || hasSummary || hasPhases);
+    };
+
+    // Cache status_update results (only if valid)
+    if (action === "status_update" && exam_attempt_id) {
+      if (!isValidStatusResponse(result)) {
+        console.warn("Skipping cache update: AI response is empty or invalid", result);
+      } else {
+        const { data: attemptData } = await supabase
+          .from("exam_attempts")
+          .select("exam_id")
+          .eq("id", exam_attempt_id)
+          .single();
+
+        if (attemptData?.exam_id) {
+          await supabase
+            .from("exams")
+            .update({
+              ai_cached_response: result,
+              ai_last_updated_at: new Date().toISOString(),
+              ai_updated_by: "gemini",
+            })
+            .eq("id", attemptData.exam_id);
+        }
       }
     }
 

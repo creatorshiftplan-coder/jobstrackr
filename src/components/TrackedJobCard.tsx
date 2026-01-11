@@ -251,12 +251,16 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(0); // Seconds remaining in cooldown
   const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const passwordTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup interval on unmount
+  // Cleanup intervals and timeouts on unmount
   useEffect(() => {
     return () => {
       if (cooldownIntervalRef.current) {
         clearInterval(cooldownIntervalRef.current);
+      }
+      if (passwordTimeoutRef.current) {
+        clearTimeout(passwordTimeoutRef.current);
       }
     };
   }, []);
@@ -375,7 +379,10 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
           setDecryptedPassword(password);
           setShowPassword(true);
           // Auto-hide password after 30 seconds for security
-          setTimeout(() => {
+          if (passwordTimeoutRef.current) {
+            clearTimeout(passwordTimeoutRef.current);
+          }
+          passwordTimeoutRef.current = setTimeout(() => {
             setShowPassword(false);
             setDecryptedPassword(null);
           }, 30000);
@@ -466,11 +473,11 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                     <span>Phase 1 Progress</span>
                     <span>{getProgress()}%</span>
                   </div>
-                  <Progress value={getProgress()} className="h-2.5 bg-white/50 shadow-sm [&>div]:bg-primary" />
+                  <Progress value={getProgress()} className="h-2.5 bg-muted/50 dark:bg-muted/30 shadow-sm [&>div]:bg-primary" />
                 </div>
                 {/* AI Summary Preview */}
                 {statusData?.summary && (
-                  <div className="mt-3 p-2 bg-white/60 rounded-lg border border-blue-100">
+                  <div className="mt-3 p-2 bg-card/60 dark:bg-card/40 rounded-lg border border-blue-100 dark:border-blue-800">
                     <p className="text-xs text-foreground line-clamp-2">{statusData.summary}</p>
                   </div>
                 )}
@@ -509,7 +516,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 1
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : "bg-white text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
+                  : "bg-card dark:bg-card/80 text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               )}
               onClick={() => setActivePhase(1)}
             >
@@ -520,7 +527,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 2
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : "bg-white text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20",
+                  : "bg-card dark:bg-card/80 text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20",
                 !isPhase2Available(statusData) && "opacity-50"
               )}
               onClick={() => setActivePhase(2)}
@@ -534,7 +541,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             isPhase2Available(statusData) ? (
               <>
                 {/* Admit Card Section for Phase 2 */}
-                <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+                <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <FileText className="h-4 w-4 text-primary" />
                   </div>
@@ -574,7 +581,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                   const examDate = getExamDateFromResponse(statusData, 2);
                   const examDetails = getExamDetailsText(statusData, 2);
                   return (
-                    <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+                    <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
                       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <Calendar className="h-4 w-4 text-primary" />
                       </div>
@@ -603,7 +610,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 {(() => {
                   const resultInfo = getResultInfoFromResponse(statusData, 2);
                   return (
-                    <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+                    <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
                       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <Clock className="h-4 w-4 text-primary" />
                       </div>
@@ -647,7 +654,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 })()}
               </>
             ) : (
-              <div className="text-center py-8 text-muted-foreground bg-white rounded-lg border border-border">
+              <div className="text-center py-8 text-muted-foreground bg-card dark:bg-card/80 rounded-lg border border-border">
                 <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm font-medium">
                   {statusData?.phases?.phase2?.status === "not_applicable"
@@ -672,7 +679,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
           ) : activePhase === 1 && statusData ? (
             <>
               {/* Admit Card Section */}
-              <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+              <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <FileText className="h-4 w-4 text-primary" />
                 </div>
@@ -704,7 +711,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 const examDate = getExamDateFromResponse(statusData);
                 const examDetails = getExamDetailsText(statusData);
                 return (
-                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+                  <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <Calendar className="h-4 w-4 text-primary" />
                     </div>
@@ -733,7 +740,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               {(() => {
                 const resultInfo = getResultInfoFromResponse(statusData);
                 return (
-                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-border">
+                  <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <Clock className="h-4 w-4 text-primary" />
                     </div>
@@ -782,12 +789,12 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                   <span className="text-muted-foreground">Phase 1 Progress</span>
                   <span className="font-medium text-primary">{getProgress()}%</span>
                 </div>
-                <Progress value={getProgress()} className="h-3 bg-white/50 shadow-sm [&>div]:bg-primary" />
+                <Progress value={getProgress()} className="h-3 bg-muted/50 dark:bg-muted/30 shadow-sm [&>div]:bg-primary" />
               </div>
 
               {/* Recent News Section */}
               {(statusData?.predicted_events?.length > 0 || statusData?.summary) && (
-                <div className="pt-2 border-t border-border bg-white rounded-lg p-3 mt-2">
+                <div className="pt-2 border-t border-border bg-card dark:bg-card/80 rounded-lg p-3 mt-2">
                   <div className="flex items-center gap-2 mb-3">
                     <Newspaper className="h-4 w-4 text-primary" />
                     <span className="font-medium text-sm">Recent News for {exam?.name}</span>
@@ -871,7 +878,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             </div>
 
             {hasCredentials ? (
-              <div className="space-y-2 bg-white rounded-lg p-3 border border-border">
+              <div className="space-y-2 bg-card dark:bg-card/80 rounded-lg p-3 border border-border">
                 {attempt.application_number && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Application No.</span>
@@ -911,7 +918,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 )}
               </div>
             ) : (
-              <div className="text-center py-3 bg-white rounded-lg border border-border">
+              <div className="text-center py-3 bg-card dark:bg-card/80 rounded-lg border border-border">
                 <p className="text-xs text-muted-foreground">
                   Add your application number, roll number & password
                 </p>

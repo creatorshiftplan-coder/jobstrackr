@@ -2,6 +2,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { useExams } from "@/hooks/useExams";
 import { useAuth } from "@/hooks/useAuth";
 import { TrackedJobCard } from "@/components/TrackedJobCard";
+import { ExamCardErrorBoundary } from "@/components/ExamCardErrorBoundary";
 import { ExamSearchSheet } from "@/components/ExamSearchSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -161,7 +162,9 @@ export default function ExamTracker() {
           ) : (
             <div className="space-y-3 px-2 pb-4">
               {userExams.map((attempt) => (
-                <TrackedJobCard key={attempt.id} attempt={attempt} />
+                <ExamCardErrorBoundary key={attempt.id}>
+                  <TrackedJobCard attempt={attempt} />
+                </ExamCardErrorBoundary>
               ))}
             </div>
           )}
