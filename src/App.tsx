@@ -32,6 +32,9 @@ const Documents = lazy(() => import("./pages/Documents"));
 const Help = lazy(() => import("./pages/Help"));
 const EditSectorPreferences = lazy(() => import("./pages/EditSectorPreferences"));
 const Trending = lazy(() => import("./pages/Trending"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const RefundPolicy = lazy(() => import("./pages/RefundPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Page loader component
@@ -82,6 +85,9 @@ const App = () => (
                       <Route path="/tracker" element={<ExamTracker />} />
                       <Route path="/trending" element={<Trending />} />
                       <Route path="/edit-sector-preferences" element={<EditSectorPreferences />} />
+                      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                      <Route path="/refund-policy" element={<RefundPolicy />} />
+                      <Route path="/terms-of-service" element={<TermsOfService />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </Suspense>

@@ -295,6 +295,38 @@ export default function Auth() {
                 {isLogin ? "Don't have an account? Sign up" : "Already have an account? Login"}
               </button>
             </div>
+
+            {/* Legal Links */}
+            <div className="mt-4 text-center">
+              <p className="text-xs text-muted-foreground">
+                {!isLogin ? (
+                  <>
+                    By signing up, you agree to our{" "}
+                    <Link to="/terms-of-service" className="text-primary hover:underline">
+                      Terms of Service
+                    </Link>
+                    {" "}and{" "}
+                    <Link to="/privacy-policy" className="text-primary hover:underline">
+                      Privacy Policy
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/terms-of-service" className="text-primary hover:underline">
+                      Terms of Service
+                    </Link>
+                    {" · "}
+                    <Link to="/privacy-policy" className="text-primary hover:underline">
+                      Privacy Policy
+                    </Link>
+                    {" · "}
+                    <Link to="/refund-policy" className="text-primary hover:underline">
+                      Refund Policy
+                    </Link>
+                  </>
+                )}
+              </p>
+            </div>
           </CardContent>
         </Card>
       </main>

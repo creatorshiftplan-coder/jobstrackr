@@ -3,7 +3,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { User, HelpCircle, LogOut, ChevronRight, Shield, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key, Sparkles } from "lucide-react";
+import { User, HelpCircle, LogOut, ChevronRight, Shield, ShieldCheck, CreditCard, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -244,6 +244,9 @@ export default function More() {
             {[
               ...(user ? [{ icon: Sparkles, label: "Sector Preferences", path: "/edit-sector-preferences" }] : []),
               { icon: HelpCircle, label: "Help & Support", path: "/help" },
+              { icon: ShieldCheck, label: "Privacy Policy", path: "/privacy-policy" },
+              { icon: CreditCard, label: "Refund Policy", path: "/refund-policy" },
+              { icon: FileText, label: "Terms of Service", path: "/terms-of-service" },
               ...(user && isAdmin ? [{ icon: Shield, label: "Admin Panel", path: "/admin" }] : []),
             ].map(({ icon: Icon, label, path }) => (
               <Link

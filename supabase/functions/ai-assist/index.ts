@@ -62,34 +62,52 @@ Deno.serve(async (req) => {
     }
 
     // Check if user is admin (admins bypass rate limit)
-    const { data: isAdminData } = await supabase.rpc("has_role", {
-      _user_id: user.id,
-      _role: "admin"
-    });
-    const isAdmin = isAdminData === true;
+    let isAdmin = false;
+    try {
+      const { data: isAdminData, error: adminError } = await supabase.rpc("has_role", {
+        _user_id: user.id,
+        _role: "admin"
+      });
+      if (adminError) {
+        console.error("Error checking admin role:", adminError);
+      } else {
+        isAdmin = isAdminData === true;
+      }
+    } catch (roleCheckError) {
+      console.error("Exception checking admin role:", roleCheckError);
+      // Continue as non-admin if check fails
+    }
 
     // Check rate limit only for non-admin users
     if (!isAdmin) {
-      const { data: rateLimitData } = await supabase.rpc("check_user_rate_limit", {
-        _user_id: user.id,
-        _daily_limit: DAILY_LIMIT,
-        _minute_limit: 1,
-      });
+      try {
+        const { data: rateLimitData, error: rateLimitError } = await supabase.rpc("check_user_rate_limit", {
+          _user_id: user.id,
+          _daily_limit: DAILY_LIMIT,
+          _minute_limit: 1,
+        });
 
-      if (rateLimitData && !rateLimitData.allowed) {
-        const errorMessage = rateLimitData.rate_limited
-          ? "Please wait a minute before making another AI request."
-          : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
+        if (rateLimitError) {
+          console.error("Error checking rate limit:", rateLimitError);
+          // Continue without rate limiting if check fails
+        } else if (rateLimitData && !rateLimitData.allowed) {
+          const errorMessage = rateLimitData.rate_limited
+            ? "Please wait a minute before making another AI request."
+            : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
 
-        return new Response(
-          JSON.stringify({
-            data: null,
-            error: errorMessage,
-            rate_limit: rateLimitData,
-            success: false,
-          }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+          return new Response(
+            JSON.stringify({
+              data: null,
+              error: errorMessage,
+              rate_limit: rateLimitData,
+              success: false,
+            }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch (rateLimitCheckError) {
+        console.error("Exception checking rate limit:", rateLimitCheckError);
+        // Continue without rate limiting if check fails
       }
     }
 
@@ -140,11 +158,19 @@ Return ONLY a JSON object:
 
         useGoogleSearch = true;
 
-        const { data: attemptData } = await supabase
+        const { data: attemptData, error: attemptFetchError } = await supabase
           .from("exam_attempts")
           .select("*, exams(*, ai_last_updated_at, ai_cached_response)")
           .eq("id", exam_attempt_id)
           .single();
+
+        if (attemptFetchError) {
+          console.error("Error fetching exam attempt:", attemptFetchError);
+          return new Response(
+            JSON.stringify({ data: null, error: `Database error: ${attemptFetchError.message}`, success: false }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
 
         if (!attemptData) {
           return new Response(
@@ -398,32 +424,52 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
       if (!isValidStatusResponse(result)) {
         console.warn("Skipping cache update: AI response is empty or invalid", result);
       } else {
-        const { data: attemptData } = await supabase
-          .from("exam_attempts")
-          .select("exam_id")
-          .eq("id", exam_attempt_id)
-          .single();
+        try {
+          const { data: attemptData, error: attemptError } = await supabase
+            .from("exam_attempts")
+            .select("exam_id")
+            .eq("id", exam_attempt_id)
+            .single();
 
-        if (attemptData?.exam_id) {
-          await supabase
-            .from("exams")
-            .update({
-              ai_cached_response: result,
-              ai_last_updated_at: new Date().toISOString(),
-              ai_updated_by: "gemini",
-            })
-            .eq("id", attemptData.exam_id);
+          if (attemptError) {
+            console.error("Error fetching exam attempt for cache:", attemptError);
+          } else if (attemptData?.exam_id) {
+            const { error: updateError } = await supabase
+              .from("exams")
+              .update({
+                ai_cached_response: result,
+                ai_last_updated_at: new Date().toISOString(),
+                ai_updated_by: "gemini",
+              })
+              .eq("id", attemptData.exam_id);
+
+            if (updateError) {
+              console.error("Error updating exam cache:", updateError);
+            }
+          }
+        } catch (cacheError) {
+          console.error("Error caching AI response:", cacheError);
+          // Continue without crashing - caching is non-critical
         }
       }
     }
 
-    // Log the update
-    await supabase.from("update_logs").insert({
-      user_id: user.id,
-      source: "ai_assist",
-      action,
-      new_data: result,
-    });
+    // Log the update (non-critical - don't crash if this fails)
+    try {
+      const { error: logError } = await supabase.from("update_logs").insert({
+        user_id: user.id,
+        source: "ai_assist",
+        action,
+        new_data: result,
+      });
+
+      if (logError) {
+        console.error("Error inserting update log:", logError);
+      }
+    } catch (logInsertError) {
+      console.error("Error logging update:", logInsertError);
+      // Continue without crashing - logging is non-critical
+    }
 
     return new Response(
       JSON.stringify({ data: result, error: null, success: true }),

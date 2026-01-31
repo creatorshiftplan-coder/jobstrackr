@@ -188,9 +188,62 @@ export function useAutoDiscover() {
             }
 
             const parseAgeLimit = (ageLimit?: string) => {
-                if (!ageLimit) return { min: 18, max: 65 };
-                const match = ageLimit.match(/(\d+)\s*[-–to]\s*(\d+)/);
-                if (match) return { min: parseInt(match[1]), max: parseInt(match[2]) };
+                if (!ageLimit) {
+                    console.log("No age limit provided, using default 18-65");
+                    return { min: 18, max: 65 };
+                }
+
+                console.log("Parsing age limit:", ageLimit);
+
+                // Try multiple patterns to extract age range
+                const rangePatterns = [
+                    /(\d+)\s*[-–—]\s*(\d+)/,           // 18-30, 18 - 30, 18–30
+                    /(\d+)\s*to\s*(\d+)/i,              // 18 to 30
+                    /min[:\s]*(\d+)[^\d].*max[:\s]*(\d+)/i,  // min: 18, max: 30
+                    /age[:\s]*(\d+)[^\d]+(\d+)/i,       // age: 18-30 or age 18 to 30
+                ];
+
+                for (const pattern of rangePatterns) {
+                    const match = ageLimit.match(pattern);
+                    if (match) {
+                        const min = parseInt(match[1]);
+                        const max = parseInt(match[2]);
+                        console.log(`Parsed age range: ${min}-${max}`);
+                        return { min, max };
+                    }
+                }
+
+                // If no range found, try to find max age only
+                const maxOnlyPatterns = [
+                    /max(?:imum)?[:\s]*(\d+)/i,         // max: 30, maximum: 30
+                    /below\s*(\d+)/i,                    // below 30
+                    /under\s*(\d+)/i,                    // under 30
+                    /upto\s*(\d+)/i,                     // upto 30
+                    /up\s*to\s*(\d+)/i,                  // up to 30
+                ];
+
+                for (const pattern of maxOnlyPatterns) {
+                    const match = ageLimit.match(pattern);
+                    if (match) {
+                        const max = parseInt(match[1]);
+                        console.log(`Parsed max age only: 18-${max}`);
+                        return { min: 18, max };
+                    }
+                }
+
+                // Last resort: find any two numbers in the string
+                const allNumbers = ageLimit.match(/\d+/g);
+                if (allNumbers && allNumbers.length >= 2) {
+                    const nums = allNumbers.map(n => parseInt(n)).filter(n => n >= 10 && n <= 70);
+                    if (nums.length >= 2) {
+                        const min = Math.min(...nums);
+                        const max = Math.max(...nums);
+                        console.log(`Extracted numbers: ${min}-${max}`);
+                        return { min, max };
+                    }
+                }
+
+                console.log("Could not parse age limit, using default 18-65");
                 return { min: 18, max: 65 };
             };
 

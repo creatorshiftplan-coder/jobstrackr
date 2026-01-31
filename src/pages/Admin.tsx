@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -408,14 +408,23 @@ export default function Admin() {
 
   // Refresh job data state
   const [refreshingJobId, setRefreshingJobId] = useState<string | null>(null);
+  const [quickRefreshingJobId, setQuickRefreshingJobId] = useState<string | null>(null);
   const [showRefreshPreview, setShowRefreshPreview] = useState(false);
+  const [showQuickRefreshPreview, setShowQuickRefreshPreview] = useState(false);
   const [refreshPreviewData, setRefreshPreviewData] = useState<{
     jobId: string;
     jobTitle: string;
     current: Record<string, any>;
     new: Record<string, any>;
   } | null>(null);
+  const [quickRefreshPreviewData, setQuickRefreshPreviewData] = useState<{
+    jobId: string;
+    jobTitle: string;
+    current: Record<string, any>;
+    new: Record<string, any>;
+  } | null>(null);
   const [applyingRefresh, setApplyingRefresh] = useState(false);
+  const [applyingQuickRefresh, setApplyingQuickRefresh] = useState(false);
 
   // Filters for jobs
   const [lastDateFilter, setLastDateFilter] = useState<string>("all");
@@ -457,10 +466,10 @@ export default function Admin() {
   }) || [];
 
   // Sorting for jobs
-  const [sortField, setSortField] = useState<"last_date" | "vacancies" | "title" | null>(null);
+  const [sortField, setSortField] = useState<"last_date" | "vacancies" | "title" | "created_at" | "age_max" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  const handleSort = (field: "last_date" | "vacancies" | "title") => {
+  const handleSort = (field: "last_date" | "vacancies" | "title" | "created_at" | "age_max") => {
     if (sortField === field) {
       if (sortDirection === "asc") {
         setSortDirection("desc");
@@ -475,7 +484,7 @@ export default function Admin() {
     }
   };
 
-  const getSortIcon = (field: "last_date" | "vacancies" | "title") => {
+  const getSortIcon = (field: "last_date" | "vacancies" | "title" | "created_at" | "age_max") => {
     if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1" />;
     if (sortDirection === "asc") return <ArrowUp className="h-4 w-4 ml-1" />;
     return <ArrowDown className="h-4 w-4 ml-1" />;
@@ -536,6 +545,18 @@ export default function Admin() {
       return sortDirection === "asc"
         ? a.title.localeCompare(b.title)
         : b.title.localeCompare(a.title);
+    }
+
+    if (sortField === "created_at") {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
+    }
+
+    if (sortField === "age_max") {
+      const ageA = a.age_max || 0;
+      const ageB = b.age_max || 0;
+      return sortDirection === "asc" ? ageA - ageB : ageB - ageA;
     }
 
     return 0;
@@ -723,6 +744,95 @@ export default function Admin() {
       toast({ title: "Refresh failed", description: error.message, variant: "destructive" });
     } finally {
       setRefreshingJobId(null);
+    }
+  };
+
+  // Quick refresh job data handler - only fetches last_date, age_limit, location
+  const handleQuickRefresh = async (job: Job) => {
+    setQuickRefreshingJobId(job.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quick-refresh-job`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ jobId: job.id }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to quick refresh");
+
+      if (result.status === "preview") {
+        setQuickRefreshPreviewData({
+          jobId: job.id,
+          jobTitle: job.title,
+          current: result.current,
+          new: result.new,
+        });
+        setShowQuickRefreshPreview(true);
+      }
+    } catch (error: any) {
+      toast({ title: "Quick refresh failed", description: error.message, variant: "destructive" });
+    } finally {
+      setQuickRefreshingJobId(null);
+    }
+  };
+
+  // Apply quick refresh changes
+  const applyQuickRefreshChanges = async () => {
+    if (!quickRefreshPreviewData) return;
+
+    setApplyingQuickRefresh(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quick-refresh-job`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            jobId: quickRefreshPreviewData.jobId,
+            autoApply: true,
+          }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to apply changes");
+
+      if (result.fieldsUpdated > 0) {
+        toast({
+          title: "Quick refresh applied!",
+          description: `Updated ${result.fieldsUpdated} fields (last date, age, location)`
+        });
+      } else {
+        toast({
+          title: "No changes applied",
+          description: "No new data was found",
+          variant: "default"
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      setShowQuickRefreshPreview(false);
+      setQuickRefreshPreviewData(null);
+    } catch (error: any) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    } finally {
+      setApplyingQuickRefresh(false);
     }
   };
 
@@ -1130,6 +1240,24 @@ export default function Admin() {
                                 {getSortIcon("vacancies")}
                               </div>
                             </TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleSort("age_max")}
+                            >
+                              <div className="flex items-center">
+                                Age Limit
+                                {getSortIcon("age_max")}
+                              </div>
+                            </TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleSort("created_at")}
+                            >
+                              <div className="flex items-center">
+                                Uploaded
+                                {getSortIcon("created_at")}
+                              </div>
+                            </TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
@@ -1146,6 +1274,12 @@ export default function Admin() {
                               </TableCell>
                               <TableCell>{job.vacancies || 1}</TableCell>
                               <TableCell>
+                                {job.age_min && job.age_max ? `${job.age_min}-${job.age_max}` : job.age_max || '-'}
+                              </TableCell>
+                              <TableCell>
+                                {format(new Date(job.created_at), "dd MMM yyyy")}
+                              </TableCell>
+                              <TableCell>
                                 <div className="flex gap-1 flex-wrap">
                                   {job.is_featured && <Badge className="bg-warning text-warning-foreground">Featured</Badge>}
                                   {job.admin_refreshed_at && (
@@ -1161,13 +1295,26 @@ export default function Admin() {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => handleRefreshJobData(job)}
-                                    disabled={refreshingJobId === job.id}
-                                    title="Refresh job data via AI"
+                                    disabled={refreshingJobId === job.id || quickRefreshingJobId === job.id}
+                                    title="Full refresh via AI (all fields)"
                                   >
                                     {refreshingJobId === job.id ? (
                                       <Loader2 className="h-4 w-4 animate-spin" />
                                     ) : (
                                       <RefreshCw className="h-4 w-4 text-blue-500" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleQuickRefresh(job)}
+                                    disabled={refreshingJobId === job.id || quickRefreshingJobId === job.id}
+                                    title="Quick refresh (last date, age, location only)"
+                                  >
+                                    {quickRefreshingJobId === job.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Clock className="h-4 w-4 text-orange-500" />
                                     )}
                                   </Button>
                                   <Button variant="ghost" size="icon" onClick={() => openEditDialog(job)}>
@@ -1182,7 +1329,7 @@ export default function Admin() {
                           ))}
                           {filteredJobs?.length === 0 && (
                             <TableRow>
-                              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                                 No jobs match the selected filters
                               </TableCell>
                             </TableRow>
@@ -2147,6 +2294,75 @@ export default function Admin() {
             </Button>
             <Button onClick={applyRefreshChanges} disabled={applyingRefresh}>
               {applyingRefresh ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Apply Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Refresh Preview Dialog */}
+      <Dialog open={showQuickRefreshPreview} onOpenChange={(open) => !open && setShowQuickRefreshPreview(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-orange-500" />
+              Quick Refresh Preview
+            </DialogTitle>
+            <DialogDescription>
+              Review changes for last date, age limit, and location.
+            </DialogDescription>
+          </DialogHeader>
+          {quickRefreshPreviewData && (
+            <div className="space-y-4">
+              <div className="text-sm font-medium">{quickRefreshPreviewData.jobTitle}</div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Field</TableHead>
+                    <TableHead>Current</TableHead>
+                    <TableHead>New</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[
+                    { key: "last_date", label: "Last Date" },
+                    { key: "age_min", label: "Min Age" },
+                    { key: "age_max", label: "Max Age" },
+                    { key: "location", label: "Location" },
+                  ].map(({ key, label }) => {
+                    const currentVal = quickRefreshPreviewData.current[key];
+                    const newVal = quickRefreshPreviewData.new[key];
+                    const hasChange = newVal !== undefined && newVal !== null && String(newVal) !== String(currentVal || "");
+
+                    return (
+                      <TableRow key={key}>
+                        <TableCell className="font-medium">{label}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {currentVal || <span className="italic">Not set</span>}
+                        </TableCell>
+                        <TableCell className={`${hasChange ? "text-green-600 font-medium" : "text-muted-foreground"}`}>
+                          {newVal !== undefined && newVal !== null ? (
+                            <>
+                              {hasChange && <Check className="h-3 w-3 inline mr-1" />}
+                              {String(newVal)}
+                            </>
+                          ) : (
+                            <span className="italic">No update</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQuickRefreshPreview(false)} disabled={applyingQuickRefresh}>
+              Cancel
+            </Button>
+            <Button onClick={applyQuickRefreshChanges} disabled={applyingQuickRefresh}>
+              {applyingQuickRefresh ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Apply Changes
             </Button>
           </DialogFooter>

@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -139,6 +139,18 @@ const Welcome = () => {
           >
             Log In
           </button>
+        </p>
+
+        {/* Legal Links */}
+        <p className="text-center text-xs text-muted-foreground pt-3">
+          By continuing, you agree to our{" "}
+          <Link to="/terms-of-service" className="text-primary hover:underline">
+            Terms of Service
+          </Link>
+          {" "}and{" "}
+          <Link to="/privacy-policy" className="text-primary hover:underline">
+            Privacy Policy
+          </Link>
         </p>
       </div>
     </div>

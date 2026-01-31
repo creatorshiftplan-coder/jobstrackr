@@ -223,19 +223,30 @@ Return ONLY a valid JSON object (no markdown):
 {
   "jobs": [
     {
-      "title": "Job/Exam title",
-      "company": "Department/Organization",
+      "title": "Full official Job/Exam title (REQUIRED)",
+      "company": "Department/Organization name (REQUIRED)",
       "location": "Location or 'All India'",
-      "last_date": "YYYY-MM-DD if found or null",
-      "eligibility": "Eligibility if found",
-      "vacancies": number if found or null,
-      "application_link": "Apply URL if found or null",
-      "description": "Brief description"
+      "post_date": "YYYY-MM-DD when notification was posted or null",
+      "last_date": "YYYY-MM-DD application deadline (REQUIRED if available)",
+      "eligibility": "Education and eligibility requirements",
+      "vacancies": number (REQUIRED - must extract total vacancies, look for 'posts', 'vacancies', 'positions'),
+      "salary_min": number (minimum monthly salary in INR) or null,
+      "salary_max": number (maximum monthly salary in INR) or null,
+      "age_limit": "XX-YY years (REQUIRED - must find age limit, e.g., '18-35 years')",
+      "application_link": "Direct official apply URL or null",
+      "description": "Brief description (max 300 chars)",
+      "confidence": 0.0 to 1.0 (how confident you are in the extracted data)
     }
   ]
 }
 
-Extract every job listing you can find. Return ONLY JSON.`;
+CRITICAL RULES:
+- vacancies and age_limit are MANDATORY - search thoroughly for these values
+- If vacancies appears as 'Various' or 'Multiple', estimate based on context or use 1
+- If age limit is not explicitly stated, use common government job limits (18-35 years)
+- Extract EVERY job listing you can find from the page
+- Return ONLY valid JSON, no markdown or extra text`;
+
 
 interface JobFromAI {
     title: string;
