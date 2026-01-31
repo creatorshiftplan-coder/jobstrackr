@@ -373,7 +373,7 @@ const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
 
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
-  const { isAdmin, isLoading: roleLoading } = useAdminRole();
+  const { isAdmin, isFullAdmin, isLoading: roleLoading } = useAdminRole();
   const { data: jobs, isLoading: jobsLoading } = useJobs();
   const { userStats, apiStats, isLoading: statsLoading } = useAdminStats();
   const analyticsData = useAnalyticsData();
@@ -1098,18 +1098,24 @@ export default function Admin() {
                 <Briefcase className="h-4 w-4" />
                 <span className="hidden sm:inline">Jobs</span>
               </TabsTrigger>
-              <TabsTrigger value="users" className="gap-1 min-w-[44px] h-10">
-                <Users className="h-4 w-4" />
-                <span className="hidden sm:inline">Users</span>
-              </TabsTrigger>
-              <TabsTrigger value="user-analytics" className="gap-1 min-w-[44px] h-10">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Analytics</span>
-              </TabsTrigger>
-              <TabsTrigger value="analytics" className="gap-1 min-w-[44px] h-10">
-                <Activity className="h-4 w-4" />
-                <span className="hidden sm:inline">API</span>
-              </TabsTrigger>
+              {isFullAdmin && (
+                <TabsTrigger value="users" className="gap-1 min-w-[44px] h-10">
+                  <Users className="h-4 w-4" />
+                  <span className="hidden sm:inline">Users</span>
+                </TabsTrigger>
+              )}
+              {isFullAdmin && (
+                <TabsTrigger value="user-analytics" className="gap-1 min-w-[44px] h-10">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Analytics</span>
+                </TabsTrigger>
+              )}
+              {isFullAdmin && (
+                <TabsTrigger value="analytics" className="gap-1 min-w-[44px] h-10">
+                  <Activity className="h-4 w-4" />
+                  <span className="hidden sm:inline">API</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger value="bulk" className="gap-1 min-w-[44px] h-10">
                 <FileJson className="h-4 w-4" />
                 <span className="hidden sm:inline">Bulk</span>
