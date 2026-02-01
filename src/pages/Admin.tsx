@@ -377,7 +377,7 @@ export default function Admin() {
   const { data: jobs, isLoading: jobsLoading } = useJobs();
   const { userStats, apiStats, isLoading: statsLoading } = useAdminStats();
   const analyticsData = useAnalyticsData();
-  const { unreviewedCount, logs: autoDiscoverLogs, logsLoading: autoDiscoverLoading, markAsReviewed, discoverByCategory, scrapeUrl, addDiscoveredJobs } = useAutoDiscover();
+  const { unreviewedCount, logs: autoDiscoverLogs, logsLoading: autoDiscoverLoading, markAsReviewed, discoverByCategory, scrapeUrl, addDiscoveredJobs, updateDiscoveredJobs } = useAutoDiscover();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -386,6 +386,7 @@ export default function Admin() {
   const [scrapedJobs, setScrapedJobs] = useState<any[]>([]);
   const [showScrapedJobs, setShowScrapedJobs] = useState(false);
   const [discoveringCategory, setDiscoveringCategory] = useState<string | null>(null);
+  const [scrapedDuplicateMode, setScrapedDuplicateMode] = useState<"skip" | "update">("skip");
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
@@ -2384,6 +2385,32 @@ export default function Admin() {
               Found {scrapedJobs.length} jobs. Select which ones to add.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Duplicate Handling Options */}
+          {scrapedJobs.some(j => j.isDuplicate) && (
+            <div className="bg-muted/50 rounded-lg p-4 border border-border">
+              <p className="text-sm font-medium mb-3">Duplicate Job Handling</p>
+              <RadioGroup
+                value={scrapedDuplicateMode}
+                onValueChange={(v) => setScrapedDuplicateMode(v as "skip" | "update")}
+                className="space-y-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="skip" id="scrape-skip" />
+                  <Label htmlFor="scrape-skip" className="text-sm font-normal cursor-pointer">
+                    Skip <span className="text-muted-foreground">(only add new jobs, ignore duplicates)</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="update" id="scrape-update" />
+                  <Label htmlFor="scrape-update" className="text-sm font-normal cursor-pointer">
+                    Update existing <span className="text-muted-foreground">(update existing records with new scraped data)</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
+
           <div className="space-y-3 py-4">
             {scrapedJobs.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -2393,14 +2420,18 @@ export default function Admin() {
               scrapedJobs.map((job, index) => (
                 <div
                   key={index}
-                  className={`p-4 rounded-lg border ${job.isDuplicate ? "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20" : "bg-secondary/30"
+                  className={`p-4 rounded-lg border ${job.isDuplicate
+                      ? scrapedDuplicateMode === "update"
+                        ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20"
+                        : "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 opacity-60"
+                      : "bg-secondary/30"
                     }`}
                 >
                   <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       checked={job.selected || false}
-                      disabled={job.isDuplicate}
+                      disabled={job.isDuplicate && scrapedDuplicateMode === "skip"}
                       onChange={(e) => {
                         const updated = [...scrapedJobs];
                         updated[index] = { ...job, selected: e.target.checked };
@@ -2412,8 +2443,14 @@ export default function Admin() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-medium text-sm">{job.title || "Untitled"}</h4>
                         {job.isDuplicate && (
-                          <Badge variant="outline" className="text-yellow-600 border-yellow-600 text-xs">
-                            Duplicate
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${scrapedDuplicateMode === "update"
+                                ? "text-amber-600 border-amber-600"
+                                : "text-yellow-600 border-yellow-600"
+                              }`}
+                          >
+                            {scrapedDuplicateMode === "update" ? "Update Available" : "Duplicate"}
                           </Badge>
                         )}
                       </div>
@@ -2425,7 +2462,10 @@ export default function Admin() {
                         <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{job.eligibility}</p>
                       )}
                       {job.isDuplicate && job.duplicateOf && (
-                        <p className="text-xs text-yellow-600 mt-1">Similar to: {job.duplicateOf}</p>
+                        <p className="text-xs text-yellow-600 mt-1">
+                          {scrapedDuplicateMode === "update" ? "Will update: " : "Similar to: "}
+                          {jobs?.find(j => j.id === job.duplicateOf)?.title || job.duplicateOf}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -2435,32 +2475,69 @@ export default function Admin() {
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <div className="text-sm text-muted-foreground">
-              {scrapedJobs.filter(j => j.selected && !j.isDuplicate).length} selected to add
+              {scrapedDuplicateMode === "skip" ? (
+                <>{scrapedJobs.filter(j => j.selected && !j.isDuplicate).length} selected to add</>
+              ) : (
+                <>
+                  {scrapedJobs.filter(j => j.selected && !j.isDuplicate).length} new, {scrapedJobs.filter(j => j.selected && j.isDuplicate).length} to update
+                </>
+              )}
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setShowScrapedJobs(false)}>
                 Cancel
               </Button>
               <Button
-                disabled={scrapedJobs.filter(j => j.selected && !j.isDuplicate).length === 0 || addDiscoveredJobs.isPending}
-                onClick={() => {
-                  const jobsToAdd = scrapedJobs.filter(j => j.selected && !j.isDuplicate);
-                  addDiscoveredJobs.mutate(jobsToAdd, {
-                    onSuccess: (result) => {
-                      toast({
-                        title: "Jobs Added!",
-                        description: `Successfully added ${result.inserted} jobs`,
-                      });
-                      setShowScrapedJobs(false);
-                      setScrapedJobs([]);
-                      setScrapeUrlInput("");
-                    },
-                    onError: (e) => toast({ title: "Failed to add jobs", description: e.message, variant: "destructive" }),
-                  });
+                disabled={
+                  (scrapedDuplicateMode === "skip" && scrapedJobs.filter(j => j.selected && !j.isDuplicate).length === 0) ||
+                  (scrapedDuplicateMode === "update" && scrapedJobs.filter(j => j.selected).length === 0) ||
+                  addDiscoveredJobs.isPending ||
+                  updateDiscoveredJobs.isPending
+                }
+                onClick={async () => {
+                  const newJobs = scrapedJobs.filter(j => j.selected && !j.isDuplicate);
+                  const duplicateJobs = scrapedJobs.filter(j => j.selected && j.isDuplicate);
+
+                  let addedCount = 0;
+                  let updatedCount = 0;
+
+                  try {
+                    // Add new jobs
+                    if (newJobs.length > 0) {
+                      const result = await addDiscoveredJobs.mutateAsync(newJobs);
+                      addedCount = result.inserted;
+                    }
+
+                    // Update duplicates if in update mode
+                    if (scrapedDuplicateMode === "update" && duplicateJobs.length > 0) {
+                      const result = await updateDiscoveredJobs.mutateAsync(duplicateJobs);
+                      updatedCount = result.updated;
+                    }
+
+                    toast({
+                      title: "Jobs Processed!",
+                      description: `Added ${addedCount} new jobs${updatedCount > 0 ? `, updated ${updatedCount} existing jobs` : ""}`,
+                    });
+                    setShowScrapedJobs(false);
+                    setScrapedJobs([]);
+                    setScrapeUrlInput("");
+                    setScrapedDuplicateMode("skip");
+                  } catch (e: any) {
+                    toast({
+                      title: "Failed to process jobs",
+                      description: e.message,
+                      variant: "destructive"
+                    });
+                  }
                 }}
               >
-                {addDiscoveredJobs.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Add Selected
+                {(addDiscoveredJobs.isPending || updateDiscoveredJobs.isPending) ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                {scrapedDuplicateMode === "skip"
+                  ? `Add ${scrapedJobs.filter(j => j.selected && !j.isDuplicate).length} Jobs`
+                  : "Process Selected"
+                }
               </Button>
             </div>
           </DialogFooter>

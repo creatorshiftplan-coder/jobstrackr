@@ -309,6 +309,106 @@ export function useAutoDiscover() {
         },
     });
 
+    // Update existing discovered jobs (for duplicate handling)
+    const updateDiscoveredJobs = useMutation({
+        mutationFn: async (jobs: (JobFromDiscovery & { selected?: boolean })[]) => {
+            const jobsToUpdate = jobs.filter(j => j.isDuplicate && j.duplicateOf && j.selected);
+
+            if (jobsToUpdate.length === 0) {
+                throw new Error("No jobs to update");
+            }
+
+            const parseAgeLimit = (ageLimit?: string) => {
+                if (!ageLimit) {
+                    return { min: 18, max: 65 };
+                }
+
+                const rangePatterns = [
+                    /(\d+)\s*[-–—]\s*(\d+)/,
+                    /(\d+)\s*to\s*(\d+)/i,
+                    /min[:\s]*(\d+)[^\d].*max[:\s]*(\d+)/i,
+                    /age[:\s]*(\d+)[^\d]+(\d+)/i,
+                ];
+
+                for (const pattern of rangePatterns) {
+                    const match = ageLimit.match(pattern);
+                    if (match) {
+                        return { min: parseInt(match[1]), max: parseInt(match[2]) };
+                    }
+                }
+
+                const maxOnlyPatterns = [
+                    /max(?:imum)?[:\s]*(\d+)/i,
+                    /below\s*(\d+)/i,
+                    /under\s*(\d+)/i,
+                    /upto\s*(\d+)/i,
+                    /up\s*to\s*(\d+)/i,
+                ];
+
+                for (const pattern of maxOnlyPatterns) {
+                    const match = ageLimit.match(pattern);
+                    if (match) {
+                        return { min: 18, max: parseInt(match[1]) };
+                    }
+                }
+
+                const allNumbers = ageLimit.match(/\d+/g);
+                if (allNumbers && allNumbers.length >= 2) {
+                    const nums = allNumbers.map(n => parseInt(n)).filter(n => n >= 10 && n <= 70);
+                    if (nums.length >= 2) {
+                        return { min: Math.min(...nums), max: Math.max(...nums) };
+                    }
+                }
+
+                return { min: 18, max: 65 };
+            };
+
+            let updatedCount = 0;
+            for (const job of jobsToUpdate) {
+                const ages = parseAgeLimit(job.age_limit);
+
+                // Build update object with only non-null fields
+                const updateData: Record<string, any> = {};
+
+                if (job.location) updateData.location = job.location;
+                if (job.eligibility) {
+                    updateData.eligibility = job.eligibility;
+                    updateData.qualification = job.eligibility;
+                }
+                if (job.description) updateData.description = job.description;
+                if (job.salary_min !== undefined) updateData.salary_min = job.salary_min;
+                if (job.salary_max !== undefined) updateData.salary_max = job.salary_max;
+                if (job.age_limit) {
+                    updateData.age_min = ages.min;
+                    updateData.age_max = ages.max;
+                }
+                if (job.vacancies !== undefined) updateData.vacancies = job.vacancies;
+                if (job.post_date) updateData.application_start_date = job.post_date;
+                if (job.last_date) updateData.last_date = job.last_date;
+                if (job.application_link) updateData.apply_link = job.application_link;
+
+                // Only update if there are fields to update
+                if (Object.keys(updateData).length > 0) {
+                    const { error } = await supabase
+                        .from("jobs")
+                        .update(updateData)
+                        .eq("id", job.duplicateOf);
+
+                    if (error) {
+                        console.error("Failed to update job:", job.duplicateOf, error);
+                    } else {
+                        updatedCount++;
+                    }
+                }
+            }
+
+            return { updated: updatedCount };
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        },
+    });
+
     return {
         unreviewedCount,
         logs,
@@ -317,5 +417,6 @@ export function useAutoDiscover() {
         discoverByCategory,
         scrapeUrl,
         addDiscoveredJobs,
+        updateDiscoveredJobs,
     };
 }
