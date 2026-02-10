@@ -318,15 +318,29 @@ export default function JobDetails() {
           </CardContent>
         </Card>
 
-        {/* Description */}
-        {job.description && (
-          <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.3s" }}>
-            <CardContent className="p-4">
-              <h3 className="font-display font-semibold text-foreground mb-2">About this Job</h3>
+        {/* About this Job - Description + Unique Info */}
+        <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.3s" }}>
+          <CardContent className="p-4 space-y-4">
+            <h3 className="font-display font-semibold text-foreground mb-2">About this Job</h3>
+
+            {job.description && (
               <p className="text-sm text-muted-foreground whitespace-pre-line">{job.description}</p>
-            </CardContent>
-          </Card>
-        )}
+            )}
+
+            {/* First Date of Application - not shown in other cards */}
+            <div className="flex items-start gap-3 pt-3 border-t border-border">
+              <div className="h-9 w-9 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
+                <Calendar className="h-4 w-4 text-success" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground">First Date of Application</p>
+                <p className="text-sm font-medium text-foreground">
+                  {format(new Date(job.created_at), "dd MMM yyyy")}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Eligibility */}
         {job.eligibility && (

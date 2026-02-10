@@ -354,14 +354,15 @@ export default function Search() {
                 <p className="text-sm text-muted-foreground mb-3">
                   Want to discover more jobs related to "{query}"?
                 </p>
-                <Button
+                <button
                   onClick={handleSearch}
-                  variant="outline"
-                  className="rounded-xl border-primary/30 text-primary hover:bg-primary/5"
+                  className="ai-glow-btn"
                 >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Find more jobs with AI
-                </Button>
+                  <div className="ai-glow-btn-inner">
+                    <Sparkles className="h-4 w-4" />
+                    Search with AI
+                  </div>
+                </button>
               </div>
             )}
 

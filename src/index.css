@@ -221,3 +221,59 @@
   display: none;
   /* Chrome, Safari, Opera */
 }
+
+/* Animated conic gradient border for AI Search button */
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.ai-glow-btn {
+  position: relative;
+  padding: 3px;
+  border: 0;
+  outline: none;
+  cursor: pointer;
+  border-radius: 12px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.ai-glow-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(from var(--angle), cyan, hotpink, #341f97, cyan);
+  opacity: 1;
+  animation: ai-glow-rotate 2s linear infinite;
+  border-radius: 12px;
+}
+
+.ai-glow-btn .ai-glow-btn-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  font-size: 0.875rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 10px;
+  text-transform: uppercase;
+  transition: background 0.3s ease;
+}
+
+.ai-glow-btn:hover .ai-glow-btn-inner {
+  background: hsl(var(--muted));
+}
+
+@keyframes ai-glow-rotate {
+  to {
+    --angle: 360deg;
+  }
+}

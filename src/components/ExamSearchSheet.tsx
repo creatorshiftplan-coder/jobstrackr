@@ -350,14 +350,15 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
           {/* AI Search Button */}
           {searchQuery && !isSearching && aiResults.length === 0 && (
             <div className="flex justify-center py-4 border-t border-dashed">
-              <Button
+              <button
                 onClick={handleAISearch}
-                variant="outline"
-                className="gap-2"
+                className="ai-glow-btn"
               >
-                <Sparkles className="h-4 w-4" />
-                Search with AI
-              </Button>
+                <div className="ai-glow-btn-inner">
+                  <Sparkles className="h-4 w-4" />
+                  Search with AI
+                </div>
+              </button>
             </div>
           )}
 
