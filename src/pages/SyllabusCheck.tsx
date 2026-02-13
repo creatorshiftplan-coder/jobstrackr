@@ -3,6 +3,8 @@ import { BottomNav } from "@/components/BottomNav";
 import { ArrowLeft, Bookmark, Search, X, Loader2, ChevronRight, RefreshCw, BookOpen, AlertCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import logoWhite from "@/assets/logo-white.png";
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -34,11 +36,42 @@ const POPULAR_EXAMS = [
     { id: "sbi_clerk", name: "SBI Clerk", badge: "SBI", description: "Junior Associates", color: "#8B5CF6" },
     { id: "gate", name: "GATE 2025", badge: "GATE", description: "Engineering Aptitude Test", color: "#EF4444" },
 ];
+// ─── Rate Limiting ───────────────────────────────────────────────────────
+
+const DAILY_AI_LIMIT = 3;
+const RATE_LIMIT_KEY = "syllabus_ai_usage";
+
+function getAIUsageToday(): { count: number; date: string } {
+    try {
+        const raw = localStorage.getItem(RATE_LIMIT_KEY);
+        if (!raw) return { count: 0, date: new Date().toDateString() };
+        const parsed = JSON.parse(raw);
+        if (parsed.date !== new Date().toDateString()) {
+            return { count: 0, date: new Date().toDateString() };
+        }
+        return parsed;
+    } catch {
+        return { count: 0, date: new Date().toDateString() };
+    }
+}
+
+function incrementAIUsage() {
+    const usage = getAIUsageToday();
+    usage.count += 1;
+    usage.date = new Date().toDateString();
+    localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(usage));
+}
+
+function getRemainingSearches(): number {
+    return Math.max(0, DAILY_AI_LIMIT - getAIUsageToday().count);
+}
 
 // ─── Main Component ──────────────────────────────────────────────────────
 
 export default function SyllabusCheck() {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const { showAuthRequired } = useAuthRequired();
 
     // Search state
     const [query, setQuery] = useState("");
@@ -47,6 +80,7 @@ export default function SyllabusCheck() {
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [remainingSearches, setRemainingSearches] = useState(getRemainingSearches());
 
     // Cached exams state
     const [cachedExams, setCachedExams] = useState<any[]>([]);
@@ -184,6 +218,19 @@ export default function SyllabusCheck() {
                 return;
             }
 
+            // Rate limit check — only for AI edge function calls
+            if (!user) {
+                setError(null);
+                showAuthRequired("Login to use AI-powered syllabus search");
+                return;
+            }
+
+            if (getRemainingSearches() <= 0) {
+                setError("You've used all 3 AI searches for today. Try again tomorrow, or search for a cached exam.");
+                setRemainingSearches(0);
+                return;
+            }
+
             // Not cached — call edge function
             const { data: fnData, error: fnError } = await supabase.functions.invoke("syllabus-search", {
                 body: { exam_name: examName },
@@ -193,6 +240,8 @@ export default function SyllabusCheck() {
             if (fnData?.error) throw new Error(fnData.error);
 
             if (fnData?.syllabus) {
+                incrementAIUsage();
+                setRemainingSearches(getRemainingSearches());
                 openResult(fnData.syllabus as SyllabusData);
             } else {
                 setError("No syllabus found. Try a more specific query.");
@@ -310,6 +359,16 @@ export default function SyllabusCheck() {
                         ))}
                     </div>
                 )}
+            </div>
+
+            {/* Remaining AI searches indicator */}
+            <div className="px-4 pt-2">
+                <p className={`text-xs ${remainingSearches === 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {remainingSearches === 0
+                        ? "⚠️ Daily AI search limit reached. Cached exams are still available."
+                        : `✨ ${remainingSearches}/${DAILY_AI_LIMIT} AI searches left today`
+                    }
+                </p>
             </div>
 
             <main className="px-4 py-4">
