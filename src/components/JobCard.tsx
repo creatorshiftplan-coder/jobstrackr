@@ -95,7 +95,7 @@ export function JobCard({ job }: JobCardProps) {
                   </Badge>
                 )}
                 {job.admin_refreshed_at && (
-                  <Badge variant="outline" className="text-[10px] sm:text-xs bg-green-50 text-green-700 border-green-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Badge variant="outline" className="text-[10px] sm:text-xs bg-green-500/5 dark:bg-green-500/10 text-green-600/70 dark:text-green-400/60 border-green-200/50 dark:border-green-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
                     <CheckCircle className="h-3 w-3" /> Verified
                   </Badge>
                 )}

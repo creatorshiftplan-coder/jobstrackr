@@ -6,10 +6,12 @@ import { ExamCardErrorBoundary } from "@/components/ExamCardErrorBoundary";
 import { ExamSearchSheet } from "@/components/ExamSearchSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Bookmark, Plus, CalendarDays } from "lucide-react";
+import { GraduationCap, Bookmark, Plus } from "lucide-react";
 import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
+import logoColor from "@/assets/logo-color.png";
+import logoWhite from "@/assets/logo-white.png";
 
 export default function ExamTracker() {
   const { user, loading: authLoading } = useAuth();
@@ -43,21 +45,22 @@ export default function ExamTracker() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl border-b border-primary-foreground/10">
+        <header className="sticky top-0 z-40 bg-primary dark:bg-card dark:border-b dark:border-border backdrop-blur-xl border-b border-primary-foreground/10">
           <div className="flex items-center justify-between gap-2 px-4 h-14">
             <Link to="/more" className="flex-shrink-0">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
                 <MenuBarsIcon className="h-5 w-5 text-primary" />
               </div>
             </Link>
-            <h1 className="font-display font-bold text-lg text-primary-foreground flex items-center gap-2 min-w-0">
-              <CalendarDays className="h-5 w-5 flex-shrink-0" />
+            <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground flex items-center gap-2 min-w-0">
+              <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
+              <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
               <span className="truncate">My Exams</span>
             </h1>
             <div className="flex items-center gap-2 flex-shrink-0">
               <div
                 onClick={handleAddExamClick}
-                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-full bg-primary hover:bg-primary/90 transition-all cursor-pointer backdrop-blur-sm shadow-sm"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-full bg-primary hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90 transition-all cursor-pointer backdrop-blur-sm shadow-sm"
               >
                 <Plus className="h-4 w-4 text-primary-foreground" />
                 <span className="text-primary-foreground text-xs sm:text-sm font-medium hidden xs:inline">Add Exam</span>
@@ -94,23 +97,24 @@ export default function ExamTracker() {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl border-b border-primary-foreground/10">
+      <header className="sticky top-0 z-40 bg-primary dark:bg-card dark:border-b dark:border-border backdrop-blur-xl border-b border-primary-foreground/10">
         <div className="flex items-center justify-between gap-2 px-4 h-14">
           <Link to="/more" className="flex-shrink-0">
             <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
               <MenuBarsIcon className="h-5 w-5 text-primary" />
             </div>
           </Link>
-          <h1 className="font-display font-bold text-lg text-primary-foreground flex items-center gap-2 min-w-0">
-            <CalendarDays className="h-5 w-5 flex-shrink-0" />
+          <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground flex items-center gap-2 min-w-0">
+            <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
+            <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
             <span className="truncate">My Exams</span>
           </h1>
           <div className="flex items-center gap-2 flex-shrink-0">
             <ExamSearchSheet
               trigger={
-                <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-full bg-primary-foreground/20 hover:bg-primary-foreground/30 transition-all cursor-pointer backdrop-blur-sm shadow-sm">
-                  <Plus className="h-4 w-4 text-primary-foreground" />
-                  <span className="text-primary-foreground text-xs sm:text-sm font-medium">Add Exam</span>
+                <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-full bg-primary-foreground/20 hover:bg-primary-foreground/30 dark:bg-secondary dark:hover:bg-secondary/80 transition-all cursor-pointer backdrop-blur-sm shadow-sm">
+                  <Plus className="h-4 w-4 text-primary-foreground dark:text-foreground" />
+                  <span className="text-primary-foreground dark:text-foreground text-xs sm:text-sm font-medium">Add Exam</span>
                 </div>
               }
             />
@@ -126,7 +130,7 @@ export default function ExamTracker() {
       {/* Subheader */}
       <div className="px-4 pt-4 pb-3">
         <h2 className="text-foreground text-lg font-bold flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-primary" />
+          <GraduationCap className="h-5 w-5 text-primary" />
           Your Tracked Exams
         </h2>
       </div>

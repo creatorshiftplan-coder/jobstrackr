@@ -36,6 +36,8 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const RefundPolicy = lazy(() => import("./pages/RefundPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const SyllabusCheck = lazy(() => import("./pages/SyllabusCheck"));
+const SyllabusResult = lazy(() => import("./pages/SyllabusResult"));
 
 // Page loader component
 const PageLoader = () => (
@@ -84,6 +86,8 @@ const App = () => (
                       <Route path="/admin" element={<Admin />} />
                       <Route path="/tracker" element={<ExamTracker />} />
                       <Route path="/trending" element={<Trending />} />
+                      <Route path="/syllabus" element={<SyllabusCheck />} />
+                      <Route path="/syllabus/result" element={<SyllabusResult />} />
                       <Route path="/edit-sector-preferences" element={<EditSectorPreferences />} />
                       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                       <Route path="/refund-policy" element={<RefundPolicy />} />

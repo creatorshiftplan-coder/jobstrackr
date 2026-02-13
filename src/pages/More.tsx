@@ -3,7 +3,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { User, HelpCircle, LogOut, ChevronRight, Shield, ShieldCheck, CreditCard, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key, Sparkles } from "lucide-react";
+import { User, HelpCircle, LogOut, ChevronRight, Shield, ShieldCheck, CreditCard, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key, Sparkles, SearchCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -208,6 +208,24 @@ export default function More() {
                 <div>
                   <h4 className="font-medium text-foreground">Upload Your Documents</h4>
                   <p className="text-xs text-muted-foreground">AI auto-fills your profile from documents</p>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Syllabus Check Link */}
+        <div onClick={() => navigate("/syllabus")} className="block cursor-pointer">
+          <Card className="bg-white dark:bg-card border-border/50 shadow-md hover:shadow-lg transition-shadow">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                  <SearchCheck className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-foreground">Syllabus Finder</h4>
+                  <p className="text-xs text-muted-foreground">Search and view exam syllabi powered by AI</p>
                 </div>
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground" />

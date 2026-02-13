@@ -196,7 +196,8 @@ export default function Trending() {
                 variant="primary"
                 showMenu={true}
                 showRefresh={true}
-                showLogo={true}
+                showLogo={false}
+                showTitleLogo={true}
                 onRefresh={refetch}
                 isRefreshing={isRefetching}
             />

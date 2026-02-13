@@ -25,6 +25,7 @@ interface AppHeaderProps {
     showSearch?: boolean;
     showRefresh?: boolean;
     showLogo?: boolean;
+    showTitleLogo?: boolean;
     rightActions?: ReactNode;
     onRefresh?: () => void;
     isRefreshing?: boolean;
@@ -38,6 +39,7 @@ export function AppHeader({
     showSearch = false,
     showRefresh = false,
     showLogo = false,
+    showTitleLogo = false,
     rightActions,
     onRefresh,
     isRefreshing = false,
@@ -47,19 +49,19 @@ export function AppHeader({
 
     // Style variants
     const bgClass = {
-        primary: "bg-primary",
+        primary: "bg-primary dark:bg-card dark:border-b dark:border-border",
         card: "bg-card/95 backdrop-blur-md border-b border-border",
         transparent: "bg-transparent",
     }[variant];
 
     const textClass = {
-        primary: "text-white",
+        primary: "text-white dark:text-foreground",
         card: "text-foreground",
         transparent: "text-foreground",
     }[variant];
 
     const iconClass = {
-        primary: "text-white hover:bg-white/10",
+        primary: "text-white hover:bg-white/10 dark:text-muted-foreground dark:hover:bg-secondary",
         card: "text-muted-foreground hover:bg-secondary",
         transparent: "text-muted-foreground hover:bg-secondary",
     }[variant];
@@ -121,13 +123,21 @@ export function AppHeader({
                 {showSearch ? (
                     <div
                         onClick={() => navigate("/search")}
-                        className="flex-1 mx-3 flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-xl h-10 px-3 cursor-pointer"
+                        className="flex-1 mx-3 flex items-center gap-2 bg-white/10 dark:bg-secondary backdrop-blur-sm rounded-xl h-10 px-3 cursor-pointer"
                     >
-                        <Search className="h-4 w-4 text-white/70" />
-                        <span className="text-white/70 text-sm">Search a job...</span>
+                        <Search className="h-4 w-4 text-white/70 dark:text-muted-foreground" />
+                        <span className="text-white/70 dark:text-muted-foreground text-sm">Search a job...</span>
                     </div>
                 ) : (
-                    <h1 className={cn("text-lg font-bold", textClass)}>{title}</h1>
+                    <div className="flex items-center gap-2">
+                        {showTitleLogo && (
+                            <>
+                                <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
+                                <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
+                            </>
+                        )}
+                        <h1 className={cn("text-lg font-bold", textClass)}>{title}</h1>
+                    </div>
                 )}
 
                 {/* Right Section */}

@@ -14,6 +14,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search as SearchIcon, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, GraduationCap, Check } from "lucide-react";
 import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { Link, useNavigate } from "react-router-dom";
+import logoColor from "@/assets/logo-color.png";
+import logoWhite from "@/assets/logo-white.png";
 import { INDIAN_STATES, EXAM_SECTORS, EDUCATION_QUALIFICATIONS } from "@/constants/filters";
 import { useDebouncedValue } from "@/hooks/useDebounce";
 import { useAuth } from "@/hooks/useAuth";
@@ -155,16 +157,20 @@ export default function Search() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-primary backdrop-blur-xl border-b border-primary-foreground/10">
+      <header className="sticky top-0 z-40 bg-primary dark:bg-card backdrop-blur-xl border-b border-primary-foreground/10 dark:border-border">
         <div className="flex items-center gap-3 px-4 h-14">
           <Link to="/more">
-            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center hover:bg-white/90 transition-colors shadow-sm">
+            <div className="h-10 w-10 rounded-full bg-white dark:bg-secondary flex items-center justify-center hover:bg-white/90 dark:hover:bg-secondary/80 transition-colors shadow-sm">
               <MenuBarsIcon className="h-5 w-5 text-primary" />
             </div>
           </Link>
-          <h1 className="font-display font-bold text-lg text-primary-foreground flex-1 text-center tracking-tight">Explore Jobs</h1>
+          <div className="flex items-center gap-2 flex-1 justify-center">
+            <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
+            <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
+            <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground tracking-tight">Explore Jobs</h1>
+          </div>
           <Link to="/saved">
-            <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center hover:bg-white/90 transition-colors shadow-sm">
+            <div className="h-10 w-10 rounded-full bg-white dark:bg-secondary flex items-center justify-center hover:bg-white/90 dark:hover:bg-secondary/80 transition-colors shadow-sm">
               <Bookmark className="h-5 w-5 text-primary" />
             </div>
           </Link>
@@ -180,14 +186,14 @@ export default function Search() {
                 if (!e.target.value) clearAIResults();
               }}
 
-              className="pl-10 bg-white border-white/50 text-foreground placeholder:text-muted-foreground rounded-xl h-11 focus:ring-2 focus:ring-white/50 transition-all shadow-sm"
+              className="pl-10 bg-white/95 dark:bg-secondary/80 border border-white/30 dark:border-border text-foreground placeholder:text-muted-foreground rounded-xl h-11 focus:ring-2 focus:ring-white/50 dark:focus:ring-primary/50 transition-all shadow-sm"
             />
           </div>
           <Button
             variant="secondary"
             size="icon"
             onClick={() => setIsFilterOpen(true)}
-            className="relative h-11 w-11 rounded-xl bg-white hover:bg-white/90 text-primary border-0 shadow-sm"
+            className="relative h-11 w-11 rounded-xl bg-white dark:bg-secondary hover:bg-white/90 dark:hover:bg-secondary/80 text-primary border-0 shadow-sm"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="h-6 w-6">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 4h9.75M10.5 4a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 4H7.5m3 16h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-8h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
