@@ -178,19 +178,40 @@ const isAdmitCardAvailable = (statusData: any, phaseNumber: 1 | 2 = 1): boolean 
   const combinedText = `${statusText} ${summaryText}`;
 
   const admitReleasedKeywords = [
-    "admit card released", "admit cards released", "admit cards out",
-    "admit card out", "admit card available", "hall ticket released",
-    "hall ticket available", "download admit card", "e-admit card"
+    // Admit card phrases
+    "admit card released", "admit card out now", "admit card declared",
+    "admit card issued", "admit card published", "admit card uploaded",
+    "admit card activated", "admit card made available", "admit card available",
+    "admit card available online", "admit card download started",
+    "admit card link available", "admit card link activated",
+    "admit card link live", "admit card link working",
+    "admit cards released", "admit cards out",
+    "admit card out", "e-admit card",
+    // Reversed admit card phrases
+    "released admit card", "out admit card", "declared admit card",
+    "issued admit card", "published admit card", "uploaded admit card",
+    "activated admit card", "available admit card", "live admit card",
+    "announced admit card", "notified admit card", "download admit card",
+    "started admit card download", "active admit card link",
+    "live admit card link", "working admit card link",
+    // Hall ticket phrases
+    "hall ticket released", "hall ticket out", "hall ticket issued",
+    "hall ticket download started", "hall ticket available online",
+    "hall ticket link activated", "hall ticket available",
+    // Reversed hall ticket phrases
+    "released hall ticket", "out hall ticket", "issued hall ticket",
+    "available hall ticket", "activated hall ticket link",
+    "announced hall ticket",
+    // Call letter phrases
+    "call letter released", "call letter issued", "call letter available",
+    "call letter download link", "call letter out now",
+    // Reversed call letter phrases
+    "released call letter", "issued call letter", "available call letter",
+    "download call letter", "published call letter",
   ];
 
-  // Check for exact keyword matches
+  // Check for exact keyword matches only
   if (admitReleasedKeywords.some(kw => combinedText.includes(kw))) return true;
-
-  // Check for "admit/hall ticket" + "released/out/available/download" combination
-  const hasAdmitWords = combinedText.includes("admit") || combinedText.includes("hall ticket");
-  const hasReleasedWords = combinedText.includes("released") || combinedText.includes("out") ||
-    combinedText.includes("available") || combinedText.includes("download");
-  if (hasAdmitWords && hasReleasedWords) return true;
 
   // Backward compat for Phase 1 status checks
   if (phaseNumber === 1) {

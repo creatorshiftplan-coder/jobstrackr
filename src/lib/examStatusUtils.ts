@@ -65,7 +65,7 @@ export interface ExamAttempt {
     } | null;
 }
 
-export type ExamStatusLabel = "Result Released" | "Admit Card Released" | "Application Pending";
+export type ExamStatusLabel = "Result Released" | "Admit Card Released" | "Expected Exam Date Released" | "Application Pending";
 
 export interface ExamStatus {
     label: ExamStatusLabel;
@@ -163,30 +163,72 @@ export function isAdmitCardReleased(attempt: ExamAttempt): boolean {
 
     // Text-based keyword matching (matches examStatus.ts logic used by TrendingExamCard)
     // This ensures consistency between Trending page and TrackedJobCard
+    // Use precise phrase matching only — avoid broad "admit" + "released" combos
     const statusText = (aiResponse?.current_status || "").toLowerCase();
     const summaryText = ((aiResponse as any)?.summary || "").toLowerCase();
     const combinedText = `${statusText} ${summaryText}`;
 
     const admitReleasedKeywords = [
-        "admit card released", "admit cards released", "admit cards out",
-        "admit card out", "admit card available", "hall ticket released",
-        "hall ticket available", "download admit card", "e-admit card"
+        // Admit card phrases
+        "admit card released", "admit card out now", "admit card declared",
+        "admit card issued", "admit card published", "admit card uploaded",
+        "admit card activated", "admit card made available", "admit card available",
+        "admit card available online", "admit card download started",
+        "admit card link available", "admit card link activated",
+        "admit card link live", "admit card link working",
+        "admit cards released", "admit cards out",
+        "admit card out", "e-admit card",
+        // Reversed admit card phrases
+        "released admit card", "out admit card", "declared admit card",
+        "issued admit card", "published admit card", "uploaded admit card",
+        "activated admit card", "available admit card", "live admit card",
+        "announced admit card", "notified admit card", "download admit card",
+        "started admit card download", "active admit card link",
+        "live admit card link", "working admit card link",
+        // Hall ticket phrases
+        "hall ticket released", "hall ticket out", "hall ticket issued",
+        "hall ticket download started", "hall ticket available online",
+        "hall ticket link activated", "hall ticket available",
+        // Reversed hall ticket phrases
+        "released hall ticket", "out hall ticket", "issued hall ticket",
+        "available hall ticket", "activated hall ticket link",
+        "announced hall ticket",
+        // Call letter phrases
+        "call letter released", "call letter issued", "call letter available",
+        "call letter download link", "call letter out now",
+        // Reversed call letter phrases
+        "released call letter", "issued call letter", "available call letter",
+        "download call letter", "published call letter",
     ];
 
-    // Check for exact keyword matches
+    // Check for exact keyword matches only
     if (admitReleasedKeywords.some(kw => combinedText.includes(kw))) {
         return true;
     }
 
-    // Check for "admit/hall ticket" + "released/out/available/download" combination
-    const hasAdmitWords = combinedText.includes("admit") || combinedText.includes("hall ticket");
-    const hasReleasedWords = combinedText.includes("released") || combinedText.includes("out") ||
-        combinedText.includes("available") || combinedText.includes("download");
-    if (hasAdmitWords && hasReleasedWords) {
-        return true;
-    }
-
     return false;
+}
+
+/**
+ * Check if expected exam date has been released for an exam
+ */
+export function isExamDateReleased(attempt: ExamAttempt): boolean {
+    const aiResponse = attempt.exams?.ai_cached_response;
+    if (!aiResponse) return false;
+
+    const statusText = (aiResponse.current_status || "").toLowerCase();
+    const summaryText = ((aiResponse as any)?.summary || "").toLowerCase();
+    const combinedText = `${statusText} ${summaryText}`;
+
+    const examDateReleasedKeywords = [
+        "expected exam date released", "expected exam date announced",
+        "expected exam date declared", "expected exam date out",
+        "exam date released", "exam date announced", "exam date declared",
+        "exam date out", "exam dates released", "exam dates announced",
+        "exam dates declared", "exam dates out",
+    ];
+
+    return examDateReleasedKeywords.some(kw => combinedText.includes(kw));
 }
 
 /**
@@ -199,6 +241,15 @@ export function getExamStatus(attempt: ExamAttempt): ExamStatus {
             label: "Result Released",
             variant: "default",
             color: "bg-green-500 text-white"
+        };
+    }
+
+    // Check for Expected Exam Date Released
+    if (isExamDateReleased(attempt)) {
+        return {
+            label: "Expected Exam Date Released",
+            variant: "default",
+            color: "bg-purple-500 text-white"
         };
     }
 
