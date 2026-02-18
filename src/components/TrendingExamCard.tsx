@@ -161,7 +161,7 @@ function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCard
         e.preventDefault();
         e.stopPropagation();
         if (jobId) {
-            navigate(`/job/${jobId}`);
+            navigate(`/jobs/${jobId}`);
         } else if (exam.official_website) {
             window.open(exam.official_website, '_blank', 'noopener,noreferrer');
         } else {
@@ -272,7 +272,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
 
     const handleViewDetails = () => {
         if (jobId) {
-            navigate(`/job/${jobId}`);
+            navigate(`/jobs/${jobId}`);
         } else if (exam.official_website) {
             window.open(exam.official_website, '_blank', 'noopener,noreferrer');
         } else {

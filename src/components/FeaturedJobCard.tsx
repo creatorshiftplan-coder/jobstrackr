@@ -33,7 +33,7 @@ export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
   };
 
   return (
-    <Link to={`/job/${job.id}`} className="block">
+    <Link to={`/jobs/${job.slug || job.id}`} className="block">
       <div className="w-[260px] sm:w-[300px] h-[160px] sm:h-[180px] flex-shrink-0 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-primary text-primary-foreground relative overflow-hidden shadow-lg hover:bg-primary/90 transition-all">
         {/* Background decorative elements */}
         <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-primary-foreground/10 rounded-full -translate-y-1/2 translate-x-1/2" />

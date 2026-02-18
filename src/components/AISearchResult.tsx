@@ -117,7 +117,7 @@ export function AISearchResult({ job, onDismiss, savedJobId }: AISearchResultPro
 
       <CardFooter className="pt-2">
         {savedJobId ? (
-          <Link to={`/job/${savedJobId}`} className="w-full">
+          <Link to={`/jobs/${savedJobId}`} className="w-full">
             <Button variant="default" className="w-full">
               <Eye className="h-4 w-4 mr-2" />
               View Details

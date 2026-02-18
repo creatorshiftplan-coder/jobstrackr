@@ -26,12 +26,35 @@ function calculateSimilarity(str1: string, str2: string): number {
   return intersection.size / union.size;
 }
 
-function parseAgeLimit(ageLimit: string): { min: number; max: number } {
-  const match = ageLimit.match(/(\d+)\s*[-–to]\s*(\d+)/);
-  if (match) {
-    return { min: parseInt(match[1]), max: parseInt(match[2]) };
+function parseAgeLimit(ageLimit: string | null | undefined): { min: number | null; max: number | null } {
+  if (!ageLimit) return { min: null, max: null };
+
+  // Try "min-max" format: "18-32 years"
+  const rangeMatch = ageLimit.match(/(\d+)\s*[-–to]\s*(\d+)/);
+  if (rangeMatch) {
+    return { min: parseInt(rangeMatch[1]), max: parseInt(rangeMatch[2]) };
   }
-  return { min: 18, max: 65 };
+
+  // Try "upto X" / "maximum X" / "not more than X"
+  const upperMatch = ageLimit.match(/(?:upto|up to|maximum|max|not more than)\s*(\d+)/i);
+  if (upperMatch) {
+    return { min: null, max: parseInt(upperMatch[1]) };
+  }
+
+  // Try "from X" / "minimum X" / "at least X"
+  const lowerMatch = ageLimit.match(/(?:from|minimum|min|at least|above)\s*(\d+)/i);
+  if (lowerMatch) {
+    return { min: parseInt(lowerMatch[1]), max: null };
+  }
+
+  // Try standalone number
+  const singleMatch = ageLimit.match(/(\d+)/);
+  if (singleMatch) {
+    return { min: null, max: parseInt(singleMatch[1]) };
+  }
+
+  // "Not available" or unrecognized → null
+  return { min: null, max: null };
 }
 
 const JOB_DISCOVERY_PROMPT = `You are a government job information extraction assistant for India with access to Google Search.
@@ -221,7 +244,7 @@ Deno.serve(async (req) => {
     if (saveJob && jobData) {
       console.log("Saving job to database:", jobData.exam_name);
 
-      const ages = parseAgeLimit(jobData.age_limit || "18-65 years");
+      const ages = parseAgeLimit(jobData.age_limit);
 
       // Use apply_link if available, otherwise fallback to official_website
       const applyLink = jobData.apply_link || jobData.official_website || null;
@@ -239,7 +262,7 @@ Deno.serve(async (req) => {
         age_min: ages.min,
         age_max: ages.max,
         application_fee: jobData.application_fees?.general || 0,
-        vacancies: 1,
+        vacancies: jobData.vacancies || null,
         last_date: jobData.last_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         apply_link: applyLink,
         is_featured: false,

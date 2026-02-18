@@ -37,7 +37,7 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
   };
 
   return (
-    <Link to={`/job/${job.id}`} className="block w-full">
+    <Link to={`/jobs/${job.slug || job.id}`} className="block w-full">
       <div className="relative p-4 sm:p-5 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg border border-border/50 min-h-[180px] sm:min-h-[200px] flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.01] hover:shadow-xl">
         {/* Save Button - Top Right */}
         <div className="absolute top-2 right-2">

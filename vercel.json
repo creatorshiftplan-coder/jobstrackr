@@ -4,8 +4,12 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/jobs/:slug",
+      "destination": "/api/jobs/:slug"
+    },
+    {
       "source": "/sitemap.xml",
-      "destination": "/sitemap.xml"
+      "destination": "/api/sitemap.xml"
     },
     {
       "source": "/robots.txt",

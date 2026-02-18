@@ -18,6 +18,7 @@ import Auth from "./pages/Auth";
 // Lazy load secondary routes
 const Index = lazy(() => import("./pages/Index"));
 const JobDetails = lazy(() => import("./pages/JobDetails"));
+const JobRedirect = lazy(() => import("./components/JobRedirect"));
 const Search = lazy(() => import("./pages/Search"));
 const Saved = lazy(() => import("./pages/Saved"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -71,7 +72,8 @@ const App = () => (
                     <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/welcome" element={<Welcome />} />
-                      <Route path="/job/:id" element={<JobDetails />} />
+                      <Route path="/jobs/:slug" element={<JobDetails />} />
+                      <Route path="/job/:id" element={<JobRedirect />} />
                       <Route path="/search" element={<Search />} />
                       <Route path="/saved" element={<Saved />} />
                       <Route path="/profile" element={<Profile />} />

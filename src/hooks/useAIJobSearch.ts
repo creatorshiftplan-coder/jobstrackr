@@ -17,7 +17,8 @@ export interface AIJobResult {
   requirements: string | null;
   salary_min: number | null;
   salary_max: number | null;
-  age_limit: string;
+  age_limit: string | null;
+  vacancies: number | null;
   application_fees: ApplicationFees;
   last_date: string | null;
   exam_date: string | null;

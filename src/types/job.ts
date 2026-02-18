@@ -1,5 +1,6 @@
 export interface Job {
   id: string;
+  slug: string | null;
   title: string;
   department: string;
   location: string;

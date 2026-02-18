@@ -32,7 +32,7 @@ export function JobCard({ job }: JobCardProps) {
   };
 
   return (
-    <Link to={`/job/${job.id}`}>
+    <Link to={`/jobs/${job.slug || job.id}`}>
       <Card className="group shadow-md hover:shadow-xl transition-all duration-300 border border-border/50 rounded-2xl overflow-hidden hover:-translate-y-0.5 bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-card/90 backdrop-blur-sm">
         <CardContent className="p-4">
           {/* Header Row: Logo + Title + Save Button */}

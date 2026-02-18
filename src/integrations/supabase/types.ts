@@ -287,6 +287,7 @@ export type Database = {
           qualification: string
           salary_max: number | null
           salary_min: number | null
+          slug: string | null
           title: string
           updated_at: string
           vacancies: number | null
@@ -310,6 +311,7 @@ export type Database = {
           qualification: string
           salary_max?: number | null
           salary_min?: number | null
+          slug?: string | null
           title: string
           updated_at?: string
           vacancies?: number | null
@@ -333,6 +335,7 @@ export type Database = {
           qualification?: string
           salary_max?: number | null
           salary_min?: number | null
+          slug?: string | null
           title?: string
           updated_at?: string
           vacancies?: number | null

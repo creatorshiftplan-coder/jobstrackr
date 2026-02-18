@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useJob } from "@/hooks/useJobs";
+import { useJobBySlug } from "@/hooks/useJobs";
 import { useExams } from "@/hooks/useExams";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -36,8 +36,8 @@ const isTBDDateDisplay = (displayValue: string | null): boolean => {
 };
 
 export default function JobDetails() {
-  const { id } = useParams<{ id: string }>();
-  const { data: job, isLoading, error } = useJob(id || "");
+  const { slug } = useParams<{ slug: string }>();
+  const { data: job, isLoading, error } = useJobBySlug(slug || "");
   const { user } = useAuth();
   const { userExams, addExamAttempt } = useExams();
   const [isTracking, setIsTracking] = useState(false);
@@ -163,8 +163,8 @@ export default function JobDetails() {
           <div className="flex gap-1">
             <button
               onClick={async () => {
-                // Use the share API URL which provides proper OG meta tags for social media
-                const shareUrl = `${window.location.origin}/api/share/${job.id}`;
+                // Use the SEO-friendly slug URL which provides proper OG meta tags
+                const shareUrl = `${window.location.origin}/jobs/${job.slug || job.id}`;
                 const shareData = {
                   title: job.title,
                   text: `Check out this job: ${job.title} at ${job.department}`,
@@ -306,7 +306,15 @@ export default function JobDetails() {
             <div className="flex items-center justify-between pt-2 border-t border-border">
               <div>
                 <p className="text-xs text-muted-foreground">Age Limit</p>
-                <p className="text-sm font-medium">{job.age_min || 18} - {job.age_max || 65} years</p>
+                <p className="text-sm font-medium">
+                  {job.age_min && job.age_max
+                    ? `${job.age_min} - ${job.age_max} years`
+                    : job.age_min
+                      ? `From ${job.age_min} years`
+                      : job.age_max
+                        ? `Upto ${job.age_max} years`
+                        : 'Not Available'}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">Application Fee</p>
