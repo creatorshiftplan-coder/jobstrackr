@@ -8,6 +8,10 @@
       "destination": "/api/jobs/:slug"
     },
     {
+      "source": "/updates/:slug",
+      "destination": "/api/updates/:slug"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap.xml"
     },

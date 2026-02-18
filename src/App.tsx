@@ -39,6 +39,7 @@ const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const SyllabusCheck = lazy(() => import("./pages/SyllabusCheck"));
 const SyllabusResult = lazy(() => import("./pages/SyllabusResult"));
+const UpdateDetails = lazy(() => import("./pages/UpdateDetails"));
 
 // Page loader component
 const PageLoader = () => (
@@ -88,6 +89,7 @@ const App = () => (
                       <Route path="/admin" element={<Admin />} />
                       <Route path="/tracker" element={<ExamTracker />} />
                       <Route path="/trending" element={<Trending />} />
+                      <Route path="/updates/:slug" element={<UpdateDetails />} />
                       <Route path="/syllabus" element={<SyllabusCheck />} />
                       <Route path="/syllabus/result" element={<SyllabusResult />} />
                       <Route path="/edit-sector-preferences" element={<EditSectorPreferences />} />

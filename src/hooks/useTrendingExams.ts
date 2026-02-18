@@ -24,6 +24,7 @@ export interface TrendingExam {
     ai_last_updated_at: string | null;
     tracking_count: number;
     logo_url?: string | null;
+    update_slug?: string | null;
 }
 
 // Category to gradient mapping with hex colors for inline styles
@@ -143,7 +144,8 @@ export function useTrendingExams(category?: string) {
                     ai_cached_response: exam.ai_cached_response as TrendingExam["ai_cached_response"],
                     ai_last_updated_at: exam.ai_last_updated_at,
                     tracking_count: trackingCounts[exam.id] || 0,
-                    logo_url: null, // Will be populated when logo management is added
+                    logo_url: null,
+                    update_slug: (exam as any).update_slug || null,
                 };
             });
 

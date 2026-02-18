@@ -160,13 +160,7 @@ function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCard
     const handleViewDetails = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (jobId) {
-            navigate(`/jobs/${jobId}`);
-        } else if (exam.official_website) {
-            window.open(exam.official_website, '_blank', 'noopener,noreferrer');
-        } else {
-            window.open(`https://www.google.com/search?q=${encodeURIComponent(exam.name + ' official website')}`, '_blank', 'noopener,noreferrer');
-        }
+        navigate(`/updates/${exam.update_slug || exam.id}`);
     };
 
     return (
@@ -271,13 +265,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
     }, [initialExpanded]);
 
     const handleViewDetails = () => {
-        if (jobId) {
-            navigate(`/jobs/${jobId}`);
-        } else if (exam.official_website) {
-            window.open(exam.official_website, '_blank', 'noopener,noreferrer');
-        } else {
-            window.open(`https://www.google.com/search?q=${encodeURIComponent(exam.name + ' official website')}`, '_blank', 'noopener,noreferrer');
-        }
+        navigate(`/updates/${exam.update_slug || exam.id}`);
     };
 
     return (

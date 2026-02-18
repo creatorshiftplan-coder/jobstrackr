@@ -76,6 +76,30 @@ export default async function handler() {
 `;
         }
 
+        // Exam update pages
+        const examsResponse = await fetch(
+            `${supabaseUrl}/rest/v1/exams?select=update_slug,updated_at&update_slug=not.is.null&is_active=eq.true&order=updated_at.desc&limit=5000`,
+            {
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                },
+            }
+        );
+
+        const exams = examsResponse.ok ? await examsResponse.json() : [];
+        for (const exam of exams) {
+            if (!exam.update_slug) continue;
+            const lastmod = exam.updated_at ? exam.updated_at.split('T')[0] : today;
+            xml += `  <url>
+    <loc>${SITE_URL}/updates/${encodeURIComponent(exam.update_slug)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+`;
+        }
+
         xml += '</urlset>\n';
 
         return new Response(xml, {
