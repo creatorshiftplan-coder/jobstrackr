@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { BottomNav } from "@/components/BottomNav";
 
 // ── Milestone timeline config ─────────────────────────────────────
 const MILESTONES = [
@@ -495,6 +496,8 @@ export default function UpdateDetails() {
                     Last updated: {exam.ai_last_updated_at ? formatDistanceToNow(new Date(exam.ai_last_updated_at), { addSuffix: true }) : 'Recently'}
                 </div>
             </div>
+
+            <BottomNav />
         </div>
     );
 }

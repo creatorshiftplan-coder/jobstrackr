@@ -1,239 +1,242 @@
+import { ssrNavbar, ssrBottomNav, ssrCtaBanner, ssrShellStyles } from '../lib/ssr-shell.ts';
+
 export const config = {
-    runtime: 'edge',
+  runtime: 'edge',
 };
 
 /**
- * Universal SEO Job Page Renderer (Modules 3-6)
+ * Universal SEO Job Page Renderer
  * ─────────────────────────────────────────────
  * Serves pre-rendered, SEO-complete HTML for /jobs/:slug
+ * Renders inside the full app shell (navbar + bottom nav)
  * Includes: dynamic metadata, JSON-LD, semantic content, internal links
  * Then boots the React SPA for interactivity.
  */
 
 function escapeHtml(str: string): string {
-    if (!str) return '';
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function formatSalary(min: number | null, max: number | null): string {
-    if (min && max) return `₹${min.toLocaleString('en-IN')} – ₹${max.toLocaleString('en-IN')} per month`;
-    if (min) return `₹${min.toLocaleString('en-IN')}+ per month`;
-    if (max) return `Up to ₹${max.toLocaleString('en-IN')} per month`;
-    return 'Not disclosed';
+  if (min && max) return `₹${min.toLocaleString('en-IN')} – ₹${max.toLocaleString('en-IN')} per month`;
+  if (min) return `₹${min.toLocaleString('en-IN')}+ per month`;
+  if (max) return `Up to ₹${max.toLocaleString('en-IN')} per month`;
+  return 'Not disclosed';
 }
 
 function formatAge(min: number | null, max: number | null): string {
-    if (min && max) return `${min} – ${max} years`;
-    if (min) return `From ${min} years`;
-    if (max) return `Upto ${max} years`;
-    return 'Not Available';
+  if (min && max) return `${min} – ${max} years`;
+  if (min) return `From ${min} years`;
+  if (max) return `Upto ${max} years`;
+  return 'Not Available';
 }
 
 function formatDate(dateStr: string | null): string {
-    if (!dateStr) return 'To be announced';
-    try {
-        return new Date(dateStr).toLocaleDateString('en-IN', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
-    } catch {
-        return dateStr;
-    }
+  if (!dateStr) return 'To be announced';
+  try {
+    return new Date(dateStr).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 export default async function handler(request: Request) {
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
-    const slug = pathParts[pathParts.length - 1];
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const slug = pathParts[pathParts.length - 1];
 
-    if (!slug) {
-        return Response.redirect(new URL('/', url.origin).toString(), 302);
+  if (!slug) {
+    return Response.redirect(new URL('/', url.origin).toString(), 302);
+  }
+
+  try {
+    const supabaseUrl = 'https://fdxksytpdfgmbkttipdf.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkeGtzeXRwZGZnbWJrdHRpcGRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTM1MTYsImV4cCI6MjA4MDQyOTUxNn0.NocVE7TCJIQgIhbHkxhHWraBRxyCkLIdgUQ3ERCHuKQ';
+
+    // Try by slug first, then UUID fallback
+    let jobResponse = await fetch(
+      `${supabaseUrl}/rest/v1/jobs?slug=eq.${encodeURIComponent(slug)}&select=*`,
+      {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+      }
+    );
+
+    let jobs = await jobResponse.json();
+    let job = jobs[0];
+
+    // UUID fallback
+    if (!job && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slug)) {
+      jobResponse = await fetch(
+        `${supabaseUrl}/rest/v1/jobs?id=eq.${encodeURIComponent(slug)}&select=*`,
+        {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+        }
+      );
+      jobs = await jobResponse.json();
+      job = jobs[0];
+
+      // If found by UUID and has slug, redirect to canonical slug URL
+      if (job?.slug) {
+        return Response.redirect(new URL(`/jobs/${job.slug}`, url.origin).toString(), 301);
+      }
     }
 
-    try {
-        const supabaseUrl = 'https://fdxksytpdfgmbkttipdf.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkeGtzeXRwZGZnbWJrdHRpcGRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTM1MTYsImV4cCI6MjA4MDQyOTUxNn0.NocVE7TCJIQgIhbHkxhHWraBRxyCkLIdgUQ3ERCHuKQ';
-
-        // Try by slug first, then UUID fallback
-        let jobResponse = await fetch(
-            `${supabaseUrl}/rest/v1/jobs?slug=eq.${encodeURIComponent(slug)}&select=*`,
-            {
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`,
-                },
-            }
-        );
-
-        let jobs = await jobResponse.json();
-        let job = jobs[0];
-
-        // UUID fallback
-        if (!job && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slug)) {
-            jobResponse = await fetch(
-                `${supabaseUrl}/rest/v1/jobs?id=eq.${encodeURIComponent(slug)}&select=*`,
-                {
-                    headers: {
-                        'apikey': supabaseKey,
-                        'Authorization': `Bearer ${supabaseKey}`,
-                    },
-                }
-            );
-            jobs = await jobResponse.json();
-            job = jobs[0];
-
-            // If found by UUID and has slug, redirect to canonical slug URL
-            if (job?.slug) {
-                return Response.redirect(new URL(`/jobs/${job.slug}`, url.origin).toString(), 301);
-            }
-        }
-
-        if (!job) {
-            // Job not found — serve SPA fallback
-            return serveSpaFallback(url);
-        }
-
-        // ── Fetch related jobs (Module 6: Internal Linking) ──
-        const relatedResponse = await fetch(
-            `${supabaseUrl}/rest/v1/jobs?department=eq.${encodeURIComponent(job.department)}&id=neq.${job.id}&select=slug,title,department,vacancies_display&order=created_at.desc&limit=5`,
-            {
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`,
-                },
-            }
-        );
-        const relatedJobs = await relatedResponse.json();
-
-        // ── Build SEO-rich HTML ──
-        const html = buildSeoPage(job, relatedJobs, url.origin);
-
-        return new Response(html, {
-            status: 200,
-            headers: {
-                'Content-Type': 'text/html; charset=utf-8',
-                'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
-            },
-        });
-    } catch (error) {
-        console.error('SEO job page error:', error);
-        return serveSpaFallback(url);
+    if (!job) {
+      // Job not found — serve SPA fallback
+      return serveSpaFallback(url);
     }
+
+    // ── Fetch related jobs (Module 6: Internal Linking) ──
+    const relatedResponse = await fetch(
+      `${supabaseUrl}/rest/v1/jobs?department=eq.${encodeURIComponent(job.department)}&id=neq.${job.id}&select=slug,title,department,vacancies_display&order=created_at.desc&limit=5`,
+      {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+      }
+    );
+    const relatedJobs = await relatedResponse.json();
+
+    // ── Build SEO-rich HTML ──
+    const html = buildSeoPage(job, relatedJobs, url.origin);
+
+    return new Response(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    });
+  } catch (error) {
+    console.error('SEO job page error:', error);
+    return serveSpaFallback(url);
+  }
 }
 
 function serveSpaFallback(url: URL): Response {
-    // Redirect to SPA — Vercel will serve index.html
-    return new Response(`<!DOCTYPE html>
+  // Redirect to SPA — Vercel will serve index.html
+  return new Response(`<!DOCTYPE html>
 <html><head><meta http-equiv="refresh" content="0;url=${url.pathname}"></head>
 <body>Redirecting...</body></html>`, {
-        status: 200,
-        headers: { 'Content-Type': 'text/html' },
-    });
+    status: 200,
+    headers: { 'Content-Type': 'text/html' },
+  });
 }
 
 function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
-    const siteUrl = 'https://jobstrackr.in';
-    const year = new Date().getFullYear();
-    const canonicalUrl = `${siteUrl}/jobs/${job.slug || job.id}`;
+  const siteUrl = 'https://jobstrackr.in';
+  const year = new Date().getFullYear();
+  const canonicalUrl = `${siteUrl}/jobs/${job.slug || job.id}`;
 
-    // ── Module 3: Dynamic SEO Metadata ──
-    const seoTitle = `${escapeHtml(job.title)} Recruitment ${year} – Vacancy, Eligibility & Apply | JobsTrackr`;
+  // ── Module 3: Dynamic SEO Metadata ──
+  const seoTitle = `${escapeHtml(job.title)} Recruitment ${year} – Vacancy, Eligibility & Apply | JobsTrackr`;
 
-    const descParts: string[] = [];
-    descParts.push(`${job.title} by ${job.department}.`);
-    if (job.vacancies_display) descParts.push(`${job.vacancies_display} vacancies.`);
-    else if (job.vacancies) descParts.push(`${job.vacancies} vacancies.`);
-    if (job.salary_min || job.salary_max) descParts.push(`Salary: ${formatSalary(job.salary_min, job.salary_max)}.`);
-    descParts.push(`Qualification: ${job.qualification}.`);
-    if (job.last_date_display || job.last_date) descParts.push(`Last date: ${job.last_date_display || formatDate(job.last_date)}.`);
-    descParts.push('Apply now on JobsTrackr.');
-    let metaDescription = descParts.join(' ');
-    if (metaDescription.length > 160) metaDescription = metaDescription.substring(0, 157) + '...';
+  const descParts: string[] = [];
+  descParts.push(`${job.title} by ${job.department}.`);
+  if (job.vacancies_display) descParts.push(`${job.vacancies_display} vacancies.`);
+  else if (job.vacancies) descParts.push(`${job.vacancies} vacancies.`);
+  if (job.salary_min || job.salary_max) descParts.push(`Salary: ${formatSalary(job.salary_min, job.salary_max)}.`);
+  descParts.push(`Qualification: ${job.qualification}.`);
+  if (job.last_date_display || job.last_date) descParts.push(`Last date: ${job.last_date_display || formatDate(job.last_date)}.`);
+  descParts.push('Apply now on JobsTrackr.');
+  let metaDescription = descParts.join(' ');
+  if (metaDescription.length > 160) metaDescription = metaDescription.substring(0, 157) + '...';
 
-    // ── Module 4: JSON-LD Structured Data ──
-    const jsonLd: any = {
-        '@context': 'https://schema.org',
-        '@type': 'JobPosting',
-        title: job.title,
-        description: job.description || `${job.title} recruitment notification from ${job.department}. Check eligibility, salary, age limit and apply online.`,
-        datePosted: job.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-        validThrough: job.last_date || undefined,
-        hiringOrganization: {
-            '@type': 'Organization',
-            name: job.department,
-        },
-        jobLocation: {
-            '@type': 'Place',
-            address: {
-                '@type': 'PostalAddress',
-                addressCountry: 'IN',
-                addressRegion: job.location || 'All India',
-            },
-        },
-        employmentType: 'FULL_TIME',
+  // ── Module 4: JSON-LD Structured Data ──
+  const jsonLd: any = {
+    '@context': 'https://schema.org',
+    '@type': 'JobPosting',
+    title: job.title,
+    description: job.description || `${job.title} recruitment notification from ${job.department}. Check eligibility, salary, age limit and apply online.`,
+    datePosted: job.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+    validThrough: job.last_date || undefined,
+    hiringOrganization: {
+      '@type': 'Organization',
+      name: job.department,
+    },
+    jobLocation: {
+      '@type': 'Place',
+      address: {
+        '@type': 'PostalAddress',
+        addressCountry: 'IN',
+        addressRegion: job.location || 'All India',
+      },
+    },
+    employmentType: 'FULL_TIME',
+  };
+
+  if (job.salary_min || job.salary_max) {
+    jsonLd.baseSalary = {
+      '@type': 'MonetaryAmount',
+      currency: 'INR',
+      value: {
+        '@type': 'QuantitativeValue',
+        ...(job.salary_min && { minValue: job.salary_min }),
+        ...(job.salary_max && { maxValue: job.salary_max }),
+        unitText: 'MONTH',
+      },
     };
+  }
 
-    if (job.salary_min || job.salary_max) {
-        jsonLd.baseSalary = {
-            '@type': 'MonetaryAmount',
-            currency: 'INR',
-            value: {
-                '@type': 'QuantitativeValue',
-                ...(job.salary_min && { minValue: job.salary_min }),
-                ...(job.salary_max && { maxValue: job.salary_max }),
-                unitText: 'MONTH',
-            },
-        };
-    }
+  if (job.vacancies) jsonLd.totalJobOpenings = job.vacancies;
+  if (job.qualification) jsonLd.qualifications = job.qualification;
+  if (job.apply_link) {
+    jsonLd.applicationContact = {
+      '@type': 'ContactPoint',
+      url: job.apply_link,
+    };
+  }
 
-    if (job.vacancies) jsonLd.totalJobOpenings = job.vacancies;
-    if (job.qualification) jsonLd.qualifications = job.qualification;
-    if (job.apply_link) {
-        jsonLd.applicationContact = {
-            '@type': 'ContactPoint',
-            url: job.apply_link,
-        };
-    }
+  // ── Module 5: SEO Content Expansion ──
+  const salaryDisplay = formatSalary(job.salary_min, job.salary_max);
+  const ageDisplay = formatAge(job.age_min, job.age_max);
+  const lastDateDisplay = job.last_date_display || formatDate(job.last_date);
 
-    // ── Module 5: SEO Content Expansion ──
-    const salaryDisplay = formatSalary(job.salary_min, job.salary_max);
-    const ageDisplay = formatAge(job.age_min, job.age_max);
-    const lastDateDisplay = job.last_date_display || formatDate(job.last_date);
+  const overviewParagraph = `${escapeHtml(job.department)} has released the official notification for ${escapeHtml(job.title)}.`
+    + (job.vacancies_display ? ` A total of ${escapeHtml(job.vacancies_display)} vacancies have been announced.` : '')
+    + ` Interested and eligible candidates can apply ${job.last_date ? `before ${escapeHtml(lastDateDisplay)}` : 'through the official website'}.`
+    + ` Read below for complete details on eligibility, salary, age limit, and how to apply.`;
 
-    const overviewParagraph = `${escapeHtml(job.department)} has released the official notification for ${escapeHtml(job.title)}.`
-        + (job.vacancies_display ? ` A total of ${escapeHtml(job.vacancies_display)} vacancies have been announced.` : '')
-        + ` Interested and eligible candidates can apply ${job.last_date ? `before ${escapeHtml(lastDateDisplay)}` : 'through the official website'}.`
-        + ` Read below for complete details on eligibility, salary, age limit, and how to apply.`;
-
-    // ── Module 6: Internal Links HTML ──
-    let relatedLinksHtml = '';
-    if (relatedJobs && relatedJobs.length > 0) {
-        const linkItems = relatedJobs.map((rj: any) => {
-            const rjUrl = `/jobs/${rj.slug || rj.id}`;
-            const anchorText = rj.vacancies_display
-                ? `${escapeHtml(rj.title)} – ${escapeHtml(rj.vacancies_display)} Vacancies`
-                : escapeHtml(rj.title);
-            return `<li style="margin:8px 0"><a href="${escapeHtml(rjUrl)}" style="color:#1d4ed8;text-decoration:underline">${anchorText}</a></li>`;
-        }).join('');
-        relatedLinksHtml = `
+  // ── Module 6: Internal Links HTML ──
+  let relatedLinksHtml = '';
+  if (relatedJobs && relatedJobs.length > 0) {
+    const linkItems = relatedJobs.map((rj: any) => {
+      const rjUrl = `/jobs/${rj.slug || rj.id}`;
+      const anchorText = rj.vacancies_display
+        ? `${escapeHtml(rj.title)} – ${escapeHtml(rj.vacancies_display)} Vacancies`
+        : escapeHtml(rj.title);
+      return `<li style="margin:8px 0"><a href="${escapeHtml(rjUrl)}" style="color:#1d4ed8;text-decoration:underline">${anchorText}</a></li>`;
+    }).join('');
+    relatedLinksHtml = `
     <nav aria-label="Related Government Jobs" style="margin-top:32px;padding-top:24px;border-top:1px solid #e5e7eb">
       <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:12px;color:#1e3a5f">Related Government Jobs</h2>
       <ul style="list-style:none;padding:0">${linkItems}</ul>
     </nav>`;
-    }
+  }
 
-    // ── Module 8: Update Signal ──
-    const updatedAt = job.updated_at || job.created_at;
-    const updatedDateStr = formatDate(updatedAt);
-    const verifiedDateStr = job.admin_refreshed_at ? formatDate(job.admin_refreshed_at) : null;
+  // ── Module 8: Update Signal ──
+  const updatedAt = job.updated_at || job.created_at;
+  const updatedDateStr = formatDate(updatedAt);
+  const verifiedDateStr = job.admin_refreshed_at ? formatDate(job.admin_refreshed_at) : null;
 
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -277,7 +280,7 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
       max-width: 720px;
       margin: 0 auto;
-      padding: 24px 16px;
+      padding: 24px 16px 96px;
       color: #1a1a2e;
       line-height: 1.7;
     }
@@ -290,11 +293,11 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
     [data-ssr-content] .info-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
     [data-ssr-content] .info-value { font-size: 1rem; font-weight: 600; color: #0f172a; margin-top: 4px; }
     [data-ssr-content] .update-footer { margin-top: 32px; padding: 16px; background: #f1f5f9; border-radius: 8px; font-size: 0.85rem; color: #475569; }
-    /* Hide SSR content once SPA has mounted */
-    .spa-mounted [data-ssr-content] { display: none; }
+    ${ssrShellStyles()}
   </style>
 </head>
 <body>
+  ${ssrNavbar()}
   <!-- SEO Content (visible to crawlers and pre-render) -->
   <article data-ssr-content itemscope itemtype="https://schema.org/JobPosting">
     <meta itemprop="datePosted" content="${job.created_at?.split('T')[0] || ''}">
@@ -380,6 +383,9 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
     <!-- Related Jobs (Internal Links) -->
     ${relatedLinksHtml}
 
+    <!-- CTA Banner -->
+    ${ssrCtaBanner('job', job.title)}
+
     <!-- Update Signal -->
     <footer class="update-footer">
       <time datetime="${updatedAt}">📆 Last updated: ${escapeHtml(updatedDateStr)}</time>
@@ -387,6 +393,7 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
     </footer>
   </article>
 
+  ${ssrBottomNav()}
   <!-- React SPA Mount Point -->
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>

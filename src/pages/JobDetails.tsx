@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
+import { BottomNav } from "@/components/BottomNav";
 
 // Check if last_date_display contains TBD-like values
 const isTBDDateDisplay = (displayValue: string | null): boolean => {
@@ -394,7 +395,7 @@ export default function JobDetails() {
       </main>
 
       {/* Fixed Apply Now Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card/95 backdrop-blur-md border-t border-border">
+      <div className="fixed bottom-16 left-0 right-0 p-4 bg-card/95 backdrop-blur-md border-t border-border z-40">
         <div className="flex justify-center">
           {job.apply_link && !isExpired ? (
             <a href={job.apply_link} target="_blank" rel="noopener noreferrer" className="w-1/2">
@@ -409,6 +410,8 @@ export default function JobDetails() {
           )}
         </div>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { ssrNavbar, ssrBottomNav, ssrCtaBanner, ssrShellStyles } from '../lib/ssr-shell.ts';
+
 export const config = {
   runtime: 'edge',
 };
@@ -342,14 +344,15 @@ function buildUpdatePage(exam: any, aiData: any, status: { type: string; label: 
   <link rel="icon" href="/favicon.ico"><meta name="theme-color" content="#0A4174">
 
   <style>
-    [data-ssr-content] { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 16px; color: #1a1a2e; line-height: 1.7; }
+    [data-ssr-content] { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 16px 96px; color: #1a1a2e; line-height: 1.7; }
     [data-ssr-content] h1 { font-size: 1.75rem; font-weight: 800; color: #0A4174; margin-bottom: 8px; }
     [data-ssr-content] h2 { font-size: 1.25rem; font-weight: 700; color: #1e3a5f; margin: 24px 0 8px; }
     [data-ssr-content] p { margin: 8px 0; color: #374151; }
-    .spa-mounted [data-ssr-content] { display: none; }
+    ${ssrShellStyles()}
   </style>
 </head>
 <body>
+  ${ssrNavbar()}
   <article data-ssr-content>
     <header>
       <a href="/trending" style="color:#64748b;text-decoration:none;font-size:0.9rem">← Back to Trending</a>
@@ -391,11 +394,14 @@ function buildUpdatePage(exam: any, aiData: any, status: { type: string; label: 
     ${jobInfoHtml}
     ${relatedHtml}
 
+    ${ssrCtaBanner('exam', exam.name)}
+
     <footer style="margin-top:32px;padding:16px;background:#f1f5f9;border-radius:8px;font-size:0.85rem;color:#475569">
       <time datetime="${updatedAt}">📆 Last updated: ${escapeHtml(formatDate(updatedAt))}</time>
     </footer>
   </article>
 
+  ${ssrBottomNav()}
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
   <script>
