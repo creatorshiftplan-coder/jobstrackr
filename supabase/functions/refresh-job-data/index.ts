@@ -39,12 +39,35 @@ function isDemoDate(value: string | null | undefined): boolean {
     return DEMO_DATE_PATTERNS.some(pattern => pattern.test(value));
 }
 
-function parseAgeLimit(ageLimit: string): { min: number; max: number } {
-    const match = ageLimit.match(/(\d+)\s*[-–to]\s*(\d+)/);
-    if (match) {
-        return { min: parseInt(match[1]), max: parseInt(match[2]) };
+function parseAgeLimit(ageLimit: string | null | undefined): { min: number | null; max: number | null } {
+    if (!ageLimit) return { min: null, max: null };
+
+    // Try "min-max" format: "18-32 years"
+    const rangeMatch = ageLimit.match(/(\d+)\s*[-–to]\s*(\d+)/);
+    if (rangeMatch) {
+        return { min: parseInt(rangeMatch[1]), max: parseInt(rangeMatch[2]) };
     }
-    return { min: 18, max: 65 };
+
+    // Try "upto X" / "maximum X" / "not more than X"
+    const upperMatch = ageLimit.match(/(?:upto|up to|maximum|max|not more than)\s*(\d+)/i);
+    if (upperMatch) {
+        return { min: null, max: parseInt(upperMatch[1]) };
+    }
+
+    // Try "from X" / "minimum X" / "at least X"
+    const lowerMatch = ageLimit.match(/(?:from|minimum|min|at least|above)\s*(\d+)/i);
+    if (lowerMatch) {
+        return { min: parseInt(lowerMatch[1]), max: null };
+    }
+
+    // Try standalone number
+    const singleMatch = ageLimit.match(/(\d+)/);
+    if (singleMatch) {
+        return { min: null, max: parseInt(singleMatch[1]) };
+    }
+
+    // "Not available" or unrecognized → null
+    return { min: null, max: null };
 }
 
 const JOB_REFRESH_PROMPT = `You are a government job information assistant for India with access to Google Search.
@@ -57,8 +80,7 @@ Return ONLY a valid JSON object (no markdown, no extra text):
   "eligibility": "Actual eligibility criteria from official notification",
   "application_start_date": "YYYY-MM-DD format or null",
   "last_date": "YYYY-MM-DD format for application deadline or null",
-  "age_min": number (minimum age, e.g., 18),
-  "age_max": number (maximum age, e.g., 35),
+  "age_limit": "Age range like '18-32 years' or null",
   "apply_link": "Direct official application URL (not example.com)",
   "confidence": 0.0 to 1.0
 }
@@ -306,11 +328,17 @@ Return verified data only.`
         if (newData.last_date && !isDemoDate(newData.last_date) && !isDemoValue(newData.last_date)) {
             cleanData.last_date = newData.last_date;
         }
-        if (newData.age_min !== null && newData.age_min !== undefined && typeof newData.age_min === "number") {
-            cleanData.age_min = newData.age_min;
-        }
-        if (newData.age_max !== null && newData.age_max !== undefined && typeof newData.age_max === "number") {
-            cleanData.age_max = newData.age_max;
+        if (newData.age_limit) {
+            const ages = parseAgeLimit(newData.age_limit);
+            if (ages.min !== null) cleanData.age_min = ages.min;
+            if (ages.max !== null) cleanData.age_max = ages.max;
+        } else {
+            if (newData.age_min !== null && newData.age_min !== undefined && typeof newData.age_min === "number") {
+                cleanData.age_min = newData.age_min;
+            }
+            if (newData.age_max !== null && newData.age_max !== undefined && typeof newData.age_max === "number") {
+                cleanData.age_max = newData.age_max;
+            }
         }
         if (newData.apply_link && !isDemoValue(newData.apply_link)) {
             cleanData.apply_link = newData.apply_link;
