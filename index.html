@@ -99,7 +99,20 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#fff">
+      <div
+        style="width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#0A4174;border-radius:50%;animation:_s .8s linear infinite">
+      </div>
+    </div>
+    <style>
+      @keyframes _s {
+        to {
+          transform: rotate(360deg)
+        }
+      }
+    </style>
+  </div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

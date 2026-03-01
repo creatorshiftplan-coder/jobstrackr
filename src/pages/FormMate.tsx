@@ -3,7 +3,7 @@ import { ArrowLeft, Copy, Check, User, Phone, GraduationCap, Shield, Briefcase }
 import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useProfile } from "@/hooks/useProfile";
+import { useProfile, useDecryptedProfile } from "@/hooks/useProfile";
 import { useEducation } from "@/hooks/useEducation";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -57,6 +57,7 @@ export default function FormMate() {
   const navigate = useNavigate();
   const { user, loading: authLoading, isGuestMode } = useAuth();
   const { profile, isLoading: profileLoading } = useProfile();
+  const { data: decryptedProfile } = useDecryptedProfile();
   const { education, isLoading: educationLoading } = useEducation();
   const { showAuthRequired } = useAuthRequired();
 
@@ -161,9 +162,9 @@ export default function FormMate() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CopyField label="Aadhaar Number" value={isGuestMode ? displayProfile?.aadhar_number : (profile?.decrypted_aadhar_number || profile?.aadhar_number)} />
-            <CopyField label="PAN Number" value={isGuestMode ? displayProfile?.pan_number : (profile?.decrypted_pan_number || profile?.pan_number)} />
-            <CopyField label="Passport Number" value={isGuestMode ? "J1234567" : (profile?.decrypted_passport_number || profile?.passport_number)} />
+            <CopyField label="Aadhaar Number" value={isGuestMode ? displayProfile?.aadhar_number : (decryptedProfile?.decrypted_aadhar_number || profile?.aadhar_number)} />
+            <CopyField label="PAN Number" value={isGuestMode ? displayProfile?.pan_number : (decryptedProfile?.decrypted_pan_number || profile?.pan_number)} />
+            <CopyField label="Passport Number" value={isGuestMode ? "J1234567" : (decryptedProfile?.decrypted_passport_number || profile?.passport_number)} />
           </CardContent>
         </Card>
 

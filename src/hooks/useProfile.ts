@@ -59,24 +59,6 @@ export function useProfile() {
         .maybeSingle();
 
       if (error) throw error;
-
-      // If profile exists, also fetch decrypted sensitive fields
-      if (data) {
-        const { data: decryptedData } = await supabase
-          .rpc("get_my_decrypted_profile");
-
-        if (decryptedData && decryptedData.length > 0) {
-          const decrypted = decryptedData[0];
-          // Merge decrypted values for display in FormMate
-          return {
-            ...data,
-            decrypted_aadhar_number: decrypted.aadhar_number_decrypted,
-            decrypted_pan_number: decrypted.pan_number_decrypted,
-            decrypted_passport_number: decrypted.passport_number_decrypted,
-          };
-        }
-      }
-
       return data;
     },
     enabled: !!user?.id,
@@ -125,4 +107,34 @@ export function useProfile() {
     isLoading: query.isLoading,
     upsertProfile,
   };
+}
+
+/**
+ * Separate hook for decrypted sensitive fields (Aadhar, PAN, Passport).
+ * Only call this on pages that actually need decrypted values (e.g. FormMate).
+ * This avoids a sequential RPC call on every page that uses useProfile.
+ */
+export function useDecryptedProfile() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["decrypted-profile", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+
+      const { data: decryptedData } = await supabase
+        .rpc("get_my_decrypted_profile");
+
+      if (decryptedData && decryptedData.length > 0) {
+        return {
+          decrypted_aadhar_number: decryptedData[0].aadhar_number_decrypted,
+          decrypted_pan_number: decryptedData[0].pan_number_decrypted,
+          decrypted_passport_number: decryptedData[0].passport_number_decrypted,
+        };
+      }
+      return null;
+    },
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 10, // Cache for 10 minutes
+  });
 }
