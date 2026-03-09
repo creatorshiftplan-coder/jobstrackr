@@ -258,9 +258,10 @@ const isValidUrl = (url: string | null | undefined): boolean => {
 
 interface TrackedJobCardProps {
   attempt: ExamAttempt;
+  cardIndex?: number;
 }
 
-export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
+export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) {
   const { removeExamAttempt, getExamStatus, decryptPassword } = useExams();
   const queryClient = useQueryClient();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -387,6 +388,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   };
 
   const hasCredentials = attempt.application_number || attempt.roll_number || attempt.password_encrypted;
+  const cardVariant = cardIndex % 3;
 
   const handleTogglePassword = async () => {
     if (showPassword) {
@@ -419,14 +421,21 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
   };
 
   return (
-    <Card className="bg-gradient-to-br from-cyan-50/80 via-sky-50/90 to-blue-100/80 dark:from-cyan-950/40 dark:via-sky-900/30 dark:to-blue-950/40 border border-cyan-200/60 dark:border-cyan-700/30 overflow-hidden shadow-lg hover:shadow-xl transition-all backdrop-blur-sm ring-1 ring-white/50 dark:ring-white/10">
+    <Card
+      className={cn(
+        "bg-white dark:bg-card border overflow-hidden rounded-2xl shadow-sm hover:shadow-md transition-shadow",
+        cardVariant === 0 && "border-sky-100/90 dark:border-sky-900/40 shadow-[0_2px_10px_rgba(14,116,144,0.08)] dark:shadow-[0_2px_12px_rgba(14,116,144,0.18)]",
+        cardVariant === 1 && "border-blue-100/90 dark:border-blue-900/40 shadow-[0_2px_10px_rgba(37,99,235,0.08)] dark:shadow-[0_2px_12px_rgba(37,99,235,0.18)]",
+        cardVariant === 2 && "border-indigo-100/90 dark:border-indigo-900/40 shadow-[0_2px_10px_rgba(79,70,229,0.08)] dark:shadow-[0_2px_12px_rgba(79,70,229,0.18)]"
+      )}
+    >
       {/* Clickable Area - Header + Collapsed Summary */}
       <div
         className="cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         {/* Header - Always Visible */}
-        <div className="flex items-center justify-between p-4">
+        <div className="flex items-center justify-between p-5">
           <div className="flex-1">
             <h3 className="font-semibold text-foreground">
               {formatExamTitle(exam?.name, attempt.year)}
@@ -476,7 +485,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
 
         {/* Collapsed Summary */}
         {!isExpanded && (
-          <div className="px-4 pb-4">
+          <div className="px-5 pb-5">
             {isLoadingStatus ? (
               <div className="space-y-2">
                 <Skeleton className="h-4 w-32" />
@@ -496,26 +505,9 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                   </div>
                   <Progress value={getProgress()} className="h-2.5 bg-muted/50 dark:bg-muted/30 shadow-sm [&>div]:bg-primary" />
                 </div>
-                {/* AI Summary Preview */}
-                {statusData?.summary && (
-                  <div className="mt-3 p-2 bg-card/60 dark:bg-card/40 rounded-lg border border-blue-100 dark:border-blue-800">
-                    <p className="text-xs text-foreground line-clamp-2">{statusData.summary}</p>
-                  </div>
-                )}
-                {/* AI Recommendation Preview */}
-                {statusData?.recommendations?.length > 0 && (
-                  <div className="mt-2 flex items-start gap-1.5">
-                    <span className="text-xs text-primary font-medium">💡</span>
-                    <p className="text-xs text-muted-foreground line-clamp-1">
-                      {statusData.recommendations[0]}
-                    </p>
-                  </div>
-                )}
-                {lastUpdatedAt && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Updated {formatDistanceToNow(new Date(lastUpdatedAt))} ago
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground mt-3">
+                  Tap to view important dates and news
+                </p>
               </>
             ) : (
               <div className="text-center py-2">
@@ -537,7 +529,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 1
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : "bg-card dark:bg-card/80 text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
+                  : "bg-slate-50/90 dark:bg-card/80 text-muted-foreground border border-slate-200/70 dark:border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20"
               )}
               onClick={() => setActivePhase(1)}
             >
@@ -548,7 +540,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 activePhase === 2
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : "bg-card dark:bg-card/80 text-muted-foreground border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20",
+                  : "bg-slate-50/90 dark:bg-card/80 text-muted-foreground border border-slate-200/70 dark:border-border hover:bg-primary/10 hover:text-primary hover:border-primary/20",
                 !isPhase2Available(statusData) && "opacity-50"
               )}
               onClick={() => setActivePhase(2)}
@@ -562,7 +554,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             isPhase2Available(statusData) ? (
               <>
                 {/* Admit Card Section for Phase 2 */}
-                <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
+                <div className="flex items-start gap-3 p-3 bg-slate-50/80 dark:bg-card/80 rounded-xl border border-slate-200/70 dark:border-border">
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <FileText className="h-4 w-4 text-primary" />
                   </div>
@@ -602,7 +594,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                   const examDate = getExamDateFromResponse(statusData, 2);
                   const examDetails = getExamDetailsText(statusData, 2);
                   return (
-                    <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
+                    <div className="flex items-start gap-3 p-3 bg-slate-50/80 dark:bg-card/80 rounded-xl border border-slate-200/70 dark:border-border">
                       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <Calendar className="h-4 w-4 text-primary" />
                       </div>
@@ -631,7 +623,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 {(() => {
                   const resultInfo = getResultInfoFromResponse(statusData, 2);
                   return (
-                    <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
+                    <div className="flex items-start gap-3 p-3 bg-slate-50/80 dark:bg-card/80 rounded-xl border border-slate-200/70 dark:border-border">
                       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <Clock className="h-4 w-4 text-primary" />
                       </div>
@@ -675,7 +667,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 })()}
               </>
             ) : (
-              <div className="text-center py-8 text-muted-foreground bg-card dark:bg-card/80 rounded-lg border border-border">
+              <div className="text-center py-8 text-muted-foreground bg-slate-50/80 dark:bg-card/80 rounded-xl border border-slate-200/70 dark:border-border">
                 <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm font-medium">
                   {statusData?.phases?.phase2?.status === "not_applicable"
@@ -700,7 +692,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
           ) : activePhase === 1 && statusData ? (
             <>
               {/* Admit Card Section */}
-              <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
+              <div className="flex items-start gap-3 p-3 bg-slate-50/80 dark:bg-card/80 rounded-xl border border-slate-200/70 dark:border-border">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <FileText className="h-4 w-4 text-primary" />
                 </div>
@@ -732,7 +724,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 const examDate = getExamDateFromResponse(statusData);
                 const examDetails = getExamDetailsText(statusData);
                 return (
-                  <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
+                  <div className="flex items-start gap-3 p-3 bg-slate-50/80 dark:bg-card/80 rounded-xl border border-slate-200/70 dark:border-border">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <Calendar className="h-4 w-4 text-primary" />
                     </div>
@@ -761,7 +753,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
               {(() => {
                 const resultInfo = getResultInfoFromResponse(statusData);
                 return (
-                  <div className="flex items-start gap-3 p-3 bg-card dark:bg-card/80 rounded-lg border border-border">
+                  <div className="flex items-start gap-3 p-3 bg-slate-50/80 dark:bg-card/80 rounded-xl border border-slate-200/70 dark:border-border">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <Clock className="h-4 w-4 text-primary" />
                     </div>
@@ -815,7 +807,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
 
               {/* Recent News Section */}
               {(statusData?.predicted_events?.length > 0 || statusData?.summary) && (
-                <div className="pt-2 border-t border-border bg-card dark:bg-card/80 rounded-lg p-3 mt-2">
+                <div className="pt-2 border-t border-slate-200/80 dark:border-border bg-slate-50/80 dark:bg-card/80 rounded-xl p-3 mt-2">
                   <div className="flex items-center gap-2 mb-3">
                     <Newspaper className="h-4 w-4 text-primary" />
                     <span className="font-medium text-sm">Recent News for {exam?.name}</span>
@@ -841,7 +833,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
 
               {/* AI Recommendations Section */}
               {statusData?.recommendations?.length > 0 && (
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-900/20 rounded-lg p-3 border border-amber-200/50 dark:border-amber-800/30">
+                <div className="bg-amber-50/70 dark:bg-amber-950/30 rounded-xl p-3 border border-amber-200/50 dark:border-amber-800/30">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-lg">💡</span>
                     <span className="font-medium text-sm text-amber-800 dark:text-amber-200">AI Recommendations</span>
@@ -899,7 +891,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
             </div>
 
             {hasCredentials ? (
-              <div className="space-y-2 bg-card dark:bg-card/80 rounded-lg p-3 border border-border">
+              <div className="space-y-2 bg-slate-50/80 dark:bg-card/80 rounded-xl p-3 border border-slate-200/70 dark:border-border">
                 {attempt.application_number && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Application No.</span>
@@ -939,7 +931,7 @@ export function TrackedJobCard({ attempt }: TrackedJobCardProps) {
                 )}
               </div>
             ) : (
-              <div className="text-center py-3 bg-card dark:bg-card/80 rounded-lg border border-border">
+              <div className="text-center py-3 bg-slate-50/80 dark:bg-card/80 rounded-xl border border-slate-200/70 dark:border-border">
                 <p className="text-xs text-muted-foreground">
                   Add your application number, roll number & password
                 </p>

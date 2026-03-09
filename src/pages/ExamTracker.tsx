@@ -44,12 +44,12 @@ export default function ExamTracker() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_hsl(204_100%_99%),_hsl(205_85%_96%)_55%,_hsl(206_70%_94%)_100%)] dark:bg-[radial-gradient(circle_at_top,_hsl(224_55%_18%),_hsl(222_50%_14%)_55%,_hsl(220_45%_10%)_100%)] pb-20">
         <header className="sticky top-0 z-40 bg-primary dark:bg-card dark:border-b dark:border-border backdrop-blur-xl border-b border-primary-foreground/10">
           <div className="flex items-center justify-between gap-2 px-4 h-14">
             <Link to="/more" className="flex-shrink-0">
-              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
-                <MenuBarsIcon className="h-5 w-5 text-primary" />
+              <div className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-primary-foreground/10 dark:hover:bg-secondary/80 transition-colors">
+                <MenuBarsIcon className="h-5 w-5 text-primary-foreground dark:text-primary" />
               </div>
             </Link>
             <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground flex items-center gap-2 min-w-0">
@@ -60,14 +60,14 @@ export default function ExamTracker() {
             <div className="flex items-center gap-2 flex-shrink-0">
               <div
                 onClick={handleAddExamClick}
-                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-full bg-primary hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90 transition-all cursor-pointer backdrop-blur-sm shadow-sm"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-full bg-primary hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90 transition-all cursor-pointer shadow-sm"
               >
                 <Plus className="h-4 w-4 text-primary-foreground" />
                 <span className="text-primary-foreground text-xs sm:text-sm font-medium hidden xs:inline">Add Exam</span>
               </div>
               <Link to="/saved">
-                <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
-                  <Bookmark className="h-5 w-5 text-primary" />
+                <div className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-primary-foreground/10 dark:hover:bg-secondary/80 transition-colors">
+                  <Bookmark className="h-5 w-5 text-primary-foreground dark:text-primary" />
                 </div>
               </Link>
             </div>
@@ -95,13 +95,13 @@ export default function ExamTracker() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_hsl(204_100%_99%),_hsl(205_85%_96%)_55%,_hsl(206_70%_94%)_100%)] dark:bg-[radial-gradient(circle_at_top,_hsl(224_55%_18%),_hsl(222_50%_14%)_55%,_hsl(220_45%_10%)_100%)] pb-24">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-primary dark:bg-card dark:border-b dark:border-border backdrop-blur-xl border-b border-primary-foreground/10">
         <div className="flex items-center justify-between gap-2 px-4 h-14">
           <Link to="/more" className="flex-shrink-0">
-            <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
-              <MenuBarsIcon className="h-5 w-5 text-primary" />
+            <div className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-primary-foreground/10 dark:hover:bg-secondary/80 transition-colors">
+              <MenuBarsIcon className="h-5 w-5 text-primary-foreground dark:text-primary" />
             </div>
           </Link>
           <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground flex items-center gap-2 min-w-0">
@@ -112,15 +112,15 @@ export default function ExamTracker() {
           <div className="flex items-center gap-2 flex-shrink-0">
             <ExamSearchSheet
               trigger={
-                <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-full bg-primary-foreground/20 hover:bg-primary-foreground/30 dark:bg-secondary dark:hover:bg-secondary/80 transition-all cursor-pointer backdrop-blur-sm shadow-sm">
-                  <Plus className="h-4 w-4 text-primary-foreground dark:text-foreground" />
-                  <span className="text-primary-foreground dark:text-foreground text-xs sm:text-sm font-medium">Add Exam</span>
+                <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-full bg-sky-100/80 hover:bg-sky-100 dark:bg-secondary dark:hover:bg-secondary/80 transition-all cursor-pointer shadow-sm">
+                  <Plus className="h-4 w-4 text-primary dark:text-foreground" />
+                  <span className="text-primary dark:text-foreground text-xs sm:text-sm font-medium">Add Exam</span>
                 </div>
               }
             />
             <Link to="/saved">
-              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
-                <Bookmark className="h-5 w-5 text-primary" />
+              <div className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-primary-foreground/10 dark:hover:bg-secondary/80 transition-colors">
+                <Bookmark className="h-5 w-5 text-primary-foreground dark:text-primary" />
               </div>
             </Link>
           </div>
@@ -128,7 +128,7 @@ export default function ExamTracker() {
       </header>
 
       {/* Subheader */}
-      <div className="px-4 pt-4 pb-3">
+      <div className="px-4 pt-4 pb-2">
         <h2 className="text-foreground text-lg font-bold flex items-center gap-2">
           <GraduationCap className="h-5 w-5 text-primary" />
           Your Tracked Exams
@@ -137,8 +137,8 @@ export default function ExamTracker() {
 
       {/* Disclaimer */}
       <div className="px-4 pb-4">
-        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-          <p className="text-xs text-amber-800 dark:text-amber-200">
+        <div className="bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800 rounded-xl p-3">
+          <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
             ⚠️ We help you stay informed — but for the most accurate and final updates, always check the official website. JobsTrackr is not responsible for any update delays or changes.
           </p>
         </div>
@@ -146,9 +146,9 @@ export default function ExamTracker() {
 
       {/* Content Area */}
       <main className="px-4">
-        <div className="bg-card/60 backdrop-blur-sm rounded-3xl min-h-[60vh] pt-4 shadow-lg border border-border">
+        <div className="min-h-[60vh]">
           {isLoading ? (
-            <div className="space-y-4 px-2">
+            <div className="space-y-4">
               <Skeleton className="h-32 w-full rounded-lg" />
               <Skeleton className="h-32 w-full rounded-lg" />
             </div>
@@ -164,10 +164,10 @@ export default function ExamTracker() {
               <ExamSearchSheet />
             </div>
           ) : (
-            <div className="space-y-3 px-2 pb-4">
-              {userExams.map((attempt) => (
+            <div className="space-y-4 pb-4">
+              {userExams.map((attempt, index) => (
                 <ExamCardErrorBoundary key={attempt.id}>
-                  <TrackedJobCard attempt={attempt} />
+                  <TrackedJobCard attempt={attempt} cardIndex={index} />
                 </ExamCardErrorBoundary>
               ))}
             </div>

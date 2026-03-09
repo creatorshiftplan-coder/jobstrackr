@@ -160,8 +160,8 @@ export default function Search() {
       <header className="sticky top-0 z-40 bg-primary dark:bg-card backdrop-blur-xl border-b border-primary-foreground/10 dark:border-border">
         <div className="flex items-center gap-3 px-4 h-14">
           <Link to="/more">
-            <div className="h-10 w-10 rounded-full bg-white dark:bg-secondary flex items-center justify-center hover:bg-white/90 dark:hover:bg-secondary/80 transition-colors shadow-sm">
-              <MenuBarsIcon className="h-5 w-5 text-primary" />
+            <div className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-primary-foreground/10 dark:hover:bg-secondary/80 transition-colors">
+              <MenuBarsIcon className="h-5 w-5 text-primary-foreground dark:text-primary" />
             </div>
           </Link>
           <div className="flex items-center gap-2 flex-1 justify-center">
@@ -170,8 +170,8 @@ export default function Search() {
             <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground tracking-tight">Explore Jobs</h1>
           </div>
           <Link to="/saved">
-            <div className="h-10 w-10 rounded-full bg-white dark:bg-secondary flex items-center justify-center hover:bg-white/90 dark:hover:bg-secondary/80 transition-colors shadow-sm">
-              <Bookmark className="h-5 w-5 text-primary" />
+            <div className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-primary-foreground/10 dark:hover:bg-secondary/80 transition-colors">
+              <Bookmark className="h-5 w-5 text-primary-foreground dark:text-primary" />
             </div>
           </Link>
         </div>
