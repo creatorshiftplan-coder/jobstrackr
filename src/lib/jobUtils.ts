@@ -69,3 +69,28 @@ export const shortenQualification = (qualification: string): string => {
     // Return first 15 chars if no match
     return qualification.length > 15 ? qualification.slice(0, 15) + "..." : qualification;
 };
+
+// Format age limit for consistent display across cards and details
+export const formatAgeLimit = (
+    ageMin?: number | null,
+    ageMax?: number | null,
+    unit: string = "years"
+): string => {
+    const min = typeof ageMin === "number" && Number.isFinite(ageMin) ? ageMin : null;
+    const max = typeof ageMax === "number" && Number.isFinite(ageMax) ? ageMax : null;
+
+    // Treat very small ages as invalid placeholders (e.g., 1) and hide them.
+    let normalizedMin = min !== null && min >= 10 ? min : null;
+    let normalizedMax = max !== null && max >= 10 ? max : null;
+
+    if (normalizedMin !== null && normalizedMax !== null && normalizedMin > normalizedMax) {
+        const tmp = normalizedMin;
+        normalizedMin = normalizedMax;
+        normalizedMax = tmp;
+    }
+
+    if (normalizedMin !== null && normalizedMax !== null) return `${normalizedMin} - ${normalizedMax} ${unit}`;
+    if (normalizedMin !== null) return `From ${normalizedMin} ${unit}`;
+    if (normalizedMax !== null) return `Upto ${normalizedMax} ${unit}`;
+    return "Not Available";
+};

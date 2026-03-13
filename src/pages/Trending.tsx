@@ -119,7 +119,9 @@ export default function Trending() {
             case "notification":
                 result = exams.filter(exam => {
                     const badge = getBadgeConfig(getExamStatusType(exam.ai_cached_response));
-                    return badge.label === "Notification" || badge.label === "Upcoming";
+                    return badge.label === "Notification" ||
+                        badge.label === "Upcoming" ||
+                        badge.label === "Exam Date Announced";
                 });
                 break;
 

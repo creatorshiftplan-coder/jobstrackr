@@ -6,7 +6,7 @@ export type ExamStatusType = 'result' | 'admit_card' | 'exam_date_released' | 'e
 export const BADGE_CONFIG: Record<ExamStatusType, { color: string; label: string }> = {
     result: { color: "#22c55e", label: "Result Released" },
     admit_card: { color: "#f59e0b", label: "Admit Card Released" },
-    exam_date_released: { color: "#a855f7", label: "Expected Exam Date Released" },
+    exam_date_released: { color: "#a855f7", label: "Exam Date Announced" },
     exam_scheduled: { color: "#8b5cf6", label: "Exam Scheduled" },
     admit_pending: { color: "#ef4444", label: "Admit Card Pending" },
     date_change: { color: "#ef4444", label: "Date Changed" },
@@ -38,6 +38,78 @@ export function isDatePassed(dateStr?: string): boolean {
     return date < new Date();
 }
 
+function getExamDateText(aiData: any): string | undefined {
+    if (!aiData) return undefined;
+
+    const direct = aiData.exam_dates ?? aiData.exam_date;
+    if (typeof direct === "string" && direct.trim()) return direct;
+    if (Array.isArray(direct) && direct.length > 0) {
+        const first = direct.find((v: any) => typeof v === "string" && v.trim());
+        if (first) return first;
+    }
+
+    const phaseDate = aiData?.phases?.phase1?.exam_date ||
+        aiData?.phases?.phase2?.exam_date ||
+        aiData?.phase_1?.exam_date ||
+        aiData?.phase_2?.exam_date;
+    if (typeof phaseDate === "string" && phaseDate.trim()) return phaseDate;
+
+    const events = Array.isArray(aiData?.predicted_events) ? aiData.predicted_events : [];
+    const examEvent = events.find((e: any) => {
+        const type = (e?.event_type || "").toLowerCase();
+        return type === "exam_date" || type === "exam" || type === "examination";
+    });
+    const predicted = examEvent?.predicted_date || examEvent?.date;
+    if (typeof predicted === "string" && predicted.trim()) return predicted;
+
+    return undefined;
+}
+
+function isUncertainDateText(text?: string): boolean {
+    if (!text) return false;
+    const t = text.toLowerCase();
+    return /tbd|to be announced|to be declared|tentative|expected|awaited|soon|likely|provisional/.test(t);
+}
+
+function hasDayPrecision(dateStr?: string): boolean {
+    if (!dateStr) return false;
+    const t = dateStr.toLowerCase();
+    if (isUncertainDateText(t)) return false;
+
+    // ISO date (YYYY-MM-DD)
+    if (/^\d{4}-\d{2}-\d{2}\b/.test(t)) return true;
+
+    // ISO date with time (YYYY-MM-DDTHH:mm)
+    if (/^\d{4}-\d{2}-\d{2}t\d{2}:\d{2}/.test(t)) return true;
+
+    // Numeric date with day included (DD/MM/YYYY or DD-MM-YYYY)
+    if (/\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b/.test(t)) return true;
+
+    // Month name with day (e.g., 15 June 2026 or June 15, 2026)
+    const monthNames = "(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)";
+    const dayBeforeMonth = new RegExp(`\\b\\d{1,2}\\s*(st|nd|rd|th)?\\s*${monthNames}\\b`);
+    const monthBeforeDay = new RegExp(`\\b${monthNames}\\s*\\d{1,2}\\b`);
+    return dayBeforeMonth.test(t) || monthBeforeDay.test(t);
+}
+
+function hasMonthPrecision(dateStr?: string): boolean {
+    if (!dateStr) return false;
+    const t = dateStr.toLowerCase();
+    if (isUncertainDateText(t)) return false;
+
+    // Month name anywhere
+    const monthNames = "(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)";
+    if (new RegExp(`\\b${monthNames}\\b`).test(t)) return true;
+
+    // Year-month formats (YYYY-MM or YYYY/MM)
+    if (/^\d{4}[\/.-](0?[1-9]|1[0-2])\b/.test(t)) return true;
+
+    // Month/year formats (MM/YYYY or MM-YYYY)
+    if (/\b(0?[1-9]|1[0-2])[\/.-]\d{4}\b/.test(t)) return true;
+
+    return false;
+}
+
 // Get badge type from exam data by checking AI cache
 // Priority: Result > Admit Card > Exam Scheduled > Admit Card Pending > Date Change > Notification > Upcoming
 export function getExamStatusType(aiData: any): ExamStatusType {
@@ -45,8 +117,12 @@ export function getExamStatusType(aiData: any): ExamStatusType {
 
     const statusText = (aiData.current_status || "").toLowerCase();
     const summaryText = (aiData.summary || "").toLowerCase();
-    const examDatesText = (aiData.exam_dates || "").toLowerCase();
+    const examDateText = getExamDateText(aiData);
+    const examDatesText = (examDateText || "").toLowerCase();
     const combinedText = `${statusText} ${summaryText} ${examDatesText}`;
+    const hasDayDate = hasDayPrecision(examDateText);
+    const hasMonthDate = hasMonthPrecision(examDateText);
+    const examDate = parseFlexibleDate(examDateText || "");
 
     // Check for Result Released
     const resultReleasedKeywords = [
@@ -62,19 +138,6 @@ export function getExamStatusType(aiData: any): ExamStatusType {
 
     if (resultReleasedKeywords.some(kw => combinedText.includes(kw)) || hasResultInStatus) {
         return 'result';
-    }
-
-    // Check for Expected Exam Date Released
-    const examDateReleasedKeywords = [
-        "expected exam date released", "expected exam date announced",
-        "expected exam date declared", "expected exam date out",
-        "exam date released", "exam date announced", "exam date declared",
-        "exam date out", "exam dates released", "exam dates announced",
-        "exam dates declared", "exam dates out",
-    ];
-
-    if (examDateReleasedKeywords.some(kw => combinedText.includes(kw))) {
-        return 'exam_date_released';
     }
 
     // Check for Admit Card Released - use precise phrase matching only
@@ -117,23 +180,28 @@ export function getExamStatusType(aiData: any): ExamStatusType {
         return 'admit_card';
     }
 
-    // Check for Exam Scheduled
-    const examScheduledKeywords = [
-        "exam scheduled", "exam on", "examination on", "exam date",
-        "exam will be held", "exam to be conducted", "examination scheduled",
-        "scheduled for", "exam dates announced",
-    ];
+    // If only month is revealed (no specific day), mark as Exam Date Announced
+    if (hasMonthDate && !hasDayDate) {
+        return 'exam_date_released';
+    }
 
-    const hasExamInStatus = (statusText.includes("exam") || statusText.includes("test")) &&
-        (statusText.includes("scheduled") || statusText.includes("date") ||
-            statusText.includes("held") || statusText.includes("conducted"));
-
-    const examDate = parseFlexibleDate(aiData.exam_dates || "");
-    if (examDate && examDate > new Date()) {
+    // Check for Exam Scheduled (only when a concrete future date exists)
+    const hasConcreteExamDate = !!examDate && hasDayDate;
+    if (hasConcreteExamDate && examDate! > new Date()) {
         return 'exam_scheduled';
     }
-    if (examScheduledKeywords.some(kw => combinedText.includes(kw)) || hasExamInStatus) {
-        return 'exam_scheduled';
+
+    // Check for Expected Exam Date Released
+    const examDateReleasedKeywords = [
+        "expected exam date released", "expected exam date announced",
+        "expected exam date declared", "expected exam date out",
+        "exam date released", "exam date announced", "exam date declared",
+        "exam date out", "exam dates released", "exam dates announced",
+        "exam dates declared", "exam dates out",
+    ];
+
+    if (examDateReleasedKeywords.some(kw => combinedText.includes(kw))) {
+        return 'exam_date_released';
     }
 
     // Check for Admit Card Pending

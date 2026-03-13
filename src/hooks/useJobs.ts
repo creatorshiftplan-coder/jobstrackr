@@ -8,7 +8,7 @@ export function useJobs() {
     queryFn: async (): Promise<Job[]> => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, salary_min, salary_max, is_featured, created_at")
+        .select("id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, salary_min, salary_max, age_min, age_max, is_featured, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -65,4 +65,3 @@ export function useJobBySlug(slugOrId: string) {
     enabled: !!slugOrId,
   });
 }
-

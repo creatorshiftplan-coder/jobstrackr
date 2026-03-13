@@ -6,7 +6,7 @@ import { format, differenceInDays } from "date-fns";
 import { Link } from "react-router-dom";
 import { SaveJobButton } from "./SaveJobButton";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
-import { isTBDDateDisplay, inferCategory, shortenQualification } from "@/lib/jobUtils";
+import { formatAgeLimit, isTBDDateDisplay, inferCategory, shortenQualification } from "@/lib/jobUtils";
 
 interface JobCardProps {
   job: Job;
@@ -137,7 +137,7 @@ export function JobCard({ job }: JobCardProps) {
 
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
             <span className="text-xs text-muted-foreground font-medium">
-              Age: {job.age_min || 18} - {job.age_max || 65} yrs
+              Age: {formatAgeLimit(job.age_min, job.age_max, "yrs")}
             </span>
             <span className="text-xs font-semibold text-primary">
               {job.application_fee ? `Fee: ₹${job.application_fee}` : "Free Apply"}

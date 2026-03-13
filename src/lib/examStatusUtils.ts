@@ -65,7 +65,7 @@ export interface ExamAttempt {
     } | null;
 }
 
-export type ExamStatusLabel = "Result Released" | "Admit Card Released" | "Expected Exam Date Released" | "Application Pending";
+export type ExamStatusLabel = "Result Released" | "Admit Card Released" | "Exam Date Announced" | "Application Pending";
 
 export interface ExamStatus {
     label: ExamStatusLabel;
@@ -247,7 +247,7 @@ export function getExamStatus(attempt: ExamAttempt): ExamStatus {
     // Check for Expected Exam Date Released
     if (isExamDateReleased(attempt)) {
         return {
-            label: "Expected Exam Date Released",
+            label: "Exam Date Announced",
             variant: "default",
             color: "bg-purple-500 text-white"
         };

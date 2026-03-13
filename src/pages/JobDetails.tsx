@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { BottomNav } from "@/components/BottomNav";
+import { formatAgeLimit } from "@/lib/jobUtils";
 
 // Check if last_date_display contains TBD-like values
 const isTBDDateDisplay = (displayValue: string | null): boolean => {
@@ -308,13 +309,7 @@ export default function JobDetails() {
               <div>
                 <p className="text-xs text-muted-foreground">Age Limit</p>
                 <p className="text-sm font-medium">
-                  {job.age_min && job.age_max
-                    ? `${job.age_min} - ${job.age_max} years`
-                    : job.age_min
-                      ? `From ${job.age_min} years`
-                      : job.age_max
-                        ? `Upto ${job.age_max} years`
-                        : 'Not Available'}
+                  {formatAgeLimit(job.age_min, job.age_max)}
                 </p>
               </div>
               <div className="text-right">
