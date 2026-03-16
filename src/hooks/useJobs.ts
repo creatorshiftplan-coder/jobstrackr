@@ -8,11 +8,11 @@ export function useJobs() {
     queryFn: async (): Promise<Job[]> => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, salary_min, salary_max, age_min, age_max, is_featured, created_at")
+        .select("id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, salary_min, salary_max, age_min, age_max, application_fee, job_metadata, is_featured, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return (data || []) as Job[];
+      return (data || []) as any;
     },
   });
 }
@@ -28,7 +28,7 @@ export function useJob(id: string) {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as any;
     },
     enabled: !!id,
   });
@@ -46,7 +46,7 @@ export function useJobBySlug(slugOrId: string) {
         .eq("slug", slugOrId)
         .single();
 
-      if (bySlug) return bySlug;
+      if (bySlug) return bySlug as any;
 
       // Fallback: try by UUID (for transition period)
       const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -57,7 +57,7 @@ export function useJobBySlug(slugOrId: string) {
           .eq("id", slugOrId)
           .single();
         if (error) throw error;
-        return byId;
+        return byId as any;
       }
 
       return null;

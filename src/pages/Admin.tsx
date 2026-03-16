@@ -20,11 +20,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
-import { Job } from "@/types/job";
+import { Job, JobMetadata } from "@/types/job";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 
 interface JobFormData {
@@ -46,6 +46,7 @@ interface JobFormData {
   is_featured: boolean;
   description: string;
   apply_link: string;
+  official_website: string;
 }
 
 const emptyFormData: JobFormData = {
@@ -67,6 +68,7 @@ const emptyFormData: JobFormData = {
   is_featured: false,
   description: "",
   apply_link: "",
+  official_website: "",
 };
 
 interface BulkUploadJob extends JobFormData {
@@ -135,6 +137,7 @@ interface BulkUploadInput {
   requirements?: string;
   highlights?: string;
   apply_link?: string;
+  official_website?: string;
 }
 
 // Comprehensive JSON Schema Validation for Bulk Upload
@@ -368,6 +371,7 @@ const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
     is_featured: false,
     description: fullDescription.trim(),
     apply_link: input.apply_link || "",
+    official_website: input.official_website || "",
   };
 };
 
@@ -387,6 +391,26 @@ export default function Admin() {
   const [showScrapedJobs, setShowScrapedJobs] = useState(false);
   const [discoveringCategory, setDiscoveringCategory] = useState<string | null>(null);
   const [scrapedDuplicateMode, setScrapedDuplicateMode] = useState<"skip" | "update">("skip");
+
+  // Scraper V5 state
+  const [scraperUrl, setScraperUrl] = useState("");
+  const [scraperLoading, setScraperLoading] = useState(false);
+  const [scraperResult, setScraperResult] = useState<any | null>(null);
+  const [scraperError, setScraperError] = useState<string | null>(null);
+  const [scraperRawExpanded, setScraperRawExpanded] = useState(false);
+  const [scraperAddingJob, setScraperAddingJob] = useState(false);
+
+  // Discover tab state
+  const [discoverUrl, setDiscoverUrl] = useState("https://www.freejobalert.com/new-updates/");
+  const [discoverPages, setDiscoverPages] = useState(1);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
+  const [discoveredLinks, setDiscoveredLinks] = useState<{update_date: string; title: string; url: string}[]>([]);
+  const [discoverScrapedResults, setDiscoverScrapedResults] = useState<Record<string, any>>({});
+  const [discoverScrapingUrl, setDiscoverScrapingUrl] = useState<string | null>(null);
+  const [discoverSavingUrl, setDiscoverSavingUrl] = useState<string | null>(null);
+  const [discoverSavedUrls, setDiscoverSavedUrls] = useState<Set<string>>(new Set());
+  const [discoverExpandedUrl, setDiscoverExpandedUrl] = useState<string | null>(null);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
@@ -876,6 +900,348 @@ export default function Admin() {
     }
   };
 
+  // Scraper V5: scrape a single URL via the Python API
+  const handleScrapeV5 = async () => {
+    if (!scraperUrl.trim()) return;
+    setScraperLoading(true);
+    setScraperError(null);
+    setScraperResult(null);
+    setScraperRawExpanded(false);
+
+    try {
+      const response = await fetch("/api/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: scraperUrl.trim() }),
+      });
+
+      // Safely parse JSON — the Python function may crash/timeout on Vercel
+      // returning an empty body or non-JSON error page
+      let data: any;
+      const text = await response.text();
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(
+          response.status >= 500
+            ? `Server error (${response.status}). The scraper may have timed out — try a shorter/simpler URL.`
+            : `Invalid response from server (${response.status}): ${text.slice(0, 200)}`
+        );
+      }
+
+      if (!data) {
+        throw new Error("Empty response from server. The scraper may have timed out.");
+      }
+
+      if (!response.ok || data.status === "error") {
+        throw new Error(data.error || "Scraping failed");
+      }
+
+      setScraperResult(data.job);
+      toast({ title: "Scraped successfully!", description: data.job.exam_name || "Job data extracted" });
+    } catch (error: any) {
+      setScraperError(error.message);
+      toast({ title: "Scrape failed", description: error.message, variant: "destructive" });
+    } finally {
+      setScraperLoading(false);
+    }
+  };
+
+  // ── Discover tab handlers ───────────────────────────────────────────
+  const handleDiscover = async () => {
+    if (!discoverUrl.trim()) return;
+    setDiscoverLoading(true);
+    setDiscoverError(null);
+    setDiscoveredLinks([]);
+    setDiscoverScrapedResults({});
+    setDiscoverSavedUrls(new Set());
+
+    try {
+      const resp = await fetch("/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: discoverUrl.trim(), pages: discoverPages, follow_pages: false }),
+      });
+      const text = await resp.text();
+      let data: any;
+      try { data = text ? JSON.parse(text) : null; } catch { throw new Error(`Invalid response: ${text.slice(0, 200)}`); }
+      if (!data) throw new Error("Empty response from server.");
+      if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+      setDiscoveredLinks(data.entries || []);
+      toast({ title: "Links discovered!", description: `Found ${data.total || 0} article(s).` });
+    } catch (error: any) {
+      setDiscoverError(error.message);
+      toast({ title: "Discovery failed", description: error.message, variant: "destructive" });
+    } finally {
+      setDiscoverLoading(false);
+    }
+  };
+
+  const handleDiscoverScrapeOne = async (url: string) => {
+    setDiscoverScrapingUrl(url);
+    try {
+      const resp = await fetch("/api/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const text = await resp.text();
+      let data: any;
+      try { data = text ? JSON.parse(text) : null; } catch { throw new Error(`Invalid response: ${text.slice(0, 200)}`); }
+      if (!data) throw new Error("Empty response from server.");
+      if (!resp.ok || data.status === "error") throw new Error(data.error || "Scraping failed");
+      setDiscoverScrapedResults(prev => ({ ...prev, [url]: data.job }));
+      toast({ title: "Scraped!", description: data.job?.exam_name || "Job data extracted." });
+    } catch (error: any) {
+      toast({ title: "Scrape failed", description: error.message, variant: "destructive" });
+    } finally {
+      setDiscoverScrapingUrl(null);
+    }
+  };
+
+  const handleDiscoverSaveJob = async (url: string) => {
+    const r = discoverScrapedResults[url];
+    if (!r) return;
+    setDiscoverSavingUrl(url);
+
+    try {
+      const metadata: JobMetadata = {};
+      if (r.salary_text) metadata.salary_text = r.salary_text;
+      if (r.age_limit_text) metadata.age_limit_text = r.age_limit_text;
+      if (r.vacancies && Array.isArray(r.vacancies)) metadata.vacancies_detail = r.vacancies;
+      if (r.application_fees) metadata.application_fees = r.application_fees;
+      if (r.selection_process) metadata.selection_process = r.selection_process;
+      if (r.important_dates) metadata.important_dates = r.important_dates;
+      if (r.overview) metadata.overview = r.overview;
+      if (r.notification_pdf) metadata.notification_pdf = r.notification_pdf;
+      if (r.employment_type) metadata.employment_type = r.employment_type;
+      if (r.exam_date) metadata.exam_date = r.exam_date;
+      if (r.official_website) metadata.official_website = r.official_website;
+
+      let totalVacancies: number | null = null;
+      if (r.vacancies && Array.isArray(r.vacancies) && r.vacancies.length > 0) {
+        const totalRow = r.vacancies.find((v: Record<string, string>) =>
+          Object.values(v).some(val => typeof val === 'string' && val.toLowerCase().includes('total'))
+        );
+        if (totalRow) {
+          const numericVals = Object.values(totalRow)
+            .map(v => parseInt(String(v).replace(/[^0-9]/g, '')))
+            .filter(n => !isNaN(n) && n > 0);
+          if (numericVals.length > 0) totalVacancies = Math.max(...numericVals);
+        }
+      }
+      if (!totalVacancies && r.overview?.total_vacancies) {
+        totalVacancies = parseInt(String(r.overview.total_vacancies).replace(/[^0-9]/g, '')) || null;
+      }
+
+      let appFee = 0;
+      if (r.application_fees && Array.isArray(r.application_fees)) {
+        // Extract the maximum numeric fee from all categories
+        const allFees = r.application_fees
+          .map((f: { category: string; fee: string }) => 
+            parseInt(String(f.fee).replace(/[^0-9]/g, ''))
+          )
+          .filter((n: number) => !isNaN(n) && n > 0);
+        if (allFees.length > 0) appFee = Math.max(...allFees);
+      }
+
+      const lastDate = parseDateValue(r.last_date);
+      const lastDateDisplay = isTBDValue(r.last_date) ? String(r.last_date) : r.last_date || null;
+
+      const cleanLoc = (loc: string) => {
+        if (!loc) return loc;
+        let s = loc.trim();
+        s = s.replace(/[\d]+[)]*\s*$/, '');
+        s = s.replace(/^\s*[\d()]+\s*/, '');
+        s = s.replace(/\(\d+\)/g, '');
+        s = s.replace(/[)(\/,;]+$/, '');
+        return s.trim() || loc;
+      };
+
+      const jobRecord = {
+        title: r.exam_name || "Untitled Job",
+        department: r.agency || "Unknown",
+        location: cleanLoc(r.location) || "India",
+        qualification: r.eligibility || "As per notification",
+        experience: "",
+        eligibility: r.eligibility || null,
+        description: r.description || null,
+        salary_min: r.salary_min || null,
+        salary_max: r.salary_max || null,
+        age_min: r.age_min || null,
+        age_max: r.age_max || null,
+        application_fee: appFee,
+        vacancies: totalVacancies,
+        vacancies_display: totalVacancies ? `${totalVacancies} Posts` : "Not Found",
+        application_start_date: r.important_dates?.apply_start || null,
+        last_date: lastDate,
+        last_date_display: lastDateDisplay,
+        apply_link: r.official_apply_link || null,
+        official_website: r.official_website || null,
+        is_featured: false,
+        job_metadata: Object.keys(metadata).length > 0 ? metadata : null,
+      };
+
+      const { error } = await supabase.from("jobs").insert(jobRecord).select("id").single();
+      if (error) throw error;
+
+      setDiscoverSavedUrls(prev => new Set(prev).add(url));
+      queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+      toast({ title: "Saved!", description: `${jobRecord.title} added to database.` });
+    } catch (error: any) {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    } finally {
+      setDiscoverSavingUrl(null);
+    }
+  };
+
+  // Scraper V5: add scraped job to the database
+  const handleAddScrapedJob = async () => {
+    if (!scraperResult) return;
+    setScraperAddingJob(true);
+
+    try {
+      const r = scraperResult;
+
+      // Build job_metadata with all the extra fields
+      const metadata: JobMetadata = {};
+      if (r.salary_text) metadata.salary_text = r.salary_text;
+      if (r.age_limit_text) metadata.age_limit_text = r.age_limit_text;
+      if (r.vacancies && Array.isArray(r.vacancies)) metadata.vacancies_detail = r.vacancies;
+      if (r.application_fees) metadata.application_fees = r.application_fees;
+      if (r.selection_process) metadata.selection_process = r.selection_process;
+      if (r.important_dates) metadata.important_dates = r.important_dates;
+      if (r.overview) metadata.overview = r.overview;
+      if (r.notification_pdf) metadata.notification_pdf = r.notification_pdf;
+      if (r.employment_type) metadata.employment_type = r.employment_type;
+      if (r.exam_date) metadata.exam_date = r.exam_date;
+      if (r.official_website) metadata.official_website = r.official_website;
+
+      // Calculate total vacancies from vacancy table if available
+      let totalVacancies: number | null = null;
+      if (r.vacancies && Array.isArray(r.vacancies) && r.vacancies.length > 0) {
+        // Try to find a "Total" row
+        const totalRow = r.vacancies.find((v: Record<string, string>) =>
+          Object.values(v).some(val => typeof val === 'string' && val.toLowerCase().includes('total'))
+        );
+        if (totalRow) {
+          const numericVals = Object.values(totalRow)
+            .map(v => parseInt(String(v).replace(/[^0-9]/g, '')))
+            .filter(n => !isNaN(n) && n > 0);
+          if (numericVals.length > 0) totalVacancies = Math.max(...numericVals);
+        }
+      }
+      // Fallback: from overview
+      if (!totalVacancies && r.overview?.total_vacancies) {
+        totalVacancies = parseInt(String(r.overview.total_vacancies).replace(/[^0-9]/g, '')) || null;
+      }
+
+      // Extract max fee from application_fees
+      let appFee = 0;
+      if (r.application_fees && Array.isArray(r.application_fees)) {
+        const allFees = r.application_fees
+          .map((f: { category: string; fee: string }) => 
+            parseInt(String(f.fee).replace(/[^0-9]/g, ''))
+          )
+          .filter((n: number) => !isNaN(n) && n > 0);
+        if (allFees.length > 0) appFee = Math.max(...allFees);
+      }
+
+      const lastDate = parseDateValue(r.last_date);
+      const lastDateDisplay = isTBDValue(r.last_date) ? String(r.last_date) : r.last_date || null;
+
+      // Clean location: strip trailing numbers/parens like "Hyderabad2812)"
+      const cleanLocation = (loc: string) => {
+        if (!loc) return loc;
+        let s = loc.trim();
+        s = s.replace(/[\d]+[)]*\s*$/, '');       // trailing digits + optional )
+        s = s.replace(/^\s*[\d()]+\s*/, '');       // leading digits/parens
+        s = s.replace(/\(\d+\)/g, '');             // (123) patterns
+        s = s.replace(/[)(\/,;]+$/, '');            // trailing punctuation junk
+        return s.trim() || loc;
+      };
+
+      const jobRecord = {
+        title: r.exam_name || "Untitled Job",
+        department: r.agency || "Unknown",
+        location: cleanLocation(r.location) || "India",
+        qualification: r.eligibility || "As per notification",
+        experience: "",
+        eligibility: r.eligibility || null,
+        description: r.description || null,
+        salary_min: r.salary_min || null,
+        salary_max: r.salary_max || null,
+        age_min: r.age_min || null,
+        age_max: r.age_max || null,
+        application_fee: appFee,
+        vacancies: totalVacancies,
+        vacancies_display: totalVacancies ? `${totalVacancies} Posts` : "Not Found",
+        application_start_date: r.important_dates?.apply_start || null,
+        last_date: lastDate,
+        last_date_display: lastDateDisplay,
+        apply_link: r.official_apply_link || null,
+        official_website: r.official_website || null,
+        is_featured: false,
+        job_metadata: Object.keys(metadata).length > 0 ? metadata : null,
+      };
+
+      // Check for duplicates
+      let isDuplicate = false;
+      let duplicateJobTitle = "";
+      if (jobs) {
+        for (const existingJob of jobs) {
+          const similarity = checkJobSimilarity({
+            ...emptyFormData,
+            title: jobRecord.title,
+            department: jobRecord.department,
+            location: jobRecord.location,
+          }, existingJob);
+          if (similarity.isSimilar) {
+            isDuplicate = true;
+            duplicateJobTitle = existingJob.title;
+            break;
+          }
+        }
+      }
+
+      if (isDuplicate) {
+        toast({
+          title: "Duplicate detected!",
+          description: `Similar to: "${duplicateJobTitle}". Job was still added.`,
+          variant: "default",
+        });
+      }
+
+      const { data: newJob, error } = await supabase
+        .from("jobs")
+        .insert(jobRecord)
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Job added successfully!",
+        description: `${jobRecord.title}. Verifying in background...`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+
+      // Auto-verify in background
+      if (newJob?.id) {
+        autoVerifyJob(newJob.id);
+      }
+
+      // Clear scraper state
+      setScraperResult(null);
+      setScraperUrl("");
+    } catch (error: any) {
+      toast({ title: "Failed to add job", description: error.message, variant: "destructive" });
+    } finally {
+      setScraperAddingJob(false);
+    }
+  };
+
   const handleParseJSON = () => {
     if (!jsonText.trim()) {
       toast({ title: "Error", description: "Please paste JSON data", variant: "destructive" });
@@ -1076,6 +1442,7 @@ export default function Admin() {
       is_featured: job.is_featured || false,
       description: job.description || "",
       apply_link: job.apply_link || "",
+      official_website: job.official_website || "",
     });
     setShowAddDialog(true);
   };
@@ -1124,6 +1491,14 @@ export default function Admin() {
               <TabsTrigger value="logos" className="gap-1 min-w-[44px] h-10">
                 <Image className="h-4 w-4" />
                 <span className="hidden sm:inline">Logos</span>
+              </TabsTrigger>
+              <TabsTrigger value="scrape" className="gap-1 min-w-[44px] h-10">
+                <Globe className="h-4 w-4" />
+                <span className="hidden sm:inline">Scrape</span>
+              </TabsTrigger>
+              <TabsTrigger value="discover" className="gap-1 min-w-[44px] h-10">
+                <Search className="h-4 w-4" />
+                <span className="hidden sm:inline">Discover</span>
               </TabsTrigger>
               <TabsTrigger value="auto-discover" className="gap-1 min-w-[44px] h-10 relative">
                 <Sparkles className="h-4 w-4" />
@@ -1803,6 +2178,495 @@ export default function Admin() {
           </TabsContent>
 
           {/* Auto Discovery Tab */}
+          {/* Scrape V5 Tab */}
+          <TabsContent value="scrape">
+            <Card className="border-0 shadow-card">
+              <CardHeader>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-primary" />
+                    Single URL Scraper
+                  </CardTitle>
+                  <CardDescription>
+                    Scrape a FreeJobAlert article URL to extract structured job data
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* URL Input */}
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Article URL</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="https://www.freejobalert.com/..."
+                      value={scraperUrl}
+                      onChange={(e) => setScraperUrl(e.target.value)}
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && scraperUrl && !scraperLoading) {
+                          handleScrapeV5();
+                        }
+                      }}
+                    />
+                    <Button
+                      disabled={!scraperUrl.trim() || scraperLoading}
+                      onClick={handleScrapeV5}
+                    >
+                      {scraperLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Globe className="h-4 w-4 mr-2" />}
+                      Scrape
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Error */}
+                {scraperError && (
+                  <div className="bg-destructive/10 text-destructive rounded-lg p-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-sm">Scraping Failed</p>
+                      <p className="text-xs mt-1">{scraperError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Scraped Result */}
+                {scraperResult && (
+                  <div className="space-y-6">
+                    {/* Header with actions */}
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium text-lg">{scraperResult.exam_name || "Scraped Job"}</h3>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(JSON.stringify(scraperResult, null, 2));
+                            toast({ title: "Copied!", description: "JSON copied to clipboard" });
+                          }}
+                        >
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copy JSON
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={scraperAddingJob}
+                          onClick={handleAddScrapedJob}
+                        >
+                          {scraperAddingJob ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                          Add as Job
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Quick Info Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <Card className="bg-secondary/50">
+                        <CardContent className="p-3 text-center">
+                          <div className="text-sm font-bold text-primary">{scraperResult.agency || "—"}</div>
+                          <div className="text-xs text-muted-foreground">Agency</div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-secondary/50">
+                        <CardContent className="p-3 text-center">
+                          <div className="text-sm font-bold text-green-600">
+                            {scraperResult.salary_min && scraperResult.salary_max
+                              ? `₹${scraperResult.salary_min.toLocaleString()} - ₹${scraperResult.salary_max.toLocaleString()}`
+                              : "—"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Salary</div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-secondary/50">
+                        <CardContent className="p-3 text-center">
+                          <div className="text-sm font-bold text-orange-600">
+                            {scraperResult.age_min && scraperResult.age_max
+                              ? `${scraperResult.age_min} - ${scraperResult.age_max} yrs`
+                              : "—"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Age Limit</div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-secondary/50">
+                        <CardContent className="p-3 text-center">
+                          <div className="text-sm font-bold text-red-600">{scraperResult.last_date || "—"}</div>
+                          <div className="text-xs text-muted-foreground">Last Date</div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Location & Employment Type */}
+                    <div className="flex flex-wrap gap-2">
+                      {scraperResult.location && (
+                        <Badge variant="outline">{scraperResult.location}</Badge>
+                      )}
+                      {scraperResult.employment_type && (
+                        <Badge variant="secondary">{scraperResult.employment_type}</Badge>
+                      )}
+                      {scraperResult.exam_date && (
+                        <Badge variant="outline" className="text-blue-600 border-blue-600">Exam: {scraperResult.exam_date}</Badge>
+                      )}
+                    </div>
+
+                    {/* Vacancy Breakdown Table */}
+                    {scraperResult.vacancies && Array.isArray(scraperResult.vacancies) && scraperResult.vacancies.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Vacancy Breakdown ({scraperResult.vacancies.length} categories)
+                        </h4>
+                        <div className="max-h-[250px] w-full overflow-auto rounded-md border bg-card">
+                          <Table className="min-w-[500px]">
+                            <TableHeader>
+                              <TableRow>
+                                {Object.keys(scraperResult.vacancies[0]).map((key) => (
+                                  <TableHead key={key} className="text-xs whitespace-nowrap bg-muted/50 sticky top-0 z-10">{key}</TableHead>
+                                ))}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {scraperResult.vacancies.map((row: Record<string, string>, i: number) => (
+                                <TableRow key={i}>
+                                  {Object.values(row).map((val, j) => (
+                                    <TableCell key={j} className="text-xs py-1.5 whitespace-nowrap">{val as string}</TableCell>
+                                  ))}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Application Fees */}
+                    {scraperResult.application_fees && Array.isArray(scraperResult.application_fees) && scraperResult.application_fees.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">💰 Application Fees</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {scraperResult.application_fees.map((fee: { category: string; fee: string }, i: number) => (
+                            <div key={i} className="flex justify-between items-center bg-secondary/30 rounded-lg px-3 py-2">
+                              <span className="text-xs text-muted-foreground">{fee.category}</span>
+                              <span className="text-xs font-medium">{fee.fee}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Selection Process */}
+                    {scraperResult.selection_process && Array.isArray(scraperResult.selection_process) && scraperResult.selection_process.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">📋 Selection Process</h4>
+                        <ol className="space-y-1 pl-4">
+                          {scraperResult.selection_process.map((step: string, i: number) => (
+                            <li key={i} className="text-xs text-muted-foreground list-decimal">{step}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+
+                    {/* Important Dates */}
+                    {scraperResult.important_dates && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">📅 Important Dates</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {Object.entries(scraperResult.important_dates)
+                            .filter(([, v]) => v)
+                            .map(([key, val]) => (
+                              <div key={key} className="bg-secondary/30 rounded-lg px-3 py-2">
+                                <div className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, " ")}</div>
+                                <div className="text-xs font-medium">{val as string}</div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Overview */}
+                    {scraperResult.overview && typeof scraperResult.overview === 'object' && Object.keys(scraperResult.overview).length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">ℹ️ Overview</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {Object.entries(scraperResult.overview).map(([key, val]) => (
+                            <div key={key} className="flex items-start gap-2 bg-secondary/30 rounded-lg px-3 py-2">
+                              <span className="text-xs text-muted-foreground capitalize min-w-[100px]">{key.replace(/_/g, " ")}</span>
+                              <span className="text-xs font-medium flex-1">{val as string}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Eligibility */}
+                    {scraperResult.eligibility && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">🎓 Eligibility</h4>
+                        <p className="text-xs text-muted-foreground whitespace-pre-line">{scraperResult.eligibility}</p>
+                      </div>
+                    )}
+
+                    {/* Links */}
+                    <div className="flex flex-wrap gap-2">
+                      {scraperResult.official_apply_link && (
+                        <a href={scraperResult.official_apply_link} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="sm">
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Apply Link
+                          </Button>
+                        </a>
+                      )}
+                      {scraperResult.notification_pdf && (
+                        <a href={scraperResult.notification_pdf} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="sm">
+                            <FileText className="h-3 w-3 mr-1" />
+                            Notification PDF
+                          </Button>
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Raw JSON (collapsible) */}
+                    <div>
+                      <button
+                        onClick={() => setScraperRawExpanded(!scraperRawExpanded)}
+                        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {scraperRawExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        Raw JSON Output
+                      </button>
+                      {scraperRawExpanded && (
+                        <div className="max-h-[400px] w-full overflow-auto mt-2 rounded-md border bg-secondary/50 p-4">
+                          <pre className="text-xs font-mono whitespace-pre w-max min-w-full">
+                            {JSON.stringify(scraperResult, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Discover Tab — Two-step: discover links then scrape per row */}
+          <TabsContent value="discover">
+            <Card className="border-0 shadow-card">
+              <CardHeader>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Search className="h-5 w-5 text-primary" />
+                    Discover & Scrape
+                  </CardTitle>
+                  <CardDescription>
+                    Load article links from a FreeJobAlert listing page, then scrape individual articles
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Step 1: Load links */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Badge className="bg-primary text-white text-[10px] px-2 py-0">Step 1</Badge>
+                    Load Listing Page
+                  </h3>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      value={discoverUrl}
+                      onChange={(e) => setDiscoverUrl(e.target.value)}
+                      placeholder="https://www.freejobalert.com/new-updates/"
+                      className="flex-1"
+                      onKeyDown={(e) => { if (e.key === "Enter" && discoverUrl && !discoverLoading) handleDiscover(); }}
+                    />
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={discoverPages}
+                        onChange={(e) => setDiscoverPages(parseInt(e.target.value) || 1)}
+                        className="w-20"
+                        title="Pages to walk"
+                      />
+                      <Button
+                        onClick={handleDiscover}
+                        disabled={!discoverUrl.trim() || discoverLoading}
+                      >
+                        {discoverLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Search className="h-4 w-4 mr-1" />}
+                        Load Links
+                      </Button>
+                    </div>
+                  </div>
+                  {discoverError && (
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+                      <span className="text-sm text-destructive">{discoverError}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Step 2: Results table */}
+                {discoveredLinks.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Badge className="bg-primary text-white text-[10px] px-2 py-0">Step 2</Badge>
+                      Discovered Links
+                      <Badge variant="secondary" className="ml-1">
+                        {discoveredLinks.length} found · {Object.keys(discoverScrapedResults).length} scraped · {discoverSavedUrls.size} saved
+                      </Badge>
+                    </h3>
+
+                    <div className="relative max-h-[600px] w-full overflow-y-auto rounded-md border bg-card">
+                      <div className="w-full overflow-x-auto">
+                        <Table className="min-w-[700px] relative">
+                          <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
+                            <TableRow>
+                              <TableHead className="w-[40px] whitespace-nowrap">#</TableHead>
+                              <TableHead className="w-[90px] whitespace-nowrap">Date</TableHead>
+                              <TableHead className="min-w-[200px]">Title</TableHead>
+                              <TableHead className="w-[90px] whitespace-nowrap">Status</TableHead>
+                              <TableHead className="w-[200px] text-right whitespace-nowrap">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {discoveredLinks.map((link, idx) => {
+                              const isScraped = !!discoverScrapedResults[link.url];
+                              const isScraping = discoverScrapingUrl === link.url;
+                              const isSaved = discoverSavedUrls.has(link.url);
+                              const isSaving = discoverSavingUrl === link.url;
+                              const isExpanded = discoverExpandedUrl === link.url;
+
+                              return (
+                              <>
+                                <TableRow key={link.url} className={isScraped ? "bg-green-50/50 dark:bg-green-950/10" : ""}>
+                                  <TableCell className="text-xs text-muted-foreground font-mono">{idx + 1}</TableCell>
+                                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{link.update_date}</TableCell>
+                                  <TableCell>
+                                    <a
+                                      href={link.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm text-primary hover:underline font-medium line-clamp-2"
+                                    >
+                                      {link.title}
+                                    </a>
+                                  </TableCell>
+                                  <TableCell>
+                                    {isSaved ? (
+                                      <Badge className="bg-green-100 text-green-700 border-0 text-[10px]"><CheckCircle className="h-3 w-3 mr-1" />Saved</Badge>
+                                    ) : isScraped ? (
+                                      <Badge className="bg-blue-100 text-blue-700 border-0 text-[10px]"><Check className="h-3 w-3 mr-1" />Scraped</Badge>
+                                    ) : isScraping ? (
+                                      <Badge className="bg-yellow-100 text-yellow-700 border-0 text-[10px]"><Loader2 className="h-3 w-3 animate-spin mr-1" />Scraping</Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-[10px]">Pending</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-1 flex-nowrap">
+                                      {!isScraped && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 text-xs whitespace-nowrap"
+                                          disabled={isScraping}
+                                          onClick={() => handleDiscoverScrapeOne(link.url)}
+                                        >
+                                          {isScraping ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+                                          Scrape
+                                        </Button>
+                                      )}
+                                      {isScraped && (
+                                        <>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 text-xs whitespace-nowrap"
+                                            onClick={() => setDiscoverExpandedUrl(isExpanded ? null : link.url)}
+                                          >
+                                            {isExpanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
+                                            View
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 text-xs whitespace-nowrap"
+                                            onClick={() => handleDiscoverScrapeOne(link.url)}
+                                          >
+                                            <RefreshCw className="h-3 w-3 mr-1" /> Re-scrape
+                                          </Button>
+                                          {!isSaved && (
+                                            <Button
+                                              size="sm"
+                                              className="h-7 text-xs whitespace-nowrap"
+                                              disabled={isSaving}
+                                              onClick={() => handleDiscoverSaveJob(link.url)}
+                                            >
+                                              {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                                              Save
+                                            </Button>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+
+                                {/* Expandable JSON panel */}
+                                {isExpanded && isScraped && (
+                                  <TableRow key={`${link.url}-detail`}>
+                                    <TableCell colSpan={5} className="p-0 max-w-0">
+                                      <div className="bg-secondary/30 border-y border-primary/20 p-4 space-y-3 w-full">
+                                        <div className="flex items-center justify-between flex-wrap gap-2">
+                                          <h4 className="text-sm font-semibold text-primary">
+                                            {discoverScrapedResults[link.url]?.exam_name || "Result"}
+                                          </h4>
+                                          <div className="flex gap-1">
+                                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { navigator.clipboard.writeText(JSON.stringify(discoverScrapedResults[link.url], null, 2)); toast({ title: "Copied!" }); }}>
+                                              <Copy className="h-3 w-3 mr-1" />Copy JSON
+                                            </Button>
+                                          </div>
+                                        </div>
+                                        {/* Quick info */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                          <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
+                                            <div className="text-[10px] text-muted-foreground">Agency</div>
+                                            <div className="text-xs font-medium truncate">{discoverScrapedResults[link.url]?.agency || "—"}</div>
+                                          </div>
+                                          <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
+                                            <div className="text-[10px] text-muted-foreground">Location</div>
+                                            <div className="text-xs font-medium truncate">{discoverScrapedResults[link.url]?.location || "—"}</div>
+                                          </div>
+                                          <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
+                                            <div className="text-[10px] text-muted-foreground">Last Date</div>
+                                            <div className="text-xs font-medium truncate text-red-600">{discoverScrapedResults[link.url]?.last_date || "—"}</div>
+                                          </div>
+                                          <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
+                                            <div className="text-[10px] text-muted-foreground">Qualification</div>
+                                            <div className="text-xs font-medium truncate">{discoverScrapedResults[link.url]?.eligibility?.slice(0, 50) || "—"}</div>
+                                          </div>
+                                        </div>
+                                        {/* Raw JSON */}
+                                        <div className="max-h-[300px] w-full overflow-auto rounded-md border bg-secondary/50 p-3">
+                                          <pre className="text-[11px] font-mono w-max">
+                                            {JSON.stringify(discoverScrapedResults[link.url], null, 2)}
+                                          </pre>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="auto-discover">
             <Card className="border-0 shadow-card">
               <CardHeader>
@@ -2051,9 +2915,13 @@ export default function Admin() {
                 <input id="is_featured" type="checkbox" checked={formData.is_featured} onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })} className="h-4 w-4" />
                 <Label htmlFor="is_featured">Featured</Label>
               </div>
-              <div className="col-span-2">
+              <div className="col-span-2 md:col-span-1">
                 <Label htmlFor="apply_link">Apply Link</Label>
                 <Input id="apply_link" value={formData.apply_link} onChange={(e) => setFormData({ ...formData, apply_link: e.target.value })} />
+              </div>
+              <div className="col-span-2 md:col-span-1">
+                <Label htmlFor="official_website">Official Website</Label>
+                <Input id="official_website" value={formData.official_website} onChange={(e) => setFormData({ ...formData, official_website: e.target.value })} />
               </div>
               <div className="col-span-2">
                 <Label htmlFor="description">Description</Label>

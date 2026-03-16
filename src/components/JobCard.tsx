@@ -26,9 +26,36 @@ export function JobCard({ job }: JobCardProps) {
 
   const formatSalary = (min: number | null, max: number | null) => {
     if (!min && !max) return "Not disclosed";
-    if (min && max) return `₹${(min / 1000).toFixed(0)}k - ₹${(max / 1000).toFixed(0)}k`;
+    if (min && max) {
+      if (min === max) return `₹${(min / 1000).toFixed(0)}k`;
+      return `₹${(min / 1000).toFixed(0)}k - ₹${(max / 1000).toFixed(0)}k`;
+    }
     if (min) return `₹${(min / 1000).toFixed(0)}k+`;
     return `Up to ₹${(max! / 1000).toFixed(0)}k`;
+  };
+
+  const getAgeDisplay = () => {
+    if (job.age_min && job.age_max) {
+      if (job.age_min === job.age_max) {
+        const text = job.job_metadata?.age_limit_text?.toLowerCase() || '';
+        if (text.includes('max') || text.includes('upper') || text.includes('upto') || text.includes('up to')) {
+          return `Upto ${job.age_max} yrs`;
+        }
+        if (text.includes('min') || text.includes('lower') || text.includes('from') || text.includes('min.')) {
+          return `From ${job.age_min} yrs`;
+        }
+        return `${job.age_min} yrs`;
+      }
+      return `${job.age_min} - ${job.age_max} yrs`;
+    }
+    if (job.job_metadata?.age_limit_text) {
+      return job.job_metadata.age_limit_text.length > 25 
+        ? job.job_metadata.age_limit_text.substring(0, 25) + '...' 
+        : job.job_metadata.age_limit_text;
+    }
+    if (job.age_min) return `From ${job.age_min} yrs`;
+    if (job.age_max) return `Upto ${job.age_max} yrs`;
+    return "Not Specified";
   };
 
   return (
@@ -136,8 +163,8 @@ export function JobCard({ job }: JobCardProps) {
           </div>
 
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
-            <span className="text-xs text-muted-foreground font-medium">
-              Age: {formatAgeLimit(job.age_min, job.age_max, "yrs")}
+            <span className="text-xs text-muted-foreground font-medium" title={job.job_metadata?.age_limit_text || undefined}>
+              Age: {getAgeDisplay()}
             </span>
             <span className="text-xs font-semibold text-primary">
               {job.application_fee ? `Fee: ₹${job.application_fee}` : "Free Apply"}

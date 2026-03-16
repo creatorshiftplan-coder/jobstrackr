@@ -1,3 +1,22 @@
+export interface JobMetadata {
+  salary_text?: string;
+  age_limit_text?: string;
+  vacancies_detail?: Record<string, string>[];
+  application_fees?: { category: string; fee: string }[];
+  selection_process?: string[];
+  important_dates?: {
+    advertised_on?: string | null;
+    apply_start?: string | null;
+    apply_end?: string | null;
+    exam_date?: string | null;
+  };
+  overview?: Record<string, string>;
+  notification_pdf?: string | null;
+  employment_type?: string;
+  exam_date?: string | null;
+  official_website?: string | null;
+}
+
 export interface Job {
   id: string;
   slug: string | null;
@@ -19,8 +38,10 @@ export interface Job {
   description: string | null;
   eligibility: string | null;
   apply_link: string | null;
+  official_website: string | null;
   is_featured: boolean | null;
   admin_refreshed_at: string | null;
+  job_metadata: JobMetadata | null;
   created_at: string;
   updated_at: string;
 }

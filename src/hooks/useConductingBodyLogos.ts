@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -50,7 +50,8 @@ export function useConductingBodyLogos() {
                         return {
                             id: file.id || file.name,
                             name: nameWithoutExt.replace(/-/g, " ").replace(/_/g, " "),
-                            slug: nameWithoutExt.toLowerCase().replace(/\s+/g, "-"),
+                            // Normalize slug same way as upload: lowercase, spaces→dashes, strip non-alphanumeric
+                            slug: nameWithoutExt.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
                             logo_url: urlData.publicUrl,
                             category: null,
                             created_at: file.created_at || new Date().toISOString(),
@@ -129,20 +130,64 @@ export function useConductingBodyLogos() {
         },
     });
 
-    // Get logo URL by name (for use in TrendingExamCard)
+    // Normalize a string for matching: lowercase, strip all non-alphanumeric
+    const normalize = (s: string): string =>
+        s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    // Split into meaningful words (letters/numbers groups)
+    const toWords = (s: string): string[] =>
+        s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 0);
+
+    /**
+     * Ranked logo matching — picks the BEST match, not the first.
+     * Scoring:
+     *   100 = exact slug match ("upsc" === "upsc")
+     *    80 = all logo words appear as whole words in the input
+     *    60 = input starts with the logo name
+     *    40 = logo name is a substring AND logo name is ≥3 chars (prevents "ssc" matching "ossc")
+     *     0 = no match
+     */
     const getLogoByName = (conductingBody: string | null): string | null => {
-        if (!conductingBody || !logosQuery.data) return null;
+        if (!conductingBody || !logosQuery.data || logosQuery.data.length === 0) return null;
 
-        const normalizedName = conductingBody.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+        const inputNorm = normalize(conductingBody);
+        const inputWords = toWords(conductingBody);
 
-        const logo = logosQuery.data.find((l) => {
-            const logoSlug = l.slug.toLowerCase();
-            return logoSlug === normalizedName ||
-                conductingBody.toLowerCase().includes(l.name.toLowerCase()) ||
-                l.name.toLowerCase().includes(conductingBody.toLowerCase().split(" ")[0]);
-        });
+        let bestLogo: ConductingBodyLogo | null = null;
+        let bestScore = 0;
 
-        return logo?.logo_url || null;
+        for (const logo of logosQuery.data) {
+            const logoNorm = normalize(logo.name);
+            const logoSlug = logo.slug.replace(/-/g, ""); // "indian-railway" → "indianrailway"
+            const logoWords = toWords(logo.name);
+            let score = 0;
+
+            // Exact slug/normalized match
+            if (inputNorm === logoNorm || inputNorm === logoSlug) {
+                score = 100;
+            }
+            // All logo words appear as whole words in the input
+            // e.g. logo "Indian Railway" matches "Indian Railway Recruitment" but NOT "Indian Army"
+            else if (logoWords.length > 0 && logoWords.every(lw => inputWords.some(iw => iw === lw))) {
+                score = 80;
+            }
+            // Input starts with logo name (normalized)
+            else if (inputNorm.startsWith(logoNorm) && logoNorm.length >= 3) {
+                score = 60;
+            }
+            // Logo is a word-boundary substring match (only for names ≥ 3 chars to avoid false positives)
+            // e.g. "SSC" matches "SSC CGL" but NOT "OSSC"
+            else if (logoNorm.length >= 3 && inputWords.some(iw => iw === logoNorm)) {
+                score = 40;
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestLogo = logo;
+            }
+        }
+
+        return bestLogo?.logo_url || null;
     };
 
     return {

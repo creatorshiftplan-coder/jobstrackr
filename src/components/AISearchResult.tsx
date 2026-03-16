@@ -14,7 +14,10 @@ interface AISearchResultProps {
 export function AISearchResult({ job, onDismiss, savedJobId }: AISearchResultProps) {
   const formatSalary = (min: number | null, max: number | null) => {
     if (!min && !max) return "Not specified";
-    if (min && max) return `₹${(min / 1000).toFixed(0)}K - ₹${(max / 1000).toFixed(0)}K/month`;
+    if (min && max) {
+      if (min === max) return `₹${(min / 1000).toFixed(0)}K/month`;
+      return `₹${(min / 1000).toFixed(0)}K - ₹${(max / 1000).toFixed(0)}K/month`;
+    }
     if (min) return `From ₹${(min / 1000).toFixed(0)}K/month`;
     if (max) return `Up to ₹${(max / 1000).toFixed(0)}K/month`;
     return "Not specified";
