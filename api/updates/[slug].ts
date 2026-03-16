@@ -140,8 +140,8 @@ export default async function handler(request: Request) {
   }
 
   try {
-    const supabaseUrl = 'https://fdxksytpdfgmbkttipdf.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkeGtzeXRwZGZnbWJrdHRpcGRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTM1MTYsImV4cCI6MjA4MDQyOTUxNn0.NocVE7TCJIQgIhbHkxhHWraBRxyCkLIdgUQ3ERCHuKQ';
+    const supabaseUrl = process.env.VITE_SUPABASE_URL!;
+    const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY!;
 
     // Fetch exam by update_slug
     let response = await fetch(

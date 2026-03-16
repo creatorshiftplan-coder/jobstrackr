@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -42,6 +43,7 @@ export function useAIJobSearch() {
   // Auto-save job silently (no toast)
   const autoSaveJobSilently = async (job: AIJobResult): Promise<{ id: string } | null> => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-job-search`,
         {
@@ -49,6 +51,7 @@ export function useAIJobSearch() {
           headers: {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
             saveJob: true,
@@ -79,6 +82,7 @@ export function useAIJobSearch() {
     setAutoSavedJobIds(new Map());
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-job-search`,
         {
@@ -86,6 +90,7 @@ export function useAIJobSearch() {
           headers: {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
             query,
