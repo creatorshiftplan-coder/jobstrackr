@@ -1497,7 +1497,7 @@ export default function Admin() {
       <main className="p-4">
         <Tabs defaultValue="jobs" className="space-y-4">
           <div className="overflow-x-auto pb-2 -mb-2">
-            <TabsList className="inline-flex w-max min-w-full gap-1 p-1">
+            <TabsList className="!flex !flex-wrap gap-1 p-1 !h-auto w-full">
               <TabsTrigger value="jobs" className="gap-1 min-w-[44px] h-10">
                 <Briefcase className="h-4 w-4" />
                 <span className="hidden sm:inline">Jobs</span>

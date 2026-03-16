@@ -24,14 +24,28 @@ export function JobCard({ job }: JobCardProps) {
   const category = inferCategory(job.department, job.title);
   const shortQualification = shortenQualification(job.qualification);
 
+  const meta = job.job_metadata;
+
   const formatSalary = (min: number | null, max: number | null) => {
-    if (!min && !max) return "Not disclosed";
-    if (min && max) {
-      if (min === max) return `₹${(min / 1000).toFixed(0)}k`;
-      return `₹${(min / 1000).toFixed(0)}k - ₹${(max / 1000).toFixed(0)}k`;
+    if (!min && !max) {
+      if (meta?.salary_text) return meta.salary_text;
+      return "Not disclosed";
     }
-    if (min) return `₹${(min / 1000).toFixed(0)}k+`;
-    return `Up to ₹${(max! / 1000).toFixed(0)}k`;
+    // If values look suspiciously low (e.g. 3 instead of 3,00,000), prefer salary_text
+    if (meta?.salary_text && ((min && min < 100) || (max && max < 100))) {
+      return meta.salary_text;
+    }
+    const fmt = (v: number) => {
+      if (v >= 100000) return `₹${(v / 100000).toFixed(v % 100000 === 0 ? 0 : 1)}L`;
+      if (v >= 1000) return `₹${(v / 1000).toFixed(0)}k`;
+      return `₹${v}`;
+    };
+    if (min && max) {
+      if (min === max) return fmt(min);
+      return `${fmt(min)} - ${fmt(max)}`;
+    }
+    if (min) return `${fmt(min)}+`;
+    return `Up to ${fmt(max!)}`;
   };
 
   const getAgeDisplay = () => {

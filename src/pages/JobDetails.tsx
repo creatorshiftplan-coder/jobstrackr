@@ -218,13 +218,21 @@ export default function JobDetails() {
   }
 
   const formatSalary = (min: number | null, max: number | null) => {
-    if (!min && !max) return "Not disclosed";
-    if (min && max) {
-      if (min === max) return `₹${min.toLocaleString()}`;
-      return `₹${min.toLocaleString()} - ₹${max.toLocaleString()}`;
+    if (!min && !max) {
+      // Fallback: use salary_text from metadata if available
+      if (meta?.salary_text) return meta.salary_text;
+      return "Not disclosed";
     }
-    if (min) return `₹${min.toLocaleString()}+`;
-    return `Up to ₹${max!.toLocaleString()}`;
+    // If values look suspiciously low (e.g. 3 instead of 3,00,000), prefer salary_text
+    if (meta?.salary_text && ((min && min < 100) || (max && max < 100))) {
+      return meta.salary_text;
+    }
+    if (min && max) {
+      if (min === max) return `₹${min.toLocaleString('en-IN')}`;
+      return `₹${min.toLocaleString('en-IN')} - ₹${max.toLocaleString('en-IN')}`;
+    }
+    if (min) return `₹${min.toLocaleString('en-IN')}+`;
+    return `Up to ₹${max!.toLocaleString('en-IN')}`;
   };
 
   const getAgeDisplay = () => {
@@ -278,11 +286,11 @@ export default function JobDetails() {
           <p className="text-muted-foreground mb-3">{job.department}</p>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleTrackExam}
               disabled={isTracking || isAlreadyTracked}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200 ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all duration-200 ${
                 isAlreadyTracked
                   ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30'
                   : 'bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 hover:border-primary/50 active:scale-95'
@@ -338,7 +346,7 @@ export default function JobDetails() {
                   }
                 }
               }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold bg-secondary/50 text-muted-foreground hover:bg-secondary border border-border/50 transition-all duration-200 active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold bg-secondary/50 text-muted-foreground hover:bg-secondary border border-border/50 transition-all duration-200 active:scale-95"
               aria-label="Share job"
             >
               <Share2 className="h-3.5 w-3.5" />
@@ -350,48 +358,48 @@ export default function JobDetails() {
         {/* Quick Info Cards */}
         <div className="grid grid-cols-2 gap-3 animate-slide-up" style={{ animationDelay: "0.1s" }}>
           <Card className="border-0 shadow-md">
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <MapPin className="h-5 w-5 text-primary" />
+            <CardContent className="p-3 flex items-center gap-2 overflow-hidden">
+              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <MapPin className="h-4 w-4 text-primary" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Location</p>
-                <p className="font-medium text-sm">{job.location}</p>
+                <p className="font-medium text-sm truncate">{job.location}</p>
               </div>
             </CardContent>
           </Card>
           <Card className="border-0 shadow-md">
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
-                <IndianRupee className="h-5 w-5 text-success" />
+            <CardContent className="p-3 flex items-center gap-2 overflow-hidden">
+              <div className="h-9 w-9 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
+                <IndianRupee className="h-4 w-4 text-success" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Salary</p>
-                <p className="font-medium text-sm">{formatSalary(job.salary_min, job.salary_max)}</p>
+                <p className="font-medium text-sm truncate">{formatSalary(job.salary_min, job.salary_max)}</p>
               </div>
             </CardContent>
           </Card>
           <Card className="border-0 shadow-md">
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center">
-                <Calendar className="h-5 w-5 text-warning" />
+            <CardContent className="p-3 flex items-center gap-2 overflow-hidden">
+              <div className="h-9 w-9 rounded-full bg-warning/10 flex items-center justify-center flex-shrink-0">
+                <Calendar className="h-4 w-4 text-warning" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Last Date</p>
-                <p className="font-medium text-sm">
+                <p className="font-medium text-sm truncate">
                   {job.last_date_display || format(new Date(job.last_date), "dd MMM yyyy")}
                 </p>
               </div>
             </CardContent>
           </Card>
           <Card className="border-0 shadow-md">
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-info/10 flex items-center justify-center">
-                <Users className="h-5 w-5 text-info" />
+            <CardContent className="p-3 flex items-center gap-2 overflow-hidden">
+              <div className="h-9 w-9 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0">
+                <Users className="h-4 w-4 text-info" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Vacancies</p>
-                <p className="font-medium text-sm">
+                <p className="font-medium text-sm truncate">
                   {(() => {
                     // Prioritize breakdownTotal from vacancy table over unhelpful display values
                     if (breakdownTotal) return `${breakdownTotal} Posts`;
@@ -684,7 +692,7 @@ export default function JobDetails() {
           {!btnDisabled && btnHref ? (
             <a href={btnHref} target="_blank" rel="noopener noreferrer" className="flex-1">
               <Button 
-                className={`w-full font-semibold h-12 ${
+                className={`w-full font-semibold h-12 text-xs sm:text-sm ${
                   btnVariant === "primary" 
                     ? "gradient-primary text-primary-foreground" 
                     : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
@@ -701,7 +709,7 @@ export default function JobDetails() {
           <Button
             onClick={handleTrackExam}
             disabled={isTracking || isAlreadyTracked}
-            className={`flex-shrink-0 h-12 px-5 font-semibold ${
+            className={`flex-shrink-0 h-12 px-3 sm:px-5 font-semibold text-xs sm:text-sm ${
               isAlreadyTracked
                 ? 'bg-green-500/15 text-green-600 dark:text-green-400 border border-green-500/30 hover:bg-green-500/20'
                 : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25'

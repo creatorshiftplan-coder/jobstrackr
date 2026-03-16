@@ -143,7 +143,12 @@ def parse_date(raw: str) -> Optional[str]:
 # ─────────────────────────── salary parsing ─────────────────────────────────
 
 _NUM_RE = re.compile(r"[\d,]+")
-_RANGE_RE = re.compile(r"([\d,]+)\s*[-–to]+\s*([\d,]+)")
+_RANGE_RE = re.compile(r"([\d,.]+)\s*[-–to]+\s*([\d,.]+)")
+# Matches a number (with optional decimals) followed by a multiplier word
+_MULTIPLIER_RE = re.compile(
+    r"([\d,.]+)\s*(lakh|lac|lakhs|lacs|l|thousand|k|crore|cr)\b",
+    re.I,
+)
 
 
 def _to_int(s: str) -> Optional[int]:
@@ -153,16 +158,75 @@ def _to_int(s: str) -> Optional[int]:
         return None
 
 
+def _apply_multiplier(num_str: str, text: str) -> Optional[int]:
+    """Parse a number string and apply lakh/thousand/crore multiplier if found near it."""
+    try:
+        val = float(num_str.replace(",", ""))
+    except (ValueError, AttributeError):
+        return None
+    if val <= 0:
+        return None
+    t = text.lower()
+    m = _MULTIPLIER_RE.search(t)
+    if m:
+        mult_word = m.group(2).lower()
+        mult_val = float(m.group(1).replace(",", ""))
+        if mult_word in ("lakh", "lac", "lakhs", "lacs", "l"):
+            return int(mult_val * 100_000)
+        elif mult_word in ("thousand", "k"):
+            return int(mult_val * 1_000)
+        elif mult_word in ("crore", "cr"):
+            return int(mult_val * 10_000_000)
+    return int(val) if val < 10_000_000 else None
+
+
 def parse_salary(raw: str):
     """
     Returns (salary_min, salary_max, salary_text).
     Tries to extract numeric min/max; salary_text keeps the full original.
+    Handles multiplier words: lakh/lac, thousand/K, crore/Cr.
     """
     text = clean(raw)
     if not text or text.lower() in ("n/a", "-", "–", "na"):
         return None, None, None
 
-    # Try "X - Y" range
+    lower = text.lower()
+
+    # Check if text contains multiplier words — use multiplier-aware parsing
+    has_multiplier = any(w in lower for w in ("lakh", "lac", "lakhs", "lacs", "thousand", "crore"))
+
+    if has_multiplier:
+        matches = _MULTIPLIER_RE.findall(text)
+        if len(matches) >= 2:
+            vals = []
+            for num_s, mult_w in matches:
+                n = float(num_s.replace(",", ""))
+                mw = mult_w.lower()
+                if mw in ("lakh", "lac", "lakhs", "lacs", "l"):
+                    vals.append(int(n * 100_000))
+                elif mw in ("thousand", "k"):
+                    vals.append(int(n * 1_000))
+                elif mw in ("crore", "cr"):
+                    vals.append(int(n * 10_000_000))
+            if len(vals) >= 2:
+                return min(vals), max(vals), text
+            elif vals:
+                return vals[0], vals[0], text
+        elif len(matches) == 1:
+            num_s, mult_w = matches[0]
+            n = float(num_s.replace(",", ""))
+            mw = mult_w.lower()
+            if mw in ("lakh", "lac", "lakhs", "lacs", "l"):
+                val = int(n * 100_000)
+            elif mw in ("thousand", "k"):
+                val = int(n * 1_000)
+            elif mw in ("crore", "cr"):
+                val = int(n * 10_000_000)
+            else:
+                val = int(n)
+            return val, val, text
+
+    # Try "X - Y" range (no multiplier words)
     m = _RANGE_RE.search(text)
     if m:
         lo = _to_int(m.group(1))
