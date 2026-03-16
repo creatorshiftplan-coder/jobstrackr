@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminRole } from "@/hooks/useAdminRole";
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -375,6 +375,56 @@ const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
   };
 };
 
+/**
+ * Parse a logo filename into a clean display title.
+ * Example: "DBIM_BIS_Hallmark_PNG_#6C1340 (1).png" → "BIS Hallmark"
+ *
+ * Rules:
+ * 1. Strip file extension
+ * 2. Remove the leading prefix before the first underscore (e.g., "DBIM")
+ * 3. Remove trailing tokens: hex color codes (#XXXXXX), format hints (PNG/JPG/SVG), copy indicators (1), (2)
+ * 4. Replace underscores with spaces and trim
+ */
+const parseLogoTitle = (filename: string): string => {
+  // 1. Strip extension
+  let name = filename.replace(/\.(png|jpe?g|svg|webp|gif)$/i, "");
+
+  // 2. Remove copy indicator like " (1)", " (2)", "(1)"
+  name = name.replace(/\s*\(\d+\)\s*$/, "");
+
+  // 3. Split by underscores
+  const parts = name.split("_");
+
+  // 4. Remove the leading prefix (first segment, e.g., "DBIM")
+  if (parts.length > 1) {
+    parts.shift();
+  }
+
+  // 5. Filter out noise tokens: hex colors, format hints, empty strings
+  const filtered = parts.filter((part) => {
+    const trimmed = part.trim();
+    if (!trimmed) return false;
+    // Hex color like #6C1340
+    if (/^#[0-9A-Fa-f]{3,8}$/.test(trimmed)) return false;
+    // Format hints (case-insensitive exact match)
+    if (/^(PNG|JPG|JPEG|SVG|WEBP|GIF)$/i.test(trimmed)) return false;
+    return true;
+  });
+
+  // 6. Join with spaces and clean up
+  return filtered.join(" ").trim() || filename.replace(/\.(png|jpe?g|svg|webp|gif)$/i, "");
+};
+
+interface LogoQueueItem {
+  id: string;
+  file: File;
+  preview: string;
+  parsedTitle: string;
+  editedTitle: string;
+  duplicateStatus: "new" | "exact" | "similar";
+  similarTo?: string;
+}
+
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, isFullAdmin, isLoading: roleLoading } = useAdminRole();
@@ -424,8 +474,159 @@ export default function Admin() {
 
   // Logo management
   const { logos, isLoading: logosLoading, uploadLogo, deleteLogo, refetch: refetchLogos } = useConductingBodyLogos();
+  const [logoQueue, setLogoQueue] = useState<LogoQueueItem[]>([]);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [batchUploading, setBatchUploading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
+  const logoDropRef = useRef<HTMLDivElement>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
   const [logoName, setLogoName] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
+
+  // Check if a parsed title is a duplicate of existing logos
+  const checkLogoDuplicate = useCallback(
+    (title: string): { status: "new" | "exact" | "similar"; similarTo?: string } => {
+      if (!title.trim()) return { status: "new" };
+      const normalizeForCompare = (s: string) =>
+        s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const inputNorm = normalizeForCompare(title);
+      const inputWords = title.toLowerCase().split(/\s+/).filter((w) => w.length > 0);
+
+      for (const logo of logos) {
+        const logoNorm = normalizeForCompare(logo.name);
+        // Exact match
+        if (inputNorm === logoNorm) {
+          return { status: "exact", similarTo: logo.name };
+        }
+      }
+
+      // Fuzzy / word-overlap check
+      for (const logo of logos) {
+        const logoWords = logo.name.toLowerCase().split(/\s+/).filter((w) => w.length > 0);
+        if (logoWords.length === 0 || inputWords.length === 0) continue;
+        const commonWords = inputWords.filter((w) => logoWords.includes(w));
+        const overlapScore =
+          (commonWords.length * 2) / (inputWords.length + logoWords.length);
+        if (overlapScore >= 0.7) {
+          return { status: "similar", similarTo: logo.name };
+        }
+      }
+
+      return { status: "new" };
+    },
+    [logos]
+  );
+
+  // Process dropped/selected files into the queue
+  const processLogoFiles = useCallback(
+    (files: FileList | File[]) => {
+      const newItems: LogoQueueItem[] = [];
+      const fileArray = Array.from(files);
+
+      for (const file of fileArray) {
+        if (!file.type.startsWith("image/")) continue;
+        const parsedTitle = parseLogoTitle(file.name);
+        const { status, similarTo } = checkLogoDuplicate(parsedTitle);
+        newItems.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          file,
+          preview: URL.createObjectURL(file),
+          parsedTitle,
+          editedTitle: parsedTitle,
+          duplicateStatus: status,
+          similarTo,
+        });
+      }
+
+      setLogoQueue((prev) => [...prev, ...newItems]);
+    },
+    [checkLogoDuplicate]
+  );
+
+  // Update edited title and re-check duplicate status
+  const updateLogoQueueTitle = useCallback(
+    (id: string, newTitle: string) => {
+      setLogoQueue((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          const { status, similarTo } = checkLogoDuplicate(newTitle);
+          return { ...item, editedTitle: newTitle, duplicateStatus: status, similarTo };
+        })
+      );
+    },
+    [checkLogoDuplicate]
+  );
+
+  // Remove item from queue
+  const removeFromLogoQueue = useCallback((id: string) => {
+    setLogoQueue((prev) => {
+      const removed = prev.find((i) => i.id === id);
+      if (removed) URL.revokeObjectURL(removed.preview);
+      return prev.filter((i) => i.id !== id);
+    });
+  }, []);
+
+  // Batch upload all non-duplicate items
+  const handleBatchLogoUpload = useCallback(async () => {
+    const uploadable = logoQueue.filter(
+      (item) => item.editedTitle.trim() && item.duplicateStatus !== "exact"
+    );
+    if (uploadable.length === 0) {
+      toast({ title: "Nothing to upload", description: "All items are duplicates or missing titles.", variant: "destructive" });
+      return;
+    }
+
+    setBatchUploading(true);
+    setBatchProgress(0);
+    let successCount = 0;
+
+    for (let i = 0; i < uploadable.length; i++) {
+      const item = uploadable[i];
+      try {
+        await uploadLogo.mutateAsync({ name: item.editedTitle.trim(), file: item.file });
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to upload ${item.editedTitle}:`, err);
+      }
+      setBatchProgress(i + 1);
+    }
+
+    // Clean up queue and previews
+    logoQueue.forEach((item) => URL.revokeObjectURL(item.preview));
+    setLogoQueue([]);
+    setBatchUploading(false);
+    toast({
+      title: `Uploaded ${successCount}/${uploadable.length} logos`,
+      description: successCount === uploadable.length
+        ? "All logos uploaded successfully!"
+        : `${uploadable.length - successCount} failed. Check console for details.`,
+    });
+  }, [logoQueue, uploadLogo, toast]);
+
+  // Drag-and-drop handlers
+  const handleLogoDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  }, []);
+
+  const handleLogoDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  }, []);
+
+  const handleLogoDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingOver(false);
+      if (e.dataTransfer.files.length > 0) {
+        processLogoFiles(e.dataTransfer.files);
+      }
+    },
+    [processLogoFiles]
+  );
 
   // Delete confirmation dialog state
   const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
@@ -2105,12 +2306,12 @@ export default function Admin() {
               <CardHeader>
                 <CardTitle>Conducting Body Logos</CardTitle>
                 <CardDescription>
-                  Upload logos for conducting bodies. Use the exact name as it appears in exams (e.g., "Staff Selection Commission").
+                  Drag & drop logo files to upload. Titles are auto-parsed from filenames (e.g., "DBIM_BIS_Hallmark_PNG_#6C1340 (1).png" → "BIS Hallmark").
                   Recommended size: 128×128px or 256×256px PNG with transparent background.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Upload Form */}
+                {/* Manual Upload Form */}
                 <div className="flex flex-col sm:flex-row gap-4 items-end">
                   <div className="flex-1">
                     <Label htmlFor="logoName" className="text-sm font-medium mb-2 block">
@@ -2140,7 +2341,6 @@ export default function Admin() {
                         uploadLogo.mutate({ name: logoName, file: logoFile });
                         setLogoName("");
                         setLogoFile(null);
-                        // Reset file input
                         const input = document.getElementById("logoFile") as HTMLInputElement;
                         if (input) input.value = "";
                       } else {
@@ -2158,7 +2358,166 @@ export default function Admin() {
                   </Button>
                 </div>
 
-                {/* Logo Grid */}
+                {/* Divider */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">or bulk upload</span>
+                  </div>
+                </div>
+
+                {/* Drag & Drop Zone */}
+                <div
+                  ref={logoDropRef}
+                  onDragOver={handleLogoDragOver}
+                  onDragLeave={handleLogoDragLeave}
+                  onDrop={handleLogoDrop}
+                  onClick={() => logoFileInputRef.current?.click()}
+                  className={`relative cursor-pointer border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${
+                    isDraggingOver
+                      ? "border-primary bg-primary/5 scale-[1.01] shadow-lg"
+                      : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
+                  }`}
+                >
+                  <input
+                    ref={logoFileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        processLogoFiles(e.target.files);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={`p-3 rounded-full transition-colors ${
+                      isDraggingOver ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    }`}>
+                      <Upload className="h-8 w-8" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {isDraggingOver ? "Drop files here" : "Drag & drop logo files here"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        or click to browse • PNG, JPG, SVG, WebP
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Upload Queue */}
+                {logoQueue.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">
+                        Upload Queue ({logoQueue.length} file{logoQueue.length !== 1 ? "s" : ""})
+                      </h3>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            logoQueue.forEach((item) => URL.revokeObjectURL(item.preview));
+                            setLogoQueue([]);
+                          }}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Clear All
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleBatchLogoUpload}
+                          disabled={batchUploading || logoQueue.every((i) => i.duplicateStatus === "exact" || !i.editedTitle.trim())}
+                        >
+                          {batchUploading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Uploading {batchProgress}/{logoQueue.filter((i) => i.duplicateStatus !== "exact" && i.editedTitle.trim()).length}
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-4 w-4 mr-2" />
+                              Upload All ({logoQueue.filter((i) => i.duplicateStatus !== "exact" && i.editedTitle.trim()).length})
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3">
+                      {logoQueue.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`flex items-center gap-4 p-3 rounded-lg border transition-colors ${
+                            item.duplicateStatus === "exact"
+                              ? "border-destructive/30 bg-destructive/5"
+                              : item.duplicateStatus === "similar"
+                              ? "border-yellow-500/30 bg-yellow-500/5"
+                              : "border-border bg-card"
+                          }`}
+                        >
+                          {/* Thumbnail */}
+                          <img
+                            src={item.preview}
+                            alt={item.editedTitle}
+                            className="h-12 w-12 rounded-lg object-contain bg-muted flex-shrink-0"
+                          />
+
+                          {/* Title Input */}
+                          <div className="flex-1 min-w-0">
+                            <Input
+                              value={item.editedTitle}
+                              onChange={(e) => updateLogoQueueTitle(item.id, e.target.value)}
+                              placeholder="Enter logo title"
+                              className="h-8 text-sm"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1 truncate">
+                              {item.file.name}
+                            </p>
+                          </div>
+
+                          {/* Duplicate Status Badge */}
+                          <div className="flex-shrink-0">
+                            {item.duplicateStatus === "exact" && (
+                              <Badge variant="destructive" className="text-xs gap-1">
+                                <XCircle className="h-3 w-3" />
+                                Duplicate{item.similarTo ? ` of "${item.similarTo}"` : ""}
+                              </Badge>
+                            )}
+                            {item.duplicateStatus === "similar" && (
+                              <Badge variant="outline" className="text-xs gap-1 border-yellow-500/50 text-yellow-600">
+                                <AlertTriangle className="h-3 w-3" />
+                                Similar to "{item.similarTo}"
+                              </Badge>
+                            )}
+                            {item.duplicateStatus === "new" && (
+                              <Badge variant="outline" className="text-xs gap-1 border-green-500/50 text-green-600">
+                                <CheckCircle className="h-3 w-3" />
+                                New
+                              </Badge>
+                            )}
+                          </div>
+
+                          {/* Remove Button */}
+                          <button
+                            onClick={() => removeFromLogoQueue(item.id)}
+                            className="p-1.5 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Existing Logo Grid */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-medium">
@@ -2178,7 +2537,7 @@ export default function Admin() {
                     <div className="text-center py-8 text-muted-foreground">
                       <Image className="h-12 w-12 mx-auto mb-2 opacity-50" />
                       <p>No logos uploaded yet.</p>
-                      <p className="text-xs mt-1">Upload logos above to display them on Trending cards.</p>
+                      <p className="text-xs mt-1">Drop logo files above to get started.</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
