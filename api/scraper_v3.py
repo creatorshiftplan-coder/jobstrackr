@@ -799,49 +799,83 @@ def parse_page(url: str, html: str) -> dict:
 
 def extract_links_from_master(html: str, base_url: str) -> list[dict]:
     """
-    Parse a FreeJobAlert listing/master page and return all article links
-    found inside  <tr class="edthr"> rows.
-
-    Each entry is:
-        {
-            "update_date":   "16/03/2026",          # raw text from col-1
-            "title":         "India Optel 77 ...",  # raw text from col-2
-            "url":           "https://www.freejobalert.com/articles/..."
-        }
-
-    The function also handles multi-page listings: if the page contains
-    pagination links (class="disp_inblock") it collects them so the caller
-    can decide whether to follow them.
+    Extracts article links from any FreeJobAlert listing page.
+    Handles 3 formats:
+      - <tr class="edthr">          → /new-updates/, state edtbl pages
+      - <tr class="lattrbord ...">  → /wb-government-jobs/ lattbl tables
+      - <div class="org_tab">       → /search-jobs/jobs-in-kolkata/ card pages
     """
     soup = BeautifulSoup(html, "lxml")
-    entries = []
+    entries: list[dict] = []
     seen_urls: set[str] = set()
 
+    def add(entry: dict) -> None:
+        href = entry.get("url", "").strip()
+        if not href:
+            return
+        if not href.startswith("http"):
+            href = urljoin(base_url, href)
+        if href in seen_urls:
+            return
+        seen_urls.add(href)
+        entry["url"] = href
+        entries.append(entry)
+
+    # FORMAT 1 — <tr class="edthr">
+    # Columns: Date | Title | Get Details link
     for tr in soup.find_all("tr", class_="edthr"):
         tds = tr.find_all("td")
         if len(tds) < 3:
             continue
-
-        update_date = clean(tds[0].get_text())
-        title       = clean(tds[1].get_text())
-
-        # The 3rd cell always holds the "Get Details" anchor
-        a_tag = tds[2].find("a", href=True)
-        if not a_tag:
+        a = tds[2].find("a", href=True)
+        if not a:
             continue
+        add({
+            "update_date": clean(tds[0].get_text()),
+            "title":       clean(tds[1].get_text()),
+            "url":         a["href"].strip(),
+        })
 
-        href = a_tag["href"].strip()
-        if not href.startswith("http"):
-            href = urljoin(base_url, href)
-
-        if href in seen_urls:
+    # FORMAT 2 — <tr class="lattrbord ...">
+    # Columns: Date | Board | Post Name | Qual | Advt No | Last Date | Get Details
+    for tr in soup.find_all("tr", class_=lambda c: c and "lattrbord" in c):
+        tds = tr.find_all("td")
+        if len(tds) < 7:
             continue
-        seen_urls.add(href)
+        a = tds[6].find("a", href=True)
+        if not a:
+            continue
+        add({
+            "update_date": clean(tds[0].get_text()),
+            "title":       clean(tds[2].get_text()),
+            "url":         a["href"].strip(),
+        })
 
-        entries.append({
-            "update_date": update_date,
+    # FORMAT 3 — <div class="org_tab">
+    # Card layout with <a class="kc_btn">Apply Now</a>
+    for card in soup.find_all("div", class_="org_tab"):
+        a = card.find("a", class_=lambda c: c and "kc_btn" in c, href=True)
+        if not a:
+            continue
+        header = card.find(["span", "h2", "h6"])
+        org    = clean(header.get_text()) if header else ""
+        post   = ""
+        date_added = ""
+        for row in card.find_all("tr"):
+            tds = row.find_all("td")
+            if len(tds) != 2:
+                continue
+            key = clean(tds[0].get_text()).lower().rstrip(":")
+            val = clean(tds[1].get_text())
+            if key == "post name":
+                post = val
+            elif key == "date added":
+                date_added = val
+        title = f"{org} — {post}" if org and post else org or post
+        add({
+            "update_date": date_added,
             "title":       title,
-            "url":         href,
+            "url":         a["href"].strip(),
         })
 
     return entries
@@ -849,11 +883,15 @@ def extract_links_from_master(html: str, base_url: str) -> list[dict]:
 
 def get_pagination_urls(html: str, base_url: str) -> list[str]:
     """
-    Return all paginated page URLs found in the listing page
-    (li.disp_inblock > a href) — excluding the active/current page.
+    Returns next page URLs from any FreeJobAlert listing page.
+    Handles two pagination styles:
+      Style A — <li class="disp_inblock">   (/new-updates/, state pages)
+      Style B — <ul class="pagination">     (/search-jobs/ filter pages)
     """
     soup = BeautifulSoup(html, "lxml")
-    urls = []
+    urls: list[str] = []
+
+    # Style A
     for li in soup.find_all("li", class_="disp_inblock"):
         if "active" in li.get("class", []):
             continue
@@ -862,6 +900,20 @@ def get_pagination_urls(html: str, base_url: str) -> list[str]:
             href = a["href"].strip()
             if href.startswith("http") and href not in urls:
                 urls.append(href)
+
+    # Style B
+    for ul in soup.find_all("ul", class_="pagination"):
+        for li in ul.find_all("li"):
+            if any(c in li.get("class", []) for c in ("currentpage", "dots", "prev")):
+                continue
+            a = li.find("a", href=True)
+            if a:
+                href = a["href"].strip()
+                if not href.startswith("http"):
+                    href = urljoin(base_url, href)
+                if href not in urls:
+                    urls.append(href)
+
     return urls
 
 

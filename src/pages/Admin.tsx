@@ -1082,6 +1082,23 @@ export default function Admin() {
         job_metadata: Object.keys(metadata).length > 0 ? metadata : null,
       };
 
+      // Check for duplicate by title before inserting
+      const { data: existingJobs } = await supabase
+        .from("jobs")
+        .select("id, title")
+        .ilike("title", jobRecord.title)
+        .limit(1);
+
+      if (existingJobs && existingJobs.length > 0) {
+        toast({
+          title: "Duplicate detected!",
+          description: `"${existingJobs[0].title}" already exists in the database. Skipped.`,
+          variant: "destructive",
+        });
+        setDiscoverSavingUrl(null);
+        return;
+      }
+
       const { error } = await supabase.from("jobs").insert(jobRecord).select("id").single();
       if (error) throw error;
 
@@ -1207,9 +1224,28 @@ export default function Admin() {
       if (isDuplicate) {
         toast({
           title: "Duplicate detected!",
-          description: `Similar to: "${duplicateJobTitle}". Job was still added.`,
-          variant: "default",
+          description: `Similar to: "${duplicateJobTitle}". Save blocked.`,
+          variant: "destructive",
         });
+        setScraperAddingJob(false);
+        return;
+      }
+
+      // Also check directly in the database by title
+      const { data: existingJobs } = await supabase
+        .from("jobs")
+        .select("id, title")
+        .ilike("title", jobRecord.title)
+        .limit(1);
+
+      if (existingJobs && existingJobs.length > 0) {
+        toast({
+          title: "Duplicate detected!",
+          description: `"${existingJobs[0].title}" already exists in the database. Save blocked.`,
+          variant: "destructive",
+        });
+        setScraperAddingJob(false);
+        return;
       }
 
       const { data: newJob, error } = await supabase
