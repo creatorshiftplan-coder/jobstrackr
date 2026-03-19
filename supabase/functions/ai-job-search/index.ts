@@ -7,6 +7,20 @@ const corsHeaders = {
 
 const DAILY_LIMIT = 7;
 
+async function getAuthenticatedUserId(req: Request, supabase: any): Promise<string | null> {
+  const authHeader = req.headers.get("Authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+  if (!token) return null;
+
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) {
+    return null;
+  }
+
+  return user.id;
+}
+
 function normalizeText(text: string): string {
   return text
     .toLowerCase()
@@ -129,24 +143,22 @@ Deno.serve(async (req) => {
     ].filter(Boolean) as string[];
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const authenticatedUserId = await getAuthenticatedUserId(req, supabase);
+
+    if (userId && authenticatedUserId && userId !== authenticatedUserId) {
+      return new Response(
+        JSON.stringify({ error: "User identity mismatch" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const effectiveUserId = authenticatedUserId;
 
     // Handle create exam request (for AI-discovered exams - bypasses RLS using service role)
     if (createExam && examData) {
       console.log("Creating exam server-side:", examData.name);
 
-      // Get user ID from auth header
-      const authHeader = req.headers.get("Authorization");
-      let authenticatedUserId = userId;
-
-      if (authHeader) {
-        const token = authHeader.replace("Bearer ", "");
-        const { data: { user } } = await supabase.auth.getUser(token);
-        if (user) {
-          authenticatedUserId = user.id;
-        }
-      }
-
-      if (!authenticatedUserId) {
+      if (!effectiveUserId) {
         return new Response(
           JSON.stringify({ error: "Authentication required" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -200,7 +212,7 @@ Deno.serve(async (req) => {
       const { data: existingAttempt } = await supabase
         .from("exam_attempts")
         .select("id")
-        .eq("user_id", authenticatedUserId)
+        .eq("user_id", effectiveUserId)
         .eq("exam_id", examId)
         .eq("year", attemptYear)
         .limit(1)
@@ -216,7 +228,7 @@ Deno.serve(async (req) => {
       const { data: attempt, error: attemptError } = await supabase
         .from("exam_attempts")
         .insert({
-          user_id: authenticatedUserId,
+          user_id: effectiveUserId,
           exam_id: examId,
           year: attemptYear,
           status: "tracking",
@@ -242,6 +254,13 @@ Deno.serve(async (req) => {
 
     // Handle save job request
     if (saveJob && jobData) {
+      if (!effectiveUserId) {
+        return new Response(
+          JSON.stringify({ error: "Authentication required to save jobs" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       console.log("Saving job to database:", jobData.exam_name);
 
       const ages = parseAgeLimit(jobData.age_limit);
@@ -296,11 +315,11 @@ Deno.serve(async (req) => {
       }
 
       // Fix: Update log to mark job as created - first get the latest log ID
-      if (userId) {
+      if (effectiveUserId) {
         const { data: latestLog } = await supabase
           .from("ai_job_discover_logs")
           .select("id")
-          .eq("user_id", userId)
+          .eq("user_id", effectiveUserId)
           .order("created_at", { ascending: false })
           .limit(1)
           .single();
@@ -335,10 +354,10 @@ Deno.serve(async (req) => {
     }
 
     // Check rate limit if userId is provided (skip for admins)
-    if (userId) {
+    if (effectiveUserId) {
       // Check if user is admin (admins bypass rate limit)
       const { data: isAdminData } = await supabase.rpc("has_role", {
-        _user_id: userId,
+        _user_id: effectiveUserId,
         _role: "admin"
       });
       const isAdmin = isAdminData === true;
@@ -346,7 +365,7 @@ Deno.serve(async (req) => {
       if (!isAdmin) {
         const { data: rateLimitData, error: rateLimitError } = await supabase.rpc(
           "check_user_rate_limit",
-          { _user_id: userId, _daily_limit: DAILY_LIMIT, _minute_limit: 1 }
+          { _user_id: effectiveUserId, _daily_limit: DAILY_LIMIT, _minute_limit: 1 }
         );
 
         if (rateLimitError) {
@@ -478,9 +497,9 @@ Return structured JSON with the job details.`
     const latencyMs = Date.now() - startTime;
 
     // Log the discovery attempt
-    if (userId) {
+    if (effectiveUserId) {
       await supabase.from("ai_job_discover_logs").insert({
-        user_id: userId,
+        user_id: effectiveUserId,
         query,
         raw_ai_response: { content: aiContent, jobs },
         parse_ok: parseOk,

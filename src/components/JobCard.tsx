@@ -28,6 +28,44 @@ export function JobCard({ job }: JobCardProps) {
 
   const meta = job.job_metadata;
 
+  const formatAgeValue = (value: number) => {
+    return Number.isInteger(value) ? `${value}` : `${value}`.replace(/\.0+$/, "");
+  };
+
+  const extractAgeRangeFromText = (text: string): { min: number | null; max: number | null } => {
+    const normalized = text.toLowerCase();
+
+    const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)/i);
+    if (rangeMatch) {
+      return {
+        min: Number.parseFloat(rangeMatch[1]),
+        max: Number.parseFloat(rangeMatch[2]),
+      };
+    }
+
+    const upperMatch = normalized.match(/(?:upto|up to|maximum|max|not more than)\s*(\d+(?:\.\d+)?)/i);
+    if (upperMatch) {
+      return { min: null, max: Number.parseFloat(upperMatch[1]) };
+    }
+
+    const lowerMatch = normalized.match(/(?:from|min(?:imum)?|at least|above)\s*(\d+(?:\.\d+)?)/i);
+    if (lowerMatch) {
+      return { min: Number.parseFloat(lowerMatch[1]), max: null };
+    }
+
+    return { min: null, max: null };
+  };
+
+  const rawAgeMin = typeof job.age_min === "number" ? job.age_min : null;
+  const rawAgeMax = typeof job.age_max === "number" ? job.age_max : null;
+  const textAge = job.job_metadata?.age_limit_text ? extractAgeRangeFromText(job.job_metadata.age_limit_text) : { min: null, max: null };
+  const hasSuspiciousLowAge = [rawAgeMin, rawAgeMax].some((age) => typeof age === "number" && age > 0 && age < 14);
+
+  // If parsed DB ages look implausibly low, prefer ages recovered from the raw age text when available.
+  const effectiveAgeMin = hasSuspiciousLowAge && textAge.min !== null ? textAge.min : rawAgeMin;
+  const effectiveAgeMax = hasSuspiciousLowAge && textAge.max !== null ? textAge.max : rawAgeMax;
+  const showLowAgeFlag = [effectiveAgeMin, effectiveAgeMax].some((age) => typeof age === "number" && age > 0 && age < 14);
+
   const formatSalary = (min: number | null, max: number | null) => {
     if (!min && !max) {
       if (meta?.salary_text) return meta.salary_text;
@@ -51,26 +89,26 @@ export function JobCard({ job }: JobCardProps) {
   };
 
   const getAgeDisplay = () => {
-    if (job.age_min && job.age_max) {
-      if (job.age_min === job.age_max) {
+    if (effectiveAgeMin !== null && effectiveAgeMax !== null) {
+      if (effectiveAgeMin === effectiveAgeMax) {
         const text = job.job_metadata?.age_limit_text?.toLowerCase() || '';
         if (text.includes('max') || text.includes('upper') || text.includes('upto') || text.includes('up to')) {
-          return `Upto ${job.age_max} yrs`;
+          return `Upto ${formatAgeValue(effectiveAgeMax)} yrs`;
         }
         if (text.includes('min') || text.includes('lower') || text.includes('from') || text.includes('min.')) {
-          return `From ${job.age_min} yrs`;
+          return `From ${formatAgeValue(effectiveAgeMin)} yrs`;
         }
-        return `${job.age_min} yrs`;
+        return `${formatAgeValue(effectiveAgeMin)} yrs`;
       }
-      return `${job.age_min} - ${job.age_max} yrs`;
+      return `${formatAgeValue(effectiveAgeMin)} - ${formatAgeValue(effectiveAgeMax)} yrs`;
     }
     if (job.job_metadata?.age_limit_text) {
       return job.job_metadata.age_limit_text.length > 25 
         ? job.job_metadata.age_limit_text.substring(0, 25) + '...' 
         : job.job_metadata.age_limit_text;
     }
-    if (job.age_min) return `From ${job.age_min} yrs`;
-    if (job.age_max) return `Upto ${job.age_max} yrs`;
+    if (effectiveAgeMin !== null) return `From ${formatAgeValue(effectiveAgeMin)} yrs`;
+    if (effectiveAgeMax !== null) return `Upto ${formatAgeValue(effectiveAgeMax)} yrs`;
     return "Not Specified";
   };
 
@@ -178,13 +216,20 @@ export function JobCard({ job }: JobCardProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
+          <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-border/50">
             <span className="text-xs text-muted-foreground font-medium" title={job.job_metadata?.age_limit_text || undefined}>
               Age: {getAgeDisplay()}
             </span>
-            <span className="text-xs font-semibold text-primary">
-              {job.application_fee ? `Fee: ₹${job.application_fee}` : "Free Apply"}
-            </span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {showLowAgeFlag && (
+                <Badge variant="destructive" className="text-[10px] px-2 py-0.5 rounded-full">
+                  Low age - verify
+                </Badge>
+              )}
+              <span className="text-xs font-semibold text-primary">
+                {job.application_fee ? `Fee: ₹${job.application_fee}` : "Free Apply"}
+              </span>
+            </div>
           </div>
         </CardContent>
       </Card>

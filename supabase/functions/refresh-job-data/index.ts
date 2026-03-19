@@ -92,6 +92,56 @@ CRITICAL RULES:
 - Dates must be in YYYY-MM-DD format
 - Return ONLY the JSON object, no other text`;
 
+async function authorizeAdminOrService(
+    req: Request,
+    supabase: any,
+    serviceRoleKey: string,
+): Promise<Response | null> {
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+
+    if (!token) {
+        return new Response(
+            JSON.stringify({ error: "Authentication required" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+    }
+
+    if (token === serviceRoleKey) {
+        return null;
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+        return new Response(
+            JSON.stringify({ error: "Invalid authentication token" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+    }
+
+    const { data: isAdmin, error: roleError } = await supabase.rpc("has_role", {
+        _user_id: user.id,
+        _role: "admin",
+    });
+
+    if (roleError) {
+        console.error("Role check error:", roleError);
+        return new Response(
+            JSON.stringify({ error: "Authorization check failed" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+    }
+
+    if (isAdmin !== true) {
+        return new Response(
+            JSON.stringify({ error: "Admin access required" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+    }
+
+    return null;
+}
+
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") {
         return new Response(null, { headers: corsHeaders });
@@ -129,6 +179,11 @@ Deno.serve(async (req) => {
         }
 
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+        const authError = await authorizeAdminOrService(req, supabase, supabaseServiceKey);
+        if (authError) {
+            return authError;
+        }
 
         // Fetch current job data
         const { data: job, error: jobError } = await supabase

@@ -5,7 +5,7 @@ enabled = true
 port = 54321
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
-max_rows = 1000
+max_rows = 10000
 
 [db]
 port = 54322
@@ -29,7 +29,16 @@ double_confirm_changes = true
 enable_confirmations = false
 
 [functions.ai-job-search]
-verify_jwt = false
+verify_jwt = true
+
+[functions.refresh-job-data]
+verify_jwt = true
+
+[functions.quick-refresh-job]
+verify_jwt = true
+
+[functions.auto-discover-jobs]
+verify_jwt = true
 
 [functions.ocr-process]
 verify_jwt = true
