@@ -9,7 +9,8 @@ export function useJobs() {
       const { data, error } = await supabase
         .from("jobs")
         .select("id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, salary_min, salary_max, age_min, age_max, application_fee, job_metadata, is_featured, created_at")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(0, 9999);
 
       if (error) throw error;
       return (data || []) as any;
