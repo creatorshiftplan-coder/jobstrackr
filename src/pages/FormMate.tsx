@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { GUEST_PROFILE, GUEST_EDUCATION } from "@/lib/guestData";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 interface CopyFieldProps {
   label: string;
@@ -55,6 +56,7 @@ function CopyField({ label, value }: CopyFieldProps) {
 
 export default function FormMate() {
   const navigate = useNavigate();
+  const handleBack = useSmartBack("/");
   const { user, loading: authLoading, isGuestMode } = useAuth();
   const { profile, isLoading: profileLoading } = useProfile();
   const { data: decryptedProfile } = useDecryptedProfile();
@@ -115,7 +117,7 @@ export default function FormMate() {
       <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-4">
         <div className="flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
           >
             <ArrowLeft className="h-5 w-5 text-primary-foreground dark:text-foreground" />

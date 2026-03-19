@@ -3,7 +3,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { User, HelpCircle, LogOut, ChevronRight, Shield, ShieldCheck, CreditCard, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key, Sparkles, SearchCheck } from "lucide-react";
+import { User, HelpCircle, LogOut, ChevronRight, Shield, ShieldCheck, CreditCard, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key, Sparkles, SearchCheck, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,6 +13,7 @@ import { useTheme } from "next-themes";
 import logoWhite from "@/assets/logo-white.png";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { GUEST_PROFILE } from "@/lib/guestData";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 export default function More() {
   const { user, loading, signOut, resetPassword, isGuestMode } = useAuth();
@@ -20,6 +21,7 @@ export default function More() {
   const { isAdmin } = useAdminRole();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const handleBack = useSmartBack("/");
   const { toast } = useToast();
   const { showAuthRequired } = useAuthRequired();
 
@@ -79,7 +81,7 @@ export default function More() {
       <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-2">
         <div className="flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="h-8 w-8 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
           >
             <ArrowLeft className="h-4 w-4 text-primary-foreground dark:text-foreground" />
@@ -175,6 +177,24 @@ export default function More() {
                 <Search className="h-6 w-6 text-primary" />
               </div>
               <span className="text-sm font-medium text-foreground">Find an Exam</span>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Jobs For You Link */}
+        <div onClick={() => navigate("/for-you")} className="block cursor-pointer">
+          <Card className="bg-white dark:bg-card border-border/50 shadow-md hover:shadow-lg transition-shadow">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center">
+                  <Target className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-foreground">Jobs For You</h4>
+                  <p className="text-xs text-muted-foreground">Find eligible jobs matching your age, qualification & preferences</p>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </CardContent>
           </Card>
         </div>

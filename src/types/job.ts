@@ -44,5 +44,9 @@ export interface Job {
   job_metadata: JobMetadata | null;
   created_at: string;
   updated_at: string;
+  /**
+   * Location inferred from title/department if explicit location is generic (e.g. 'India', 'All India')
+   */
+  inferred_location?: string | null;
 }
 

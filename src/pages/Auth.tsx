@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useSmartBack } from "@/hooks/useSmartBack";
 import { ArrowLeft, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import logoColor from "@/assets/logo-color.png";
@@ -23,6 +24,7 @@ export default function Auth() {
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const navigate = useNavigate();
+  const handleBack = useSmartBack("/");
   const { toast } = useToast();
 
   const validate = () => {
@@ -114,10 +116,10 @@ export default function Auth() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="px-4 py-3">
-        <Link to="/" className="inline-flex items-center text-muted-foreground hover:text-foreground">
+        <button onClick={handleBack} className="inline-flex items-center text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-5 w-5 mr-2" />
           Back
-        </Link>
+        </button>
       </header>
 
       <main className="flex-1 flex items-center justify-center px-4 py-8">

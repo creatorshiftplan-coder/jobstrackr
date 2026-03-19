@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import logoWhite from "@/assets/logo-white.png";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ function getRemainingSearches(): number {
 
 export default function SyllabusCheck() {
     const navigate = useNavigate();
+    const handleBack = useSmartBack("/");
     const { user } = useAuth();
     const { showAuthRequired } = useAuthRequired();
 
@@ -292,7 +294,7 @@ export default function SyllabusCheck() {
             <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-2">
                 <div className="flex items-center justify-between">
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={handleBack}
                         className="h-8 w-8 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
                     >
                         <ArrowLeft className="h-4 w-4 text-primary-foreground dark:text-foreground" />

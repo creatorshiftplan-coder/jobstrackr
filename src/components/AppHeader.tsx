@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, Search, Bookmark, RefreshCw, Home, CalendarDays, User, Settings, HelpCircle, Flame, ArrowLeft } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { useSmartBack } from "@/hooks/useSmartBack";
 import logoColor from "@/assets/logo-color.png";
 import logoWhite from "@/assets/logo-white.png";
 
@@ -46,6 +47,7 @@ export function AppHeader({
 }: AppHeaderProps) {
     const location = useLocation();
     const navigate = useNavigate();
+    const handleBack = useSmartBack("/");
 
     // Style variants
     const bgClass = {
@@ -74,7 +76,7 @@ export function AppHeader({
                 <div className="flex items-center gap-2 min-w-[44px]">
                     {showBack && (
                         <button
-                            onClick={() => navigate(-1)}
+                            onClick={handleBack}
                             className={cn("p-2 -ml-2 rounded-lg transition-colors", iconClass)}
                         >
                             <ArrowLeft className="h-5 w-5" />

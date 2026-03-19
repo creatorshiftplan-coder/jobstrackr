@@ -20,6 +20,7 @@ import { INDIAN_STATES, EXAM_SECTORS, EDUCATION_QUALIFICATIONS } from "@/constan
 import { useDebouncedValue } from "@/hooks/useDebounce";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
+import { inferCategory, isJobActive, matchesSectorPreference } from "@/lib/jobUtils";
 
 export default function Search() {
   const navigate = useNavigate();
@@ -79,17 +80,19 @@ export default function Search() {
     }
 
     if (selectedLocations.length > 0) {
+      if (!selectedLocations.includes("All India")) {
       filtered = filtered.filter((job) =>
         selectedLocations.some((loc) => job.location.toLowerCase().includes(loc.toLowerCase()))
       );
+      }
     }
 
     if (selectedSectors.length > 0) {
       filtered = filtered.filter((job) =>
         selectedSectors.some(
           (sector) =>
-            job.title.toLowerCase().includes(sector.toLowerCase()) ||
-            job.department.toLowerCase().includes(sector.toLowerCase())
+            matchesSectorPreference(job.department, job.title, sector) ||
+            inferCategory(job.department, job.title).toLowerCase().includes(sector.toLowerCase())
         )
       );
     }
@@ -105,8 +108,8 @@ export default function Search() {
     // Sort by newest active jobs first
     const now = new Date();
     filtered = [...filtered].sort((a, b) => {
-      const aActive = new Date(a.last_date) > now;
-      const bActive = new Date(b.last_date) > now;
+      const aActive = isJobActive(a.last_date);
+      const bActive = isJobActive(b.last_date);
       // Prioritize active jobs
       if (aActive !== bActive) return bActive ? 1 : -1;
       // Then sort by created_at descending (newest first)

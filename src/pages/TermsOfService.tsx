@@ -1,9 +1,11 @@
 import { ArrowLeft, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 export default function TermsOfService() {
     const navigate = useNavigate();
+    const handleBack = useSmartBack("/");
 
     const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
         <Card className="border-0 shadow-card">
@@ -29,7 +31,7 @@ export default function TermsOfService() {
             <header className="sticky top-0 z-40 bg-[hsl(var(--blue-900))] px-4 py-4">
                 <div className="flex items-center justify-between">
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={handleBack}
                         className="h-10 w-10 rounded-full bg-[hsl(var(--blue-700))] flex items-center justify-center hover:bg-[hsl(var(--blue-600))] transition-colors"
                     >
                         <ArrowLeft className="h-5 w-5 text-white" />

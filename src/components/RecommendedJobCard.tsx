@@ -5,7 +5,7 @@ import { format, differenceInDays } from "date-fns";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { SaveJobButton } from "@/components/SaveJobButton";
 import { Badge } from "@/components/ui/badge";
-import { isTBDDateDisplay, inferCategory, shortenQualification } from "@/lib/jobUtils";
+import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification } from "@/lib/jobUtils";
 
 interface RecommendedJobCardProps {
   job: Job;
@@ -15,8 +15,9 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
   const { getLogoByName } = useConductingBodyLogos();
   const logoUrl = getLogoByName(job.department);
 
-  const daysLeft = differenceInDays(new Date(job.last_date), new Date());
-  const isExpired = daysLeft < 0;
+  const deadlineDate = parseJobDeadline(job.last_date);
+  const daysLeft = deadlineDate ? differenceInDays(deadlineDate, new Date()) : null;
+  const isExpired = daysLeft !== null && daysLeft < 0;
   const isTBDDate = isTBDDateDisplay(job.last_date_display);
 
   const category = inferCategory(job.department, job.title);
@@ -32,8 +33,9 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
     if (isTBDDate) return 'TBD';
     if (isExpired) return 'Expired';
     if (daysLeft === 0) return 'Last day!';
+    if (!deadlineDate) return 'TBD';
     // Show full date format
-    return format(new Date(job.last_date), "dd MMM yyyy");
+    return format(deadlineDate, "dd MMM yyyy");
   };
 
   return (
@@ -94,5 +96,4 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
     </Link>
   );
 }
-
 

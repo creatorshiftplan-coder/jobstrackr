@@ -1,5 +1,6 @@
+import { getBestJobLocation } from "@/lib/jobMatcher";
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useJobBySlug } from "@/hooks/useJobs";
 import { useExams } from "@/hooks/useExams";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,6 +32,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { BottomNav } from "@/components/BottomNav";
 import { formatAgeLimit } from "@/lib/jobUtils";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 // Check if last_date_display contains TBD-like values
 const isTBDDateDisplay = (displayValue: string | null): boolean => {
@@ -42,6 +44,7 @@ const isTBDDateDisplay = (displayValue: string | null): boolean => {
 
 export default function JobDetails() {
   const { slug } = useParams<{ slug: string }>();
+  const handleBack = useSmartBack("/search");
   const { data: job, isLoading, error } = useJobBySlug(slug || "");
   const { user } = useAuth();
   const { userExams, addExamAttempt } = useExams();
@@ -138,9 +141,7 @@ export default function JobDetails() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-destructive mb-4">Job not found</p>
-          <Link to="/">
-            <Button>Go Back</Button>
-          </Link>
+          <Button onClick={handleBack}>Go Back</Button>
         </div>
       </div>
     );
@@ -259,9 +260,13 @@ export default function JobDetails() {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border">
         <div className="flex items-center justify-between px-4 py-3 gap-3">
-          <Link to="/" className="p-2 -ml-2 rounded-full hover:bg-secondary transition-colors flex-shrink-0">
+          <button
+            onClick={handleBack}
+            className="p-2 -ml-2 rounded-full hover:bg-secondary transition-colors flex-shrink-0"
+            aria-label="Go back"
+          >
             <ArrowLeft className="h-5 w-5" />
-          </Link>
+          </button>
           <h1 className="flex-1 font-semibold text-sm text-foreground truncate">{job.title}</h1>
           <SaveJobButton jobId={job.id} />
         </div>
@@ -364,7 +369,7 @@ export default function JobDetails() {
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Location</p>
-                <p className="font-medium text-sm truncate">{job.location}</p>
+                <p className="font-medium text-sm truncate">{getBestJobLocation(job)}</p>
               </div>
             </CardContent>
           </Card>

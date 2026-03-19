@@ -13,10 +13,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile, Profile } from "@/hooks/useProfile";
 import { DocumentUploader } from "@/components/DocumentUploader";
 import { OCRResultModal } from "@/components/OCRResultModal";
+import { useSmartBack } from "@/hooks/useSmartBack";
 import { toast } from "sonner";
 
 export default function EditProfile() {
   const navigate = useNavigate();
+  const handleBack = useSmartBack("/");
   const { user, loading } = useAuth();
   const { profile, isLoading, upsertProfile } = useProfile();
   const [activeTab, setActiveTab] = useState("personal");
@@ -87,7 +89,7 @@ export default function EditProfile() {
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-4">
         <div className="flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
           >
             <ArrowLeft className="h-5 w-5 text-foreground" />

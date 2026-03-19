@@ -9,6 +9,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AnalyticsProvider } from "@/components/AnalyticsProvider";
 import { AuthRequiredProvider } from "@/components/AuthRequiredDialog";
+import { ScrollRestoration } from "@/components/ScrollRestoration";
 import { Loader2 } from "lucide-react";
 
 // Eager load critical routes
@@ -40,6 +41,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const SyllabusCheck = lazy(() => import("./pages/SyllabusCheck"));
 const SyllabusResult = lazy(() => import("./pages/SyllabusResult"));
 const UpdateDetails = lazy(() => import("./pages/UpdateDetails"));
+const Recommendations = lazy(() => import("./pages/Recommendations"));
 
 // Page loader component
 const PageLoader = () => (
@@ -67,6 +69,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <ScrollRestoration />
               <AnalyticsProvider>
                 <AuthRequiredProvider>
                   <Suspense fallback={<PageLoader />}>
@@ -93,6 +96,7 @@ const App = () => (
                       <Route path="/syllabus" element={<SyllabusCheck />} />
                       <Route path="/syllabus/result" element={<SyllabusResult />} />
                       <Route path="/edit-sector-preferences" element={<EditSectorPreferences />} />
+                      <Route path="/for-you" element={<Recommendations />} />
                       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                       <Route path="/refund-policy" element={<RefundPolicy />} />
                       <Route path="/terms-of-service" element={<TermsOfService />} />

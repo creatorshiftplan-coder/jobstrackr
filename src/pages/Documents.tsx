@@ -11,6 +11,7 @@ import { useEducation } from "@/hooks/useEducation";
 import { useAuth } from "@/hooks/useAuth";
 import { OCRResultModal } from "@/components/OCRResultModal";
 import { BottomNav } from "@/components/BottomNav";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 const DOCUMENT_TYPES = [
   { value: "job_application", label: "Online Application Pdf" },
@@ -38,6 +39,7 @@ const EDUCATION_FIELDS = [
 
 export default function Documents() {
   const navigate = useNavigate();
+  const handleBack = useSmartBack("/");
   const { user, loading: authLoading } = useAuth();
   const { upsertProfile } = useProfile();
   const { addEducation } = useEducation();
@@ -127,7 +129,7 @@ export default function Documents() {
       <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-4">
         <div className="flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
           >
             <ArrowLeft className="h-5 w-5 text-primary-foreground dark:text-foreground" />

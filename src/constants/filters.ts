@@ -36,22 +36,30 @@ export const INDIAN_STATES = [
 ];
 
 export const EXAM_SECTORS = [
+  "Central Government",
+  "State Government",
   "UPSC",
   "SSC",
+  "State PSC",
   "Railway",
+  "Clerical",
   "Banking",
+  "Insurance",
   "Defence",
   "Police",
-  "State Government",
+  "Paramilitary",
   "PSU",
   "Teaching",
-  "Engineering (AE/JE)",
+  "Engineering",
   "Medical",
+  "Nursing",
+  "Pharmacy",
   "Judiciary",
-  "Paramilitary",
   "Forest Department",
   "Post Office",
-  "Insurance",
+  "Data Entry",
+  "Apprentice",
+  "Research",
   "Public Service Commissions"
 ];
 

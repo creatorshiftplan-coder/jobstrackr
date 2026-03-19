@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 export default function Saved() {
   const navigate = useNavigate();
+  const handleBack = useSmartBack("/");
   const { user, loading: authLoading } = useAuth();
   const { data: savedJobs, isLoading } = useSavedJobs();
 
@@ -24,7 +26,7 @@ export default function Saved() {
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-3 sm:py-4">
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
           >
             <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 text-foreground" />

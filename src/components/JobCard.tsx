@@ -6,7 +6,8 @@ import { format, differenceInDays } from "date-fns";
 import { Link } from "react-router-dom";
 import { SaveJobButton } from "./SaveJobButton";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
-import { formatAgeLimit, isTBDDateDisplay, inferCategory, shortenQualification } from "@/lib/jobUtils";
+import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification } from "@/lib/jobUtils";
+import { getBestJobLocation } from "@/lib/jobMatcher";
 
 interface JobCardProps {
   job: Job;
@@ -16,7 +17,8 @@ export function JobCard({ job }: JobCardProps) {
   const { getLogoByName } = useConductingBodyLogos();
   const logoUrl = getLogoByName(job.department);
 
-  const daysLeft = differenceInDays(new Date(job.last_date), new Date());
+  const deadlineDate = parseJobDeadline(job.last_date);
+  const daysLeft = deadlineDate ? differenceInDays(deadlineDate, new Date()) : Number.POSITIVE_INFINITY;
   const isUrgent = daysLeft <= 7 && daysLeft >= 0;
   const isExpired = daysLeft < 0;
   const isTBDDate = isTBDDateDisplay(job.last_date_display);
@@ -106,7 +108,7 @@ export function JobCard({ job }: JobCardProps) {
                 {/* Days left / Expired / Date TBD badges first for urgency visibility */}
                 {!isTBDDate && isUrgent && !isExpired && (
                   <Badge variant="destructive" className="text-[10px] sm:text-xs font-medium px-2 py-0.5 rounded-full">
-                    {daysLeft} days left
+                    {daysLeft === 0 ? "Last Day" : `${daysLeft} days left`}
                   </Badge>
                 )}
                 {!isTBDDate && isExpired && (
@@ -149,7 +151,7 @@ export function JobCard({ job }: JobCardProps) {
               <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <MapPin className="h-3.5 w-3.5 text-primary" />
               </div>
-              <span className="truncate">{job.location}</span>
+              <span className="truncate">{getBestJobLocation(job)}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="h-7 w-7 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
@@ -163,7 +165,7 @@ export function JobCard({ job }: JobCardProps) {
               </div>
               <span className="truncate text-red-500 dark:text-red-400 font-medium">
                 <span className="hidden sm:inline">Last date: </span>
-                {job.last_date_display || format(new Date(job.last_date), "dd MMM yyyy")}
+                {job.last_date_display || (deadlineDate ? format(deadlineDate, "dd MMM yyyy") : "TBD")}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">

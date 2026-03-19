@@ -8,9 +8,11 @@ import { EXAM_SECTORS } from "@/constants/filters";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/BottomNav";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 export default function EditSectorPreferences() {
     const navigate = useNavigate();
+    const handleBack = useSmartBack("/");
     const { user, loading: authLoading } = useAuth();
     const { profile, isLoading: profileLoading, upsertProfile } = useProfile();
     const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
@@ -44,7 +46,7 @@ export default function EditSectorPreferences() {
             await upsertProfile.mutateAsync({
                 preferred_sectors: selectedSectors,
             });
-            navigate(-1);
+            handleBack();
         } catch (error) {
             console.error("Failed to save preferences:", error);
         } finally {
@@ -65,7 +67,7 @@ export default function EditSectorPreferences() {
             <header className="sticky top-0 z-40 bg-card border-b border-border px-4 py-3">
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={handleBack}
                         className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
                     >
                         <ArrowLeft className="h-5 w-5 text-foreground" />

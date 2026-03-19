@@ -10,6 +10,7 @@ import { ArrowLeft, Plus, Trash2, Loader2, GraduationCap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useEducation, EducationQualification } from "@/hooks/useEducation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 const QUALIFICATION_TYPES = [
   { value: "10th", label: "Class 10 (Matriculation)" },
@@ -23,6 +24,7 @@ const QUALIFICATION_TYPES = [
 
 export default function EditEducation() {
   const navigate = useNavigate();
+  const handleBack = useSmartBack("/");
   const { user, loading } = useAuth();
   const { education, isLoading, addEducation, updateEducation, deleteEducation } = useEducation();
   const [showAddModal, setShowAddModal] = useState(false);
@@ -88,7 +90,7 @@ export default function EditEducation() {
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-4">
         <div className="flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
           >
             <ArrowLeft className="h-5 w-5 text-foreground" />

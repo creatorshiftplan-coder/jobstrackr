@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import logoColor from "@/assets/logo-color.png";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 export default function ResetPassword() {
   const [password, setPassword] = useState("");
@@ -17,6 +18,7 @@ export default function ResetPassword() {
   const [isValidSession, setIsValidSession] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const navigate = useNavigate();
+  const handleBack = useSmartBack("/");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -179,7 +181,7 @@ export default function ResetPassword() {
           <Button
             variant="ghost"
             className="w-full mt-4"
-            onClick={() => navigate("/")}
+            onClick={handleBack}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Home
