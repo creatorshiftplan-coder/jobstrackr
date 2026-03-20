@@ -1,4 +1,4 @@
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,8 +26,17 @@ export function SearchWithFilter({
             placeholder="Search a job or position"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-12 pr-4 h-12 rounded-2xl bg-transparent border-0 text-base text-white placeholder:text-white/60 focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="pl-12 pr-10 h-12 rounded-2xl bg-transparent border-0 text-base text-white placeholder:text-white/60 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => onSearchChange("")}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <Button
           variant="default"

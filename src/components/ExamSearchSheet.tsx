@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Sparkles, BookOpen, Loader2, Plus, Briefcase } from "lucide-react";
+import { Search, Sparkles, BookOpen, Loader2, Plus, Briefcase, X } from "lucide-react";
 import { useExams } from "@/hooks/useExams";
 import { useJobs } from "@/hooks/useJobs";
 import { useAIJobSearch } from "@/hooks/useAIJobSearch";
@@ -274,8 +274,17 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
             placeholder="Search exams or jobs..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-12 rounded-xl bg-muted/50 border-0"
+            className="pl-10 pr-9 h-12 rounded-xl bg-muted/50 border-0"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         {/* Search Results */}

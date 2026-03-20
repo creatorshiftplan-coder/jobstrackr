@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
 import { Badge } from "@/components/ui/badge";
 import { SaveJobButton } from "@/components/SaveJobButton";
+import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
+import { OrganizationLogo } from "@/components/OrganizationLogo";
 
 import { format, differenceInDays } from "date-fns";
 
@@ -19,6 +21,9 @@ const isTBDDateDisplay = (displayValue: string | null): boolean => {
 };
 
 export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
+  const { getLogoByName } = useConductingBodyLogos();
+  const logoUrl = getLogoByName(job.department);
+
   const daysLeft = differenceInDays(new Date(job.last_date), new Date());
   const isUrgent = daysLeft <= 7 && daysLeft >= 0;
   const isExpired = daysLeft < 0;
@@ -49,7 +54,16 @@ export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
 
         {/* Content */}
         <div className="relative z-10 h-full flex flex-col">
-          <p className="text-sm sm:text-lg font-bold mb-0.5 sm:mb-1 truncate pr-8">{job.title}</p>
+          <div className="flex items-start gap-2 mb-0.5 sm:mb-1 pr-8">
+            <OrganizationLogo
+              logoUrl={logoUrl}
+              name={job.department}
+              containerClassName="h-7 w-7 rounded-md bg-primary-foreground/15 flex items-center justify-center flex-shrink-0 overflow-hidden"
+              imageClassName="h-5 w-5 object-contain"
+              iconClassName="h-4 w-4 text-primary-foreground"
+            />
+            <p className="text-sm sm:text-lg font-bold truncate">{job.title}</p>
+          </div>
           <p className="text-xs sm:text-sm text-primary-foreground/80 mb-3 sm:mb-4 truncate">{job.department}</p>
 
           {/* Tags */}

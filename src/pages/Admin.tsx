@@ -473,7 +473,7 @@ export default function Admin() {
   const [duplicateMode, setDuplicateMode] = useState<"skip" | "update" | "replace">("skip");
 
   // Logo management
-  const { logos, isLoading: logosLoading, uploadLogo, deleteLogo, refetch: refetchLogos } = useConductingBodyLogos();
+  const { logos, isLoading: logosLoading, uploadLogo, deleteLogo, getUnmatchedDepartments, refetch: refetchLogos } = useConductingBodyLogos();
   const [logoQueue, setLogoQueue] = useState<LogoQueueItem[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [batchUploading, setBatchUploading] = useState(false);
@@ -2568,11 +2568,51 @@ export default function Admin() {
                     </div>
                   )}
                 </div>
+
+                {/* Unmatched Departments Report */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium">
+                      Unmatched Departments
+                    </h3>
+                  </div>
+                  {jobsLoading || logosLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (() => {
+                    const departments = (jobs || []).map(j => j.department);
+                    const unmatched = getUnmatchedDepartments(departments);
+                    return unmatched.length === 0 ? (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500 opacity-60" />
+                        <p className="text-sm">All departments have matching logos!</p>
+                      </div>
+                    ) : (
+                      <div className="border rounded-xl overflow-hidden">
+                        <div className="bg-destructive/5 px-4 py-2 border-b">
+                          <p className="text-xs font-medium text-destructive">
+                            {unmatched.length} department{unmatched.length > 1 ? 's' : ''} with no logo match
+                          </p>
+                        </div>
+                        <ScrollArea className="max-h-64">
+                          <div className="divide-y">
+                            {unmatched.map((dept) => (
+                              <div key={dept} className="flex items-center justify-between px-4 py-2 text-sm hover:bg-muted/50">
+                                <span className="truncate mr-2">{dept}</span>
+                                <Badge variant="outline" className="text-[10px] shrink-0">No logo</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    );
+                  })()}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Auto Discovery Tab */}
           {/* Scrape V5 Tab */}
           <TabsContent value="scrape">
             <Card className="border-0 shadow-card">

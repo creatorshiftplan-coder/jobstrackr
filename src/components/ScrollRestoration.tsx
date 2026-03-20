@@ -109,7 +109,7 @@ export function ScrollRestoration() {
     }
 
     if (navigationType !== "POP") {
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
       return;
     }
 
@@ -126,7 +126,7 @@ export function ScrollRestoration() {
       const maxScrollY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       const canFullyRestore = maxScrollY >= targetY || attempts >= MAX_RESTORE_ATTEMPTS;
 
-      window.scrollTo({ top: Math.min(targetY, maxScrollY), left: 0, behavior: "auto" });
+      window.scrollTo({ top: Math.min(targetY, maxScrollY), left: 0, behavior: "instant" });
 
       if (canFullyRestore) return;
 

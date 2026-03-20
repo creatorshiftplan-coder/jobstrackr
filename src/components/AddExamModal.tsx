@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useExams, Exam } from "@/hooks/useExams";
-import { Plus, Search, Loader2 } from "lucide-react";
+import { Plus, Search, Loader2, X } from "lucide-react";
 
 interface AddExamModalProps {
   trigger?: React.ReactNode;
@@ -96,8 +96,17 @@ export function AddExamModal({ trigger }: AddExamModalProps) {
                     placeholder="Search by name or conducting body..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 pr-9"
                   />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 

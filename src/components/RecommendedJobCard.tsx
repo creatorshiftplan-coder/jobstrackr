@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
-import { Building2, Users, Calendar, GraduationCap, Tag } from "lucide-react";
+import { Users, Calendar, GraduationCap, Tag } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { SaveJobButton } from "@/components/SaveJobButton";
 import { Badge } from "@/components/ui/badge";
 import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification } from "@/lib/jobUtils";
+import { OrganizationLogo } from "@/components/OrganizationLogo";
 
 interface RecommendedJobCardProps {
   job: Job;
@@ -48,13 +49,13 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
 
         {/* Icon + Job Title Row */}
         <div className="flex items-start gap-3 mb-2 pr-8">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden">
-            {logoUrl ? (
-              <img src={logoUrl} alt="" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
-            ) : (
-              <Building2 className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
-            )}
-          </div>
+          <OrganizationLogo
+            logoUrl={logoUrl}
+            name={job.department}
+            containerClassName="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden"
+            imageClassName="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+            iconClassName="h-6 w-6 sm:h-7 sm:w-7 text-primary"
+          />
           <div className="flex-1 min-w-0">
             <h3 className="font-bold text-foreground text-sm sm:text-base leading-tight line-clamp-2">
               {job.title}

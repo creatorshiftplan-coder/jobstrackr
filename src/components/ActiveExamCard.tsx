@@ -3,6 +3,7 @@ import { BookOpen } from "lucide-react";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { Badge } from "@/components/ui/badge";
 import { getExamStatus, ExamAttempt } from "@/lib/examStatusUtils";
+import { OrganizationLogo } from "@/components/OrganizationLogo";
 
 interface ActiveExamCardProps {
   attempt: ExamAttempt;
@@ -22,13 +23,13 @@ export function ActiveExamCard({ attempt }: ActiveExamCardProps) {
     >
       <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg border border-border/50 w-[150px] sm:w-[180px] md:w-[200px] h-[130px] sm:h-[150px] md:h-[160px] flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.02]">
         <div className="flex items-center justify-between mb-2">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden">
-            {logoUrl ? (
-              <img src={logoUrl} alt={exam?.conducting_body || ""} className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
-            ) : (
-              <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-primary" aria-hidden="true" />
-            )}
-          </div>
+          <OrganizationLogo
+            logoUrl={logoUrl}
+            name={exam?.conducting_body || "Exam"}
+            containerClassName="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden"
+            imageClassName="w-6 h-6 sm:w-8 sm:h-8 object-contain"
+            iconClassName="h-4 w-4 sm:h-5 sm:w-5 text-primary"
+          />
         </div>
         <h3 className="font-bold text-foreground text-xs sm:text-sm md:text-sm leading-tight flex-1 line-clamp-3">
           {exam?.name || "Unknown Exam"}

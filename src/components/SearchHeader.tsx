@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface SearchHeaderProps {
@@ -25,8 +25,17 @@ export function SearchHeader({ searchQuery, onSearchChange }: SearchHeaderProps)
             placeholder="Search jobs, departments..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10 bg-secondary border-0 focus-visible:ring-primary"
+            className="pl-10 pr-9 bg-secondary border-0 focus-visible:ring-primary"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => onSearchChange("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </header>

@@ -188,9 +188,17 @@ export default function Search() {
                 setQuery(e.target.value);
                 if (!e.target.value) clearAIResults();
               }}
-
-              className="pl-10 bg-white/95 dark:bg-secondary/80 border border-white/30 dark:border-border text-foreground placeholder:text-muted-foreground rounded-xl h-11 focus:ring-2 focus:ring-white/50 dark:focus:ring-primary/50 transition-all shadow-sm"
+              className="pl-10 pr-9 bg-white/95 dark:bg-secondary/80 border border-white/30 dark:border-border text-foreground placeholder:text-muted-foreground rounded-xl h-11 focus:ring-2 focus:ring-white/50 dark:focus:ring-primary/50 transition-all shadow-sm"
             />
+            {query && (
+              <button
+                type="button"
+                onClick={() => { setQuery(""); clearAIResults(); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <Button
             variant="secondary"

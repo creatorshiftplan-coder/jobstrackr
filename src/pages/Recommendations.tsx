@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import logoColor from "@/assets/logo-color.png";
 import logoWhite from "@/assets/logo-white.png";
-import { ArrowLeft, Loader2, Target, User, Check, AlertTriangle, ChevronDown, ChevronUp, Calendar, GraduationCap, Briefcase, IndianRupee, MapPin, Award, SkipForward, FlaskConical, Settings, Wrench, Globe } from "lucide-react";
+import { ArrowLeft, Loader2, Target, User, Check, AlertTriangle, ChevronDown, ChevronUp, Calendar, GraduationCap, Briefcase, IndianRupee, MapPin, Award, SkipForward, FlaskConical, Settings, Wrench, Globe, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -738,15 +738,29 @@ export default function Recommendations() {
                   </div>
 
                   {(step.id === "location" || step.id === "sectors") && (
-                    <Input
-                      value={step.id === "location" ? locationQuery : sectorQuery}
-                      onChange={(event) => {
-                        if (step.id === "location") setLocationQuery(event.target.value);
-                        else setSectorQuery(event.target.value);
-                      }}
-                      placeholder={step.id === "location" ? "Search all Indian states and UTs" : "Search sectors"}
-                      className="h-10"
-                    />
+                    <div className="relative">
+                      <Input
+                        value={step.id === "location" ? locationQuery : sectorQuery}
+                        onChange={(event) => {
+                          if (step.id === "location") setLocationQuery(event.target.value);
+                          else setSectorQuery(event.target.value);
+                        }}
+                        placeholder={step.id === "location" ? "Search all Indian states and UTs" : "Search sectors"}
+                        className="h-10 pr-9"
+                      />
+                      {(step.id === "location" ? locationQuery : sectorQuery) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (step.id === "location") setLocationQuery("");
+                            else setSectorQuery("");
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   {step.id === "skills" && (

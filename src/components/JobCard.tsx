@@ -8,6 +8,7 @@ import { SaveJobButton } from "./SaveJobButton";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification } from "@/lib/jobUtils";
 import { getBestJobLocation } from "@/lib/jobMatcher";
+import { OrganizationLogo } from "@/components/OrganizationLogo";
 
 interface JobCardProps {
   job: Job;
@@ -119,13 +120,13 @@ export function JobCard({ job }: JobCardProps) {
           {/* Header Row: Logo + Title + Save Button */}
           <div className="flex gap-3">
             {/* Logo - vertically centered with title */}
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 overflow-hidden mt-0.5">
-              {logoUrl ? (
-                <img src={logoUrl} alt="" className="w-7 h-7 sm:w-9 sm:h-9 object-contain" />
-              ) : (
-                <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-              )}
-            </div>
+            <OrganizationLogo
+              logoUrl={logoUrl}
+              name={job.department}
+              containerClassName="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 overflow-hidden mt-0.5"
+              imageClassName="w-7 h-7 sm:w-9 sm:h-9 object-contain"
+              iconClassName="h-5 w-5 sm:h-6 sm:w-6 text-primary"
+            />
 
             <div className="flex-1 min-w-0">
               {/* Job Title Row with inline badges */}
