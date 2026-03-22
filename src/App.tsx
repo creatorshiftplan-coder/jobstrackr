@@ -10,6 +10,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AnalyticsProvider } from "@/components/AnalyticsProvider";
 import { AuthRequiredProvider } from "@/components/AuthRequiredDialog";
 import { ScrollRestoration } from "@/components/ScrollRestoration";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { DesktopSidebar } from "@/components/DesktopSidebar";
+import { TopBar } from "@/components/TopBar";
 import { Loader2 } from "lucide-react";
 
 // Eager load critical routes
@@ -72,8 +75,14 @@ const App = () => (
               <ScrollRestoration />
               <AnalyticsProvider>
                 <AuthRequiredProvider>
-                  <Suspense fallback={<PageLoader />}>
-                    <Routes>
+                  <SidebarProvider defaultOpen={true}>
+                    <div className="flex min-h-screen w-full">
+                      <DesktopSidebar />
+                      <div className="flex flex-1 flex-col min-w-0">
+                        <TopBar />
+                        <main className="flex-1 overflow-y-auto">
+                          <Suspense fallback={<PageLoader />}>
+                            <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/welcome" element={<Welcome />} />
                       <Route path="/jobs/:slug" element={<JobDetails />} />
@@ -102,7 +111,11 @@ const App = () => (
                       <Route path="/terms-of-service" element={<TermsOfService />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
-                  </Suspense>
+                          </Suspense>
+                        </main>
+                      </div>
+                    </div>
+                  </SidebarProvider>
                 </AuthRequiredProvider>
               </AnalyticsProvider>
             </BrowserRouter>

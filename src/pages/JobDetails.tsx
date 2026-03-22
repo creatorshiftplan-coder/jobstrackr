@@ -1,6 +1,6 @@
 import { getBestJobLocation } from "@/lib/jobMatcher";
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useJobBySlug } from "@/hooks/useJobs";
 import { useExams } from "@/hooks/useExams";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,6 +33,7 @@ import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { BottomNav } from "@/components/BottomNav";
 import { formatAgeLimit } from "@/lib/jobUtils";
 import { useSmartBack } from "@/hooks/useSmartBack";
+import { useSimilarJobs } from "@/hooks/useSimilarJobs";
 
 // Check if last_date_display contains TBD-like values
 const isTBDDateDisplay = (displayValue: string | null): boolean => {
@@ -689,6 +690,9 @@ export default function JobDetails() {
 
         {/* Blank space below Track button */}
         <div className="h-24" />
+
+        {/* Similar Jobs Section (vector similarity) */}
+        <SimilarJobsSection jobId={job?.id} />
       </main>
 
       {/* Fixed Apply Now Button */}
@@ -735,5 +739,35 @@ export default function JobDetails() {
 
       <BottomNav />
     </div>
+  );
+}
+
+/** Similar Jobs section using vector similarity */
+function SimilarJobsSection({ jobId }: { jobId: string | undefined }) {
+  const navigate = useNavigate();
+  const { data: similarJobs, isLoading } = useSimilarJobs(jobId);
+
+  if (isLoading || !similarJobs || similarJobs.length === 0) return null;
+
+  return (
+    <section className="px-5 mb-8">
+      <h3 className="font-display font-semibold text-base text-foreground mb-3">Similar Jobs</h3>
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+        {similarJobs.map((sj) => (
+          <button
+            key={sj.id}
+            onClick={() => navigate(sj.slug ? `/jobs/${sj.slug}` : `/jobs/${sj.id}`)}
+            className="flex-shrink-0 w-[220px] rounded-xl border border-border bg-card p-3 text-left hover:shadow-md transition-shadow"
+          >
+            <p className="font-semibold text-sm text-foreground line-clamp-2 mb-1">{sj.title}</p>
+            <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{sj.department}</p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3" />
+              <span className="line-clamp-1">{sj.location}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

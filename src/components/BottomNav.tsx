@@ -3,37 +3,73 @@ import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { icon: Home, label: "Home", path: "/" },
-  { icon: Search, label: "Explore", path: "/search" },
-  { icon: Flame, label: "Trending", path: "/trending" },
-  { icon: CalendarDays, label: "My Exams", path: "/tracker" },
-  { icon: User, label: "Profile", path: "/profile" },
+  { icon: Home, label: "Home", path: "/", color: "#f44336" },
+  { icon: Search, label: "Explore", path: "/search", color: "#ffa117" },
+  { icon: Flame, label: "Trending", path: "/trending", color: "#0fc70f" },
+  { icon: CalendarDays, label: "My Exams", path: "/tracker", color: "#2196f3" },
+  { icon: User, label: "Profile", path: "/profile", color: "#b145e9" },
 ];
 
 export function BottomNav() {
   const location = useLocation();
 
+  const activeIndex = navItems.findIndex(
+    (item) => item.path === location.pathname
+  );
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-2xl border-t border-border/50 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)] z-50 pb-safe">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
-        {navItems.map(({ icon: Icon, label, path }) => {
-          const isActive = location.pathname === path;
-          return (
-            <Link
-              key={path}
-              to={path}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 py-2 rounded-xl transition-all duration-200 flex-1 min-w-0",
-                isActive
-                  ? "text-primary bg-primary/10 scale-105"
-                  : "text-muted-foreground hover:text-primary/70 hover:bg-secondary/50"
-              )}
-            >
-              <Icon className={cn("h-6 w-6 transition-all stroke-[2px]", isActive && "stroke-[2.5px]")} />
-              <span className={cn("text-[11px] whitespace-nowrap tracking-wide font-semibold", isActive && "font-bold")}>{label}</span>
-            </Link>
-          );
-        })}
+    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 md:hidden">
+      <div className="glow-nav relative flex items-center justify-center h-[60px] bg-card rounded-2xl shadow-lg px-2">
+        <ul className="flex w-[350px] relative">
+          {navItems.map(({ icon: Icon, label, path, color }, index) => {
+            const isActive = activeIndex === index;
+            return (
+              <li
+                key={path}
+                className="relative w-[70px] h-[60px] z-[2] list-none"
+              >
+                <Link
+                  to={path}
+                  className="flex items-center justify-center w-full h-full text-muted-foreground no-underline"
+                >
+                  <span
+                    className={cn(
+                      "relative flex items-center justify-center w-[50px] h-[50px] rounded-full bg-card transition-all duration-500",
+                      isActive && "-translate-y-[27px]"
+                    )}
+                    style={
+                      isActive
+                        ? { background: color, transitionDelay: "0.25s" }
+                        : { transitionDelay: "0s" }
+                    }
+                  >
+                    <Icon
+                      className={cn(
+                        "h-[22px] w-[22px] transition-colors duration-300",
+                        isActive ? "text-white" : "text-muted-foreground"
+                      )}
+                      strokeWidth={isActive ? 2.5 : 2}
+                    />
+                    {/* Glow blur */}
+                    {isActive && (
+                      <span
+                        className="absolute top-[8px] left-0 w-full h-full rounded-full opacity-50 blur-[5px] transition-opacity duration-500"
+                        style={{ background: color }}
+                      />
+                    )}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+          {/* Sliding indicator */}
+          <div
+            className="glow-indicator absolute -top-[35px] w-[70px] h-[70px] bg-card rounded-full z-[1] transition-transform duration-500"
+            style={{
+              transform: `translateX(${activeIndex >= 0 ? activeIndex * 70 : 0}px)`,
+            }}
+          />
+        </ul>
       </div>
     </nav>
   );

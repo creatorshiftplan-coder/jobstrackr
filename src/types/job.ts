@@ -44,6 +44,8 @@ export interface Job {
   job_metadata: JobMetadata | null;
   created_at: string;
   updated_at: string;
+  /** Rule-based tags for hybrid recommendations (sectors, qualification tier, org type) */
+  tags?: string[] | null;
   /**
    * Location inferred from title/department if explicit location is generic (e.g. 'India', 'All India')
    */

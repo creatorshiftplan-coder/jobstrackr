@@ -21,7 +21,7 @@ export function ActiveExamCard({ attempt }: ActiveExamCardProps) {
       className="block flex-shrink-0"
       aria-label={`${exam?.name || "Unknown Exam"} - ${status.label}. Click to view details.`}
     >
-      <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg border border-border/50 w-[150px] sm:w-[180px] md:w-[200px] h-[130px] sm:h-[150px] md:h-[160px] flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.02]">
+      <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg border border-border/50 w-[150px] sm:w-[180px] md:w-auto h-[130px] sm:h-[150px] md:h-[160px] flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.02]">
         <div className="flex items-center justify-between mb-2">
           <OrganizationLogo
             logoUrl={logoUrl}

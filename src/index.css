@@ -209,6 +209,29 @@
   }
 }
 
+/* Glowing bottom navigation */
+.glow-indicator::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: -27.5px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  box-shadow: 15px 18px hsl(var(--card));
+}
+
+.glow-indicator::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: -27.5px;
+  height: 30px;
+  width: 30px;
+  border-radius: 50%;
+  box-shadow: -15px 18px hsl(var(--card));
+}
+
 /* Hide scrollbar utility */
 .scrollbar-hide {
   -ms-overflow-style: none;

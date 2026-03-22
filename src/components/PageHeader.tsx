@@ -19,7 +19,7 @@ export function PageHeader({ showSearchBar = true, variant = "transparent" }: Pa
   const placeholderColor = "text-muted-foreground";
 
   return (
-    <header className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 h-14">
+    <header className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 h-14 md:hidden">
       {/* More Button - Left */}
       <Link to="/more">
         <div className={`h-11 w-11 sm:h-12 sm:w-12 rounded-full ${bgClass} backdrop-blur-sm flex items-center justify-center ${hoverClass} transition-colors`}>

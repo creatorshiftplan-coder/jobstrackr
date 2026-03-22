@@ -14,7 +14,7 @@ export function SectionHeader({
   variant = "light"
 }: SectionHeaderProps) {
   return (
-    <div className="flex items-center justify-between px-5 mb-4">
+    <div className="flex items-center justify-between px-5 mb-4 md:px-0">
       <h2 className="text-base sm:text-lg font-bold text-foreground">{title}</h2>
       <Link 
         to={linkTo} 

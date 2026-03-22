@@ -14,10 +14,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { Profile, useProfile } from "@/hooks/useProfile";
 import { EducationQualification, useEducation } from "@/hooks/useEducation";
 import { useJobs } from "@/hooks/useJobs";
+import { useExams } from "@/hooks/useExams";
 import { Job } from "@/types/job";
 import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
 import { QualStream, matchAndSort, getEducationRank, getQualLabel, getQualStreamLabel, getSkillLabel, inferQualificationStream, MatchPreferences, MatchedJob, getBestJobLocation } from "@/lib/jobMatcher";
 import { isAllIndiaLocationText, resolveStateFromLocationText } from "@/lib/jobUtils";
+import { hybridRecommend, qualificationToTag, HybridMatchedJob } from "@/lib/hybridScorer";
 import { cn } from "@/lib/utils";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { toast } from "sonner";
@@ -545,8 +547,28 @@ export default function Recommendations() {
     if (!jobs) return [];
     return matchAndSort(jobs, preferences);
   }, [jobs, preferences]);
-  // Four-tier classification
-  const canApplyJobs = useMemo(() => matchedJobs.filter((m) => m.eligibility.eligible && m.eligibility.skillsMissing.length === 0), [matchedJobs]);
+
+  // Hybrid scoring: re-rank eligible jobs using exam intent + tag overlap
+  const { userExams } = useExams();
+  const hybridMatchedJobs: HybridMatchedJob[] = useMemo(() => {
+    const eligible = matchedJobs.filter((m) => m.eligibility.eligible);
+    const qualTag = qualificationToTag(preferences.qualificationType);
+    return hybridRecommend(
+      eligible,
+      (answers.sectors as string[]) || profile?.preferred_sectors || [],
+      userExams,
+      qualTag,
+      eligible.length // don't limit — Recommendations shows all
+    );
+  }, [matchedJobs, preferences, answers.sectors, profile?.preferred_sectors, userExams]);
+
+  // Set of job IDs that match tracked exams (for badge display)
+  const examMatchedIds = useMemo(() => {
+    return new Set(hybridMatchedJobs.filter((h) => h.matchesTrackedExam).map((h) => h.job.id));
+  }, [hybridMatchedJobs]);
+
+  // Four-tier classification (use hybrid-ranked order for eligible jobs)
+  const canApplyJobs = useMemo(() => hybridMatchedJobs.filter((m) => m.eligibility.skillsMissing.length === 0), [hybridMatchedJobs]);
 
   // Split canApply into preferred location -> all India -> other state buckets
   const selectedLocations = useMemo(() => {
@@ -593,7 +615,7 @@ export default function Recommendations() {
     );
   }, [canApplyJobs, hasPreferredLocations, isAllIndiaJob, matchesSelectedLocation]);
 
-  const skillsNeededJobs = useMemo(() => matchedJobs.filter((m) => m.eligibility.eligible && m.eligibility.skillsMissing.length > 0), [matchedJobs]);
+  const skillsNeededJobs = useMemo(() => hybridMatchedJobs.filter((m) => m.eligibility.skillsMissing.length > 0), [hybridMatchedJobs]);
   const preferredLocationSkillsNeededJobs = useMemo(() => {
     if (!hasPreferredLocations) return [];
     return skillsNeededJobs.filter(({ job }) => matchesSelectedLocation(job));
@@ -1152,7 +1174,13 @@ export default function Recommendations() {
               <div className="flex-1 h-px bg-border/60" />
             </div>
             {preferredLocationJobs.map(({ job }, index) => (
-              <div key={job.id} className="animate-fadeIn" style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}>
+              <div key={job.id} className="animate-fadeIn relative" style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}>
+                {examMatchedIds.has(job.id) && (
+                  <Badge className="absolute -top-2 right-3 z-10 bg-amber-500/90 text-white text-[10px] px-2 py-0.5 shadow-sm">
+                    <Target className="h-3 w-3 mr-1" />
+                    Tracked Exam
+                  </Badge>
+                )}
                 <JobCard job={job} />
               </div>
             ))}
