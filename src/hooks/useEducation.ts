@@ -3,6 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
+interface UseEducationOptions {
+  enabled?: boolean;
+}
+
 export interface EducationQualification {
   id: string;
   user_id: string;
@@ -21,7 +25,8 @@ export interface EducationQualification {
   updated_at: string;
 }
 
-export function useEducation() {
+export function useEducation(options: UseEducationOptions = {}) {
+  const { enabled = true } = options;
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -39,7 +44,7 @@ export function useEducation() {
       if (error) throw error;
       return (data || []) as EducationQualification[];
     },
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
   });
 
   const addEducation = useMutation({

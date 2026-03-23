@@ -6,6 +6,7 @@ import { TrendingExamCard } from "@/components/TrendingExamCard";
 import { BottomNav } from "@/components/BottomNav";
 import { AppHeader } from "@/components/AppHeader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { TrendingUp, X, Check, ChevronDown, MapPin, Grid3X3, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getExamStatusType, getBadgeConfig } from "@/lib/examStatus";
@@ -193,26 +194,72 @@ export default function Trending() {
     return (
         <div className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/20 flex flex-col">
             {/* App Header */}
-            <AppHeader
-                title="Trending"
-                variant="primary"
-                showMenu={true}
-                showRefresh={true}
-                showLogo={false}
-                showTitleLogo={true}
-                onRefresh={refetch}
-                isRefreshing={isRefetching}
-            />
+            <div className="md:hidden">
+                <AppHeader
+                    title="Trending"
+                    variant="primary"
+                    showMenu={true}
+                    showRefresh={true}
+                    showLogo={false}
+                    showTitleLogo={true}
+                    onRefresh={refetch}
+                    isRefreshing={isRefetching}
+                />
+            </div>
+
+            <section className="hidden md:block border-b border-border/60 bg-[linear-gradient(135deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.55)_52%,hsl(var(--primary)/0.12)_100%)]">
+                <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
+                    <div className="flex items-end justify-between gap-8">
+                        <div className="max-w-3xl">
+                            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                                <TrendingUp className="h-3.5 w-3.5" />
+                                Live Update Feed
+                            </div>
+                            <h1 className="font-display text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
+                                Latest government exam updates in a clearer, more professional desktop view.
+                            </h1>
+                            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground lg:text-base">
+                                Follow notifications, admit cards, and results in one refined workspace built for fast scanning and better filtering.
+                            </p>
+                        </div>
+
+                        <div className="grid min-w-[320px] grid-cols-2 gap-4">
+                            <div className="rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
+                                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Visible Updates</p>
+                                <p className="mt-2 text-3xl font-bold text-foreground">{filteredExams.length}</p>
+                                <p className="mt-1 text-sm text-muted-foreground">matching current filters</p>
+                            </div>
+                            <div className="rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
+                                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Filter State</p>
+                                <p className="mt-2 text-3xl font-bold text-foreground">{selectedCategories.length + selectedLocations.length + (latestFilter ? 1 : 0)}</p>
+                                <p className="mt-1 text-sm text-muted-foreground">active refinements</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex items-center justify-between gap-4">
+                        <div className="flex flex-wrap gap-2">
+                            <span className="rounded-full border border-border bg-background/70 px-3 py-1 text-sm text-muted-foreground">Notifications</span>
+                            <span className="rounded-full border border-border bg-background/70 px-3 py-1 text-sm text-muted-foreground">Admit Cards</span>
+                            <span className="rounded-full border border-border bg-background/70 px-3 py-1 text-sm text-muted-foreground">Results</span>
+                        </div>
+                        <Button onClick={refetch} variant="outline" className="rounded-xl" disabled={isRefetching}>
+                            <TrendingUp className="mr-2 h-4 w-4" />
+                            {isRefetching ? "Refreshing..." : "Refresh Feed"}
+                        </Button>
+                    </div>
+                </div>
+            </section>
 
             {/* Animated Filter Bar */}
             <motion.div
                 initial={{ y: 0 }}
                 animate={{ y: filterVisible ? 0 : -100 }}
                 transition={{ duration: 0.2 }}
-                className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b shadow-sm shrink-0"
+                className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b shadow-sm shrink-0 md:top-16"
             >
                 {/* Filter Pills */}
-                <div className="px-4 py-3 flex gap-2 overflow-x-auto scrollbar-hide">
+                <div className="mx-auto flex gap-2 overflow-x-auto px-4 py-3 scrollbar-hide md:max-w-6xl md:px-6 lg:px-8">
                     {/* Latest Toggle */}
                     <button
                         onClick={() => setLatestFilter(!latestFilter)}
@@ -313,7 +360,7 @@ export default function Trending() {
                 </div>
 
                 {/* Tab Navigation */}
-                <div className="px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide border-t border-border/50">
+                <div className="mx-auto flex gap-2 overflow-x-auto border-t border-border/50 px-4 pb-3 scrollbar-hide md:max-w-6xl md:px-6 lg:px-8">
                     {TABS.map((tab) => (
                         <button
                             key={tab.id}
@@ -334,7 +381,7 @@ export default function Trending() {
             {/* Content */}
             <main
                 ref={containerRef}
-                className="flex-1 overflow-y-auto px-4 py-6 pb-24"
+                className="mx-auto flex-1 w-full max-w-6xl overflow-y-auto px-4 py-6 pb-24 md:px-6 lg:px-8"
             >
                 {isLoading ? (
                     <div className="space-y-4">

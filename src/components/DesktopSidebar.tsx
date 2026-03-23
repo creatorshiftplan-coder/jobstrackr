@@ -10,10 +10,19 @@ import {
   Upload,
   Settings,
   LogOut,
+  Bookmark,
+  HelpCircle,
+  ShieldCheck,
+  CreditCard,
+  Shield,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminRole } from "@/hooks/useAdminRole";
+import { useTheme } from "next-themes";
 import {
   Sidebar,
   SidebarContent,
@@ -33,6 +42,7 @@ const navItems = [
   { title: "Explore", url: "/search", icon: Search },
   { title: "Trending", url: "/trending", icon: TrendingUp },
   { title: "My Exams", url: "/tracker", icon: FileText },
+  { title: "Saved Jobs", url: "/saved", icon: Bookmark },
   { title: "Profile", url: "/profile", icon: User },
 ];
 
@@ -44,10 +54,19 @@ const toolItems = [
   { title: "Sector Preferences", url: "/edit-sector-preferences", icon: Settings },
 ];
 
+const supportItems = [
+  { title: "Help & Support", url: "/help", icon: HelpCircle },
+  { title: "Privacy Policy", url: "/privacy-policy", icon: ShieldCheck },
+  { title: "Refund Policy", url: "/refund-policy", icon: CreditCard },
+  { title: "Terms of Service", url: "/terms-of-service", icon: FileText },
+];
+
 export function DesktopSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { signOut } = useAuth();
+  const { isAdmin } = useAdminRole();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -118,9 +137,68 @@ export function DesktopSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Admin Panel - only for admins */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to="/admin"
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      activeClassName="bg-sidebar-accent text-primary font-semibold"
+                    >
+                      <Shield className="h-[18px] w-[18px] shrink-0" />
+                      {!collapsed && <span>Admin Panel</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+            Support
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {supportItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to={item.url}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      activeClassName="bg-sidebar-accent text-primary font-semibold"
+                    >
+                      <item.icon className="h-[18px] w-[18px] shrink-0" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-3">
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-[18px] w-[18px] shrink-0" />
+              ) : (
+                <Moon className="h-[18px] w-[18px] shrink-0" />
+              )}
+              {!collapsed && <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={handleLogout}

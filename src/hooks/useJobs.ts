@@ -2,7 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Job } from "@/types/job";
 
-export function useJobs() {
+interface UseJobsOptions {
+  enabled?: boolean;
+}
+
+export function useJobs(options: UseJobsOptions = {}) {
+  const { enabled = true } = options;
+
   return useQuery({
     queryKey: ["jobs"],
     queryFn: async (): Promise<Job[]> => {
@@ -15,6 +21,7 @@ export function useJobs() {
       if (error) throw error;
       return (data || []) as any;
     },
+    enabled,
   });
 }
 

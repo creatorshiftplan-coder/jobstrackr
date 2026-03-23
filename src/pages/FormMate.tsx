@@ -112,9 +112,9 @@ export default function FormMate() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-screen bg-background pb-8 md:pb-10">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-4">
+      <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-4 md:hidden">
         <div className="flex items-center justify-between">
           <button
             onClick={handleBack}
@@ -127,9 +127,27 @@ export default function FormMate() {
         </div>
       </header>
 
-      <main className="px-4 py-4 space-y-4">
+      <section className="hidden md:block border-b border-border/60 bg-[linear-gradient(135deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.5)_48%,hsl(var(--primary)/0.1)_100%)]">
+        <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
+          <div className="flex items-end justify-between gap-8">
+            <div className="max-w-3xl">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                <Copy className="h-3.5 w-3.5" />
+                Form Filling Helper
+              </div>
+              <h1 className="font-display text-3xl font-bold tracking-tight text-foreground lg:text-4xl">Application Guide</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground lg:text-base">
+                Keep your important profile details ready to copy in a structured desktop workspace built for faster government application filling.
+              </p>
+            </div>
+            <Button variant="outline" onClick={handleEditClick} className="rounded-xl">Edit Profile Details</Button>
+          </div>
+        </div>
+      </section>
+
+      <main className="px-4 py-4 space-y-4 md:mx-auto md:grid md:max-w-6xl md:grid-cols-2 md:gap-6 md:space-y-0 md:px-6 lg:px-8">
         {/* Intro Card */}
-        <Card className="border-0 shadow-card bg-primary/10 dark:bg-card">
+        <Card className="border-0 shadow-card bg-primary/10 dark:bg-card md:col-span-2">
           <CardContent className="p-4">
             <p className="text-sm text-primary dark:text-foreground">
               No more searching documents or memorizing details — just tap copy and paste in the form.
@@ -255,7 +273,7 @@ export default function FormMate() {
         {/* Edit Profile Link */}
         <Button
           variant="outline"
-          className="w-full"
+          className="w-full md:col-span-2"
           onClick={handleEditClick}
         >
           Edit Profile Details

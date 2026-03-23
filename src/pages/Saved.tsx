@@ -22,8 +22,8 @@ export default function Saved() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-3 sm:py-4">
+    <div className="min-h-screen bg-background pb-20 md:pb-10">
+      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-3 sm:py-4 md:hidden">
         <div className="flex items-center gap-3">
           <button 
             onClick={handleBack}
@@ -35,7 +35,29 @@ export default function Saved() {
         </div>
       </header>
 
-      <main className="px-4 py-4">
+      <section className="hidden md:block border-b border-border/60 bg-[linear-gradient(135deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.45)_48%,hsl(var(--primary)/0.12)_100%)]">
+        <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
+          <div className="flex items-end justify-between gap-8">
+            <div className="max-w-3xl">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                <Bookmark className="h-3.5 w-3.5" />
+                Personal Shortlist
+              </div>
+              <h1 className="font-display text-3xl font-bold tracking-tight text-foreground lg:text-4xl">Saved Jobs</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground lg:text-base">
+                Keep your shortlisted government jobs in one focused desktop workspace and return to them whenever you are ready to apply.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border/70 bg-card/85 p-5 shadow-sm backdrop-blur-sm min-w-[220px]">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Saved Count</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{savedJobs?.length || 0}</p>
+              <p className="mt-1 text-sm text-muted-foreground">jobs bookmarked for later</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main className="px-4 py-4 md:mx-auto md:max-w-6xl md:px-6 lg:px-8">
         {!user ? (
           <div className="text-center py-12">
             <div className="mx-auto h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-secondary flex items-center justify-center mb-4">

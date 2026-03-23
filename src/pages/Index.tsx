@@ -26,6 +26,7 @@ const colorVariants = ["pink", "blue", "green", "orange"] as const;
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, isGuestMode } = useAuth();
+  const [personalizedSectionsReady, setPersonalizedSectionsReady] = useState(false);
 
   useEffect(() => {
     // Allow access if user is logged in OR is in guest mode
@@ -33,6 +34,29 @@ const Index = () => {
       navigate("/welcome", { replace: true });
     }
   }, [user, authLoading, isGuestMode, navigate]);
+
+  useEffect(() => {
+    let timeoutId: number | undefined;
+    let idleId: number | undefined;
+
+    const enablePersonalizedSections = () => setPersonalizedSectionsReady(true);
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(enablePersonalizedSections, { timeout: 400 });
+    } else {
+      timeoutId = window.setTimeout(enablePersonalizedSections, 250);
+    }
+
+    return () => {
+      if (idleId !== undefined && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [activeExamIndex, setActiveExamIndex] = useState(0);
   const [activeForYouIndex, setActiveForYouIndex] = useState(0);
@@ -60,8 +84,8 @@ const Index = () => {
   const { data: jobs, isLoading, error } = useJobs();
   const { userExams } = useExams();
   const { profile, isLoading: profileLoading } = useProfile();
-  const { recommended: hybridRecommended, examMatched, hasTrackedExams } = useRecommendations(10);
-  const { forYouJobs, hasWizardAnswers } = useForYouJobs(5);
+  const { recommended: hybridRecommended, examMatched, hasTrackedExams } = useRecommendations(10, personalizedSectionsReady);
+  const { forYouJobs, hasWizardAnswers } = useForYouJobs(5, personalizedSectionsReady);
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
@@ -82,7 +106,7 @@ const Index = () => {
 
   // Similar jobs based on top recommendation or newest job
   const seedJobId = recommendedJobs[0]?.id || newJobs[0]?.id;
-  const { data: similarJobs = [] } = useSimilarJobs(seedJobId, 5);
+  const { data: similarJobs = [] } = useSimilarJobs(seedJobId, 5, personalizedSectionsReady);
 
   // Jobs matching user's tracked exams
   const examMatchedJobs = useMemo(() => {

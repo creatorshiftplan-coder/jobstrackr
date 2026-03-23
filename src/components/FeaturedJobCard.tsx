@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { MapPin, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
@@ -20,22 +21,23 @@ const isTBDDateDisplay = (displayValue: string | null): boolean => {
   return tbdPatterns.some(pattern => lowerValue.includes(pattern));
 };
 
-export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
+export const FeaturedJobCard = memo(function FeaturedJobCard({ job }: FeaturedJobCardProps) {
   const { getLogoByName } = useConductingBodyLogos();
   const logoUrl = getLogoByName(job.department);
 
-  const daysLeft = differenceInDays(new Date(job.last_date), new Date());
-  const isUrgent = daysLeft <= 7 && daysLeft >= 0;
-  const isExpired = daysLeft < 0;
-  const isTBDDate = isTBDDateDisplay(job.last_date_display);
-
-  const formatLastDate = () => {
-    if (isTBDDate) return 'Date TBD';
-    if (isExpired) return 'Expired';
-    if (daysLeft === 0) return 'Last day!';
-    if (daysLeft <= 7) return `${daysLeft} days left`;
-    return format(new Date(job.last_date), "dd MMM yyyy");
-  };
+  const { daysLeft, isUrgent, isExpired, isTBDDate, lastDateText } = useMemo(() => {
+    const dl = differenceInDays(new Date(job.last_date), new Date());
+    const urgent = dl <= 7 && dl >= 0;
+    const expired = dl < 0;
+    const tbd = isTBDDateDisplay(job.last_date_display);
+    let text: string;
+    if (tbd) text = 'Date TBD';
+    else if (expired) text = 'Expired';
+    else if (dl === 0) text = 'Last day!';
+    else if (dl <= 7) text = `${dl} days left`;
+    else text = format(new Date(job.last_date), "dd MMM yyyy");
+    return { daysLeft: dl, isUrgent: urgent, isExpired: expired, isTBDDate: tbd, lastDateText: text };
+  }, [job.last_date, job.last_date_display]);
 
   return (
     <Link to={`/jobs/${job.slug || job.id}`} className="block">
@@ -83,7 +85,7 @@ export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
             <div className={`flex items-center gap-1 text-xs sm:text-sm font-semibold ${isUrgent && !isExpired ? 'text-yellow-200' : isExpired ? 'text-primary-foreground/60' : 'text-primary-foreground'}`}>
               <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               <span className="truncate max-w-[100px] sm:max-w-[120px]">
-                {formatLastDate()}
+                {lastDateText}
               </span>
             </div>
             <div className="flex items-center gap-1 text-xs sm:text-sm text-primary-foreground/80">
@@ -95,4 +97,4 @@ export function FeaturedJobCard({ job }: FeaturedJobCardProps) {
       </div>
     </Link>
   );
-}
+});

@@ -21,7 +21,7 @@ interface SimilarJob {
  *
  * Only returns results if the given job has an embedding.
  */
-export function useSimilarJobs(jobId: string | undefined, limit: number = 5) {
+export function useSimilarJobs(jobId: string | undefined, limit: number = 5, enabled: boolean = true) {
   return useQuery({
     queryKey: ["similar-jobs", jobId, limit],
     queryFn: async (): Promise<SimilarJob[]> => {
@@ -40,7 +40,7 @@ export function useSimilarJobs(jobId: string | undefined, limit: number = 5) {
 
       return (data || []) as SimilarJob[];
     },
-    enabled: !!jobId,
+    enabled: enabled && !!jobId,
     staleTime: 1000 * 60 * 30, // Cache for 30 minutes
     retry: false, // Don't retry on failure — embedding may not exist
   });

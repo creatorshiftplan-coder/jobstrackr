@@ -10,11 +10,18 @@ const navItems = [
   { icon: User, label: "Profile", path: "/profile", color: "#b145e9" },
 ];
 
+const visiblePaths = new Set(navItems.map((item) => item.path));
+
 export function BottomNav() {
   const location = useLocation();
+  const normalizedPath = location.pathname.replace(/\/$/, "") || "/";
+
+  if (!visiblePaths.has(normalizedPath)) {
+    return null;
+  }
 
   const activeIndex = navItems.findIndex(
-    (item) => item.path === location.pathname
+    (item) => item.path === normalizedPath
   );
 
   return (

@@ -289,9 +289,9 @@ export default function SyllabusCheck() {
     // ─── Render ────────────────────────────────────────────────────────
 
     return (
-        <div className="min-h-screen bg-background pb-20">
+        <div className="min-h-screen bg-background pb-20 md:pb-10">
             {/* Header */}
-            <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-2">
+            <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-2 md:hidden">
                 <div className="flex items-center justify-between">
                     <button
                         onClick={handleBack}
@@ -311,9 +311,31 @@ export default function SyllabusCheck() {
                 </div>
             </header>
 
+            <section className="hidden md:block border-b border-border/60 bg-[linear-gradient(135deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.48)_46%,hsl(var(--primary)/0.12)_100%)]">
+                <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
+                    <div className="flex items-end justify-between gap-8">
+                        <div className="max-w-3xl">
+                            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                                <BookOpen className="h-3.5 w-3.5" />
+                                Smart Syllabus Lookup
+                            </div>
+                            <h1 className="font-display text-3xl font-bold tracking-tight text-foreground lg:text-4xl">Syllabus Finder</h1>
+                            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground lg:text-base">
+                                Search official exam syllabi, reuse saved results, and review cached sources from a cleaner desktop research view.
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-border/70 bg-card/85 p-5 shadow-sm backdrop-blur-sm min-w-[240px]">
+                            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">AI Searches Left</p>
+                            <p className="mt-2 text-3xl font-bold text-foreground">{remainingSearches}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">out of {DAILY_AI_LIMIT} today</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* Search Bar */}
-            <div className="sticky top-[48px] z-30 bg-background dark:bg-card px-4 py-3 border-b border-border">
-                <div className="flex items-center gap-3">
+            <div className="sticky top-[48px] z-30 bg-background dark:bg-card px-4 py-3 border-b border-border md:top-16">
+                <div className="mx-auto flex items-center gap-3 md:max-w-6xl md:px-2">
                     <div className="flex-1 flex items-center gap-2 bg-secondary dark:bg-secondary/50 border border-border rounded-xl h-11 px-3">
                         <Search className="h-4 w-4 text-muted-foreground shrink-0" />
                         <input
@@ -364,7 +386,7 @@ export default function SyllabusCheck() {
             </div>
 
             {/* Remaining AI searches indicator */}
-            <div className="px-4 pt-2">
+            <div className="px-4 pt-2 md:mx-auto md:max-w-6xl md:px-6 lg:px-8">
                 <p className={`text-xs ${remainingSearches === 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                     {remainingSearches === 0
                         ? "⚠️ Daily AI search limit reached. Cached exams are still available."
@@ -373,7 +395,7 @@ export default function SyllabusCheck() {
                 </p>
             </div>
 
-            <main className="px-4 py-4">
+            <main className="px-4 py-4 md:mx-auto md:max-w-6xl md:px-6 lg:px-8">
                 {/* Loading State */}
                 {searching && (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import { Building2 } from "lucide-react";
 
 /**
@@ -39,7 +39,7 @@ interface OrganizationLogoProps {
   renderHeight?: number;
 }
 
-export function OrganizationLogo({
+export const OrganizationLogo = memo(function OrganizationLogo({
   logoUrl,
   name,
   containerClassName,
@@ -76,4 +76,4 @@ export function OrganizationLogo({
       )}
     </div>
   );
-}
+});

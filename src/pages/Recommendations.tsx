@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import logoColor from "@/assets/logo-color.png";
 import logoWhite from "@/assets/logo-white.png";
 import { ArrowLeft, Loader2, Target, User, Check, AlertTriangle, ChevronDown, ChevronUp, Calendar, GraduationCap, Briefcase, IndianRupee, MapPin, Award, SkipForward, FlaskConical, Settings, Wrench, Globe, X } from "lucide-react";
@@ -183,10 +183,15 @@ function parseSalaryRange(val: string): [number | null, number | null] {
 }
 
 const LOCALSTORAGE_KEY = "jfy_preferences";
+const COMPLETION_KEY = "jfy_preferences_completed";
 const AGE_RANGE_VALUES = new Set(["18-20", "21-25", "26-30", "31-35", "36-40", "40+"]);
 
 function getStorageKey(userId: string) {
   return `${LOCALSTORAGE_KEY}:${userId}`;
+}
+
+function getCompletionKey(userId: string) {
+  return `${COMPLETION_KEY}:${userId}`;
 }
 
 function readStoredAnswers(userId: string | null | undefined): Record<string, string | string[]> {
@@ -212,6 +217,17 @@ function hasStoredAnswers(userId: string | null | undefined): boolean {
   }
 }
 
+function hasCompletedPreferences(userId: string | null | undefined): boolean {
+  if (!userId) return false;
+
+  try {
+    return localStorage.getItem(getCompletionKey(userId)) === "true";
+  } catch (error) {
+    console.warn("Failed to check Jobs For You completion flag:", error);
+    return false;
+  }
+}
+
 function persistAnswers(userId: string | null | undefined, answers: Record<string, string | string[]>) {
   if (!userId) return;
 
@@ -219,6 +235,16 @@ function persistAnswers(userId: string | null | undefined, answers: Record<strin
     localStorage.setItem(getStorageKey(userId), JSON.stringify(answers));
   } catch (error) {
     console.warn("Failed to save Jobs For You preferences:", error);
+  }
+}
+
+function markPreferencesCompleted(userId: string | null | undefined) {
+  if (!userId) return;
+
+  try {
+    localStorage.setItem(getCompletionKey(userId), "true");
+  } catch (error) {
+    console.warn("Failed to save Jobs For You completion flag:", error);
   }
 }
 
@@ -270,6 +296,7 @@ function getVisibleSteps(
 // ── Main Component ──────────────────────────────────────────────────────
 
 export default function Recommendations() {
+  const navigate = useNavigate();
   const handleBack = useSmartBack("/");
   const { user, loading: authLoading } = useAuth();
   const { profile, isLoading: profileLoading, upsertProfile } = useProfile();
@@ -315,8 +342,10 @@ export default function Recommendations() {
     }
 
     const storedAnswers = readStoredAnswers(user.id);
+    const hasSavedPreferences = hasCompletedPreferences(user.id) || hasStoredAnswers(user.id);
+
     setAnswers(storedAnswers);
-    setWizardComplete(hasStoredAnswers(user.id));
+    setWizardComplete(hasSavedPreferences);
     setPreferencesHydrated(true);
   }, [authLoading, user?.id]);
 
@@ -353,6 +382,7 @@ export default function Recommendations() {
     try {
       if (!user) return;
       persistAnswers(user.id, answers);
+      markPreferencesCompleted(user.id);
 
       const updates: Partial<Profile> = {};
       const normalizedDob = normalizeDobAnswer(answers.dob);
@@ -386,6 +416,7 @@ export default function Recommendations() {
 
     // Persist to localStorage so wizard won't show again
     persistAnswers(user?.id, answers);
+    markPreferencesCompleted(user?.id);
 
     // Save to DB in background
     try {
@@ -1044,10 +1075,10 @@ export default function Recommendations() {
 
   // ── Results Mode ──────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 md:pb-10">
 
       {/* ── Compact sticky nav header ── */}
-      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border/50 px-4 py-2.5">
+      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border/50 px-4 py-2.5 md:hidden">
         <div className="flex items-center justify-between">
           <button onClick={handleBack} className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
             <ArrowLeft className="h-4 w-4 text-foreground" />
@@ -1058,16 +1089,57 @@ export default function Recommendations() {
             <span className="font-display font-bold text-sm text-foreground">JobsTrackr</span>
           </div>
           <button
-            onClick={() => { setWizardComplete(false); setCurrentStepIndex(0); setEditMode(true); }}
+            onClick={() => navigate("/edit-sector-preferences")}
             className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
-            title="Edit Filters"
+            title="Open Settings"
           >
             <Settings className="h-4 w-4 text-primary" />
           </button>
         </div>
       </header>
 
-      <main className="px-4 py-4 space-y-4">
+      <section className="hidden md:block border-b border-border/60 bg-[linear-gradient(135deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.52)_48%,hsl(var(--primary)/0.12)_100%)]">
+        <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
+          <div className="flex items-end justify-between gap-8">
+            <div className="max-w-3xl">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                <Target className="h-3.5 w-3.5" />
+                Personalized Matching Engine
+              </div>
+              <h1 className="font-display text-3xl font-bold tracking-tight text-foreground lg:text-4xl">Jobs For You</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground lg:text-base">
+                View government jobs matched to your profile, education, and preferences in a more refined desktop recommendation workspace.
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-4">
+              <Button
+                variant="outline"
+                onClick={() => navigate("/edit-sector-preferences")}
+                className="rounded-xl border-border/70 bg-card/80 px-4 py-2.5 shadow-sm backdrop-blur-sm"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </Button>
+              <div className="grid min-w-[340px] grid-cols-3 gap-4">
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Can Apply</p>
+                <p className="mt-2 text-3xl font-bold text-emerald-700 dark:text-emerald-300">{canApplyJobs.length}</p>
+              </div>
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">Skills Gap</p>
+                <p className="mt-2 text-3xl font-bold text-amber-700 dark:text-amber-300">{skillsNeededJobs.length}</p>
+              </div>
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-red-700 dark:text-red-300">Not Eligible</p>
+                <p className="mt-2 text-3xl font-bold text-red-700 dark:text-red-300">{notEligibleJobs.length}</p>
+              </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main className="px-4 py-4 space-y-4 md:mx-auto md:max-w-6xl md:px-6 lg:px-8">
 
         {/* ── Hero banner ── */}
         <div className="rounded-2xl bg-gradient-to-r from-primary to-info text-white relative overflow-hidden p-5 shadow-lg">
@@ -1259,9 +1331,9 @@ export default function Recommendations() {
             </div>
             <h3 className="font-display font-semibold text-lg text-foreground mb-2">No matching jobs yet</h3>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">Try widening your filters — add more locations or adjust your qualification level</p>
-            <Button variant="outline" onClick={() => { setWizardComplete(false); setCurrentStepIndex(0); setEditMode(true); }}>
+            <Button variant="outline" onClick={() => navigate("/edit-sector-preferences")}>
               <Settings className="h-4 w-4 mr-2" />
-              Adjust Filters
+              Open Settings
             </Button>
           </div>
         )}

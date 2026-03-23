@@ -116,9 +116,9 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 md:pb-10">
       {/* Header */}
-      <div className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 pb-12">
+      <div className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-950/50 dark:to-sky-900/30 pb-12 md:hidden">
         <header className="sticky top-0 z-40">
           <div className="flex items-center gap-3 px-4 h-14">
             <Link to="/more">
@@ -161,7 +161,70 @@ export default function Profile() {
         </div>
       </div>
 
-      <main className="px-4 py-6 space-y-6 mt-2">
+      <section className="hidden md:block border-b border-border/60 bg-[linear-gradient(135deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.52)_46%,hsl(var(--primary)/0.1)_100%)]">
+        <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
+          <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+            <div className="rounded-[28px] border border-border/70 bg-card/85 p-6 shadow-sm backdrop-blur-sm">
+              <div className="flex items-start justify-between gap-6">
+                <div className="flex items-center gap-5">
+                  <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 ring-4 ring-background">
+                    {profile?.photo_url ? (
+                      <img src={profile.photo_url} alt={userName} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-3xl font-bold">{userInitials}</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                      <User className="h-3.5 w-3.5" />
+                      Candidate Profile
+                    </div>
+                    <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">{userName}</h1>
+                    <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                      Your personal details, education, and exam activity are organized here in a cleaner desktop workspace aligned with the rest of the app.
+                    </p>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-border bg-background/80 px-3 py-1 text-sm text-muted-foreground">
+                        {highestEducation ? getQualificationLabel(highestEducation.qualification_type) : "Add Education"}
+                      </span>
+                      <span className="rounded-full border border-border bg-background/80 px-3 py-1 text-sm text-muted-foreground">
+                        {profile?.current_status || "Job Seeker"}
+                      </span>
+                      <span className="rounded-full border border-border bg-background/80 px-3 py-1 text-sm text-muted-foreground">
+                        {profile?.category || "General"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <Link to="/edit-profile" className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-transform hover:-translate-y-0.5 hover:bg-primary/90">
+                  <Edit2 className="h-4 w-4" />
+                  Edit Profile
+                </Link>
+              </div>
+              <div className="mt-6">
+                <EmbeddedProfileProgress profile={profile} education={education} />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+              <div className="rounded-2xl border border-border/70 bg-card/85 p-5 shadow-sm backdrop-blur-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Saved Exams</p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{savedExamsCount}</p>
+              </div>
+              <div className="rounded-2xl border border-border/70 bg-card/85 p-5 shadow-sm backdrop-blur-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Admit Cards Released</p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{admitCardAwaitedCount}</p>
+              </div>
+              <div className="rounded-2xl border border-border/70 bg-card/85 p-5 shadow-sm backdrop-blur-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Results Released</p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{resultCount}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main className="px-4 py-6 space-y-6 mt-2 md:mx-auto md:max-w-6xl md:px-6 lg:px-8">
 
         {/* Stats Row */}
         <Card className="bg-white dark:bg-card border-border/50 shadow-md">

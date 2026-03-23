@@ -3,6 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
+interface UseProfileOptions {
+  enabled?: boolean;
+}
+
 export interface Profile {
   id: string;
   user_id: string;
@@ -43,7 +47,8 @@ export interface Profile {
   decrypted_passport_number?: string | null;
 }
 
-export function useProfile() {
+export function useProfile(options: UseProfileOptions = {}) {
+  const { enabled = true } = options;
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -61,7 +66,7 @@ export function useProfile() {
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
   });
 
   const upsertProfile = useMutation({

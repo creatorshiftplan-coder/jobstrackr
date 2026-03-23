@@ -63,8 +63,8 @@ export default function EditSectorPreferences() {
     }
 
     return (
-        <div className="min-h-screen bg-background pb-24">
-            <header className="sticky top-0 z-40 bg-card border-b border-border px-4 py-3">
+        <div className="min-h-screen bg-background pb-24 md:pb-10">
+            <header className="sticky top-0 z-40 bg-card border-b border-border px-4 py-3 md:hidden">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={handleBack}
@@ -76,7 +76,29 @@ export default function EditSectorPreferences() {
                 </div>
             </header>
 
-            <main className="px-4 py-6 space-y-6">
+            <section className="hidden md:block border-b border-border/60 bg-[linear-gradient(135deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.46)_48%,hsl(var(--primary)/0.1)_100%)]">
+                <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
+                    <div className="flex items-end justify-between gap-8">
+                        <div className="max-w-3xl">
+                            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                                <Sparkles className="h-3.5 w-3.5" />
+                                Recommendation Tuning
+                            </div>
+                            <h1 className="font-display text-3xl font-bold tracking-tight text-foreground lg:text-4xl">Sector Preferences</h1>
+                            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground lg:text-base">
+                                Fine-tune which government job sectors should be prioritized across your recommendations and discovery experience.
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-border/70 bg-card/85 p-5 shadow-sm backdrop-blur-sm min-w-[240px]">
+                            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Selected Sectors</p>
+                            <p className="mt-2 text-3xl font-bold text-foreground">{selectedSectors.length}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">preferences currently active</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <main className="px-4 py-6 space-y-6 md:mx-auto md:max-w-6xl md:px-6 lg:px-8">
                 <Card className="border-0 shadow-md">
                     <CardHeader className="pb-2">
                         <div className="flex items-center gap-2">

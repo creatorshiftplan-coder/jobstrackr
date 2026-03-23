@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { Job } from "@/types/job";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,103 +15,112 @@ interface JobCardProps {
   job: Job;
 }
 
-export function JobCard({ job }: JobCardProps) {
+const formatAgeValue = (value: number) => {
+  return Number.isInteger(value) ? `${value}` : `${value}`.replace(/\.0+$/, "");
+};
+
+const extractAgeRangeFromText = (text: string): { min: number | null; max: number | null } => {
+  const normalized = text.toLowerCase();
+
+  const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)/i);
+  if (rangeMatch) {
+    return {
+      min: Number.parseFloat(rangeMatch[1]),
+      max: Number.parseFloat(rangeMatch[2]),
+    };
+  }
+
+  const upperMatch = normalized.match(/(?:upto|up to|maximum|max|not more than)\s*(\d+(?:\.\d+)?)/i);
+  if (upperMatch) {
+    return { min: null, max: Number.parseFloat(upperMatch[1]) };
+  }
+
+  const lowerMatch = normalized.match(/(?:from|min(?:imum)?|at least|above)\s*(\d+(?:\.\d+)?)/i);
+  if (lowerMatch) {
+    return { min: Number.parseFloat(lowerMatch[1]), max: null };
+  }
+
+  return { min: null, max: null };
+};
+
+const formatSalaryValue = (v: number) => {
+  if (v >= 100000) return `₹${(v / 100000).toFixed(v % 100000 === 0 ? 0 : 1)}L`;
+  if (v >= 1000) return `₹${(v / 1000).toFixed(0)}k`;
+  return `₹${v}`;
+};
+
+export const JobCard = memo(function JobCard({ job }: JobCardProps) {
   const { getLogoByName } = useConductingBodyLogos();
   const logoUrl = getLogoByName(job.department);
 
-  const deadlineDate = parseJobDeadline(job.last_date);
-  const daysLeft = deadlineDate ? differenceInDays(deadlineDate, new Date()) : Number.POSITIVE_INFINITY;
-  const isUrgent = daysLeft <= 7 && daysLeft >= 0;
-  const isExpired = daysLeft < 0;
-  const isTBDDate = isTBDDateDisplay(job.last_date_display);
+  const computed = useMemo(() => {
+    const deadlineDate = parseJobDeadline(job.last_date);
+    const daysLeft = deadlineDate ? differenceInDays(deadlineDate, new Date()) : Number.POSITIVE_INFINITY;
+    const isUrgent = daysLeft <= 7 && daysLeft >= 0;
+    const isExpired = daysLeft < 0;
+    const isTBDDate = isTBDDateDisplay(job.last_date_display);
+    const category = inferCategory(job.department, job.title);
+    const shortQualification = shortenQualification(job.qualification);
+    const meta = job.job_metadata;
 
-  const category = inferCategory(job.department, job.title);
-  const shortQualification = shortenQualification(job.qualification);
+    const rawAgeMin = typeof job.age_min === "number" ? job.age_min : null;
+    const rawAgeMax = typeof job.age_max === "number" ? job.age_max : null;
+    const textAge = meta?.age_limit_text ? extractAgeRangeFromText(meta.age_limit_text) : { min: null, max: null };
+    const hasSuspiciousLowAge = [rawAgeMin, rawAgeMax].some((age) => typeof age === "number" && age > 0 && age < 14);
+    const effectiveAgeMin = hasSuspiciousLowAge && textAge.min !== null ? textAge.min : rawAgeMin;
+    const effectiveAgeMax = hasSuspiciousLowAge && textAge.max !== null ? textAge.max : rawAgeMax;
+    const showLowAgeFlag = [effectiveAgeMin, effectiveAgeMax].some((age) => typeof age === "number" && age > 0 && age < 14);
 
-  const meta = job.job_metadata;
-
-  const formatAgeValue = (value: number) => {
-    return Number.isInteger(value) ? `${value}` : `${value}`.replace(/\.0+$/, "");
-  };
-
-  const extractAgeRangeFromText = (text: string): { min: number | null; max: number | null } => {
-    const normalized = text.toLowerCase();
-
-    const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)/i);
-    if (rangeMatch) {
-      return {
-        min: Number.parseFloat(rangeMatch[1]),
-        max: Number.parseFloat(rangeMatch[2]),
-      };
+    // Salary display
+    let salaryDisplay: string;
+    if (!job.salary_min && !job.salary_max) {
+      salaryDisplay = meta?.salary_text || "Not disclosed";
+    } else if (meta?.salary_text && ((job.salary_min && job.salary_min < 100) || (job.salary_max && job.salary_max < 100))) {
+      salaryDisplay = meta.salary_text;
+    } else if (job.salary_min && job.salary_max) {
+      salaryDisplay = job.salary_min === job.salary_max ? formatSalaryValue(job.salary_min) : `${formatSalaryValue(job.salary_min)} - ${formatSalaryValue(job.salary_max)}`;
+    } else if (job.salary_min) {
+      salaryDisplay = `${formatSalaryValue(job.salary_min)}+`;
+    } else {
+      salaryDisplay = `Up to ${formatSalaryValue(job.salary_max!)}`;
     }
 
-    const upperMatch = normalized.match(/(?:upto|up to|maximum|max|not more than)\s*(\d+(?:\.\d+)?)/i);
-    if (upperMatch) {
-      return { min: null, max: Number.parseFloat(upperMatch[1]) };
-    }
-
-    const lowerMatch = normalized.match(/(?:from|min(?:imum)?|at least|above)\s*(\d+(?:\.\d+)?)/i);
-    if (lowerMatch) {
-      return { min: Number.parseFloat(lowerMatch[1]), max: null };
-    }
-
-    return { min: null, max: null };
-  };
-
-  const rawAgeMin = typeof job.age_min === "number" ? job.age_min : null;
-  const rawAgeMax = typeof job.age_max === "number" ? job.age_max : null;
-  const textAge = job.job_metadata?.age_limit_text ? extractAgeRangeFromText(job.job_metadata.age_limit_text) : { min: null, max: null };
-  const hasSuspiciousLowAge = [rawAgeMin, rawAgeMax].some((age) => typeof age === "number" && age > 0 && age < 14);
-
-  // If parsed DB ages look implausibly low, prefer ages recovered from the raw age text when available.
-  const effectiveAgeMin = hasSuspiciousLowAge && textAge.min !== null ? textAge.min : rawAgeMin;
-  const effectiveAgeMax = hasSuspiciousLowAge && textAge.max !== null ? textAge.max : rawAgeMax;
-  const showLowAgeFlag = [effectiveAgeMin, effectiveAgeMax].some((age) => typeof age === "number" && age > 0 && age < 14);
-
-  const formatSalary = (min: number | null, max: number | null) => {
-    if (!min && !max) {
-      if (meta?.salary_text) return meta.salary_text;
-      return "Not disclosed";
-    }
-    // If values look suspiciously low (e.g. 3 instead of 3,00,000), prefer salary_text
-    if (meta?.salary_text && ((min && min < 100) || (max && max < 100))) {
-      return meta.salary_text;
-    }
-    const fmt = (v: number) => {
-      if (v >= 100000) return `₹${(v / 100000).toFixed(v % 100000 === 0 ? 0 : 1)}L`;
-      if (v >= 1000) return `₹${(v / 1000).toFixed(0)}k`;
-      return `₹${v}`;
-    };
-    if (min && max) {
-      if (min === max) return fmt(min);
-      return `${fmt(min)} - ${fmt(max)}`;
-    }
-    if (min) return `${fmt(min)}+`;
-    return `Up to ${fmt(max!)}`;
-  };
-
-  const getAgeDisplay = () => {
+    // Age display
+    let ageDisplay: string;
     if (effectiveAgeMin !== null && effectiveAgeMax !== null) {
       if (effectiveAgeMin === effectiveAgeMax) {
-        const text = job.job_metadata?.age_limit_text?.toLowerCase() || '';
+        const text = meta?.age_limit_text?.toLowerCase() || '';
         if (text.includes('max') || text.includes('upper') || text.includes('upto') || text.includes('up to')) {
-          return `Upto ${formatAgeValue(effectiveAgeMax)} yrs`;
+          ageDisplay = `Upto ${formatAgeValue(effectiveAgeMax)} yrs`;
+        } else if (text.includes('min') || text.includes('lower') || text.includes('from') || text.includes('min.')) {
+          ageDisplay = `From ${formatAgeValue(effectiveAgeMin)} yrs`;
+        } else {
+          ageDisplay = `${formatAgeValue(effectiveAgeMin)} yrs`;
         }
-        if (text.includes('min') || text.includes('lower') || text.includes('from') || text.includes('min.')) {
-          return `From ${formatAgeValue(effectiveAgeMin)} yrs`;
-        }
-        return `${formatAgeValue(effectiveAgeMin)} yrs`;
+      } else {
+        ageDisplay = `${formatAgeValue(effectiveAgeMin)} - ${formatAgeValue(effectiveAgeMax)} yrs`;
       }
-      return `${formatAgeValue(effectiveAgeMin)} - ${formatAgeValue(effectiveAgeMax)} yrs`;
+    } else if (meta?.age_limit_text) {
+      ageDisplay = meta.age_limit_text.length > 25 ? meta.age_limit_text.substring(0, 25) + '...' : meta.age_limit_text;
+    } else if (effectiveAgeMin !== null) {
+      ageDisplay = `From ${formatAgeValue(effectiveAgeMin)} yrs`;
+    } else if (effectiveAgeMax !== null) {
+      ageDisplay = `Upto ${formatAgeValue(effectiveAgeMax)} yrs`;
+    } else {
+      ageDisplay = "Not Specified";
     }
-    if (job.job_metadata?.age_limit_text) {
-      return job.job_metadata.age_limit_text.length > 25 
-        ? job.job_metadata.age_limit_text.substring(0, 25) + '...' 
-        : job.job_metadata.age_limit_text;
-    }
-    if (effectiveAgeMin !== null) return `From ${formatAgeValue(effectiveAgeMin)} yrs`;
-    if (effectiveAgeMax !== null) return `Upto ${formatAgeValue(effectiveAgeMax)} yrs`;
-    return "Not Specified";
+
+    // Date display
+    const dateDisplay = job.last_date_display || (deadlineDate ? format(deadlineDate, "dd MMM yyyy") : "TBD");
+    const location = getBestJobLocation(job);
+
+    return { deadlineDate, daysLeft, isUrgent, isExpired, isTBDDate, category, shortQualification, meta, showLowAgeFlag, salaryDisplay, ageDisplay, dateDisplay, location };
+  }, [job]);
+
+  const { deadlineDate, daysLeft, isUrgent, isExpired, isTBDDate, category, shortQualification, meta, showLowAgeFlag, salaryDisplay, ageDisplay, dateDisplay, location } = computed;
+
+  const getAgeDisplay = () => {
+    return ageDisplay;
   };
 
   return (
@@ -190,13 +200,13 @@ export function JobCard({ job }: JobCardProps) {
               <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <MapPin className="h-3.5 w-3.5 text-primary" />
               </div>
-              <span className="truncate">{getBestJobLocation(job)}</span>
+              <span className="truncate">{location}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="h-7 w-7 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
                 <IndianRupee className="h-3.5 w-3.5 text-success" />
               </div>
-              <span className="truncate">{formatSalary(job.salary_min, job.salary_max)}</span>
+              <span className="truncate">{salaryDisplay}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="h-7 w-7 rounded-lg bg-warning/10 flex items-center justify-center flex-shrink-0">
@@ -204,7 +214,7 @@ export function JobCard({ job }: JobCardProps) {
               </div>
               <span className="truncate text-red-500 dark:text-red-400 font-medium">
                 <span className="hidden sm:inline">Last date: </span>
-                {job.last_date_display || (deadlineDate ? format(deadlineDate, "dd MMM yyyy") : "TBD")}
+                {dateDisplay}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -218,8 +228,8 @@ export function JobCard({ job }: JobCardProps) {
           </div>
 
           <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-border/50">
-            <span className="text-xs text-muted-foreground font-medium" title={job.job_metadata?.age_limit_text || undefined}>
-              Age: {getAgeDisplay()}
+            <span className="text-xs text-muted-foreground font-medium" title={meta?.age_limit_text || undefined}>
+              Age: {ageDisplay}
             </span>
             <div className="flex items-center gap-2 flex-shrink-0">
               {showLowAgeFlag && (
@@ -236,4 +246,4 @@ export function JobCard({ job }: JobCardProps) {
       </Card>
     </Link>
   );
-}
+});

@@ -20,11 +20,11 @@ import { matchAndSort, MatchPreferences } from "@/lib/jobMatcher";
  * This is a simpler path than the full Recommendations wizard.
  * It uses profile data directly (no 8-step wizard answers needed).
  */
-export function useRecommendations(limit: number = 10) {
+export function useRecommendations(limit: number = 10, enabled: boolean = true) {
   const { user, isGuestMode } = useAuth();
-  const { data: jobs, isLoading: jobsLoading } = useJobs();
-  const { profile, isLoading: profileLoading } = useProfile();
-  const { userExams } = useExams();
+  const { data: jobs, isLoading: jobsLoading } = useJobs({ enabled });
+  const { profile, isLoading: profileLoading } = useProfile({ enabled });
+  const { userExams } = useExams({ enabled, includeExamCatalog: false });
 
   // Build lightweight preferences from profile data
   const preferences: MatchPreferences = useMemo(() => ({
@@ -44,7 +44,7 @@ export function useRecommendations(limit: number = 10) {
 
   // Run full pipeline
   const { recommended, examMatched } = useMemo(() => {
-    if (!jobs || jobs.length === 0) {
+    if (!enabled || !jobs || jobs.length === 0) {
       return { recommended: [] as HybridMatchedJob[], examMatched: [] as HybridMatchedJob[] };
     }
 
@@ -80,7 +80,7 @@ export function useRecommendations(limit: number = 10) {
       recommended: recommendedJobs,
       examMatched: examMatchedJobs,
     };
-  }, [jobs, preferences, profile?.preferred_sectors, userExams, limit]);
+  }, [enabled, jobs, preferences, profile?.preferred_sectors, userExams, limit]);
 
   return {
     /** Jobs matching user's tracked exams — highest priority */
@@ -88,9 +88,9 @@ export function useRecommendations(limit: number = 10) {
     /** Jobs recommended based on sectors, tags, recency — general recommendations */
     recommended,
     /** Whether data is still loading */
-    isLoading: jobsLoading || profileLoading,
+    isLoading: enabled && (jobsLoading || profileLoading),
     /** Whether user has tracked exams */
-    hasTrackedExams: userExams.length > 0,
+    hasTrackedExams: enabled && userExams.length > 0,
     /** Whether user has set sector preferences */
     hasSectorPreferences: (profile?.preferred_sectors?.length ?? 0) > 0,
   };

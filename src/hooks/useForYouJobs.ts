@@ -56,12 +56,12 @@ function readStoredAnswers(userId: string | null | undefined): Record<string, st
  * Reads wizard answers from localStorage and runs full matchAndSort + hybridRecommend.
  * Only returns results if the user has completed the wizard (has stored preferences).
  */
-export function useForYouJobs(limit: number = 5) {
+export function useForYouJobs(limit: number = 5, enabled: boolean = true) {
   const { user } = useAuth();
-  const { data: jobs, isLoading: jobsLoading } = useJobs();
-  const { profile, isLoading: profileLoading } = useProfile();
-  const { education, isLoading: educationLoading } = useEducation();
-  const { userExams } = useExams();
+  const { data: jobs, isLoading: jobsLoading } = useJobs({ enabled });
+  const { profile, isLoading: profileLoading } = useProfile({ enabled });
+  const { education, isLoading: educationLoading } = useEducation({ enabled });
+  const { userExams } = useExams({ enabled, includeExamCatalog: false });
 
   const answers = useMemo(() => readStoredAnswers(user?.id), [user?.id]);
   const hasWizardAnswers = Object.keys(answers).length > 0;
@@ -133,7 +133,7 @@ export function useForYouJobs(limit: number = 5) {
   }, [answers, profile, highestEducation, inferredStream]);
 
   const forYouJobs = useMemo((): Job[] => {
-    if (!hasWizardAnswers || !jobs || jobs.length === 0) return [];
+    if (!enabled || !hasWizardAnswers || !jobs || jobs.length === 0) return [];
 
     const matched = matchAndSort(jobs, preferences);
     const eligible = matched.filter((m) => m.eligibility.eligible && m.eligibility.skillsMissing.length === 0);
@@ -148,11 +148,11 @@ export function useForYouJobs(limit: number = 5) {
     );
 
     return hybrid.map((h) => h.job);
-  }, [hasWizardAnswers, jobs, preferences, answers.sectors, profile?.preferred_sectors, userExams, limit]);
+  }, [enabled, hasWizardAnswers, jobs, preferences, answers.sectors, profile?.preferred_sectors, userExams, limit]);
 
   return {
     forYouJobs,
     hasWizardAnswers,
-    isLoading: jobsLoading || profileLoading || educationLoading,
+    isLoading: enabled && (jobsLoading || profileLoading || educationLoading),
   };
 }

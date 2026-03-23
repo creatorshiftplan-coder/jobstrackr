@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useDeferredValue } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search as SearchIcon, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, GraduationCap, Check } from "lucide-react";
 import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import logoColor from "@/assets/logo-color.png";
 import logoWhite from "@/assets/logo-white.png";
 import { INDIAN_STATES, EXAM_SECTORS, EDUCATION_QUALIFICATIONS } from "@/constants/filters";
@@ -23,8 +23,8 @@ import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { inferCategory, isJobActive, matchesSectorPreference } from "@/lib/jobUtils";
 
 export default function Search() {
-  const navigate = useNavigate();
-  const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get("q") ?? "";
   const debouncedQuery = useDebouncedValue(query, 300);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
@@ -35,10 +35,23 @@ export default function Search() {
   const { user } = useAuth();
   const { showAuthRequired } = useAuthRequired();
 
+  const updateSearchQuery = (value: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+
+    if (value.trim()) {
+      nextParams.set("q", value);
+    } else {
+      nextParams.delete("q");
+      clearAIResults();
+    }
+
+    setSearchParams(nextParams, { replace: true });
+  };
+
   // Scroll detection for hiding/showing search bar
   const [isSearchBarVisible, setIsSearchBarVisible] = useState(true);
   const lastScrollY = useRef(0);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [visibleJobsCount, setVisibleJobsCount] = useState(20);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -119,6 +132,12 @@ export default function Search() {
     return filtered;
   }, [jobs, debouncedQuery, selectedLocations, selectedSectors, selectedQualifications]);
 
+  const deferredFilteredJobs = useDeferredValue(filteredJobs);
+
+  useEffect(() => {
+    setVisibleJobsCount(20);
+  }, [debouncedQuery, selectedLocations, selectedSectors, selectedQualifications]);
+
   const toggleLocation = (location: string) => {
     setSelectedLocations((prev) =>
       prev.includes(location) ? prev.filter((l) => l !== location) : [...prev, location]
@@ -154,13 +173,15 @@ export default function Search() {
   };
 
   const totalFilters = selectedLocations.length + selectedSectors.length + selectedQualifications.length;
+  const visibleJobs = deferredFilteredJobs.slice(0, visibleJobsCount);
+  const hasMoreJobs = deferredFilteredJobs.length > visibleJobs.length;
 
   // Show AI button when query has 3+ chars and no AI results yet
   const showAISearchButton = query.length >= 3 && !isSearching && searchStatus !== "not_found" && aiResults.length === 0;
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-primary dark:bg-card backdrop-blur-xl border-b border-primary-foreground/10 dark:border-border">
+    <div className="min-h-screen bg-background pb-20 md:pb-8">
+      <header className="sticky top-0 z-40 bg-primary dark:bg-card backdrop-blur-xl border-b border-primary-foreground/10 dark:border-border md:hidden">
         <div className="flex items-center gap-3 px-4 h-14">
           <Link to="/more">
             <div className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-primary-foreground/10 dark:hover:bg-secondary/80 transition-colors">
@@ -184,16 +205,13 @@ export default function Search() {
             <Input
               placeholder="Job title, department, location..."
               value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                if (!e.target.value) clearAIResults();
-              }}
+              onChange={(e) => updateSearchQuery(e.target.value)}
               className="pl-10 pr-9 bg-white/95 dark:bg-secondary/80 border border-white/30 dark:border-border text-foreground placeholder:text-muted-foreground rounded-xl h-11 focus:ring-2 focus:ring-white/50 dark:focus:ring-primary/50 transition-all shadow-sm"
             />
             {query && (
               <button
                 type="button"
-                onClick={() => { setQuery(""); clearAIResults(); }}
+                onClick={() => updateSearchQuery("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="h-4 w-4" />
@@ -348,7 +366,26 @@ export default function Search() {
         </SheetContent>
       </Sheet>
 
-      <main className="px-4 py-4">
+      <main className="px-4 py-4 md:mx-auto md:max-w-6xl md:px-6 md:py-6">
+        <div className="hidden md:flex md:items-center md:justify-between md:gap-6 md:pb-2">
+          <div>
+            <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Explore Jobs</h1>
+            <p className="text-sm text-muted-foreground">Search by title, department, location, and qualification.</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setIsFilterOpen(true)}
+            className="relative min-w-32 rounded-xl"
+          >
+            Filters
+            {totalFilters > 0 && (
+              <Badge className="ml-2 h-5 min-w-5 px-1.5 justify-center text-xs bg-primary text-primary-foreground rounded-full">
+                {totalFilters}
+              </Badge>
+            )}
+          </Button>
+        </div>
+
         {isLoading ? (
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
@@ -357,13 +394,25 @@ export default function Search() {
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground font-medium">{filteredJobs.length} results</p>
+            <p className="text-sm text-muted-foreground font-medium">{deferredFilteredJobs.length} results</p>
 
             <div className="flex flex-col gap-4">
-              {filteredJobs.map((job) => (
+              {visibleJobs.map((job) => (
                 <JobCard key={job.id} job={job} />
               ))}
             </div>
+
+            {hasMoreJobs && (
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setVisibleJobsCount((count) => count + 20)}
+                  className="min-w-40 rounded-xl"
+                >
+                  Load 20 more
+                </Button>
+              </div>
+            )}
 
             {/* Find more jobs with AI button - appears after search results */}
             {showAISearchButton && (

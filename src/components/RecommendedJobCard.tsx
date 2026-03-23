@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
 import { Users, Calendar, GraduationCap, Tag } from "lucide-react";
@@ -12,32 +13,40 @@ interface RecommendedJobCardProps {
   job: Job;
 }
 
-export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
+const formatVacancy = (vacancies: number | null, vacanciesDisplay: string | null) => {
+  if (vacanciesDisplay) return vacanciesDisplay;
+  if (vacancies) return `${vacancies} Vacancies`;
+  return "TBD";
+};
+
+export const RecommendedJobCard = memo(function RecommendedJobCard({ job }: RecommendedJobCardProps) {
   const { getLogoByName } = useConductingBodyLogos();
   const logoUrl = getLogoByName(job.department);
 
-  const deadlineDate = parseJobDeadline(job.last_date);
-  const daysLeft = deadlineDate ? differenceInDays(deadlineDate, new Date()) : null;
-  const isExpired = daysLeft !== null && daysLeft < 0;
-  const isTBDDate = isTBDDateDisplay(job.last_date_display);
+  const { isExpired, isTBDDate, category, shortQualification, lastDateText, vacancyText } = useMemo(() => {
+    const deadlineDate = parseJobDeadline(job.last_date);
+    const daysLeft = deadlineDate ? differenceInDays(deadlineDate, new Date()) : null;
+    const expired = daysLeft !== null && daysLeft < 0;
+    const tbd = isTBDDateDisplay(job.last_date_display);
+    const cat = inferCategory(job.department, job.title);
+    const shortQual = shortenQualification(job.qualification);
 
-  const category = inferCategory(job.department, job.title);
-  const shortQualification = shortenQualification(job.qualification);
+    let dateText: string;
+    if (tbd) dateText = 'TBD';
+    else if (expired) dateText = 'Expired';
+    else if (daysLeft === 0) dateText = 'Last day!';
+    else if (!deadlineDate) dateText = 'TBD';
+    else dateText = format(deadlineDate, "dd MMM yyyy");
 
-  const formatVacancy = (vacancies: number | null, vacanciesDisplay: string | null) => {
-    if (vacanciesDisplay) return vacanciesDisplay;
-    if (vacancies) return `${vacancies} Vacancies`;
-    return "TBD";
-  };
-
-  const formatLastDate = () => {
-    if (isTBDDate) return 'TBD';
-    if (isExpired) return 'Expired';
-    if (daysLeft === 0) return 'Last day!';
-    if (!deadlineDate) return 'TBD';
-    // Show full date format
-    return format(deadlineDate, "dd MMM yyyy");
-  };
+    return {
+      isExpired: expired,
+      isTBDDate: tbd,
+      category: cat,
+      shortQualification: shortQual,
+      lastDateText: dateText,
+      vacancyText: formatVacancy(job.vacancies, job.vacancies_display),
+    };
+  }, [job]);
 
   return (
     <Link to={`/jobs/${job.slug || job.id}`} className="block w-full">
@@ -86,15 +95,15 @@ export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
         <div className="flex items-center justify-between pt-3 border-t border-border/30">
           <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-destructive">
             <Calendar className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-            <span>Last date: {formatLastDate()}</span>
+            <span>Last date: {lastDateText}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-primary">
             <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-            {formatVacancy(job.vacancies, job.vacancies_display)}
+            {vacancyText}
           </div>
         </div>
       </div>
     </Link>
   );
-}
+});
 

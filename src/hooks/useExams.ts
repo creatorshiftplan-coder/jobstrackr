@@ -3,6 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
+interface UseExamsOptions {
+  enabled?: boolean;
+  includeExamCatalog?: boolean;
+  includeUserExams?: boolean;
+}
+
 export interface Exam {
   id: string;
   name: string;
@@ -38,7 +44,12 @@ export interface ExamCredentials {
   password: string;
 }
 
-export function useExams() {
+export function useExams(options: UseExamsOptions = {}) {
+  const {
+    enabled = true,
+    includeExamCatalog = true,
+    includeUserExams = true,
+  } = options;
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -54,6 +65,7 @@ export function useExams() {
       if (error) throw error;
       return data || [];
     },
+    enabled: enabled && includeExamCatalog,
   });
 
   const userExamsQuery = useQuery({
@@ -70,7 +82,7 @@ export function useExams() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user?.id,
+    enabled: enabled && includeUserExams && !!user?.id,
   });
 
   const addExamAttempt = useMutation({
