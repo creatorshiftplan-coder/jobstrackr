@@ -92,7 +92,8 @@ export function AppHeader({
                             <SheetContent side="left" className="w-72">
                                 <SheetHeader className="pb-6">
                                     <div className="flex items-center gap-3">
-                                        <img src={logoColor} alt="JobsTrackr" className="h-10 w-10" />
+                                        <img src={logoColor} alt="JobsTrackr" className="h-10 w-10 dark:hidden" />
+                                        <img src={logoWhite} alt="JobsTrackr" className="h-10 w-10 hidden dark:block" />
                                         <SheetTitle className="text-xl font-bold">JobsTrackr</SheetTitle>
                                     </div>
                                 </SheetHeader>
@@ -134,8 +135,8 @@ export function AppHeader({
                     <div className="flex items-center gap-2">
                         {showTitleLogo && (
                             <>
-                                <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
-                                <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
+                                <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
+                                <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
                             </>
                         )}
                         <h1 className={cn("text-lg font-bold", textClass)}>{title}</h1>
@@ -154,11 +155,18 @@ export function AppHeader({
                         </button>
                     )}
                     {showLogo && (
-                        <img
-                            src={variant === "primary" ? logoWhite : logoColor}
-                            alt="JobsTrackr"
-                            className="h-8 w-8 object-contain"
-                        />
+                        <>
+                            <img
+                                src={logoColor}
+                                alt="JobsTrackr"
+                                className="h-8 w-8 object-contain dark:hidden"
+                            />
+                            <img
+                                src={logoWhite}
+                                alt="JobsTrackr"
+                                className="h-8 w-8 object-contain hidden dark:block"
+                            />
+                        </>
                     )}
                     {rightActions}
                 </div>

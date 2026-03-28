@@ -189,8 +189,8 @@ export default function Search() {
             </div>
           </Link>
           <div className="flex items-center gap-2 flex-1 justify-center">
-            <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
-            <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
+            <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
+            <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
             <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground tracking-tight">Explore Jobs</h1>
           </div>
           <Link to="/saved">

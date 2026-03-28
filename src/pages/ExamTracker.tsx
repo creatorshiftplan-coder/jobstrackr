@@ -53,8 +53,8 @@ export default function ExamTracker() {
               </div>
             </Link>
             <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground flex items-center gap-2 min-w-0">
-              <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
-              <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
+              <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
+              <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
               <span className="truncate">My Exams</span>
             </h1>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -105,8 +105,8 @@ export default function ExamTracker() {
             </div>
           </Link>
           <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground flex items-center gap-2 min-w-0">
-            <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
-            <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
+            <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
+            <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
             <span className="truncate">My Exams</span>
           </h1>
           <div className="flex items-center gap-2 flex-shrink-0">

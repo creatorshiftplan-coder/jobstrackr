@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +14,8 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { TopBar } from "@/components/TopBar";
 import { Loader2 } from "lucide-react";
+
+import { SplashScreen, shouldShowSplash } from "@/components/SplashScreen";
 
 // Eager load critical routes
 import Welcome from "./pages/Welcome";
@@ -63,11 +65,15 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
-  <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <AuthProvider>
+const App = () => {
+  const [showSplash, setShowSplash] = useState(() => shouldShowSplash());
+
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+          <AuthProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -124,6 +130,7 @@ const App = () => (
       </ThemeProvider>
     </QueryClientProvider>
   </ErrorBoundary>
-);
+  );
+};
 
 export default App;

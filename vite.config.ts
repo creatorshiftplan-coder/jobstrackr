@@ -142,6 +142,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [localScraperPlugin(), localDiscoverPlugin(), react()],
   build: {
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -149,6 +150,8 @@ export default defineConfig(({ mode }) => ({
           'vendor-supabase': ['@supabase/supabase-js'],
           'vendor-query': ['@tanstack/react-query'],
           'vendor-ui': ['framer-motion', 'recharts'],
+          'vendor-lottie': ['lottie-react'],
+          'vendor-icons': ['lucide-react'],
         },
       },
     },

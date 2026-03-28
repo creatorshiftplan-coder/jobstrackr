@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import logoWhite from "@/assets/logo-white.png";
+import logoColor from "@/assets/logo-color.png";
 import { useSmartBack } from "@/hooks/useSmartBack";
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -300,7 +301,8 @@ export default function SyllabusCheck() {
                         <ArrowLeft className="h-4 w-4 text-primary-foreground dark:text-foreground" />
                     </button>
                     <div className="flex items-center gap-2">
-                        <img src={logoWhite} alt="JobsTrackr" className="h-7 sm:h-8 w-auto" />
+                        <img src={logoColor} alt="JobsTrackr" className="h-7 sm:h-8 w-auto dark:hidden" />
+                        <img src={logoWhite} alt="JobsTrackr" className="h-7 sm:h-8 w-auto hidden dark:block" />
                         <span className="font-display font-bold text-base sm:text-lg text-primary-foreground dark:text-foreground tracking-wider">SYLLABUS FINDER</span>
                     </div>
                     <Link to="/saved">

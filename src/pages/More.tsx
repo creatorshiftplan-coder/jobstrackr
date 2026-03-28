@@ -11,6 +11,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { useTheme } from "next-themes";
 import logoWhite from "@/assets/logo-white.png";
+import logoColor from "@/assets/logo-color.png";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { GUEST_PROFILE } from "@/lib/guestData";
 import { useSmartBack } from "@/hooks/useSmartBack";
@@ -87,7 +88,8 @@ export default function More() {
             <ArrowLeft className="h-4 w-4 text-primary-foreground dark:text-foreground" />
           </button>
           <div className="flex items-center gap-2">
-            <img src={logoWhite} alt="JobsTrackr" className="h-7 sm:h-8 w-auto" />
+            <img src={logoColor} alt="JobsTrackr" className="h-7 sm:h-8 w-auto dark:hidden" />
+            <img src={logoWhite} alt="JobsTrackr" className="h-7 sm:h-8 w-auto hidden dark:block" />
             <span className="font-display font-bold text-base sm:text-lg text-primary-foreground dark:text-foreground tracking-wider">JOBSTRACKR</span>
           </div>
           <Link to="/saved">
