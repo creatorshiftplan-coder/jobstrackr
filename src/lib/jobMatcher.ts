@@ -1,4 +1,5 @@
 import { Job } from "@/types/job";
+import { getEligibilityProfile } from "@/lib/eligibilityParser";
 import { matchesSectorPreference, parseJobDeadline, extractLocationFromText, cleanLocationString, resolveStateFromLocationText, isAllIndiaLocationText } from "@/lib/jobUtils";
 /**
  * Returns the best location for a job: inferred from title/department if explicit location is generic.
@@ -412,6 +413,163 @@ function getAgeRelaxation(category: string | null): number {
   }
 }
 
+function qualLevelToNumber(level: string): number {
+  return QUAL_LEVELS[level as keyof typeof QUAL_LEVELS] ?? 0;
+}
+
+function addUniqueLabel(target: string[], label: string) {
+  if (label && !target.includes(label)) {
+    target.push(label);
+  }
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .split(/[\s_]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function hasSpecificQualificationStream(streams: string[]): boolean {
+  return streams.some((stream) => stream !== "general");
+}
+
+function userMatchesSpecialization(userQualificationName: string | null, specializations: string[]): boolean {
+  if (specializations.length === 0) return true;
+  const userText = (userQualificationName || "").toLowerCase();
+  if (!userText) return false;
+
+  return specializations.some((specialization) => {
+    const normalized = specialization.toLowerCase();
+    if (!normalized || /\b(related|relevant|concerned|same|equivalent)\b/.test(normalized)) return false;
+    if (userText.includes(normalized)) return true;
+    return normalized
+      .split(/\s+/)
+      .filter((word) => word.length > 3)
+      .some((word) => userText.includes(word));
+  });
+}
+
+function getAlternativeLevelLabel(levels: string[]): string {
+  if (levels.length === 0) return "required qualification";
+  const highestLevel = levels.reduce((current, level) =>
+    qualLevelToNumber(level) > qualLevelToNumber(current) ? level : current,
+  levels[0]);
+  return getQualLabel(highestLevel);
+}
+
+function evaluateStructuredQualification(
+  userQual: QualProfile,
+  userQualificationName: string | null,
+  job: Job,
+): { qualOk: boolean; reason: string | null; requirementLabels: string[] } {
+  const profile = getEligibilityProfile(job);
+  const requirementLabels: string[] = [];
+
+  if (profile.quality_flags.includes("review_needed") || profile.quality_flags.includes("manual_review") || profile.quality_flags.includes("post_wise_eligibility")) {
+    addUniqueLabel(requirementLabels, "Eligibility needs manual review");
+  }
+
+  const alternatives = profile.alternatives.filter((alternative) => alternative.qualification_levels.length > 0 || alternative.specializations.length > 0 || alternative.qualification_streams.length > 0);
+  if (alternatives.length === 0) {
+    const jobQual = parseJobQualRequirement(job.qualification);
+    const qualOk = isQualificationEligible(userQual, jobQual);
+    return {
+      qualOk,
+      reason: qualOk ? null : `Requires ${getJobQualLabel(job.qualification)}`,
+      requirementLabels,
+    };
+  }
+
+  for (const alternative of alternatives) {
+    const highestRequiredLevel = alternative.qualification_levels.reduce((current, level) =>
+      Math.max(current, qualLevelToNumber(level)), 0);
+    if (highestRequiredLevel > 0 && userQual.level < highestRequiredLevel) {
+      continue;
+    }
+
+    if (hasSpecificQualificationStream(alternative.qualification_streams) && !alternative.qualification_streams.includes(userQual.stream)) {
+      continue;
+    }
+
+    if (alternative.specializations.length > 0 && !userMatchesSpecialization(userQualificationName, alternative.specializations)) {
+      continue;
+    }
+
+    for (const registration of [...profile.global_rules.required_registrations, ...alternative.required_registrations]) {
+      addUniqueLabel(requirementLabels, registration.label);
+    }
+    for (const language of [...profile.global_rules.required_languages, ...alternative.required_languages]) {
+      addUniqueLabel(requirementLabels, language.label);
+    }
+    for (const residency of profile.global_rules.residency_rules) {
+      addUniqueLabel(requirementLabels, residency.label);
+    }
+    for (const skill of [...profile.global_rules.required_skills, ...alternative.required_skills]) {
+      addUniqueLabel(requirementLabels, skill.label);
+    }
+    for (const physicalRule of profile.global_rules.physical_rules) {
+      addUniqueLabel(requirementLabels, physicalRule.label);
+    }
+
+    return { qualOk: true, reason: null, requirementLabels };
+  }
+
+  const bestAlternative = alternatives.reduce((best, alternative) => {
+    const bestLevel = best.qualification_levels.reduce((current, level) => Math.max(current, qualLevelToNumber(level)), 0);
+    const nextLevel = alternative.qualification_levels.reduce((current, level) => Math.max(current, qualLevelToNumber(level)), 0);
+    return nextLevel < bestLevel ? alternative : best;
+  }, alternatives[0]);
+
+  if (bestAlternative.specializations.length > 0) {
+    const specializationLabel = bestAlternative.specializations[0];
+    return {
+      qualOk: false,
+      reason: `Requires ${toTitleCase(specializationLabel)}`,
+      requirementLabels,
+    };
+  }
+
+  if (hasSpecificQualificationStream(bestAlternative.qualification_streams)) {
+    const streamLabel = getQualStreamLabel(bestAlternative.qualification_streams[0] as QualStream);
+    return {
+      qualOk: false,
+      reason: `Requires ${streamLabel}`,
+      requirementLabels,
+    };
+  }
+
+  return {
+    qualOk: false,
+    reason: `Requires ${getAlternativeLevelLabel(bestAlternative.qualification_levels)}`,
+    requirementLabels,
+  };
+}
+
+function evaluateStructuredConstraints(
+  userQual: QualProfile | null,
+  gender: string | null,
+  job: Job,
+): string[] {
+  const profile = getEligibilityProfile(job);
+  const reasons: string[] = [];
+
+  for (const constraint of profile.global_rules.negative_constraints) {
+    if (constraint.type === "female_only" && (!gender || gender.toLowerCase() !== "female")) {
+      addUniqueLabel(reasons, constraint.label);
+    }
+    if (constraint.type === "male_only" && (!gender || gender.toLowerCase() !== "male")) {
+      addUniqueLabel(reasons, constraint.label);
+    }
+    if (constraint.type === "higher_qualification_not_allowed" && userQual && userQual.level >= QUAL_LEVELS.graduation) {
+      addUniqueLabel(reasons, constraint.label);
+    }
+  }
+
+  return reasons;
+}
+
 // ═════════════════════════════════════════════════════════════════════════
 // SPECIALIZED QUALIFICATION DETECTION
 // Detects "Diploma in X", "Degree in X", "Certificate in X" patterns
@@ -583,14 +741,22 @@ export function checkEligibility(
   const reasons: string[] = [];
   let ageOk: boolean | null = null;
   let qualOk: boolean | null = null;
+  const profile = getEligibilityProfile(job);
+  const structuredQualification = userQual ? evaluateStructuredQualification(userQual, userQualificationName, job) : null;
 
   // ── STRICT Age Check (with category relaxation) ───────────────
   if (userAge !== null) {
-    const hasAgeReq = (job.age_min && job.age_min >= 10) || (job.age_max && job.age_max >= 10);
+    const profileAgeRule = profile.global_rules.age_rule;
+    const hasProfileAgeReq = (profileAgeRule?.min && profileAgeRule.min >= 10) || (profileAgeRule?.max && profileAgeRule.max >= 10);
+    const hasAgeReq = hasProfileAgeReq || (job.age_min && job.age_min >= 10) || (job.age_max && job.age_max >= 10);
     if (hasAgeReq) {
       const relaxation = getAgeRelaxation(category);
-      const min = (job.age_min && job.age_min >= 10) ? job.age_min : 0;
-      const max = (job.age_max && job.age_max >= 10) ? job.age_max + relaxation : 100;
+      const min = (profileAgeRule?.min && profileAgeRule.min >= 10)
+        ? profileAgeRule.min
+        : (job.age_min && job.age_min >= 10) ? job.age_min : 0;
+      const max = (profileAgeRule?.max && profileAgeRule.max >= 10)
+        ? profileAgeRule.max + relaxation
+        : (job.age_max && job.age_max >= 10) ? job.age_max + relaxation : 100;
       ageOk = userAge >= min && userAge <= max;
       if (!ageOk) {
         if (userAge < min) reasons.push(`Min age ${min}, you are ${userAge}`);
@@ -601,15 +767,9 @@ export function checkEligibility(
 
   // ── STRICT Qualification Check ────────────────────────────────
   if (userQual !== null && job.qualification) {
-    const jobQual = parseJobQualRequirement(job.qualification);
-    qualOk = isQualificationEligible(userQual, jobQual);
+    qualOk = structuredQualification?.qualOk ?? null;
     if (!qualOk) {
-      const label = getJobQualLabel(job.qualification);
-      if (userQual.level < jobQual.level) {
-        reasons.push(`Requires ${label}`);
-      } else {
-        reasons.push(`Requires ${label} (specific stream)`);
-      }
+      if (structuredQualification?.reason) reasons.push(structuredQualification.reason);
     }
   }
 
@@ -628,32 +788,42 @@ export function checkEligibility(
     }
   }
 
+  for (const constraintReason of evaluateStructuredConstraints(userQual, gender, job)) {
+    genderOk = false;
+    addUniqueLabel(reasons, constraintReason);
+  }
+
   // ── STRICT Skill Requirement Check ────────────────────────────
   const jobText = `${job.qualification || ""} ${job.eligibility || ""} ${job.title || ""}`.toLowerCase();
   const skillsMissing: string[] = [];
   const normalizedUserSkills = userSkills.map((skill) => skill.trim().toLowerCase()).filter(Boolean);
+
+  if (structuredQualification) {
+    for (const label of structuredQualification.requirementLabels) {
+      if (
+        !/requires /i.test(label) &&
+        !/qualification/i.test(label)
+      ) {
+        addUniqueLabel(skillsMissing, label);
+      }
+    }
+  }
+
   for (const [skillKey, pattern] of Object.entries(SKILL_KEYWORDS)) {
     if (pattern.test(jobText) && !normalizedUserSkills.includes(skillKey)) {
       skillsMissing.push(getSkillLabel(skillKey));
     }
   }
 
-  // ── Specialized Qualification Detection ────────────────────────
-  // Detects "Diploma in X", "Degree in X", etc. and checks against user's qualification_name
-  const specializedMissing = detectSpecializedRequirements(jobText, userQualificationName);
-  for (const label of specializedMissing) {
-    if (!skillsMissing.includes(label)) {
-      skillsMissing.push(label);
+  if (!profile.quality_flags.includes("review_needed") && !profile.quality_flags.includes("manual_review")) {
+    const specializedMissing = detectSpecializedRequirements(jobText, userQualificationName);
+    for (const label of specializedMissing) {
+      if (!skillsMissing.includes(label)) {
+        skillsMissing.push(label);
+      }
     }
-  }
-
-  // ── Domain Requirements (pipe-delimited eligibility text) ──────
-  // Parses "Constitutional Law | Criminal Law | Demonstrated experience in X, Y" etc.
-  const domainMissing = extractDomainRequirements(job.eligibility, userQualificationName);
-  for (const label of domainMissing) {
-    if (!skillsMissing.includes(label)) {
-      skillsMissing.push(label);
-    }
+  } else {
+    addUniqueLabel(skillsMissing, "Eligibility needs manual review");
   }
 
   // All hard checks must pass. Skills missing is a separate tier.

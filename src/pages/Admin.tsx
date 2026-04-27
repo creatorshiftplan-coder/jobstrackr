@@ -25,6 +25,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { Job, JobMetadata } from "@/types/job";
+import { parseEligibilityProfileFromText } from "@/lib/eligibilityParser";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 
 interface JobFormData {
@@ -113,6 +114,17 @@ const parseDateValue = (value: string | null | undefined): string => {
     return futureDate.toISOString().split('T')[0];
   }
   return value;
+};
+
+const buildEligibilityAwareMetadata = (
+  title: string,
+  qualification: string | null | undefined,
+  eligibility: string | null | undefined,
+  existingMetadata?: JobMetadata | null,
+): JobMetadata => {
+  const metadata: JobMetadata = { ...(existingMetadata || {}) };
+  metadata.eligibility_profile = parseEligibilityProfileFromText(qualification, eligibility, title);
+  return metadata;
 };
 
 interface BulkUploadInput {
@@ -449,6 +461,7 @@ export default function Admin() {
   const [scraperError, setScraperError] = useState<string | null>(null);
   const [scraperRawExpanded, setScraperRawExpanded] = useState(false);
   const [scraperAddingJob, setScraperAddingJob] = useState(false);
+  const [backfillingEligibility, setBackfillingEligibility] = useState(false);
 
   // Discover tab state
   const [discoverUrl, setDiscoverUrl] = useState("https://www.freejobalert.com/new-updates/");
@@ -653,6 +666,7 @@ export default function Admin() {
   const [applyingQuickRefresh, setApplyingQuickRefresh] = useState(false);
 
   // Filters for jobs
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [lastDateFilter, setLastDateFilter] = useState<string>("all");
   const [vacanciesFilter, setVacanciesFilter] = useState<string>("all");
   const [applyLinkFilter, setApplyLinkFilter] = useState<string>("all");
@@ -749,6 +763,14 @@ export default function Admin() {
       if (job.apply_link && job.apply_link.trim() !== "") return false;
     } else if (applyLinkFilter === "present") {
       if (!job.apply_link || job.apply_link.trim() === "") return false;
+    }
+
+    // Search query filter
+    if (searchQuery.trim() !== "") {
+      const q = searchQuery.toLowerCase();
+      const titleMatch = job.title?.toLowerCase().includes(q);
+      const deptMatch = job.department?.toLowerCase().includes(q);
+      if (!titleMatch && !deptMatch) return false;
     }
 
     return true;
@@ -883,15 +905,25 @@ export default function Admin() {
 
     setSaving(true);
     try {
+      const payload = {
+        ...formData,
+        job_metadata: buildEligibilityAwareMetadata(
+          formData.title,
+          formData.qualification,
+          formData.eligibility,
+          editingJob?.job_metadata ?? null,
+        ),
+      };
+
       if (editingJob) {
-        const { error } = await supabase.from("jobs").update(formData).eq("id", editingJob.id);
+        const { error } = await supabase.from("jobs").update(payload).eq("id", editingJob.id);
         if (error) throw error;
         toast({ title: "Job updated successfully!" });
       } else {
         // Insert and get the new job ID for auto-verification
         const { data: newJob, error } = await supabase
           .from("jobs")
-          .insert(formData)
+          .insert(payload)
           .select("id")
           .single();
         if (error) throw error;
@@ -1206,7 +1238,7 @@ export default function Admin() {
     setDiscoverSavingUrl(url);
 
     try {
-      const metadata: JobMetadata = {};
+      const metadata = buildEligibilityAwareMetadata(r.exam_name || "Untitled Job", r.eligibility || "As per notification", r.eligibility || null);
       if (r.salary_text) metadata.salary_text = r.salary_text;
       if (r.age_limit_text) metadata.age_limit_text = r.age_limit_text;
       if (r.vacancies && Array.isArray(r.vacancies)) metadata.vacancies_detail = r.vacancies;
@@ -1313,6 +1345,50 @@ export default function Admin() {
     }
   };
 
+  const handleBackfillEligibilityProfiles = async () => {
+    if (!jobs || jobs.length === 0) {
+      toast({ title: "No jobs found", description: "There are no jobs available to backfill." });
+      return;
+    }
+
+    setBackfillingEligibility(true);
+    let updatedCount = 0;
+
+    try {
+      for (const job of jobs) {
+        const nextProfile = parseEligibilityProfileFromText(job.qualification, job.eligibility, job.title);
+        const currentProfile = job.job_metadata?.eligibility_profile;
+
+        if (currentProfile?.version === nextProfile.version && currentProfile.raw_text === nextProfile.raw_text) {
+          continue;
+        }
+
+        const nextMetadata: JobMetadata = {
+          ...(job.job_metadata || {}),
+          eligibility_profile: nextProfile,
+        };
+
+        const { error } = await supabase
+          .from("jobs")
+          .update({ job_metadata: nextMetadata })
+          .eq("id", job.id);
+
+        if (error) throw error;
+        updatedCount += 1;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      toast({
+        title: "Eligibility profiles backfilled",
+        description: updatedCount > 0 ? `${updatedCount} job${updatedCount === 1 ? "" : "s"} updated.` : "All jobs were already up to date.",
+      });
+    } catch (error: any) {
+      toast({ title: "Backfill failed", description: error.message, variant: "destructive" });
+    } finally {
+      setBackfillingEligibility(false);
+    }
+  };
+
   // Scraper V5: add scraped job to the database
   const handleAddScrapedJob = async () => {
     if (!scraperResult) return;
@@ -1322,7 +1398,7 @@ export default function Admin() {
       const r = scraperResult;
 
       // Build job_metadata with all the extra fields
-      const metadata: JobMetadata = {};
+      const metadata = buildEligibilityAwareMetadata(r.exam_name || "Untitled Job", r.eligibility || "As per notification", r.eligibility || null);
       if (r.salary_text) metadata.salary_text = r.salary_text;
       if (r.age_limit_text) metadata.age_limit_text = r.age_limit_text;
       if (r.vacancies && Array.isArray(r.vacancies)) metadata.vacancies_detail = r.vacancies;
@@ -1758,10 +1834,22 @@ export default function Admin() {
                     <CardTitle>Jobs ({filteredJobs?.length || 0} of {jobs?.length || 0})</CardTitle>
                     <CardDescription>Manage government job listings</CardDescription>
                   </div>
-                  <Button size="sm" className="w-full sm:w-auto" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Job
-                  </Button>
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      onClick={handleBackfillEligibilityProfiles}
+                      disabled={jobsLoading || backfillingEligibility}
+                    >
+                      {backfillingEligibility ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                      Backfill Eligibility
+                    </Button>
+                    <Button size="sm" className="w-full sm:w-auto" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Job
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Filters */}
@@ -1808,11 +1896,21 @@ export default function Admin() {
                     </SelectContent>
                   </Select>
 
-                  {(lastDateFilter !== "all" || vacanciesFilter !== "all" || applyLinkFilter !== "all") && (
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search jobs..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-8 w-[200px] h-9"
+                    />
+                  </div>
+
+                  {(searchQuery !== "" || lastDateFilter !== "all" || vacanciesFilter !== "all" || applyLinkFilter !== "all") && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => { setLastDateFilter("all"); setVacanciesFilter("all"); setApplyLinkFilter("all"); }}
+                      onClick={() => { setSearchQuery(""); setLastDateFilter("all"); setVacanciesFilter("all"); setApplyLinkFilter("all"); }}
                       className="text-muted-foreground"
                     >
                       Clear filters

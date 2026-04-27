@@ -34,6 +34,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { formatAgeLimit } from "@/lib/jobUtils";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { useSimilarJobs } from "@/hooks/useSimilarJobs";
+import { useSidebar } from "@/components/ui/sidebar";
 
 // Check if last_date_display contains TBD-like values
 const isTBDDateDisplay = (displayValue: string | null): boolean => {
@@ -52,6 +53,7 @@ export default function JobDetails() {
   const [isTracking, setIsTracking] = useState(false);
   const { trackJobViewed, trackExamTracked } = useAnalytics();
   const { showAuthRequired } = useAuthRequired();
+  const { state, isMobile } = useSidebar();
 
   // Track job view when page loads
   useEffect(() => {
@@ -696,7 +698,13 @@ export default function JobDetails() {
       </main>
 
       {/* Fixed Apply Now Button */}
-      <div className="fixed bottom-16 left-0 right-0 p-4 bg-card/95 backdrop-blur-md border-t border-border z-40">
+      <div 
+        className="fixed bottom-16 md:bottom-0 p-4 bg-card/95 backdrop-blur-md border-t border-border z-40 transition-all duration-200 ease-linear"
+        style={{ 
+          left: isMobile ? '0' : (state === 'expanded' ? '16rem' : '3rem'),
+          width: isMobile ? '100%' : (state === 'expanded' ? 'calc(100% - 16rem)' : 'calc(100% - 3rem)')
+        }}
+      >
         <div className="flex justify-center gap-3">
           {!btnDisabled && btnHref ? (
             <a href={btnHref} target="_blank" rel="noopener noreferrer" className="flex-1">
