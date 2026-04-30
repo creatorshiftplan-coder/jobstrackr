@@ -1,0 +1,35 @@
+name: Auto-Discover FreeJobAlert Jobs
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # 01:00 UTC daily
+  workflow_dispatch:      # Manual trigger from GitHub UI
+
+concurrency:
+  group: auto-discover
+  cancel-in-progress: false
+
+jobs:
+  discover-and-scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 lxml supabase>=2.0.0
+
+      - name: Run auto-discover script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python scripts/auto_discover.py
