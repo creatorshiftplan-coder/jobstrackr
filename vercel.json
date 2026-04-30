@@ -56,6 +56,16 @@
       "destination": "/index.html"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/auto-discover-cron",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/process-scrape-queue",
+      "schedule": "*/10 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/og-image.png",
