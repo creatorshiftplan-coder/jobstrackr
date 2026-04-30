@@ -478,12 +478,47 @@ export const matchesSectorPreference = (department: string, title: string, secto
 export const parseJobDeadline = (lastDate: string | null | undefined): Date | null => {
     if (!lastDate) return null;
 
-    if (/^\d{4}-\d{2}-\d{2}$/.test(lastDate)) {
-        const [year, month, day] = lastDate.split("-").map(Number);
+    // Strip newlines and time-related text for matching
+    let cleaned = lastDate.replace(/\n/g, " ").trim();
+    cleaned = cleaned
+        .replace(/\(?\s*\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*\)?/g, "")
+        .replace(/from\s+\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*onwards?/gi, "")
+        .trim();
+    if (!cleaned) cleaned = lastDate.replace(/\n/g, " ").trim();
+
+    // YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+        const [year, month, day] = cleaned.split("-").map(Number);
         return new Date(year, month - 1, day, 23, 59, 59, 999);
     }
 
-    const parsed = new Date(lastDate);
+    // DD/MM/YYYY or DD-MM-YYYY
+    const dmy = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (dmy) {
+        return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]), 23, 59, 59, 999);
+    }
+
+    // DD-MM YYYY (space-separated year)
+    const dmySpace = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})\s+(\d{4})$/);
+    if (dmySpace) {
+        return new Date(Number(dmySpace[3]), Number(dmySpace[2]) - 1, Number(dmySpace[1]), 23, 59, 59, 999);
+    }
+
+    // DD Month YYYY
+    const monthMap: Record<string, number> = {
+        jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+        jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+    };
+    const named = cleaned.match(/^(\d{1,2})[\s\-/]([a-zA-Z]+)[\s\-/](\d{4})$/);
+    if (named) {
+        const mon = monthMap[named[2].toLowerCase().slice(0, 3)];
+        if (mon !== undefined) {
+            return new Date(Number(named[3]), mon, Number(named[1]), 23, 59, 59, 999);
+        }
+    }
+
+    // Fallback: native Date parse
+    const parsed = new Date(cleaned);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 

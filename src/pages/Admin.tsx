@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns";
 import { Job, JobMetadata } from "@/types/job";
 import { parseEligibilityProfileFromText } from "@/lib/eligibilityParser";
+import { parseJobDeadline } from "@/lib/jobUtils";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 
 interface JobFormData {
@@ -100,20 +101,60 @@ const parseVacancies = (value: string | number | null | undefined): number | nul
 const parseDateValue = (value: string | null | undefined): string => {
   if (!value) return new Date().toISOString().split('T')[0]; // Default to today if empty
   if (isTBDValue(value)) {
-    // Return a date 1 year from now for TBD dates to keep job active
     const futureDate = new Date();
     futureDate.setFullYear(futureDate.getFullYear() + 1);
     return futureDate.toISOString().split('T')[0];
   }
-  // Check if it's a valid date format
-  const date = new Date(value);
-  if (isNaN(date.getTime())) {
-    // Invalid date, return 1 year from now
-    const futureDate = new Date();
-    futureDate.setFullYear(futureDate.getFullYear() + 1);
-    return futureDate.toISOString().split('T')[0];
+
+  // Pre-process: strip newlines, time info, parenthesized time text
+  let cleaned = value.replace(/\n/g, " ").trim();
+  cleaned = cleaned
+    .replace(/\(?\s*\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*\)?/g, "")
+    .replace(/from\s+\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*onwards?/gi, "")
+    .trim();
+  if (!cleaned) cleaned = value.replace(/\n/g, " ").trim();
+
+  // Already ISO format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned;
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmy = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
-  return value;
+
+  // DD-MM YYYY (space-separated year)
+  const dmySpace = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})\s+(\d{4})$/);
+  if (dmySpace) {
+    const [, d, m, y] = dmySpace;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  // DD Month YYYY (e.g. "14 March 2026")
+  const monthNames: Record<string, string> = {
+    jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+    jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+    january: "01", february: "02", march: "03", april: "04",
+    june: "06", july: "07", august: "08", september: "09",
+    october: "10", november: "11", december: "12",
+  };
+  const named = cleaned.match(/^(\d{1,2})[\s\-/]([a-zA-Z]+)[\s\-/](\d{4})$/);
+  if (named) {
+    const mon = monthNames[named[2].toLowerCase().slice(0, 3)];
+    if (mon) return `${named[3]}-${mon}-${named[1].padStart(2, "0")}`;
+  }
+
+  // Fallback: try native Date parse
+  const date = new Date(cleaned);
+  if (!isNaN(date.getTime())) {
+    return date.toISOString().split('T')[0];
+  }
+
+  // Unparseable — return 1 year from now
+  const futureDate = new Date();
+  futureDate.setFullYear(futureDate.getFullYear() + 1);
+  return futureDate.toISOString().split('T')[0];
 };
 
 const buildEligibilityAwareMetadata = (
@@ -468,7 +509,7 @@ export default function Admin() {
   const [discoverPages, setDiscoverPages] = useState(1);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
-  const [discoveredLinks, setDiscoveredLinks] = useState<{update_date: string; title: string; url: string}[]>([]);
+  const [discoveredLinks, setDiscoveredLinks] = useState<{ update_date: string; title: string; url: string }[]>([]);
   const [discoverScrapedResults, setDiscoverScrapedResults] = useState<Record<string, any>>({});
   const [discoverScrapingUrl, setDiscoverScrapingUrl] = useState<string | null>(null);
   const [discoverSavingUrl, setDiscoverSavingUrl] = useState<string | null>(null);
@@ -735,7 +776,8 @@ export default function Admin() {
     // Last date filter
     if (lastDateFilter !== "all") {
       const today = new Date();
-      const lastDate = new Date(job.last_date);
+      const lastDate = parseJobDeadline(job.last_date);
+      if (!lastDate) return lastDateFilter === "active"; // unparseable → treat as active
 
       if (lastDateFilter === "expired" && lastDate >= today) return false;
       if (lastDateFilter === "active" && lastDate < today) return false;
@@ -778,8 +820,8 @@ export default function Admin() {
     if (!sortField) return 0;
 
     if (sortField === "last_date") {
-      const dateA = new Date(a.last_date).getTime();
-      const dateB = new Date(b.last_date).getTime();
+      const dateA = parseJobDeadline(a.last_date)?.getTime() ?? 0;
+      const dateB = parseJobDeadline(b.last_date)?.getTime() ?? 0;
       return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
     }
 
@@ -1271,7 +1313,7 @@ export default function Admin() {
       if (r.application_fees && Array.isArray(r.application_fees)) {
         // Extract the maximum numeric fee from all categories
         const allFees = r.application_fees
-          .map((f: { category: string; fee: string }) => 
+          .map((f: { category: string; fee: string }) =>
             parseInt(String(f.fee).replace(/[^0-9]/g, ''))
           )
           .filter((n: number) => !isNaN(n) && n > 0);
@@ -1279,7 +1321,7 @@ export default function Admin() {
       }
 
       const lastDate = parseDateValue(r.last_date);
-      const lastDateDisplay = isTBDValue(r.last_date) ? String(r.last_date) : r.last_date || null;
+      const lastDateDisplay = r.last_date || null;
 
       const cleanLoc = (loc: string) => {
         if (!loc) return loc;
@@ -1306,7 +1348,7 @@ export default function Admin() {
         application_fee: appFee,
         vacancies: totalVacancies,
         vacancies_display: totalVacancies ? `${totalVacancies} Posts` : "Not Found",
-        application_start_date: r.important_dates?.apply_start || null,
+        application_start_date: r.important_dates?.apply_start ? parseDateValue(r.important_dates.apply_start) : null,
         last_date: lastDate,
         last_date_display: lastDateDisplay,
         apply_link: r.official_apply_link || null,
@@ -1434,7 +1476,7 @@ export default function Admin() {
       let appFee = 0;
       if (r.application_fees && Array.isArray(r.application_fees)) {
         const allFees = r.application_fees
-          .map((f: { category: string; fee: string }) => 
+          .map((f: { category: string; fee: string }) =>
             parseInt(String(f.fee).replace(/[^0-9]/g, ''))
           )
           .filter((n: number) => !isNaN(n) && n > 0);
@@ -1442,7 +1484,7 @@ export default function Admin() {
       }
 
       const lastDate = parseDateValue(r.last_date);
-      const lastDateDisplay = isTBDValue(r.last_date) ? String(r.last_date) : r.last_date || null;
+      const lastDateDisplay = r.last_date || null;
 
       // Clean location: strip trailing numbers/parens like "Hyderabad2812)"
       const cleanLocation = (loc: string) => {
@@ -1470,7 +1512,7 @@ export default function Admin() {
         application_fee: appFee,
         vacancies: totalVacancies,
         vacancies_display: totalVacancies ? `${totalVacancies} Posts` : "Not Found",
-        application_start_date: r.important_dates?.apply_start || null,
+        application_start_date: r.important_dates?.apply_start ? parseDateValue(r.important_dates.apply_start) : null,
         last_date: lastDate,
         last_date_display: lastDateDisplay,
         apply_link: r.official_apply_link || null,
@@ -1985,8 +2027,8 @@ export default function Admin() {
                               <TableCell className="font-medium max-w-[200px] truncate">{job.title}</TableCell>
                               <TableCell className="max-w-[150px] truncate">{job.department}</TableCell>
                               <TableCell>
-                                <span className={new Date(job.last_date) < new Date() ? "text-destructive" : ""}>
-                                  {format(new Date(job.last_date), "dd MMM yyyy")}
+                                <span className={(() => { const d = parseJobDeadline(job.last_date); return d && d < new Date() ? "text-destructive" : ""; })()}>
+                                  {(() => { const d = parseJobDeadline(job.last_date); return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date; })()}
                                 </span>
                               </TableCell>
                               <TableCell>{job.vacancies || 1}</TableCell>
@@ -2473,11 +2515,10 @@ export default function Admin() {
                   onDragLeave={handleLogoDragLeave}
                   onDrop={handleLogoDrop}
                   onClick={() => logoFileInputRef.current?.click()}
-                  className={`relative cursor-pointer border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${
-                    isDraggingOver
+                  className={`relative cursor-pointer border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${isDraggingOver
                       ? "border-primary bg-primary/5 scale-[1.01] shadow-lg"
                       : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
-                  }`}
+                    }`}
                 >
                   <input
                     ref={logoFileInputRef}
@@ -2493,9 +2534,8 @@ export default function Admin() {
                     }}
                   />
                   <div className="flex flex-col items-center gap-2">
-                    <div className={`p-3 rounded-full transition-colors ${
-                      isDraggingOver ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                    }`}>
+                    <div className={`p-3 rounded-full transition-colors ${isDraggingOver ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                      }`}>
                       <Upload className="h-8 w-8" />
                     </div>
                     <div>
@@ -2552,13 +2592,12 @@ export default function Admin() {
                       {logoQueue.map((item) => (
                         <div
                           key={item.id}
-                          className={`flex items-center gap-4 p-3 rounded-lg border transition-colors ${
-                            item.duplicateStatus === "exact"
+                          className={`flex items-center gap-4 p-3 rounded-lg border transition-colors ${item.duplicateStatus === "exact"
                               ? "border-destructive/30 bg-destructive/5"
                               : item.duplicateStatus === "similar"
-                              ? "border-yellow-500/30 bg-yellow-500/5"
-                              : "border-border bg-card"
-                          }`}
+                                ? "border-yellow-500/30 bg-yellow-500/5"
+                                : "border-border bg-card"
+                            }`}
                         >
                           {/* Thumbnail */}
                           <img
@@ -3068,130 +3107,130 @@ export default function Admin() {
                               const isExpanded = discoverExpandedUrl === link.url;
 
                               return (
-                              <>
-                                <TableRow key={link.url} className={isScraped ? "bg-green-50/50 dark:bg-green-950/10" : ""}>
-                                  <TableCell className="text-xs text-muted-foreground font-mono">{idx + 1}</TableCell>
-                                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{link.update_date}</TableCell>
-                                  <TableCell>
-                                    <a
-                                      href={link.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-sm text-primary hover:underline font-medium line-clamp-2"
-                                    >
-                                      {link.title}
-                                    </a>
-                                  </TableCell>
-                                  <TableCell>
-                                    {isSaved ? (
-                                      <Badge className="bg-green-100 text-green-700 border-0 text-[10px]"><CheckCircle className="h-3 w-3 mr-1" />Saved</Badge>
-                                    ) : isScraped ? (
-                                      <Badge className="bg-blue-100 text-blue-700 border-0 text-[10px]"><Check className="h-3 w-3 mr-1" />Scraped</Badge>
-                                    ) : isScraping ? (
-                                      <Badge className="bg-yellow-100 text-yellow-700 border-0 text-[10px]"><Loader2 className="h-3 w-3 animate-spin mr-1" />Scraping</Badge>
-                                    ) : (
-                                      <Badge variant="outline" className="text-[10px]">Pending</Badge>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-1 flex-nowrap">
-                                      {!isScraped && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-7 text-xs whitespace-nowrap"
-                                          disabled={isScraping}
-                                          onClick={() => handleDiscoverScrapeOne(link.url)}
-                                        >
-                                          {isScraping ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Play className="h-3 w-3 mr-1" />}
-                                          Scrape
-                                        </Button>
+                                <>
+                                  <TableRow key={link.url} className={isScraped ? "bg-green-50/50 dark:bg-green-950/10" : ""}>
+                                    <TableCell className="text-xs text-muted-foreground font-mono">{idx + 1}</TableCell>
+                                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{link.update_date}</TableCell>
+                                    <TableCell>
+                                      <a
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-primary hover:underline font-medium line-clamp-2"
+                                      >
+                                        {link.title}
+                                      </a>
+                                    </TableCell>
+                                    <TableCell>
+                                      {isSaved ? (
+                                        <Badge className="bg-green-100 text-green-700 border-0 text-[10px]"><CheckCircle className="h-3 w-3 mr-1" />Saved</Badge>
+                                      ) : isScraped ? (
+                                        <Badge className="bg-blue-100 text-blue-700 border-0 text-[10px]"><Check className="h-3 w-3 mr-1" />Scraped</Badge>
+                                      ) : isScraping ? (
+                                        <Badge className="bg-yellow-100 text-yellow-700 border-0 text-[10px]"><Loader2 className="h-3 w-3 animate-spin mr-1" />Scraping</Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="text-[10px]">Pending</Badge>
                                       )}
-                                      {isScraped && (
-                                        <>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex items-center justify-end gap-1 flex-nowrap">
+                                        {!isScraped && (
                                           <Button
                                             size="sm"
                                             variant="outline"
                                             className="h-7 text-xs whitespace-nowrap"
-                                            onClick={() => setDiscoverExpandedUrl(isExpanded ? null : link.url)}
-                                          >
-                                            {isExpanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
-                                            View
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-7 text-xs whitespace-nowrap"
+                                            disabled={isScraping}
                                             onClick={() => handleDiscoverScrapeOne(link.url)}
                                           >
-                                            <RefreshCw className="h-3 w-3 mr-1" /> Re-scrape
+                                            {isScraping ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+                                            Scrape
                                           </Button>
-                                          {!isSaved && (
+                                        )}
+                                        {isScraped && (
+                                          <>
                                             <Button
                                               size="sm"
+                                              variant="outline"
                                               className="h-7 text-xs whitespace-nowrap"
-                                              disabled={isSaving}
-                                              onClick={() => handleDiscoverSaveJob(link.url)}
+                                              onClick={() => setDiscoverExpandedUrl(isExpanded ? null : link.url)}
                                             >
-                                              {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
-                                              Save
+                                              {isExpanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
+                                              View
                                             </Button>
-                                          )}
-                                        </>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-
-                                {/* Expandable JSON panel */}
-                                {isExpanded && isScraped && (
-                                  <TableRow key={`${link.url}-detail`}>
-                                    <TableCell colSpan={5} className="p-0 max-w-0">
-                                      <div className="bg-secondary/30 border-y border-primary/20 p-4 space-y-3 w-full">
-                                        <div className="flex items-center justify-between flex-wrap gap-2">
-                                          <h4 className="text-sm font-semibold text-primary">
-                                            {discoverScrapedResults[link.url]?.exam_name || "Result"}
-                                          </h4>
-                                          <div className="flex gap-1">
-                                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { navigator.clipboard.writeText(JSON.stringify(discoverScrapedResults[link.url], null, 2)); toast({ title: "Copied!" }); }}>
-                                              <Copy className="h-3 w-3 mr-1" />Copy JSON
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="h-7 text-xs whitespace-nowrap"
+                                              onClick={() => handleDiscoverScrapeOne(link.url)}
+                                            >
+                                              <RefreshCw className="h-3 w-3 mr-1" /> Re-scrape
                                             </Button>
-                                          </div>
-                                        </div>
-                                        {/* Quick info */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                          <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
-                                            <div className="text-[10px] text-muted-foreground">Agency</div>
-                                            <div className="text-xs font-medium truncate">{discoverScrapedResults[link.url]?.agency || "—"}</div>
-                                          </div>
-                                          <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
-                                            <div className="text-[10px] text-muted-foreground">Location</div>
-                                            <div className="text-xs font-medium truncate">{discoverScrapedResults[link.url]?.location || "—"}</div>
-                                          </div>
-                                          <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
-                                            <div className="text-[10px] text-muted-foreground">Last Date</div>
-                                            <div className="text-xs font-medium truncate text-red-600">{discoverScrapedResults[link.url]?.last_date || "—"}</div>
-                                          </div>
-                                          <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
-                                            <div className="text-[10px] text-muted-foreground">Qualification</div>
-                                            <div className="text-xs font-medium truncate">{discoverScrapedResults[link.url]?.eligibility?.slice(0, 50) || "—"}</div>
-                                          </div>
-                                        </div>
-                                        {/* Raw JSON */}
-                                        <div className="max-h-[300px] w-full overflow-auto rounded-md border bg-secondary/50 p-3">
-                                          <pre className="text-[11px] font-mono w-max">
-                                            {JSON.stringify(discoverScrapedResults[link.url], null, 2)}
-                                          </pre>
-                                        </div>
+                                            {!isSaved && (
+                                              <Button
+                                                size="sm"
+                                                className="h-7 text-xs whitespace-nowrap"
+                                                disabled={isSaving}
+                                                onClick={() => handleDiscoverSaveJob(link.url)}
+                                              >
+                                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                                                Save
+                                              </Button>
+                                            )}
+                                          </>
+                                        )}
                                       </div>
                                     </TableCell>
                                   </TableRow>
-                                )}
-                              </>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
+
+                                  {/* Expandable JSON panel */}
+                                  {isExpanded && isScraped && (
+                                    <TableRow key={`${link.url}-detail`}>
+                                      <TableCell colSpan={5} className="p-0 max-w-0">
+                                        <div className="bg-secondary/30 border-y border-primary/20 p-4 space-y-3 w-full">
+                                          <div className="flex items-center justify-between flex-wrap gap-2">
+                                            <h4 className="text-sm font-semibold text-primary">
+                                              {discoverScrapedResults[link.url]?.exam_name || "Result"}
+                                            </h4>
+                                            <div className="flex gap-1">
+                                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { navigator.clipboard.writeText(JSON.stringify(discoverScrapedResults[link.url], null, 2)); toast({ title: "Copied!" }); }}>
+                                                <Copy className="h-3 w-3 mr-1" />Copy JSON
+                                              </Button>
+                                            </div>
+                                          </div>
+                                          {/* Quick info */}
+                                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                            <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
+                                              <div className="text-[10px] text-muted-foreground">Agency</div>
+                                              <div className="text-xs font-medium truncate">{discoverScrapedResults[link.url]?.agency || "—"}</div>
+                                            </div>
+                                            <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
+                                              <div className="text-[10px] text-muted-foreground">Location</div>
+                                              <div className="text-xs font-medium truncate">{discoverScrapedResults[link.url]?.location || "—"}</div>
+                                            </div>
+                                            <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
+                                              <div className="text-[10px] text-muted-foreground">Last Date</div>
+                                              <div className="text-xs font-medium truncate text-red-600">{discoverScrapedResults[link.url]?.last_date || "—"}</div>
+                                            </div>
+                                            <div className="bg-white dark:bg-card rounded-lg px-3 py-2">
+                                              <div className="text-[10px] text-muted-foreground">Qualification</div>
+                                              <div className="text-xs font-medium truncate">{discoverScrapedResults[link.url]?.eligibility?.slice(0, 50) || "—"}</div>
+                                            </div>
+                                          </div>
+                                          {/* Raw JSON */}
+                                          <div className="max-h-[300px] w-full overflow-auto rounded-md border bg-secondary/50 p-3">
+                                            <pre className="text-[11px] font-mono w-max">
+                                              {JSON.stringify(discoverScrapedResults[link.url], null, 2)}
+                                            </pre>
+                                          </div>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                </>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
                       </div>
                     </div>
                   </div>
@@ -3822,10 +3861,10 @@ export default function Admin() {
                 <div
                   key={index}
                   className={`p-4 rounded-lg border ${job.isDuplicate
-                      ? scrapedDuplicateMode === "update"
-                        ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20"
-                        : "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 opacity-60"
-                      : "bg-secondary/30"
+                    ? scrapedDuplicateMode === "update"
+                      ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20"
+                      : "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 opacity-60"
+                    : "bg-secondary/30"
                     }`}
                 >
                   <div className="flex items-start gap-3">
@@ -3847,8 +3886,8 @@ export default function Admin() {
                           <Badge
                             variant="outline"
                             className={`text-xs ${scrapedDuplicateMode === "update"
-                                ? "text-amber-600 border-amber-600"
-                                : "text-yellow-600 border-yellow-600"
+                              ? "text-amber-600 border-amber-600"
+                              : "text-yellow-600 border-yellow-600"
                               }`}
                           >
                             {scrapedDuplicateMode === "update" ? "Update Available" : "Duplicate"}

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Calendar, GraduationCap, Banknote, Sparkles, Eye, X, Users, Clock, CheckCircle } from "lucide-react";
 import { AIJobResult } from "@/hooks/useAIJobSearch";
+import { parseJobDeadline } from "@/lib/jobUtils";
 
 interface AISearchResultProps {
   job: AIJobResult;
@@ -91,7 +92,7 @@ export function AISearchResult({ job, onDismiss, savedJobId }: AISearchResultPro
           {job.last_date && (
             <div className="flex items-center gap-1 text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              <span>Due: {new Date(job.last_date).toLocaleDateString()}</span>
+              <span>Due: {(() => { const d = parseJobDeadline(job.last_date); return d ? d.toLocaleDateString() : job.last_date; })()}</span>
             </div>
           )}
         </div>

@@ -107,6 +107,13 @@ _DATE_RE = re.compile(
 )
 
 
+_TIME_STRIP_RE = re.compile(
+    r"\(?\s*\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*\)?"  # (10:00 AM) or 3:00 PM
+    r"|from\s+\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*onwards?"  # from 3:00 PM onwards
+    r"|\bfrom\s+\d{1,2}\s*(?:AM|PM|am|pm)\s*onwards?"  # from 3 PM onwards
+)
+
+
 def parse_date(raw: str) -> Optional[str]:
     """
     Try to parse a date string into ISO-8601 (YYYY-MM-DD).
@@ -120,13 +127,25 @@ def parse_date(raw: str) -> Optional[str]:
     if any(w in raw.lower() for w in ("tentative", "expected", "to be")):
         return raw
 
-    m = _DATE_RE.search(raw)
+    # Strip time-related text before matching (e.g. "from 3:00 PM onwards", "(10:00 AM)")
+    date_text = _TIME_STRIP_RE.sub("", raw).strip()
+    if not date_text:
+        date_text = raw
+
+    m = _DATE_RE.search(date_text)
     if m:
-        if m.group(1):          # "14 March 2026"
+        if m.group(1):          # "14 March 2026" or "29-04 2026"
             day, mon_str, year = m.group(1), m.group(2).lower()[:3], m.group(3)
             mon = _MONTH_MAP.get(mon_str)
             if mon:
                 return f"{year}-{mon}-{int(day):02d}"
+            # Handle numeric month (e.g. "29-04 2026" where group(2) is "04")
+            try:
+                mon_num = int(m.group(2))
+                if 1 <= mon_num <= 12:
+                    return f"{year}-{mon_num:02d}-{int(day):02d}"
+            except (ValueError, TypeError):
+                pass
         elif m.group(4):        # "2026-03-14"
             y, mo, d = m.group(4), m.group(5), m.group(6)
             return f"{y}-{int(mo):02d}-{int(d):02d}"

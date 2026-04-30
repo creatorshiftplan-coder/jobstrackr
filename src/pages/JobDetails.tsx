@@ -31,7 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { BottomNav } from "@/components/BottomNav";
-import { formatAgeLimit } from "@/lib/jobUtils";
+import { formatAgeLimit, parseJobDeadline } from "@/lib/jobUtils";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { useSimilarJobs } from "@/hooks/useSimilarJobs";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -150,8 +150,9 @@ export default function JobDetails() {
     );
   }
 
-  const daysLeft = differenceInDays(new Date(job.last_date), new Date());
-  const isExpired = daysLeft < 0;
+  const deadlineDate = parseJobDeadline(job.last_date);
+  const daysLeft = deadlineDate ? differenceInDays(deadlineDate, new Date()) : Number.POSITIVE_INFINITY;
+  const isExpired = deadlineDate ? daysLeft < 0 : false;
   const isTBDDate = isTBDDateDisplay(job.last_date_display);
 
   const meta = job.job_metadata as any;
@@ -395,7 +396,7 @@ export default function JobDetails() {
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Last Date</p>
                 <p className="font-medium text-sm truncate">
-                  {job.last_date_display || format(new Date(job.last_date), "dd MMM yyyy")}
+                  {job.last_date_display || (deadlineDate ? format(deadlineDate, "dd MMM yyyy") : job.last_date || "TBD")}
                 </p>
               </div>
             </CardContent>

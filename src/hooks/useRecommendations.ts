@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Job } from "@/types/job";
 import { hybridRecommend, qualificationToTag, HybridMatchedJob } from "@/lib/hybridScorer";
 import { matchAndSort, MatchPreferences } from "@/lib/jobMatcher";
+import { isJobActive } from "@/lib/jobUtils";
 
 /**
  * Combined hook for hybrid job recommendations on the Index page.
@@ -49,14 +50,7 @@ export function useRecommendations(limit: number = 10, enabled: boolean = true) 
     }
 
     // Step 1: Filter expired jobs (lightweight — no qualification filter without wizard)
-    const today = new Date();
-    const activeJobs = jobs.filter((job) => {
-      try {
-        return new Date(job.last_date) >= today;
-      } catch {
-        return true; // Keep jobs with unparseable dates
-      }
-    });
+    const activeJobs = jobs.filter((job) => isJobActive(job.last_date));
 
     // Step 2: Run matchAndSort with lightweight preferences
     // Since we don't have qualification type from wizard, this mainly filters by salary/grade/expiry

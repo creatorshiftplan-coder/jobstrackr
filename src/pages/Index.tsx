@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Briefcase, ChevronLeft, ChevronRight, MapPin, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isJobActive } from "@/lib/jobUtils";
 
 const colorVariants = ["pink", "blue", "green", "orange"] as const;
 
@@ -95,7 +96,7 @@ const Index = () => {
   // Show the 7 most recently uploaded jobs that haven't expired (already sorted by created_at DESC from useJobs)
   const newJobs = useMemo(() => {
     return filteredJobs
-      .filter((job) => new Date(job.last_date) >= new Date())
+      .filter((job) => isJobActive(job.last_date))
       .slice(0, 7);
   }, [filteredJobs]);
 

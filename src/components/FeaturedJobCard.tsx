@@ -8,6 +8,7 @@ import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { OrganizationLogo } from "@/components/OrganizationLogo";
 
 import { format, differenceInDays } from "date-fns";
+import { parseJobDeadline } from "@/lib/jobUtils";
 
 interface FeaturedJobCardProps {
   job: Job;
@@ -26,16 +27,18 @@ export const FeaturedJobCard = memo(function FeaturedJobCard({ job }: FeaturedJo
   const logoUrl = getLogoByName(job.department);
 
   const { daysLeft, isUrgent, isExpired, isTBDDate, lastDateText } = useMemo(() => {
-    const dl = differenceInDays(new Date(job.last_date), new Date());
+    const deadlineDate = parseJobDeadline(job.last_date);
+    const dl = deadlineDate ? differenceInDays(deadlineDate, new Date()) : Number.POSITIVE_INFINITY;
     const urgent = dl <= 7 && dl >= 0;
     const expired = dl < 0;
     const tbd = isTBDDateDisplay(job.last_date_display);
     let text: string;
     if (tbd) text = 'Date TBD';
+    else if (!deadlineDate) text = job.last_date_display || job.last_date || 'TBD';
     else if (expired) text = 'Expired';
     else if (dl === 0) text = 'Last day!';
     else if (dl <= 7) text = `${dl} days left`;
-    else text = format(new Date(job.last_date), "dd MMM yyyy");
+    else text = format(deadlineDate, "dd MMM yyyy");
     return { daysLeft: dl, isUrgent: urgent, isExpired: expired, isTBDDate: tbd, lastDateText: text };
   }, [job.last_date, job.last_date_display]);
 
