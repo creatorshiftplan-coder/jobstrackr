@@ -700,7 +700,7 @@ export default function JobDetails() {
 
       {/* Fixed Apply Now Button */}
       <div 
-        className="fixed bottom-16 md:bottom-0 p-4 bg-card/95 backdrop-blur-md border-t border-border z-40 transition-all duration-200 ease-linear"
+        className="fixed bottom-8 md:bottom-0 p-4 bg-card/95 backdrop-blur-md border-t border-border z-40 transition-all duration-200 ease-linear"
         style={{ 
           left: isMobile ? '0' : (state === 'expanded' ? '16rem' : '3rem'),
           width: isMobile ? '100%' : (state === 'expanded' ? 'calc(100% - 16rem)' : 'calc(100% - 3rem)')

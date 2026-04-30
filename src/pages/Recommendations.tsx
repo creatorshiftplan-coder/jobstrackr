@@ -652,13 +652,17 @@ export default function Recommendations() {
     return skillsNeededJobs.filter(({ job }) => matchesSelectedLocation(job));
   }, [hasPreferredLocations, matchesSelectedLocation, skillsNeededJobs]);
 
-  const remainingSkillsNeededJobs = useMemo(() => {
+  const allIndiaSkillsNeededJobs = useMemo(() => {
     if (!hasPreferredLocations) return skillsNeededJobs;
-    return skillsNeededJobs.filter(({ job }) => !matchesSelectedLocation(job));
-  }, [hasPreferredLocations, matchesSelectedLocation, skillsNeededJobs]);
+    return skillsNeededJobs.filter(({ job }) => !matchesSelectedLocation(job) && isAllIndiaJob(job));
+  }, [hasPreferredLocations, matchesSelectedLocation, skillsNeededJobs, isAllIndiaJob]);
+
+  const otherStateSkillsNeededJobs = useMemo(() => {
+    if (!hasPreferredLocations) return [];
+    return skillsNeededJobs.filter(({ job }) => !matchesSelectedLocation(job) && !isAllIndiaJob(job));
+  }, [hasPreferredLocations, matchesSelectedLocation, skillsNeededJobs, isAllIndiaJob]);
 
   const notEligibleJobs = useMemo(() => matchedJobs.filter((m) => !m.eligibility.eligible), [matchedJobs]);
-  const [showSkillsNeeded, setShowSkillsNeeded] = useState(false);
   const visibleEditSteps = useMemo(() => getVisibleSteps(profile, education, answers, true), [profile, education, answers]);
   const filteredSectorSuggestions = useMemo(
     () => EXAM_SECTORS.filter((sector) => sector.toLowerCase().includes(sectorQuery.toLowerCase())),
@@ -1286,14 +1290,14 @@ export default function Recommendations() {
         )}
 
         {/* ── All India ── */}
-        {!jobsLoading && allIndiaJobs.length > 0 && (
+        {!jobsLoading && (allIndiaJobs.length > 0 || allIndiaSkillsNeededJobs.length > 0) && (
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
               <div className="h-7 w-7 rounded-lg bg-sky-500/15 flex items-center justify-center">
                 <Globe className="h-4 w-4 text-sky-600 dark:text-sky-400" />
               </div>
               <span className="font-display font-semibold text-sm text-foreground">All India</span>
-              <span className="text-xs text-muted-foreground font-medium">({allIndiaJobs.length})</span>
+              <span className="text-xs text-muted-foreground font-medium">({allIndiaJobs.length + allIndiaSkillsNeededJobs.length})</span>
               <div className="flex-1 h-px bg-border/60" />
             </div>
             {allIndiaJobs.map(({ job }, index) => (
@@ -1301,22 +1305,46 @@ export default function Recommendations() {
                 <JobCard job={job} />
               </div>
             ))}
+            {allIndiaSkillsNeededJobs.map(({ job, eligibility }, index) => (
+              <div key={job.id} className="space-y-1.5 animate-fadeIn" style={{ animationDelay: `${(allIndiaJobs.length + index) * 50}ms`, animationFillMode: "both" }}>
+                <div className="flex flex-wrap gap-1.5 px-1">
+                  {eligibility.skillsMissing.map((skill, i) => (
+                    <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium inline-flex items-center gap-1">
+                      <Wrench className="h-3 w-3" />{skill}
+                    </span>
+                  ))}
+                </div>
+                <JobCard job={job} />
+              </div>
+            ))}
           </div>
         )}
 
         {/* ── Other States ── */}
-        {!jobsLoading && otherStateJobs.length > 0 && (
+        {!jobsLoading && (otherStateJobs.length > 0 || otherStateSkillsNeededJobs.length > 0) && (
           <div className="space-y-3 opacity-90">
             <div className="flex items-center gap-2.5">
               <div className="h-7 w-7 rounded-lg bg-blue-500/15 flex items-center justify-center">
                 <Globe className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               </div>
               <span className="font-display font-semibold text-sm text-foreground">Other States</span>
-              <span className="text-xs text-muted-foreground font-medium">({otherStateJobs.length})</span>
+              <span className="text-xs text-muted-foreground font-medium">({otherStateJobs.length + otherStateSkillsNeededJobs.length})</span>
               <div className="flex-1 h-px bg-border/60" />
             </div>
             {otherStateJobs.map(({ job }, index) => (
               <div key={job.id} className="animate-fadeIn" style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}>
+                <JobCard job={job} />
+              </div>
+            ))}
+            {otherStateSkillsNeededJobs.map(({ job, eligibility }, index) => (
+              <div key={job.id} className="space-y-1.5 animate-fadeIn" style={{ animationDelay: `${(otherStateJobs.length + index) * 50}ms`, animationFillMode: "both" }}>
+                <div className="flex flex-wrap gap-1.5 px-1">
+                  {eligibility.skillsMissing.map((skill, i) => (
+                    <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium inline-flex items-center gap-1">
+                      <Wrench className="h-3 w-3" />{skill}
+                    </span>
+                  ))}
+                </div>
                 <JobCard job={job} />
               </div>
             ))}
@@ -1335,39 +1363,6 @@ export default function Recommendations() {
               <Settings className="h-4 w-4 mr-2" />
               Open Settings
             </Button>
-          </div>
-        )}
-
-        {/* ── Extra Skills Required (collapsible) ── */}
-        {!jobsLoading && remainingSkillsNeededJobs.length > 0 && (
-          <div className="space-y-3">
-            <button
-              onClick={() => setShowSkillsNeeded(!showSkillsNeeded)}
-              className="flex items-center gap-2.5 w-full text-left px-3 py-3 rounded-xl bg-amber-500/5 border border-amber-500/15 hover:bg-amber-500/10 transition-colors"
-            >
-              <div className="h-7 w-7 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
-                <Wrench className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
-              <span className="text-sm font-semibold text-foreground flex-1">Extra Skills Required</span>
-              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{remainingSkillsNeededJobs.length} jobs</span>
-              <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", showSkillsNeeded && "rotate-180")} />
-            </button>
-            {showSkillsNeeded && (
-              <div className="space-y-3">
-                {remainingSkillsNeededJobs.map(({ job, eligibility }, index) => (
-                  <div key={job.id} className="space-y-1.5 opacity-85 animate-fadeIn" style={{ animationDelay: `${index * 40}ms`, animationFillMode: "both" }}>
-                    <div className="flex flex-wrap gap-1.5 px-1">
-                      {eligibility.skillsMissing.map((skill, i) => (
-                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium inline-flex items-center gap-1">
-                          <Wrench className="h-3 w-3" />{skill}
-                        </span>
-                      ))}
-                    </div>
-                    <JobCard job={job} />
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
