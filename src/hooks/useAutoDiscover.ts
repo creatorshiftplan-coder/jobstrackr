@@ -35,6 +35,7 @@ interface AutoDiscoverLog {
     jobs_found: number;
     jobs_inserted: number;
     jobs_duplicate: number;
+    jobs_failed?: number;
     raw_response: any;
     error: string | null;
     latency_ms: number;
@@ -42,6 +43,7 @@ interface AutoDiscoverLog {
     reviewed: boolean;
     reviewed_at: string | null;
     reviewed_by: string | null;
+    source?: string;
 }
 
 interface CategoryDiscoveryResponse {

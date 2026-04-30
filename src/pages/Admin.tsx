@@ -3034,6 +3034,50 @@ export default function Admin() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Auto-Discover Status Card */}
+                {(() => {
+                  const latest = autoDiscoverLogs?.[0];
+                  if (!latest) return null;
+                  const isRecent = latest.run_at && (Date.now() - new Date(latest.run_at).getTime()) < 25 * 60 * 60 * 1000;
+                  const hasError = !!latest.error || (latest.jobs_failed || 0) > 0;
+                  const sourceLabel = latest.source === "freejobalert_github_actions" ? "GitHub Actions" : latest.source || "Manual";
+                  return (
+                    <div className={`rounded-lg border p-3 text-sm ${hasError ? "border-destructive/30 bg-destructive/5" : isRecent ? "border-success/30 bg-success/5" : "border-muted bg-muted/30"}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5" />
+                          Last Auto-Discover — {sourceLabel}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${hasError ? "bg-destructive/10 text-destructive" : isRecent ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
+                          {hasError ? "Issues" : isRecent ? "Recent" : "Old"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Found</span>
+                          <span className="ml-1 font-medium">{latest.jobs_found}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Inserted</span>
+                          <span className="ml-1 font-medium text-success">{latest.jobs_inserted}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Dup</span>
+                          <span className="ml-1 font-medium text-warning">{latest.jobs_duplicate}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Fail</span>
+                          <span className="ml-1 font-medium text-destructive">{latest.jobs_failed || 0}</span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1.5">
+                        {latest.run_at ? new Date(latest.run_at).toLocaleString() : "—"}
+                        {latest.latency_ms ? ` · ${latest.latency_ms}ms` : ""}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Step 1: Load links */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold flex items-center gap-2">
