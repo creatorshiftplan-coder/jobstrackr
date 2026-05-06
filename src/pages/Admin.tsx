@@ -499,6 +499,7 @@ export default function Admin() {
   const [updatesDiscoveredLinks, setUpdatesDiscoveredLinks] = useState<ArticleLink[]>([]);
   const [updatesScrapedResults, setUpdatesScrapedResults] = useState<Record<string, ArticleData>>({});
   const [updatesScrapingUrl, setUpdatesScrapingUrl] = useState<string | null>(null);
+  const [updatesSavingAll, setUpdatesSavingAll] = useState(false);
   const [updatesSavedUrls, setUpdatesSavedUrls] = useState<Set<string>>(new Set());
   const [updatesExpandedUrl, setUpdatesExpandedUrl] = useState<string | null>(null);
   const [updatesCrawlingSourceId, setUpdatesCrawlingSourceId] = useState<string | null>(null);
@@ -3743,28 +3744,54 @@ export default function Admin() {
                             {updatesDiscoveredLinks.length} found · {Object.keys(updatesScrapedResults).length} scraped · {updatesSavedUrls.size} saved
                           </Badge>
                         </h3>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={updatesScrapingUrl !== null}
-                          onClick={async () => {
-                            for (const link of updatesDiscoveredLinks) {
-                              if (updatesScrapedResults[link.url]) continue;
-                              setUpdatesScrapingUrl(link.url);
-                              try {
-                                const result = await govtScraper.scrapeSingleArticle.mutateAsync(link.url);
-                                setUpdatesScrapedResults((prev) => ({ ...prev, [link.url]: result.article }));
-                              } catch {
-                                // skip failed
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={updatesScrapingUrl !== null || updatesSavingAll}
+                            onClick={async () => {
+                              for (const link of updatesDiscoveredLinks) {
+                                if (updatesScrapedResults[link.url]) continue;
+                                setUpdatesScrapingUrl(link.url);
+                                try {
+                                  const result = await govtScraper.scrapeSingleArticle.mutateAsync(link.url);
+                                  setUpdatesScrapedResults((prev) => ({ ...prev, [link.url]: result.article }));
+                                } catch {
+                                  // skip failed
+                                }
                               }
-                            }
-                            setUpdatesScrapingUrl(null);
-                            toast({ title: "Scrape All complete" });
-                          }}
-                        >
-                          <Play className="h-3 w-3 mr-1" />
-                          Scrape All
-                        </Button>
+                              setUpdatesScrapingUrl(null);
+                              toast({ title: "Scrape All complete" });
+                            }}
+                          >
+                            {updatesScrapingUrl !== null ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+                            Scrape All
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={updatesSavingAll || updatesScrapingUrl !== null || Object.keys(updatesScrapedResults).filter(url => !updatesSavedUrls.has(url)).length === 0}
+                            onClick={async () => {
+                              setUpdatesSavingAll(true);
+                              const unsaved = updatesDiscoveredLinks.filter(l => updatesScrapedResults[l.url] && !updatesSavedUrls.has(l.url));
+                              let saved = 0;
+                              for (const link of unsaved) {
+                                try {
+                                  await govtScraper.saveArticle.mutateAsync(updatesScrapedResults[link.url]);
+                                  setUpdatesSavedUrls((prev) => new Set(prev).add(link.url));
+                                  saved++;
+                                } catch {
+                                  // skip failed
+                                }
+                              }
+                              setUpdatesSavingAll(false);
+                              toast({ title: `Save All complete`, description: `${saved} article${saved !== 1 ? "s" : ""} saved.` });
+                            }}
+                          >
+                            {updatesSavingAll ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                            Save All
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="relative max-h-[600px] w-full overflow-y-auto rounded-md border bg-card">
