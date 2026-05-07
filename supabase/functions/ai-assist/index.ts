@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { loadApiKeys, callWithRotation } from "../_shared/apiKeyRotation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,20 +17,11 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Support multiple API keys for rotation
-    const geminiApiKeys = [
-      Deno.env.get("GEMINI_API_KEY"),
-      Deno.env.get("GEMINI_API_KEY_2"),
-      Deno.env.get("GEMINI_API_KEY_3"),
-      Deno.env.get("GEMINI_API_KEY_4"),
-      Deno.env.get("GEMINI_API_KEY_5"),
-      Deno.env.get("GEMINI_API_KEY_6"),
-      Deno.env.get("GEMINI_API_KEY_7"),
-    ].filter(Boolean) as string[];
-
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    if (geminiApiKeys.length === 0) {
+    // Load API keys from DB with env-var fallback
+    const apiKeys = await loadApiKeys(supabase);
+    if (apiKeys.length === 0) {
       return new Response(
         JSON.stringify({ data: null, error: "AI service not configured", success: false }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -273,71 +265,28 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
         );
     }
 
-    // Call Gemini API with optional Google Search grounding - with key rotation
+    // Call AI with key rotation
     const today = new Date();
     const formattedDate = today.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     const dateAwarePrompt = `Current Date: ${formattedDate}.\n\n${userPrompt}`;
 
-    const requestBody: any = {
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: dateAwarePrompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
-    };
-
-    if (useGoogleSearch) {
-      requestBody.tools = [{ google_search: {} }];
-    }
-
-    let geminiResponse: Response | null = null;
-    let lastError = "";
-
-    for (let i = 0; i < geminiApiKeys.length; i++) {
-      const apiKey = geminiApiKeys[i];
-      console.log(`Trying API key ${i + 1} of ${geminiApiKeys.length}`);
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
-        }
-      );
-
-      if (response.ok) {
-        geminiResponse = response;
-        console.log(`API key ${i + 1} succeeded`);
-        break;
-      }
-
-      if (response.status === 429) {
-        console.log(`API key ${i + 1} rate limited, trying next...`);
-        lastError = "All API keys rate limited";
-        continue;
-      }
-
-      if (response.status >= 500) {
-        console.log(`API key ${i + 1} server error ${response.status}, trying next...`);
-        lastError = `Server error: ${response.status}`;
-        continue;
-      }
-
-      // Client error - stop trying
-      const errorText = await response.text();
-      console.error(`API key ${i + 1} error:`, response.status, errorText);
-      lastError = `AI API error: ${response.status}`;
-      break;
-    }
-
-    if (!geminiResponse) {
+    let aiContent = "";
+    try {
+      const rotationResult = await callWithRotation(supabase, apiKeys, {
+        systemPrompt,
+        userPrompt: dateAwarePrompt,
+        temperature: 0.3,
+        maxTokens: 4096,
+        useGoogleSearch,
+      });
+      aiContent = rotationResult.content;
+    } catch (rotationError) {
+      console.error("All keys failed:", rotationError);
       return new Response(
-        JSON.stringify({ data: null, error: lastError || "AI service temporarily unavailable", success: false }),
+        JSON.stringify({ data: null, error: (rotationError as Error).message || "AI service temporarily unavailable", success: false }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const geminiData = await geminiResponse.json();
-    const aiContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     console.log("AI raw response:", aiContent);
 

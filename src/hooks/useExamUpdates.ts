@@ -1,5 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { sortByTitleMatch, tokenizeTitle } from "@/lib/titleMatcher";
+import { isFreeJobAlertUrl } from "@/lib/urlUtils";
+
+/** Strip all freejobalert URLs from an array of exam updates */
+function filterFreeJobAlertFromUpdates(updates: ExamUpdateItem[]): ExamUpdateItem[] {
+  return updates
+    .filter((u) => !isFreeJobAlertUrl(u.url))
+    .map((u) => ({
+      ...u,
+      download_links: u.download_links?.filter((dl) => !isFreeJobAlertUrl(dl.url)) ?? [],
+      important_dates: u.important_dates?.map((d) => ({
+        ...d,
+        link: isFreeJobAlertUrl(d.link) ? "" : d.link,
+      })) ?? [],
+      related_articles: u.related_articles?.filter((a) => !isFreeJobAlertUrl(a.url)) ?? [],
+    }));
+}
 
 export interface ExamUpdateItem {
   id: string;
@@ -36,29 +53,28 @@ export function useExamUpdatesForJob(jobId: string | undefined, jobTitle: string
           .limit(20);
 
         if (!err1 && byJobId && byJobId.length > 0) {
-          return byJobId as ExamUpdateItem[];
+          return filterFreeJobAlertFromUpdates(byJobId as ExamUpdateItem[]);
         }
       }
 
-      // Fallback: keyword search on title
+      // Fallback: fuzzy keyword search on title
       if (jobTitle) {
-        // Extract first 3-4 meaningful keywords from job title
-        const keywords = jobTitle
-          .replace(/[^a-zA-Z0-9\s]/g, " ")
-          .split(/\s+/)
+        const keywords = tokenizeTitle(jobTitle)
           .filter((w) => w.length > 2)
-          .slice(0, 4);
+          .slice(0, 6);
 
-        if (keywords.length >= 2) {
-          const searchPattern = `%${keywords.join("%")}%`;
+        if (keywords.length > 0) {
+          const orQuery = keywords.map((keyword) => `title.ilike.%${keyword}%`).join(",");
           const { data: byTitle, error: err2 } = await (supabase.from as any)("exam_updates")
             .select("*")
-            .ilike("title", searchPattern)
+            .or(orQuery)
             .order("scraped_at", { ascending: false })
-            .limit(20);
+            .limit(50);
 
           if (!err2 && byTitle) {
-            return byTitle as ExamUpdateItem[];
+            return filterFreeJobAlertFromUpdates(
+              sortByTitleMatch(jobTitle, byTitle as ExamUpdateItem[], (update) => update.title).slice(0, 20)
+            );
           }
         }
       }
@@ -86,28 +102,44 @@ export function useExamUpdatesForExam(examId: string | undefined, examName: stri
           .limit(20);
 
         if (!err1 && byExamId && byExamId.length > 0) {
-          return byExamId as ExamUpdateItem[];
+          return filterFreeJobAlertFromUpdates(byExamId as ExamUpdateItem[]);
         }
       }
 
-      // Fallback: keyword search on exam name
+      // Fallback: fuzzy keyword search on exam name
       if (examName) {
-        const keywords = examName
-          .replace(/[^a-zA-Z0-9\s]/g, " ")
-          .split(/\s+/)
+        const keywords = tokenizeTitle(examName)
           .filter((w) => w.length > 2)
-          .slice(0, 4);
+          .slice(0, 8);
 
-        if (keywords.length >= 2) {
-          const searchPattern = `%${keywords.join("%")}%`;
+        if (keywords.length > 0) {
+          const orQuery = keywords.map((keyword) => `title.ilike.%${keyword}%`).join(",");
           const { data: byName, error: err2 } = await (supabase.from as any)("exam_updates")
             .select("*")
-            .ilike("title", searchPattern)
+            .or(orQuery)
             .order("scraped_at", { ascending: false })
-            .limit(20);
+            .limit(50);
 
-          if (!err2 && byName) {
-            return byName as ExamUpdateItem[];
+          if (!err2 && byName && byName.length > 0) {
+            const matched = sortByTitleMatch(examName, byName as ExamUpdateItem[], (update) => update.title, 30).slice(0, 20);
+            if (matched.length > 0) return filterFreeJobAlertFromUpdates(matched);
+          }
+
+          // Secondary fallback: use only first 3 core tokens for broader matching
+          const coreKeywords = keywords.slice(0, 3);
+          if (coreKeywords.length > 0) {
+            const coreOrQuery = coreKeywords.map((keyword) => `title.ilike.%${keyword}%`).join(",");
+            const { data: byCore, error: err3 } = await (supabase.from as any)("exam_updates")
+              .select("*")
+              .or(coreOrQuery)
+              .order("scraped_at", { ascending: false })
+              .limit(50);
+
+            if (!err3 && byCore && byCore.length > 0) {
+              return filterFreeJobAlertFromUpdates(
+                sortByTitleMatch(examName, byCore as ExamUpdateItem[], (update) => update.title, 25).slice(0, 20)
+              );
+            }
           }
         }
       }

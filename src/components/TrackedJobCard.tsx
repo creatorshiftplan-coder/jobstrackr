@@ -39,6 +39,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExamCredentialsModal } from "@/components/ExamCredentialsModal";
 import { useExamUpdatesForExam } from "@/hooks/useExamUpdates";
+import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 
 // Helper function to get phase-specific data from AI response
 const getPhaseData = (statusData: any, phaseNumber: 1 | 2): any => {
@@ -581,7 +582,7 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
                         ? "Download from the official website."
                         : "Will be available after Phase 1 result."}
                     </p>
-                    {isValidUrl(getPhaseData(statusData, 2)?.admit_card_link) && isAdmitCardAvailable(statusData, 2) && (
+                    {isValidUrl(getPhaseData(statusData, 2)?.admit_card_link) && isAdmitCardAvailable(statusData, 2) && !isFreeJobAlertUrl(getPhaseData(statusData, 2)?.admit_card_link) && (
                       <a
                         href={getPhaseData(statusData, 2).admit_card_link}
                         target="_blank"
@@ -656,7 +657,7 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
                               ? `Expected on ${resultInfo.date}`
                               : "Result date will be announced."}
                         </p>
-                        {isValidUrl(getPhaseData(statusData, 2)?.result_link) && resultInfo.isReleased && (
+                        {isValidUrl(getPhaseData(statusData, 2)?.result_link) && resultInfo.isReleased && !isFreeJobAlertUrl(getPhaseData(statusData, 2)?.result_link) && (
                           <a
                             href={getPhaseData(statusData, 2).result_link}
                             target="_blank"
@@ -711,7 +712,7 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
                       ? "Download from the official website."
                       : "Will be available soon."}
                   </p>
-                  {isValidUrl(statusData?.admit_card_link) && isPhaseComplete("admit_card") && (
+                  {isValidUrl(statusData?.admit_card_link) && isPhaseComplete("admit_card") && !isFreeJobAlertUrl(statusData?.admit_card_link) && (
                     <a
                       href={statusData.admit_card_link}
                       target="_blank"
@@ -786,7 +787,7 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
                             ? `Expected on ${resultInfo.date}`
                             : "Result date will be announced."}
                       </p>
-                      {isValidUrl(statusData?.result_link) && resultInfo.isReleased && (
+                      {isValidUrl(statusData?.result_link) && resultInfo.isReleased && !isFreeJobAlertUrl(statusData?.result_link) && (
                         <a
                           href={statusData.result_link}
                           target="_blank"
@@ -867,7 +868,7 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
                             <span className="text-muted-foreground truncate">{d.event}</span>
                             <div className="flex items-center gap-1.5 flex-shrink-0">
                               <span className="font-medium">{d.date || 'TBD'}</span>
-                              {d.link && (
+                              {d.link && !isFreeJobAlertUrl(d.link) && (
                                 <a href={d.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80">
                                   <ExternalLink className="h-3 w-3" />
                                 </a>
@@ -876,7 +877,7 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
                           </div>
                         ))}
                         {/* Download links from this update */}
-                        {update.download_links?.slice(0, 2).map((dl: any, j: number) => (
+                        {update.download_links?.filter((dl: any) => !isFreeJobAlertUrl(dl.url)).slice(0, 2).map((dl: any, j: number) => (
                           <a
                             key={`dl-${j}`}
                             href={dl.url}

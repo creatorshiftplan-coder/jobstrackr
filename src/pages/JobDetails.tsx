@@ -32,6 +32,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { BottomNav } from "@/components/BottomNav";
 import { formatAgeLimit, parseJobDeadline } from "@/lib/jobUtils";
+import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { useSimilarJobs } from "@/hooks/useSimilarJobs";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -160,8 +161,10 @@ export default function JobDetails() {
   const isTBDDate = isTBDDateDisplay(job.last_date_display);
 
   const meta = job.job_metadata as any;
-  const officialWebsite = job.official_website?.trim() || meta?.official_website?.trim() || null;
-  const applyLink = job.apply_link?.trim() || null;
+  const rawOfficialWebsite = job.official_website?.trim() || meta?.official_website?.trim() || null;
+  const rawApplyLink = job.apply_link?.trim() || null;
+  const officialWebsite = isFreeJobAlertUrl(rawOfficialWebsite) ? null : rawOfficialWebsite;
+  const applyLink = isFreeJobAlertUrl(rawApplyLink) ? null : rawApplyLink;
 
   // Format raw JSON keys into proper column headers: "post_name" → "Post Name"
   const formatKey = (key: string) =>
@@ -649,7 +652,7 @@ export default function JobDetails() {
               )}
 
               {/* Notification PDF & Links */}
-              {meta.notification_pdf && (
+              {meta.notification_pdf && !isFreeJobAlertUrl(meta.notification_pdf) && (
                 <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.8s" }}>
                   <CardContent className="p-4">
                     <h3 className="font-display font-semibold text-foreground mb-3">📄 Documents</h3>
@@ -805,7 +808,7 @@ function ExamUpdatesSection({ updates }: { updates: ExamUpdateItem[] }) {
     }
     if (update.download_links?.length) {
       for (const dl of update.download_links) {
-        if (!seenLinks.has(dl.url)) {
+        if (!seenLinks.has(dl.url) && !isFreeJobAlertUrl(dl.url)) {
           seenLinks.add(dl.url);
           allDownloads.push({ ...dl, category: update.category });
         }
@@ -904,7 +907,7 @@ function ExamUpdatesSection({ updates }: { updates: ExamUpdateItem[] }) {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-sm font-medium">{d.date || "TBD"}</span>
-                    {d.link && (
+                    {d.link && !isFreeJobAlertUrl(d.link) && (
                       <a href={d.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80">
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>

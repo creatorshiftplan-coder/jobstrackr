@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { loadApiKeys } from "../_shared/apiKeyRotation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,21 +17,14 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Support multiple API keys for rotation
-    const geminiApiKeys = [
-      Deno.env.get("GEMINI_API_KEY"),
-      Deno.env.get("GEMINI_API_KEY_2"),
-      Deno.env.get("GEMINI_API_KEY_3"),
-      Deno.env.get("GEMINI_API_KEY_4"),
-      Deno.env.get("GEMINI_API_KEY_5"),
-      Deno.env.get("GEMINI_API_KEY_6"),
-      Deno.env.get("GEMINI_API_KEY_7"),
-    ].filter(Boolean) as string[];
-
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Load API keys from DB with env-var fallback
+    const apiKeysConfig = await loadApiKeys(supabase);
+    const geminiApiKeys = apiKeysConfig.map(k => k.api_key);
+
     if (geminiApiKeys.length === 0) {
-      console.error("No GEMINI_API_KEY configured");
+      console.error("No API keys configured");
       return new Response(
         JSON.stringify({ data: null, error: "AI service not configured", success: false }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

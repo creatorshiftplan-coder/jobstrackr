@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { loadApiKeys, callWithRotation, ApiKeyConfig } from "../_shared/apiKeyRotation.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -326,7 +327,7 @@ async function authorizeAdminOrService(
 
 async function discoverCategory(
     category: string,
-    apiKey: string,
+    apiKeys: ApiKeyConfig[],
     existingJobs: { id: string; title: string; department: string }[],
     supabase: any,
     autoInsert: boolean,
@@ -346,39 +347,24 @@ async function discoverCategory(
     try {
         console.log(`Discovering jobs for category: ${category}`);
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    systemInstruction: { parts: [{ text: JOB_DISCOVERY_PROMPT }] },
-                    contents: [{
-                        role: "user",
-                        parts: [{
-                            text: `Search for the ${JOBS_PER_CATEGORY} latest ${category} government job notifications released in India in the last 7 days.
+        let aiContent = "";
+        try {
+            const rotationResult = await callWithRotation(supabase, apiKeys, {
+                systemPrompt: JOB_DISCOVERY_PROMPT,
+                userPrompt: `Search for the ${JOBS_PER_CATEGORY} latest ${category} government job notifications released in India in the last 7 days.
               
 Find: official notifications, application dates, eligibility, vacancies, direct application links.
-Return structured JSON.`
-                        }]
-                    }],
-                    generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
-                    tools: [{ google_search: {} }],
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            result.error = response.status === 429 ? "Rate limited" : `API error: ${response.status}`;
+Return structured JSON.`,
+                temperature: 0.2,
+                maxTokens: 4096,
+                useGoogleSearch: true,
+            });
+            aiContent = rotationResult.content;
+        } catch (rotationError) {
+            console.error(`All keys failed for category ${category}:`, rotationError);
+            result.error = (rotationError as Error).message || "All API keys failed";
             result.latency_ms = Date.now() - startTime;
             return result;
-        }
-
-        const geminiData = await response.json();
-        let aiContent = "";
-        const parts = geminiData.candidates?.[0]?.content?.parts || [];
-        for (const part of parts) {
-            if (part.text) aiContent += part.text;
         }
 
         // Parse JSON
@@ -479,7 +465,8 @@ Return structured JSON.`
 
 async function scrapeUrl(
     url: string,
-    apiKey: string,
+    apiKeys: ApiKeyConfig[],
+    supabase: any,
     existingJobs: { id: string; title: string; department: string }[]
 ): Promise<DiscoveryResult> {
     const startTime = Date.now();
@@ -495,39 +482,24 @@ async function scrapeUrl(
     try {
         console.log(`Scraping URL: ${url}`);
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    systemInstruction: { parts: [{ text: URL_SCRAPE_PROMPT }] },
-                    contents: [{
-                        role: "user",
-                        parts: [{
-                            text: `Visit and extract all government job listings from this URL: ${url}
+        let aiContent = "";
+        try {
+            const rotationResult = await callWithRotation(supabase, apiKeys, {
+                systemPrompt: URL_SCRAPE_PROMPT,
+                userPrompt: `Visit and extract all government job listings from this URL: ${url}
 
 Use Google Search to access the URL content and extract every job listing you find.
-Return structured JSON with job details.`
-                        }]
-                    }],
-                    generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
-                    tools: [{ google_search: {} }],
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            result.error = response.status === 429 ? "Rate limited" : `API error: ${response.status}`;
+Return structured JSON with job details.`,
+                temperature: 0.1,
+                maxTokens: 8192,
+                useGoogleSearch: true,
+            });
+            aiContent = rotationResult.content;
+        } catch (rotationError) {
+            console.error("All keys failed for URL scrape:", rotationError);
+            result.error = (rotationError as Error).message || "All API keys failed";
             result.latency_ms = Date.now() - startTime;
             return result;
-        }
-
-        const geminiData = await response.json();
-        let aiContent = "";
-        const parts = geminiData.candidates?.[0]?.content?.parts || [];
-        for (const part of parts) {
-            if (part.text) aiContent += part.text;
         }
 
         console.log("URL scrape response:", aiContent.substring(0, 500));
@@ -589,25 +561,16 @@ Deno.serve(async (req) => {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-        const geminiApiKeys = [
-            Deno.env.get("GEMINI_API_KEY"),
-            Deno.env.get("GEMINI_API_KEY_2"),
-            Deno.env.get("GEMINI_API_KEY_3"),
-            Deno.env.get("GEMINI_API_KEY_4"),
-            Deno.env.get("GEMINI_API_KEY_5"),
-            Deno.env.get("GEMINI_API_KEY_6"),
-            Deno.env.get("GEMINI_API_KEY_7"),
-        ].filter(Boolean) as string[];
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-        if (geminiApiKeys.length === 0) {
+        // Load API keys from DB with env-var fallback
+        const apiKeysConfig = await loadApiKeys(supabase);
+        if (apiKeysConfig.length === 0) {
             return new Response(
                 JSON.stringify({ error: "AI service not configured" }),
                 { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
-
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
         const authError = await authorizeAdminOrService(req, supabase, supabaseServiceKey);
         if (authError) {
             return authError;
@@ -619,11 +582,9 @@ Deno.serve(async (req) => {
             .select("id, title, department");
 
         const jobsList = existingJobs || [];
-        const apiKey = geminiApiKeys[Math.floor(Math.random() * geminiApiKeys.length)];
-
         // MODE 1: URL Scraping
         if (urlToScrape) {
-            const result = await scrapeUrl(urlToScrape, apiKey, jobsList);
+            const result = await scrapeUrl(urlToScrape, apiKeysConfig, supabase, jobsList);
 
             // Log the scrape
             await supabase.from("auto_discover_logs").insert({
@@ -647,7 +608,7 @@ Deno.serve(async (req) => {
 
         // MODE 2: Single Category Discovery
         if (category) {
-            const result = await discoverCategory(category, apiKey, jobsList, supabase, autoInsert, supabaseUrl, supabaseServiceKey);
+            const result = await discoverCategory(category, apiKeysConfig, jobsList, supabase, autoInsert, supabaseUrl, supabaseServiceKey);
 
             // Log the discovery
             await supabase.from("auto_discover_logs").insert({
@@ -672,12 +633,9 @@ Deno.serve(async (req) => {
         // MODE 3: Multiple Categories (legacy)
         const categoriesToSearch = categories || JOB_CATEGORIES;
         const results: DiscoveryResult[] = [];
-        let keyIndex = 0;
 
         for (const cat of categoriesToSearch) {
-            const key = geminiApiKeys[keyIndex % geminiApiKeys.length];
-            keyIndex++;
-            const result = await discoverCategory(cat, key, jobsList, supabase, autoInsert, supabaseUrl, supabaseServiceKey);
+            const result = await discoverCategory(cat, apiKeysConfig, jobsList, supabase, autoInsert, supabaseUrl, supabaseServiceKey);
             results.push(result);
             await new Promise(resolve => setTimeout(resolve, 1000));
         }

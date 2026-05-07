@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import logoWhite from "@/assets/logo-white.png";
 import logoColor from "@/assets/logo-color.png";
+import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -524,7 +525,7 @@ export default function SyllabusResult() {
                             <ExternalLink className="h-4 w-4" /> Sources
                         </h4>
                         <div className="space-y-2">
-                            {syllabusData.grounding_sources.slice(0, 3).map((url, i) => (
+                            {syllabusData.grounding_sources.filter((url) => !isFreeJobAlertUrl(url)).slice(0, 3).map((url, i) => (
                                 <a
                                     key={i}
                                     href={url}

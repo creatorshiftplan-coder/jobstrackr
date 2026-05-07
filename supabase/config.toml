@@ -51,3 +51,6 @@ verify_jwt = true
 
 [functions.govtjob-scraper]
 verify_jwt = true
+
+[functions.syllabus-search]
+verify_jwt = true

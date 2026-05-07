@@ -13,6 +13,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { BottomNav } from "@/components/BottomNav";
+import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 
 // ── Milestone timeline config ─────────────────────────────────────
 const MILESTONES = [
@@ -423,7 +424,7 @@ export default function UpdateDetails() {
                                         View Full Job Details <ExternalLink className="h-3.5 w-3.5" />
                                     </Link>
                                 )}
-                                {matchingJob.apply_link && (
+                                {matchingJob.apply_link && !isFreeJobAlertUrl(matchingJob.apply_link) && (
                                     <a href={matchingJob.apply_link} target="_blank" rel="noopener noreferrer"
                                         className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-full text-sm font-medium hover:bg-green-700 transition-colors">
                                         Apply Now <ExternalLink className="h-3.5 w-3.5" />
@@ -482,7 +483,7 @@ export default function UpdateDetails() {
                 )}
 
                 {/* ── Official Website CTA ─────────────────────────── */}
-                {exam.official_website && (
+                {exam.official_website && !isFreeJobAlertUrl(exam.official_website) && (
                     <div className="text-center py-2">
                         <a href={exam.official_website} target="_blank" rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-full font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/25">

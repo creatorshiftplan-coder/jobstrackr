@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Job } from "@/types/job";
+import { sortByTitleMatch, tokenizeTitle } from "@/lib/titleMatcher";
 
 /**
  * Hook to find a job that matches an exam by name similarity.
@@ -17,11 +18,7 @@ export function useJobForExam(examName: string | undefined) {
         queryFn: async (): Promise<Job | null> => {
             if (!examName) return null;
 
-            // Normalize the exam name for matching
-            const normalizedName = examName
-                .toLowerCase()
-                .replace(/\s+/g, " ")
-                .trim();
+            const normalizedName = examName.toLowerCase().replace(/\s+/g, " ").trim();
 
             // Try exact title match first
             const { data: exactMatch } = await supabase
@@ -44,26 +41,22 @@ export function useJobForExam(examName: string | undefined) {
 
             if (partialMatch) return partialMatch as Job;
 
-            // Extract key words for fuzzy matching (3+ char words)
-            const keywords = normalizedName
-                .split(" ")
+            const keywords = tokenizeTitle(normalizedName)
                 .filter(word => word.length >= 3)
-                .slice(0, 3); // Take first 3 keywords
+                .slice(0, 8);
 
             if (keywords.length === 0) return null;
 
-            // Try matching with keywords
-            // Use OR condition with ilike for each keyword
-            for (const keyword of keywords) {
-                const { data: keywordMatch } = await supabase
-                    .from("jobs")
-                    .select("*")
-                    .ilike("title", `%${keyword}%`)
-                    .order("created_at", { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
+            const orQuery = keywords.map((keyword) => `title.ilike.%${keyword}%`).join(",");
+            const { data: keywordMatches } = await supabase
+                .from("jobs")
+                .select("*")
+                .or(orQuery)
+                .order("created_at", { ascending: false })
+                .limit(50);
 
-                if (keywordMatch) return keywordMatch as Job;
+            if (keywordMatches && keywordMatches.length > 0) {
+                return sortByTitleMatch(normalizedName, keywordMatches as Job[], (job) => job.title)[0] || null;
             }
 
             return null;

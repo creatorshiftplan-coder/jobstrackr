@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { loadApiKeys, callWithRotation } from "../_shared/apiKeyRotation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -131,18 +132,10 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Support multiple API keys for rotation
-    const geminiApiKeys = [
-      Deno.env.get("GEMINI_API_KEY"),
-      Deno.env.get("GEMINI_API_KEY_2"),
-      Deno.env.get("GEMINI_API_KEY_3"),
-      Deno.env.get("GEMINI_API_KEY_4"),
-      Deno.env.get("GEMINI_API_KEY_5"),
-      Deno.env.get("GEMINI_API_KEY_6"),
-      Deno.env.get("GEMINI_API_KEY_7"),
-    ].filter(Boolean) as string[];
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Load API keys from DB with env-var fallback
+    const apiKeys = await loadApiKeys(supabase);
     const authenticatedUserId = await getAuthenticatedUserId(req, supabase);
 
     if (userId && authenticatedUserId && userId !== authenticatedUserId) {
@@ -346,7 +339,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (geminiApiKeys.length === 0) {
+    if (apiKeys.length === 0) {
       return new Response(
         JSON.stringify({ error: "AI service not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -386,27 +379,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Call Gemini API with Google Search grounding - with key rotation
-    console.log("Calling Gemini API with Google Search grounding for:", query);
+    // Call AI with key rotation + Google Search grounding
+    console.log("Calling AI with key rotation for:", query);
 
-    let geminiResponse: Response | null = null;
-    let lastError = "";
-
-    for (let i = 0; i < geminiApiKeys.length; i++) {
-      const apiKey = geminiApiKeys[i];
-      console.log(`Trying API key ${i + 1} of ${geminiApiKeys.length}`);
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: JOB_DISCOVERY_PROMPT }] },
-            contents: [{
-              role: "user",
-              parts: [{
-                text: `Search for current Indian government jobs matching: "${query}"
+    let aiContent = "";
+    try {
+      const rotationResult = await callWithRotation(supabase, apiKeys, {
+        systemPrompt: JOB_DISCOVERY_PROMPT,
+        userPrompt: `Search for current Indian government jobs matching: "${query}"
 
 Please use Google Search to find:
 1. Official notifications from government websites
@@ -415,60 +395,18 @@ Please use Google Search to find:
 4. Any recent news about this exam/job
 5. The DIRECT official application link
 
-Return structured JSON with the job details.`
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 4096
-            },
-            tools: [{ google_search: {} }],
-          }),
-        }
-      );
-
-      if (response.ok) {
-        geminiResponse = response;
-        console.log(`API key ${i + 1} succeeded`);
-        break;
-      }
-
-      if (response.status === 429) {
-        console.log(`API key ${i + 1} rate limited, trying next...`);
-        lastError = "All API keys rate limited";
-        continue;
-      }
-
-      if (response.status >= 500) {
-        console.log(`API key ${i + 1} server error ${response.status}, trying next...`);
-        lastError = `Server error: ${response.status}`;
-        continue;
-      }
-
-      // Client error - stop trying
-      const errorText = await response.text();
-      console.error(`API key ${i + 1} error:`, response.status, errorText);
-      lastError = `AI API error: ${response.status}`;
-      break;
-    }
-
-    if (!geminiResponse) {
+Return structured JSON with the job details.`,
+        temperature: 0.2,
+        maxTokens: 4096,
+        useGoogleSearch: true,
+      });
+      aiContent = rotationResult.content;
+    } catch (rotationError) {
+      console.error("All keys failed:", rotationError);
       return new Response(
-        JSON.stringify({ error: lastError || "AI service temporarily unavailable" }),
+        JSON.stringify({ error: (rotationError as Error).message || "AI service temporarily unavailable" }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    }
-
-    const geminiData = await geminiResponse.json();
-    console.log("Gemini response candidates:", JSON.stringify(geminiData.candidates?.[0]?.content?.parts?.length || 0, null, 2));
-
-    // Extract text from all parts
-    let aiContent = "";
-    const parts = geminiData.candidates?.[0]?.content?.parts || [];
-    for (const part of parts) {
-      if (part.text) {
-        aiContent += part.text;
-      }
     }
 
     console.log("AI raw response:", aiContent);

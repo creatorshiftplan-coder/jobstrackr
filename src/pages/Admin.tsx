@@ -20,8 +20,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { Job, JobMetadata } from "@/types/job";
@@ -29,6 +30,8 @@ import { parseEligibilityProfileFromText } from "@/lib/eligibilityParser";
 import { parseJobDeadline } from "@/lib/jobUtils";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { useGovtJobScraper, type ScraperSource, type ExamUpdate, type ArticleLink, type ArticleData } from "@/hooks/useGovtJobScraper";
+import { useApiKeys, PROVIDER_PRESETS, type ApiKeyEntry, type NewApiKeyEntry } from "@/hooks/useApiKeys";
+import { Switch } from "@/components/ui/switch";
 
 interface JobFormData {
   title: string;
@@ -505,6 +508,15 @@ export default function Admin() {
   const [updatesCrawlingSourceId, setUpdatesCrawlingSourceId] = useState<string | null>(null);
   const [updatesDetailView, setUpdatesDetailView] = useState<ExamUpdate | null>(null);
 
+  // API Keys state
+  const apiKeysHook = useApiKeys();
+  const [showAddKeyDialog, setShowAddKeyDialog] = useState(false);
+  const [editingKey, setEditingKey] = useState<ApiKeyEntry | null>(null);
+  const [keyForm, setKeyForm] = useState<NewApiKeyEntry>({ provider: "gemini", model_name: "gemini-2.5-flash", api_key: "", label: "" });
+  const [keyFormPriority, setKeyFormPriority] = useState(0);
+  const [deleteKeyId, setDeleteKeyId] = useState<string | null>(null);
+  const [showKeyValues, setShowKeyValues] = useState<Set<string>>(new Set());
+
   // URL scraping state
   const [scrapeUrlInput, setScrapeUrlInput] = useState("");
   const [scrapedJobs, setScrapedJobs] = useState<any[]>([]);
@@ -530,6 +542,7 @@ export default function Admin() {
   const [discoverScrapedResults, setDiscoverScrapedResults] = useState<Record<string, any>>({});
   const [discoverScrapingUrl, setDiscoverScrapingUrl] = useState<string | null>(null);
   const [discoverSavingUrl, setDiscoverSavingUrl] = useState<string | null>(null);
+  const [discoverSavingAll, setDiscoverSavingAll] = useState(false);
   const [discoverSavedUrls, setDiscoverSavedUrls] = useState<Set<string>>(new Set());
   const [discoverExpandedUrl, setDiscoverExpandedUrl] = useState<string | null>(null);
 
@@ -1885,6 +1898,12 @@ export default function Admin() {
                 <FileText className="h-4 w-4" />
                 <span className="hidden sm:inline">Updates</span>
               </TabsTrigger>
+              {isFullAdmin && (
+                <TabsTrigger value="ai-keys" className="gap-1 min-w-[44px] h-10">
+                  <Key className="h-4 w-4" />
+                  <span className="hidden sm:inline">AI Keys</span>
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -2999,7 +3018,7 @@ export default function Admin() {
 
                     {/* Links */}
                     <div className="flex flex-wrap gap-2">
-                      {scraperResult.official_apply_link && (
+                      {scraperResult.official_apply_link && !isFreeJobAlertUrl(scraperResult.official_apply_link) && (
                         <a href={scraperResult.official_apply_link} target="_blank" rel="noopener noreferrer">
                           <Button variant="outline" size="sm">
                             <ExternalLink className="h-3 w-3 mr-1" />
@@ -3007,7 +3026,7 @@ export default function Admin() {
                           </Button>
                         </a>
                       )}
-                      {scraperResult.notification_pdf && (
+                      {scraperResult.notification_pdf && !isFreeJobAlertUrl(scraperResult.notification_pdf) && (
                         <a href={scraperResult.notification_pdf} target="_blank" rel="noopener noreferrer">
                           <Button variant="outline" size="sm">
                             <FileText className="h-3 w-3 mr-1" />
@@ -3099,13 +3118,51 @@ export default function Admin() {
                 {/* Step 2: Results table */}
                 {discoveredLinks.length > 0 && (
                   <div className="space-y-3">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <Badge className="bg-primary text-white text-[10px] px-2 py-0">Step 2</Badge>
-                      Discovered Links
-                      <Badge variant="secondary" className="ml-1">
-                        {discoveredLinks.length} found · {Object.keys(discoverScrapedResults).length} scraped · {discoverSavedUrls.size} saved
-                      </Badge>
-                    </h3>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Badge className="bg-primary text-white text-[10px] px-2 py-0">Step 2</Badge>
+                        Discovered Links
+                        <Badge variant="secondary" className="ml-1">
+                          {discoveredLinks.length} found · {Object.keys(discoverScrapedResults).length} scraped · {discoverSavedUrls.size} saved
+                        </Badge>
+                      </h3>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={discoverScrapingUrl !== null || discoverSavingAll}
+                          onClick={async () => {
+                            for (const link of discoveredLinks) {
+                              if (discoverScrapedResults[link.url]) continue;
+                              await handleDiscoverScrapeOne(link.url);
+                            }
+                            toast({ title: "Scrape All complete" });
+                          }}
+                        >
+                          {discoverScrapingUrl !== null ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+                          Scrape All
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={discoverSavingAll || discoverScrapingUrl !== null || Object.keys(discoverScrapedResults).filter(url => !discoverSavedUrls.has(url)).length === 0}
+                          onClick={async () => {
+                            setDiscoverSavingAll(true);
+                            const unsaved = discoveredLinks.filter(l => discoverScrapedResults[l.url] && !discoverSavedUrls.has(l.url));
+                            let saved = 0;
+                            for (const link of unsaved) {
+                              await handleDiscoverSaveJob(link.url);
+                              saved++;
+                            }
+                            setDiscoverSavingAll(false);
+                            toast({ title: "Save All complete", description: `${saved} job${saved !== 1 ? "s" : ""} saved.` });
+                          }}
+                        >
+                          {discoverSavingAll ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                          Save All
+                        </Button>
+                      </div>
+                    </div>
 
                     <div className="relative max-h-[600px] w-full overflow-y-auto rounded-md border bg-card">
                       <div className="w-full overflow-x-auto">
@@ -4190,8 +4247,315 @@ export default function Admin() {
               </Card>
             </div>
           </TabsContent>
+
+          {/* AI Keys Tab */}
+          <TabsContent value="ai-keys">
+            <div className="space-y-4">
+              {/* Stats Row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription className="text-xs">Total Keys</CardDescription>
+                    <CardTitle className="text-2xl">{apiKeysHook.keys.length}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription className="text-xs">Active</CardDescription>
+                    <CardTitle className="text-2xl text-green-600">{apiKeysHook.keys.filter(k => k.is_active).length}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription className="text-xs">Total Calls</CardDescription>
+                    <CardTitle className="text-2xl">{apiKeysHook.keys.reduce((s, k) => s + (k.total_calls || 0), 0)}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription className="text-xs">Total Errors</CardDescription>
+                    <CardTitle className="text-2xl text-red-500">{apiKeysHook.keys.reduce((s, k) => s + (k.total_errors || 0), 0)}</CardTitle>
+                  </CardHeader>
+                </Card>
+              </div>
+
+              <Card className="border-0 shadow-card">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>API Keys &amp; Models</CardTitle>
+                      <CardDescription>Manage AI provider keys with automatic rotation on exhaustion</CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => apiKeysHook.refetch()}>
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" onClick={() => {
+                        setEditingKey(null);
+                        setKeyForm({ provider: "gemini", model_name: "gemini-2.5-flash", api_key: "", label: "" });
+                        setKeyFormPriority(apiKeysHook.keys.length);
+                        setShowAddKeyDialog(true);
+                      }}>
+                        <Plus className="h-4 w-4 mr-1" /> Add Key
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {apiKeysHook.isLoading ? (
+                    <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                  ) : apiKeysHook.keys.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Key className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                      <p className="text-sm">No API keys configured yet.</p>
+                      <p className="text-xs mt-1">Add keys from OpenRouter, Gemini, OpenAI, or Groq to enable AI features.</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs w-10">#</TableHead>
+                            <TableHead className="text-xs">Provider</TableHead>
+                            <TableHead className="text-xs">Model</TableHead>
+                            <TableHead className="text-xs">Label</TableHead>
+                            <TableHead className="text-xs">Key</TableHead>
+                            <TableHead className="text-xs text-center">Active</TableHead>
+                            <TableHead className="text-xs text-right">Calls</TableHead>
+                            <TableHead className="text-xs text-right">Errors</TableHead>
+                            <TableHead className="text-xs">Last Used</TableHead>
+                            <TableHead className="text-xs">Status</TableHead>
+                            <TableHead className="text-xs text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {apiKeysHook.keys.map((k, idx) => (
+                            <TableRow key={k.id} className={!k.is_active ? "opacity-50" : ""}>
+                              <TableCell className="text-xs font-mono">{k.priority}</TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-[10px] capitalize">{k.provider}</Badge>
+                              </TableCell>
+                              <TableCell className="text-xs font-mono max-w-[140px] truncate">{k.model_name}</TableCell>
+                              <TableCell className="text-xs">{k.label || "—"}</TableCell>
+                              <TableCell className="text-xs font-mono">
+                                <div className="flex items-center gap-1">
+                                  <span className="max-w-[100px] truncate">
+                                    {showKeyValues.has(k.id) ? k.api_key : `${k.api_key.slice(0, 6)}${"•".repeat(12)}`}
+                                  </span>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-5 w-5 p-0"
+                                    onClick={() => {
+                                      const next = new Set(showKeyValues);
+                                      if (next.has(k.id)) next.delete(k.id); else next.add(k.id);
+                                      setShowKeyValues(next);
+                                    }}
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-5 w-5 p-0"
+                                    onClick={() => { navigator.clipboard.writeText(k.api_key); toast({ title: "Copied!" }); }}
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Switch
+                                  checked={k.is_active}
+                                  onCheckedChange={(checked) => apiKeysHook.toggleActive.mutate({ id: k.id, is_active: checked })}
+                                />
+                              </TableCell>
+                              <TableCell className="text-xs text-right font-mono">{k.total_calls || 0}</TableCell>
+                              <TableCell className="text-xs text-right font-mono text-red-500">{k.total_errors || 0}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {k.last_used_at ? format(new Date(k.last_used_at), "MMM d, HH:mm") : "Never"}
+                              </TableCell>
+                              <TableCell>
+                                {k.last_error ? (
+                                  <Badge variant="destructive" className="text-[9px] max-w-[120px] truncate" title={k.last_error}>
+                                    {k.last_error.slice(0, 20)}
+                                  </Badge>
+                                ) : k.total_calls > 0 ? (
+                                  <Badge className="text-[9px] bg-green-100 text-green-700">OK</Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1 justify-end">
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => {
+                                    setEditingKey(k);
+                                    setKeyForm({ provider: k.provider, model_name: k.model_name, api_key: k.api_key, label: k.label || "" });
+                                    setKeyFormPriority(k.priority);
+                                    setShowAddKeyDialog(true);
+                                  }}>
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteKeyId(k.id)}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {/* How rotation works info */}
+                  <div className="mt-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3">
+                    <h4 className="text-xs font-semibold mb-1 flex items-center gap-1"><RefreshCw className="h-3 w-3" /> How Key Rotation Works</h4>
+                    <ul className="text-[11px] text-muted-foreground space-y-0.5 list-disc list-inside">
+                      <li>Keys are tried in <strong>priority order</strong> (lowest number first).</li>
+                      <li>If a key returns 429 (rate limit) or 402 (quota exhausted), the next key is tried automatically.</li>
+                      <li>Server errors (5xx) also trigger rotation to the next key.</li>
+                      <li>Usage stats (calls, errors, last used) are tracked per key.</li>
+                      <li>Supports <strong>Gemini, OpenRouter, OpenAI, and Groq</strong> providers — mix and match freely.</li>
+                      <li>Falls back to <code>GEMINI_API_KEY</code> env vars if no DB keys are configured.</li>
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
+
+      {/* Add/Edit API Key Dialog */}
+      <Dialog open={showAddKeyDialog} onOpenChange={(open) => { if (!open) { setShowAddKeyDialog(false); setEditingKey(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingKey ? "Edit API Key" : "Add API Key"}</DialogTitle>
+            <DialogDescription>Configure a provider API key with model for rotation.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Provider</Label>
+              <Select value={keyForm.provider} onValueChange={(val) => {
+                const models = PROVIDER_PRESETS[val]?.models || [];
+                setKeyForm({ ...keyForm, provider: val, model_name: models[0] || "" });
+              }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.keys(PROVIDER_PRESETS).map(p => (
+                    <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Model</Label>
+              <Select value={keyForm.model_name} onValueChange={(val) => setKeyForm({ ...keyForm, model_name: val })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(PROVIDER_PRESETS[keyForm.provider]?.models || []).map(m => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Or type a custom model name..."
+                value={keyForm.model_name}
+                onChange={(e) => setKeyForm({ ...keyForm, model_name: e.target.value })}
+                className="text-xs mt-1"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">API Key</Label>
+              <Input
+                type="password"
+                placeholder="sk-... or AIza..."
+                value={keyForm.api_key}
+                onChange={(e) => setKeyForm({ ...keyForm, api_key: e.target.value })}
+                className="font-mono text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Label (optional)</Label>
+                <Input
+                  placeholder="e.g. Personal Key 1"
+                  value={keyForm.label || ""}
+                  onChange={(e) => setKeyForm({ ...keyForm, label: e.target.value })}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Priority (lower = first)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={keyFormPriority}
+                  onChange={(e) => setKeyFormPriority(parseInt(e.target.value) || 0)}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowAddKeyDialog(false); setEditingKey(null); }}>Cancel</Button>
+            <Button
+              disabled={!keyForm.api_key || !keyForm.model_name || apiKeysHook.addKey.isPending || apiKeysHook.updateKey.isPending}
+              onClick={() => {
+                if (editingKey) {
+                  apiKeysHook.updateKey.mutate({
+                    id: editingKey.id,
+                    provider: keyForm.provider,
+                    model_name: keyForm.model_name,
+                    api_key: keyForm.api_key,
+                    label: keyForm.label || null,
+                    priority: keyFormPriority,
+                  }, {
+                    onSuccess: () => { setShowAddKeyDialog(false); setEditingKey(null); },
+                  });
+                } else {
+                  apiKeysHook.addKey.mutate({
+                    ...keyForm,
+                    priority: keyFormPriority,
+                  }, {
+                    onSuccess: () => { setShowAddKeyDialog(false); },
+                  });
+                }
+              }}
+            >
+              {(apiKeysHook.addKey.isPending || apiKeysHook.updateKey.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              {editingKey ? "Update" : "Add Key"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete API Key Confirm */}
+      <AlertDialog open={!!deleteKeyId} onOpenChange={(open) => { if (!open) setDeleteKeyId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete API Key?</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently remove this key from rotation. Edge functions will no longer use it.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground"
+              onClick={() => {
+                if (deleteKeyId) {
+                  apiKeysHook.deleteKey.mutate(deleteKeyId, { onSuccess: () => setDeleteKeyId(null) });
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Exam Update Detail Dialog */}
       <Dialog open={!!updatesDetailView} onOpenChange={(open) => { if (!open) setUpdatesDetailView(null); }}>
