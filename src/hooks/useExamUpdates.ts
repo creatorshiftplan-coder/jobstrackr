@@ -38,6 +38,30 @@ export interface ExamUpdateItem {
 }
 
 /**
+ * Fetch all recent exam_updates for the trending page, optionally filtered by category
+ */
+export function useAllExamUpdates(category?: string) {
+  return useQuery({
+    queryKey: ["all-exam-updates", category],
+    queryFn: async (): Promise<ExamUpdateItem[]> => {
+      let query = (supabase.from as any)("exam_updates")
+        .select("*")
+        .order("scraped_at", { ascending: false })
+        .limit(100);
+
+      if (category && category !== "all") {
+        query = query.eq("category", category);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return filterFreeJobAlertFromUpdates((data || []) as ExamUpdateItem[]);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
  * Fetch exam_updates linked to a specific job (by job_id or title keyword fallback)
  */
 export function useExamUpdatesForJob(jobId: string | undefined, jobTitle: string | undefined) {

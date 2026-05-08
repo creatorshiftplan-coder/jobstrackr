@@ -3,13 +3,16 @@ import { useSearchParams } from "react-router-dom";
 import { useTrendingExams, CATEGORY_GRADIENTS } from "@/hooks/useTrendingExams";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { TrendingExamCard } from "@/components/TrendingExamCard";
+import { ExamUpdateCard } from "@/components/ExamUpdateCard";
 import { BottomNav } from "@/components/BottomNav";
 import { AppHeader } from "@/components/AppHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, X, Check, ChevronDown, MapPin, Grid3X3, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { TrendingUp, X, Check, ChevronDown, MapPin, Grid3X3, Clock, Newspaper } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getExamStatusType, getBadgeConfig } from "@/lib/examStatus";
+import { useAllExamUpdates } from "@/hooks/useExamUpdates";
 import { motion, useScroll, AnimatePresence } from "framer-motion";
 import {
     DropdownMenu,
@@ -28,7 +31,25 @@ const TABS = [
     { id: "notification", label: "🔔 Notification" },
     { id: "admit_card", label: "🎫 Admit Card" },
     { id: "result", label: "🏆 Result" },
+    { id: "answer_key", label: "🔑 Answer Key" },
+    { id: "cutoff", label: "📊 Cutoff" },
+    { id: "syllabus", label: "📖 Syllabus" },
+    { id: "news", label: "📰 News" },
 ];
+
+// Map tab IDs to exam_updates category values for filtering
+const TAB_TO_UPDATE_CATEGORY: Record<string, string | undefined> = {
+    all: undefined,
+    admit_card: "admit_card",
+    result: "result",
+    answer_key: "answer_key",
+    cutoff: "cutoff",
+    syllabus: "syllabus",
+    news: "latest",
+};
+
+// Tabs that only show exam_updates (no exam cards)
+const UPDATES_ONLY_TABS = new Set(["answer_key", "cutoff", "syllabus", "news"]);
 
 // Exam categories for filtering
 const EXAM_CATEGORIES = [
@@ -69,9 +90,14 @@ export default function Trending() {
     const [latestFilter, setLatestFilter] = useState(true);
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
     const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+    const [showAllUpdates, setShowAllUpdates] = useState(false);
 
     const { data: exams, isLoading, error, refetch, isRefetching } = useTrendingExams("All");
     const { getLogoByName } = useConductingBodyLogos();
+
+    // Fetch exam updates from the updates tab (scraped data)
+    const updateCategory = TAB_TO_UPDATE_CATEGORY[selectedTab];
+    const { data: examUpdates, isLoading: updatesLoading } = useAllExamUpdates(updateCategory);
 
     // Scroll tracking for hide/show filter bar
     const containerRef = useRef<HTMLDivElement>(null);
@@ -109,9 +135,12 @@ export default function Trending() {
         );
     }, []);
 
+    // Determine if the current tab is "updates-only" (no exam cards)
+    const isUpdatesOnlyTab = UPDATES_ONLY_TABS.has(selectedTab);
+
     // Filter exams based on selected tab and filters
     const filteredExams = useMemo(() => {
-        if (!exams) return [];
+        if (!exams || isUpdatesOnlyTab) return [];
 
         let result = [...exams];
 
@@ -189,7 +218,13 @@ export default function Trending() {
         }
 
         return result;
-    }, [exams, selectedTab, selectedCategories, selectedLocations, latestFilter]);
+    }, [exams, selectedTab, selectedCategories, selectedLocations, latestFilter, isUpdatesOnlyTab]);
+
+    // Filter exam updates for display
+    const filteredUpdates = useMemo(() => {
+        if (!examUpdates) return [];
+        return examUpdates;
+    }, [examUpdates]);
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/20 flex flex-col">
@@ -202,7 +237,7 @@ export default function Trending() {
                     showRefresh={true}
                     showLogo={false}
                     showTitleLogo={true}
-                    onRefresh={refetch}
+                    onRefresh={() => refetch()}
                     isRefreshing={isRefetching}
                 />
             </div>
@@ -226,7 +261,7 @@ export default function Trending() {
                         <div className="grid min-w-[320px] grid-cols-2 gap-4">
                             <div className="rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
                                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Visible Updates</p>
-                                <p className="mt-2 text-3xl font-bold text-foreground">{filteredExams.length}</p>
+                                <p className="mt-2 text-3xl font-bold text-foreground">{filteredExams.length + filteredUpdates.length}</p>
                                 <p className="mt-1 text-sm text-muted-foreground">matching current filters</p>
                             </div>
                             <div className="rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
@@ -243,7 +278,7 @@ export default function Trending() {
                             <span className="rounded-full border border-border bg-background/70 px-3 py-1 text-sm text-muted-foreground">Admit Cards</span>
                             <span className="rounded-full border border-border bg-background/70 px-3 py-1 text-sm text-muted-foreground">Results</span>
                         </div>
-                        <Button onClick={refetch} variant="outline" className="rounded-xl" disabled={isRefetching}>
+                        <Button onClick={() => refetch()} variant="outline" className="rounded-xl" disabled={isRefetching}>
                             <TrendingUp className="mr-2 h-4 w-4" />
                             {isRefetching ? "Refreshing..." : "Refresh Feed"}
                         </Button>
@@ -364,7 +399,7 @@ export default function Trending() {
                     {TABS.map((tab) => (
                         <button
                             key={tab.id}
-                            onClick={() => setSelectedTab(tab.id)}
+                            onClick={() => { setSelectedTab(tab.id); setShowAllUpdates(false); }}
                             className={cn(
                                 "px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all",
                                 selectedTab === tab.id
@@ -383,7 +418,7 @@ export default function Trending() {
                 ref={containerRef}
                 className="mx-auto flex-1 w-full max-w-6xl overflow-y-auto px-4 py-6 pb-24 md:px-6 lg:px-8"
             >
-                {isLoading ? (
+                {(isLoading || updatesLoading) ? (
                     <div className="space-y-4">
                         {[1, 2, 3].map((i) => (
                             <Skeleton key={i} className="h-48 w-full rounded-2xl" />
@@ -399,48 +434,110 @@ export default function Trending() {
                             Retry
                         </button>
                     </div>
-                ) : filteredExams && filteredExams.length > 0 ? (
-                    <div className="space-y-4">
-                        {filteredExams.map((exam, index) => (
-                            <TrendingExamCard
-                                key={exam.id}
-                                exam={{
-                                    ...exam,
-                                    logo_url: getLogoByName(exam.conducting_body) || exam.logo_url
-                                }}
-                                index={index}
-                                initialExpanded={expandedExamId === exam.id}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-16">
-                        <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
-                            <TrendingUp className="h-10 w-10 text-muted-foreground" />
+                ) : isUpdatesOnlyTab ? (
+                    /* Updates-only tabs (Answer Key, Cutoff, Syllabus, News) */
+                    filteredUpdates.length > 0 ? (
+                        <div className="space-y-4">
+                            {filteredUpdates.map((update, index) => (
+                                <ExamUpdateCard key={update.id} update={update} index={index} />
+                            ))}
                         </div>
-                        <h2 className="text-lg font-semibold text-foreground mb-2">
-                            {selectedCategories.length > 0 || selectedLocations.length > 0
-                                ? "No Exams Found"
-                                : "No Trending Exams Yet"
-                            }
-                        </h2>
-                        <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                            {selectedCategories.length > 0 || selectedLocations.length > 0
-                                ? "No updates available. Try changing your filters."
-                                : "Exams will appear here once users start tracking and refreshing status updates."
-                            }
-                        </p>
-                        {(selectedCategories.length > 0 || selectedLocations.length > 0) && (
-                            <button
-                                onClick={() => {
-                                    setSelectedCategories([]);
-                                    setSelectedLocations([]);
-                                }}
-                                className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm"
-                            >
-                                Clear All Filters
-                            </button>
-                        )}
+                    ) : (
+                        <div className="text-center py-16">
+                            <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
+                                <TrendingUp className="h-10 w-10 text-muted-foreground" />
+                            </div>
+                            <h2 className="text-lg font-semibold text-foreground mb-2">No Updates Found</h2>
+                            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                                No {selectedTab.replace(/_/g, " ")} updates available yet.
+                            </p>
+                        </div>
+                    )
+                ) : (
+                    /* Combined view: Exam updates + Exam cards */
+                    <div className="space-y-6">
+                        {/* Exam Updates Section (shown at top for relevant tabs) */}
+                        {filteredUpdates.length > 0 && selectedTab !== "notification" && (() => {
+                            const isAllTab = selectedTab === "all";
+                            const visibleLimit = isAllTab && !showAllUpdates ? 10 : filteredUpdates.length;
+                            const visibleUpdates = filteredUpdates.slice(0, visibleLimit);
+                            const hasMore = isAllTab && !showAllUpdates && filteredUpdates.length > 10;
+
+                            return (
+                                <div className="space-y-3">
+                                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                        <Newspaper className="h-4 w-4" />
+                                        {isAllTab ? "Latest Updates" : `${selectedTab.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())} Updates`}
+                                        <Badge variant="secondary" className="text-[10px] ml-1">{filteredUpdates.length}</Badge>
+                                    </h2>
+                                    <div className="space-y-3">
+                                        {visibleUpdates.map((update, index) => (
+                                            <ExamUpdateCard key={update.id} update={update} index={index} />
+                                        ))}
+                                    </div>
+                                    {hasMore && (
+                                        <button
+                                            onClick={() => setShowAllUpdates(true)}
+                                            className="w-full py-2.5 text-sm font-medium text-primary hover:text-primary/80 bg-secondary/40 hover:bg-secondary/60 rounded-xl transition-colors"
+                                        >
+                                            Show all {filteredUpdates.length} updates
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        {/* Exam Cards Section */}
+                        {filteredExams.length > 0 ? (
+                            <div className="space-y-4">
+                                {filteredUpdates.length > 0 && selectedTab !== "notification" && (
+                                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 pt-2">
+                                        <TrendingUp className="h-4 w-4" />
+                                        Tracked Exams
+                                    </h2>
+                                )}
+                                {filteredExams.map((exam, index) => (
+                                    <TrendingExamCard
+                                        key={exam.id}
+                                        exam={{
+                                            ...exam,
+                                            logo_url: getLogoByName(exam.conducting_body) || exam.logo_url
+                                        }}
+                                        index={index}
+                                        initialExpanded={expandedExamId === exam.id}
+                                    />
+                                ))}
+                            </div>
+                        ) : filteredUpdates.length === 0 ? (
+                            <div className="text-center py-16">
+                                <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
+                                    <TrendingUp className="h-10 w-10 text-muted-foreground" />
+                                </div>
+                                <h2 className="text-lg font-semibold text-foreground mb-2">
+                                    {selectedCategories.length > 0 || selectedLocations.length > 0
+                                        ? "No Exams Found"
+                                        : "No Trending Exams Yet"
+                                    }
+                                </h2>
+                                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                                    {selectedCategories.length > 0 || selectedLocations.length > 0
+                                        ? "No updates available. Try changing your filters."
+                                        : "Exams will appear here once users start tracking and refreshing status updates."
+                                    }
+                                </p>
+                                {(selectedCategories.length > 0 || selectedLocations.length > 0) && (
+                                    <button
+                                        onClick={() => {
+                                            setSelectedCategories([]);
+                                            setSelectedLocations([]);
+                                        }}
+                                        className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm"
+                                    >
+                                        Clear All Filters
+                                    </button>
+                                )}
+                            </div>
+                        ) : null}
                     </div>
                 )}
             </main>
