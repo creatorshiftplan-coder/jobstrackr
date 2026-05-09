@@ -4059,9 +4059,13 @@ export default function Admin() {
                                                 )}
                                               </div>
                                               <div className="flex gap-1">
-                                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { navigator.clipboard.writeText(JSON.stringify(updatesScrapedResults[link.url], null, 2)); toast({ title: "Copied!" }); }}>
-                                                  <Copy className="h-3 w-3 mr-1" />Copy JSON
-                                                </Button>
+                                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                                  const { url: _url, scraped_at: _sat, ...displayData } = updatesScrapedResults[link.url] || {};
+                                  navigator.clipboard.writeText(JSON.stringify(displayData, null, 2));
+                                  toast({ title: "Copied!" });
+                                }}>
+                                  <Copy className="h-3 w-3 mr-1" />Copy JSON
+                                </Button>
                                               </div>
                                             </div>
 

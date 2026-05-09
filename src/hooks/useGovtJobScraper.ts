@@ -307,7 +307,6 @@ export function useGovtJobScraper() {
                 tags: article.tags,
                 sections: article.sections,
                 related_articles: article.related_articles,
-                images: article.images || null,
                 scraped_at: article.scraped_at,
                 updated_at: new Date().toISOString(),
             };
