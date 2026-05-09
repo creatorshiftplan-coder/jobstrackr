@@ -49,10 +49,18 @@ const NAV_TEXTS = new Set([
 
 const SKIP_HEADINGS_RE = /follow us|join|advertisement|share|about the author|other posts|job notifications|jobs by|state job|other active|other ssc/i;
 
+const JUNK_CLASSES = [
+    "ad_div", "adsbygoogle", "fja-follow-bar", "fja-alert-widget",
+    "yarpp", "mobile-app", "social-bar", "share-bar", "related-posts",
+    "post-navigation", "author-box", "comment-respond", "sidebar",
+];
+
 const DOWNLOAD_KW = [
     "download", "admit card", "hall ticket", "result", "apply",
     "login", "official", "click here", "direct link", "answer key", "scorecard",
 ];
+
+const GENERIC_LINK_TEXTS = ["download pdf", "click here", "view", "visit", "link", "download"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -81,9 +89,10 @@ function isNavLink(href: string, text: string): boolean {
 function detectCategory(title: string): string {
     const t = title.toLowerCase();
     if (/admit card|hall ticket|call letter|admit\b/.test(t)) return "admit_card";
-    if (/result|scorecard|merit list|cut.?off|marks/.test(t)) return "result";
-    if (/answer key/.test(t)) return "answer_key";
-    if (/syllabus|exam pattern/.test(t)) return "syllabus";
+    if (/cut.?off|cutoff marks|minimum qualifying marks/.test(t)) return "cutoff";
+    if (/answer key|objection|provisional key/.test(t)) return "answer_key";
+    if (/syllabus|exam pattern|new pattern/.test(t)) return "syllabus";
+    if (/result|scorecard|merit list|marks/.test(t)) return "result";
     if (/recruitment|apply online|vacancy|vacancies|notification/.test(t)) return "recruitment";
     return "news";
 }
@@ -175,7 +184,10 @@ function parseDatesTable(tableEl: any): DateRow[] {
                 status = parseStatus(texts.slice(2).join(" ")) || texts[2];
             }
 
-            if (event) rows.push({ event, date, status, link });
+            if (event) {
+                if (link && link.toLowerCase().includes("freejobalert")) link = "";
+                rows.push({ event, date, status, link });
+            }
         }
     } catch (e) {
         console.warn("parseDatesTable error:", e);
@@ -344,7 +356,18 @@ async function parseArticle(url: string): Promise<ArticleData> {
         doc.querySelector("main");
 
     if (body) {
-        // Tables
+        // ── 1. Remove junk elements (ads, social bars, scripts, styles) ──
+        for (const el of body.querySelectorAll("script, style, ins, iframe")) {
+            try { (el as any).remove(); } catch { /* ignore */ }
+        }
+        for (const el of body.querySelectorAll("[class]")) {
+            const cls = ((el as any).getAttribute("class") || "").toLowerCase();
+            if (JUNK_CLASSES.some((j) => cls.includes(j))) {
+                try { (el as any).remove(); } catch { /* ignore */ }
+            }
+        }
+
+        // ── 2. Tables (dates & overview) ──
         for (const table of body.querySelectorAll("table")) {
             const ttext = (table.textContent || "").toLowerCase();
 
@@ -366,22 +389,39 @@ async function parseArticle(url: string): Promise<ArticleData> {
             }
         }
 
-        // Download / official links
+        // ── 3. Download / official links with context-aware naming ──
         const seenLinks = new Set<string>();
         for (const a of body.querySelectorAll("a[href]")) {
             const href = absUrl((a as any).getAttribute("href") || "");
-            const text = clean(a.textContent);
+            let text = clean(a.textContent);
             if (!text || !href) continue;
-            if (href.startsWith("javascript") || href.startsWith("#") || href.startsWith("mailto")) continue;
+            if (!href.startsWith("http")) continue; // strict: only external links
+            if (href.startsWith("javascript") || href.startsWith("mailto")) continue;
             if (isNavLink(href, text)) continue;
-            if (href.includes("freejobalert.com") && !href.includes("/articles/")) {
-                if (!["gov.in", "nic.in", "login", "download", "admit", "result"].some((k) => href.includes(k))) {
-                    continue;
-                }
-            }
+            if (href.toLowerCase().includes("freejobalert")) continue;
+
+            // Context-aware naming: if link text is generic, look at parent table row
             const loT = text.toLowerCase();
+            if (!text || GENERIC_LINK_TEXTS.some((g) => loT.includes(g))) {
+                const parentTr = (a as any).closest("tr");
+                if (parentTr) {
+                    const cells = parentTr.querySelectorAll("td, th");
+                    if (cells && cells.length > 0) {
+                        const firstCell = cells[0];
+                        if (firstCell !== (a as any).closest("td, th")) {
+                            const rowContext = clean(firstCell.textContent);
+                            if (rowContext && rowContext.length > 0 && rowContext !== text) {
+                                text = `${rowContext} - ${text || "Link"}`;
+                            }
+                        }
+                    }
+                }
+                if (!text) text = "Direct Link";
+            }
+
+            const loT2 = text.toLowerCase();
             const loH = href.toLowerCase();
-            if (DOWNLOAD_KW.some((k) => loT.includes(k) || loH.includes(k))) {
+            if (DOWNLOAD_KW.some((k) => loT2.includes(k) || loH.includes(k))) {
                 if (!seenLinks.has(href)) {
                     seenLinks.add(href);
                     out.download_links.push({ text, url: href });
@@ -389,7 +429,22 @@ async function parseArticle(url: string): Promise<ArticleData> {
             }
         }
 
-        // Sections (headings + body)
+        // ── 4. Generate summary from body text if missing/short ──
+        if (!out.summary || out.summary.length < 50) {
+            const bodyText = (body.textContent || "")
+                .replace(/\s+/g, " ")
+                .replace(/\s{3,}/g, "\n\n")
+                .trim();
+            // Extract first meaningful paragraph (skip "Tags:" lines)
+            const paragraphs = bodyText.split(/\n+/).map((p: string) => p.trim()).filter((p: string) =>
+                p.length > 30 && !/^Tags?:/i.test(p)
+            );
+            if (paragraphs.length > 0) {
+                out.summary = paragraphs[0].slice(0, 500);
+            }
+        }
+
+        // ── 5. Sections (headings + body) ──
         let current: { heading: string; level: string; content: string[] } | null = null;
         for (const tag of body.querySelectorAll("h2, h3, h4, p, ul, ol")) {
             const tagName = tag.tagName.toLowerCase();
@@ -415,6 +470,7 @@ async function parseArticle(url: string): Promise<ArticleData> {
         const href = absUrl((a as any).getAttribute("href") || "");
         const text = clean(a.textContent);
         if (text && href && href !== url && !seenRel.has(href) && !isNavLink(href, text)) {
+            if (href.toLowerCase().includes("freejobalert")) continue;
             seenRel.add(href);
             out.related_articles.push({ title: text, url: href });
         }

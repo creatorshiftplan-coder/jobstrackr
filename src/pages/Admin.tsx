@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -503,10 +503,14 @@ export default function Admin() {
   const [updatesScrapedResults, setUpdatesScrapedResults] = useState<Record<string, ArticleData>>({});
   const [updatesScrapingUrl, setUpdatesScrapingUrl] = useState<string | null>(null);
   const [updatesSavingAll, setUpdatesSavingAll] = useState(false);
+  const [updatesSavingUrl, setUpdatesSavingUrl] = useState<string | null>(null);
   const [updatesSavedUrls, setUpdatesSavedUrls] = useState<Set<string>>(new Set());
   const [updatesExpandedUrl, setUpdatesExpandedUrl] = useState<string | null>(null);
   const [updatesCrawlingSourceId, setUpdatesCrawlingSourceId] = useState<string | null>(null);
   const [updatesDetailView, setUpdatesDetailView] = useState<ExamUpdate | null>(null);
+  const [updatesRephraseOn, setUpdatesRephraseOn] = useState(true);
+  const updatesScrapeAbortRef = useRef(false);
+  const discoverScrapeAbortRef = useRef(false);
 
   // API Keys state
   const apiKeysHook = useApiKeys();
@@ -3127,21 +3131,29 @@ export default function Admin() {
                         </Badge>
                       </h3>
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={discoverScrapingUrl !== null || discoverSavingAll}
-                          onClick={async () => {
-                            for (const link of discoveredLinks) {
-                              if (discoverScrapedResults[link.url]) continue;
-                              await handleDiscoverScrapeOne(link.url);
-                            }
-                            toast({ title: "Scrape All complete" });
-                          }}
-                        >
-                          {discoverScrapingUrl !== null ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Play className="h-3 w-3 mr-1" />}
-                          Scrape All
-                        </Button>
+                        {discoverScrapingUrl !== null ? (
+                          <Button size="sm" variant="destructive" onClick={() => { discoverScrapeAbortRef.current = true; }}>
+                            <Square className="h-3 w-3 mr-1" /> Stop
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={discoverSavingAll}
+                            onClick={async () => {
+                              discoverScrapeAbortRef.current = false;
+                              for (const link of discoveredLinks) {
+                                if (discoverScrapeAbortRef.current) break;
+                                if (discoverScrapedResults[link.url]) continue;
+                                await handleDiscoverScrapeOne(link.url);
+                              }
+                              setDiscoverScrapingUrl(null);
+                              toast({ title: "Scrape All complete" });
+                            }}
+                          >
+                            <Play className="h-3 w-3 mr-1" /> Scrape All
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -3732,6 +3744,22 @@ export default function Admin() {
                       <Badge className="bg-primary text-white text-[10px] px-2 py-0">Step 1</Badge>
                       Load Listing Page
                     </h3>
+                    {govtScraper.sources.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-xs text-muted-foreground">Quick:</span>
+                        {govtScraper.sources.map((s, i) => (
+                          <Button
+                            key={s.id}
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 text-[11px] px-2"
+                            onClick={() => { setUpdatesDiscoverUrl(s.url); setUpdatesDiscoverLimit(s.limit_per_run); }}
+                          >
+                            {i + 1}. {s.name}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Input
                         value={updatesDiscoverUrl}
@@ -3801,29 +3829,52 @@ export default function Admin() {
                             {updatesDiscoveredLinks.length} found · {Object.keys(updatesScrapedResults).length} scraped · {updatesSavedUrls.size} saved
                           </Badge>
                         </h3>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={updatesScrapingUrl !== null || updatesSavingAll}
-                            onClick={async () => {
-                              for (const link of updatesDiscoveredLinks) {
-                                if (updatesScrapedResults[link.url]) continue;
-                                setUpdatesScrapingUrl(link.url);
-                                try {
-                                  const result = await govtScraper.scrapeSingleArticle.mutateAsync(link.url);
-                                  setUpdatesScrapedResults((prev) => ({ ...prev, [link.url]: result.article }));
-                                } catch {
-                                  // skip failed
+                        <div className="flex gap-2 items-center">
+                          <div className="flex items-center gap-1.5 mr-1">
+                            <Switch
+                              id="rephrase-toggle"
+                              checked={updatesRephraseOn}
+                              onCheckedChange={(checked: boolean) => setUpdatesRephraseOn(checked)}
+                            />
+                            <label htmlFor="rephrase-toggle" className="text-xs text-muted-foreground cursor-pointer select-none">
+                              Rephrase text
+                            </label>
+                          </div>
+                          {updatesScrapingUrl !== null ? (
+                            <Button size="sm" variant="destructive" onClick={() => { updatesScrapeAbortRef.current = true; }}>
+                              <Square className="h-3 w-3 mr-1" /> Stop
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={updatesSavingAll}
+                              onClick={async () => {
+                                updatesScrapeAbortRef.current = false;
+                                let failed = 0;
+                                for (const link of updatesDiscoveredLinks) {
+                                  if (updatesScrapeAbortRef.current) break;
+                                  if (updatesScrapedResults[link.url]) continue;
+                                  setUpdatesScrapingUrl(link.url);
+                                  try {
+                                    const result = await govtScraper.scrapeSingleArticle.mutateAsync({ articleUrl: link.url, rephrase: updatesRephraseOn });
+                                    setUpdatesScrapedResults((prev) => ({ ...prev, [link.url]: result.article }));
+                                  } catch (e: any) {
+                                    console.error("Scrape failed for", link.url, e);
+                                    failed++;
+                                  }
                                 }
-                              }
-                              setUpdatesScrapingUrl(null);
-                              toast({ title: "Scrape All complete" });
-                            }}
-                          >
-                            {updatesScrapingUrl !== null ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Play className="h-3 w-3 mr-1" />}
-                            Scrape All
-                          </Button>
+                                setUpdatesScrapingUrl(null);
+                                if (failed > 0) {
+                                  toast({ title: "Scrape All complete", description: `${failed} article(s) failed to scrape.`, variant: "destructive" });
+                                } else {
+                                  toast({ title: "Scrape All complete" });
+                                }
+                              }}
+                            >
+                              <Play className="h-3 w-3 mr-1" /> Scrape All
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
@@ -3832,17 +3883,24 @@ export default function Admin() {
                               setUpdatesSavingAll(true);
                               const unsaved = updatesDiscoveredLinks.filter(l => updatesScrapedResults[l.url] && !updatesSavedUrls.has(l.url));
                               let saved = 0;
+                              let failed = 0;
                               for (const link of unsaved) {
                                 try {
-                                  await govtScraper.saveArticle.mutateAsync(updatesScrapedResults[link.url]);
+                                  await govtScraper.saveArticle.mutateAsync({ article: updatesScrapedResults[link.url] });
                                   setUpdatesSavedUrls((prev) => new Set(prev).add(link.url));
                                   saved++;
-                                } catch {
-                                  // skip failed
+                                } catch (e: any) {
+                                  console.error("Save failed for", link.url, e);
+                                  failed++;
                                 }
                               }
                               setUpdatesSavingAll(false);
-                              toast({ title: `Save All complete`, description: `${saved} article${saved !== 1 ? "s" : ""} saved.` });
+                              const total = unsaved.length;
+                              if (failed > 0) {
+                                toast({ title: "Save All complete", description: `${saved}/${total} saved, ${failed} failed.`, variant: "destructive" });
+                              } else {
+                                toast({ title: "Save All complete", description: `${saved} article${saved !== 1 ? "s" : ""} saved.` });
+                              }
                             }}
                           >
                             {updatesSavingAll ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
@@ -3869,10 +3927,11 @@ export default function Admin() {
                                 const isScraping = updatesScrapingUrl === link.url;
                                 const isSaved = updatesSavedUrls.has(link.url);
                                 const isExpanded = updatesExpandedUrl === link.url;
+                                const isSaving = updatesSavingUrl === link.url;
 
                                 return (
                                   <>
-                                    <TableRow className={isScraped ? "bg-green-50/50 dark:bg-green-950/10" : ""}>
+                                    <TableRow key={link.url} className={isScraped ? "bg-green-50/50 dark:bg-green-950/10" : ""}>
                                       <TableCell className="text-xs text-muted-foreground font-mono">{idx + 1}</TableCell>
                                       <TableCell>
                                         <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline font-medium line-clamp-2">
@@ -3903,12 +3962,15 @@ export default function Admin() {
                                               disabled={isScraping}
                                               onClick={() => {
                                                 setUpdatesScrapingUrl(link.url);
-                                                govtScraper.scrapeSingleArticle.mutate(link.url, {
+                                                govtScraper.scrapeSingleArticle.mutate({ articleUrl: link.url, rephrase: updatesRephraseOn }, {
                                                   onSuccess: (result) => {
                                                     setUpdatesScrapedResults((prev) => ({ ...prev, [link.url]: result.article }));
                                                     setUpdatesScrapingUrl(null);
                                                   },
-                                                  onError: () => setUpdatesScrapingUrl(null),
+                                                  onError: (e: any) => {
+                                                    setUpdatesScrapingUrl(null);
+                                                    toast({ title: "Scrape failed", description: e.message, variant: "destructive" });
+                                                  },
                                                 });
                                               }}
                                             >
@@ -3933,12 +3995,15 @@ export default function Admin() {
                                                 className="h-7 text-xs"
                                                 onClick={() => {
                                                   setUpdatesScrapingUrl(link.url);
-                                                  govtScraper.scrapeSingleArticle.mutate(link.url, {
+                                                  govtScraper.scrapeSingleArticle.mutate({ articleUrl: link.url, rephrase: updatesRephraseOn }, {
                                                     onSuccess: (result) => {
                                                       setUpdatesScrapedResults((prev) => ({ ...prev, [link.url]: result.article }));
                                                       setUpdatesScrapingUrl(null);
                                                     },
-                                                    onError: () => setUpdatesScrapingUrl(null),
+                                                    onError: (e: any) => {
+                                                      setUpdatesScrapingUrl(null);
+                                                      toast({ title: "Re-scrape failed", description: e.message, variant: "destructive" });
+                                                    },
                                                   });
                                                 }}
                                               >
@@ -3948,18 +4013,23 @@ export default function Admin() {
                                                 <Button
                                                   size="sm"
                                                   className="h-7 text-xs"
-                                                  disabled={govtScraper.saveArticle.isPending}
+                                                  disabled={isSaving || updatesSavingAll}
                                                   onClick={() => {
-                                                    govtScraper.saveArticle.mutate(updatesScrapedResults[link.url], {
+                                                    setUpdatesSavingUrl(link.url);
+                                                    govtScraper.saveArticle.mutate({ article: updatesScrapedResults[link.url] }, {
                                                       onSuccess: (result) => {
                                                         setUpdatesSavedUrls((prev) => new Set(prev).add(link.url));
+                                                        setUpdatesSavingUrl(null);
                                                         toast({ title: result.action === "new" ? "Saved!" : "Updated!", description: link.title });
                                                       },
-                                                      onError: (e: any) => toast({ title: "Save failed", description: e.message, variant: "destructive" }),
+                                                      onError: (e: any) => {
+                                                        setUpdatesSavingUrl(null);
+                                                        toast({ title: "Save failed", description: e.message, variant: "destructive" });
+                                                      },
                                                     });
                                                   }}
                                                 >
-                                                  {govtScraper.saveArticle.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                                                  {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
                                                   Save
                                                 </Button>
                                               )}
@@ -3971,13 +4041,20 @@ export default function Admin() {
 
                                     {/* Expandable detail panel */}
                                     {isExpanded && isScraped && (
-                                      <TableRow>
+                                      <TableRow key={`${link.url}-detail`}>
                                         <TableCell colSpan={5} className="p-0 max-w-0">
                                           <div className="bg-secondary/30 border-y border-primary/20 p-4 space-y-3 w-full">
                                             <div className="flex items-center justify-between flex-wrap gap-2">
-                                              <h4 className="text-sm font-semibold text-primary">
-                                                {updatesScrapedResults[link.url]?.title || "Article"}
-                                              </h4>
+                                              <div className="flex items-center gap-2 flex-wrap">
+                                                <h4 className="text-sm font-semibold text-primary">
+                                                  {updatesScrapedResults[link.url]?.title || "Article"}
+                                                </h4>
+                                                {updatesScrapedResults[link.url]?.is_rephrased && (
+                                                  <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
+                                                    Rephrased
+                                                  </Badge>
+                                                )}
+                                              </div>
                                               <div className="flex gap-1">
                                                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { navigator.clipboard.writeText(JSON.stringify(updatesScrapedResults[link.url], null, 2)); toast({ title: "Copied!" }); }}>
                                                   <Copy className="h-3 w-3 mr-1" />Copy JSON
@@ -4034,6 +4111,93 @@ export default function Admin() {
                                                     <a key={i} href={dl.url} target="_blank" rel="noopener noreferrer">
                                                       <Badge variant="outline" className="text-[10px] cursor-pointer hover:bg-primary/10">
                                                         <ExternalLink className="h-2.5 w-2.5 mr-1" />{dl.text.slice(0, 40)}
+                                                      </Badge>
+                                                    </a>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            {/* Images */}
+                                            {updatesScrapedResults[link.url]?.images?.length > 0 && (
+                                              <div>
+                                                <h5 className="text-xs font-medium mb-1">Images ({updatesScrapedResults[link.url].images.length})</h5>
+                                                <div className="flex flex-wrap gap-2">
+                                                  {updatesScrapedResults[link.url].images.map((img: string, i: number) => (
+                                                    <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="block">
+                                                      <img src={img} alt={`img-${i}`} className="h-16 w-auto rounded border hover:opacity-80 transition-opacity" />
+                                                    </a>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            {/* Vacancy Table */}
+                                            {updatesScrapedResults[link.url]?.vacancy_table?.length > 0 && (
+                                              <div>
+                                                <h5 className="text-xs font-medium mb-1">Vacancy Table</h5>
+                                                <div className="max-h-[150px] overflow-auto rounded border">
+                                                  <Table>
+                                                    <TableBody>
+                                                      {updatesScrapedResults[link.url].vacancy_table.map((v: any, i: number) => (
+                                                        <TableRow key={i}>
+                                                          <TableCell className="text-xs py-1">{v.post_name}</TableCell>
+                                                          <TableCell className="text-xs py-1 font-medium">{v.vacancies}</TableCell>
+                                                        </TableRow>
+                                                      ))}
+                                                    </TableBody>
+                                                  </Table>
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            {/* Fee Table */}
+                                            {updatesScrapedResults[link.url]?.fee_table?.length > 0 && (
+                                              <div>
+                                                <h5 className="text-xs font-medium mb-1">Application Fee</h5>
+                                                <div className="max-h-[150px] overflow-auto rounded border">
+                                                  <Table>
+                                                    <TableBody>
+                                                      {updatesScrapedResults[link.url].fee_table.map((f: any, i: number) => (
+                                                        <TableRow key={i}>
+                                                          <TableCell className="text-xs py-1">{f.category}</TableCell>
+                                                          <TableCell className="text-xs py-1 font-medium">{f.fee}</TableCell>
+                                                        </TableRow>
+                                                      ))}
+                                                    </TableBody>
+                                                  </Table>
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            {/* Cutoff Table */}
+                                            {updatesScrapedResults[link.url]?.cutoff_table?.length > 0 && (
+                                              <div>
+                                                <h5 className="text-xs font-medium mb-1">Cutoff / Qualifying Marks</h5>
+                                                <div className="max-h-[150px] overflow-auto rounded border">
+                                                  <Table>
+                                                    <TableBody>
+                                                      {updatesScrapedResults[link.url].cutoff_table.map((c: any, i: number) => (
+                                                        <TableRow key={i}>
+                                                          <TableCell className="text-xs py-1">{c.category}</TableCell>
+                                                          <TableCell className="text-xs py-1 font-medium">{c.marks}</TableCell>
+                                                        </TableRow>
+                                                      ))}
+                                                    </TableBody>
+                                                  </Table>
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            {/* Official Links */}
+                                            {updatesScrapedResults[link.url]?.official_links?.length > 0 && (
+                                              <div>
+                                                <h5 className="text-xs font-medium mb-1">Official Links</h5>
+                                                <div className="flex flex-wrap gap-1">
+                                                  {updatesScrapedResults[link.url].official_links.map((ol: any, i: number) => (
+                                                    <a key={i} href={ol.url} target="_blank" rel="noopener noreferrer">
+                                                      <Badge variant="outline" className="text-[10px] cursor-pointer hover:bg-green-50 border-green-200 text-green-700">
+                                                        <ExternalLink className="h-2.5 w-2.5 mr-1" />{ol.text.slice(0, 40)}
                                                       </Badge>
                                                     </a>
                                                   ))}
@@ -4140,7 +4304,7 @@ export default function Admin() {
                           </TableHeader>
                           <TableBody>
                             {govtScraper.examUpdates.map((update) => {
-                              const isNew = update.created_at === update.updated_at;
+                              const isNew = Math.abs(new Date(update.created_at).getTime() - new Date(update.updated_at).getTime()) < 2000;
                               return (
                                 <TableRow key={update.id}>
                                   <TableCell className="max-w-[250px]">

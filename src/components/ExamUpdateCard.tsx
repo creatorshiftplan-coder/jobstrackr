@@ -3,8 +3,9 @@ import { Badge } from "@/components/ui/badge";
 import { ExamUpdateItem } from "@/hooks/useExamUpdates";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { ExternalLink, FileText, Award, BarChart3, Newspaper, Calendar, Download, Key } from "lucide-react";
+import { ExternalLink, FileText, Award, BarChart3, Newspaper, Calendar, Download, Key, Sparkles, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
+import { useState } from "react";
 
 interface ExamUpdateCardProps {
     update: ExamUpdateItem;
@@ -35,10 +36,22 @@ function getTimeAgo(dateStr?: string | null): string {
     }
 }
 
+function isNew(createdAt?: string | null): boolean {
+    if (!createdAt) return false;
+    try {
+        const created = new Date(createdAt).getTime();
+        return Date.now() - created < 24 * 60 * 60 * 1000;
+    } catch {
+        return false;
+    }
+}
+
 export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
     const catConfig = getCategoryConfig(update.category);
     const CatIcon = catConfig.icon;
     const timeAgo = getTimeAgo(update.scraped_at);
+    const newBadge = isNew(update.created_at);
+    const [expandedSection, setExpandedSection] = useState<number | null>(null);
 
     return (
         <motion.div
@@ -46,7 +59,7 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.4) }}
         >
-            <Card className={cn("overflow-hidden border shadow-md hover:shadow-lg transition-all duration-300 group")}>
+            <Card className={cn("overflow-hidden border shadow-md hover:shadow-lg transition-all duration-300 group", newBadge && "ring-1 ring-green-500/30")}>
                 {/* Gradient accent bar */}
                 <div className={cn("h-1 bg-gradient-to-r", catConfig.gradient)} />
 
@@ -69,6 +82,11 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
                                         {update.status}
                                     </Badge>
                                 )}
+                                {newBadge && (
+                                    <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">
+                                        <Sparkles className="h-3 w-3 mr-1" />New
+                                    </Badge>
+                                )}
                                 {timeAgo && (
                                     <span className="text-[11px] text-muted-foreground">{timeAgo}</span>
                                 )}
@@ -76,6 +94,11 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
                             <h3 className="font-semibold text-foreground leading-tight line-clamp-2 text-sm sm:text-base">
                                 {update.title}
                             </h3>
+                            {update.published_date && (
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                    Published: {update.published_date}
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -84,6 +107,15 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
                         <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 pl-[44px]">
                             {update.summary}
                         </p>
+                    )}
+
+                    {/* Tags */}
+                    {update.tags && update.tags.length > 0 && (
+                        <div className="pl-[44px] flex flex-wrap gap-1">
+                            {update.tags.slice(0, 6).map((tag, i) => (
+                                <Badge key={i} variant="secondary" className="text-[10px]">{tag}</Badge>
+                            ))}
+                        </div>
                     )}
 
                     {/* Important Dates */}
@@ -137,6 +169,52 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
                                     >
                                         <ExternalLink className="h-3 w-3" />
                                         {dl.text.length > 30 ? dl.text.slice(0, 30) + "..." : dl.text}
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Sections — collapsible */}
+                    {update.sections && update.sections.length > 0 && (
+                        <div className="pl-[44px] space-y-1">
+                            {update.sections.slice(0, 3).map((s, i) => (
+                                <div key={i} className="border border-border/40 rounded-md overflow-hidden">
+                                    <button
+                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-medium bg-secondary/20 hover:bg-secondary/40 transition-colors"
+                                        onClick={() => setExpandedSection(expandedSection === i ? null : i)}
+                                    >
+                                        <span className="line-clamp-1 text-left">{s.heading}</span>
+                                        <ChevronDown className={cn("h-3 w-3 shrink-0 transition-transform", expandedSection === i ? "rotate-180" : "")} />
+                                    </button>
+                                    {expandedSection === i && (
+                                        <div className="px-2.5 py-2 text-xs text-muted-foreground space-y-1 bg-secondary/10">
+                                            {s.content.map((line, li) => (
+                                                <p key={li} className="leading-relaxed">{line}</p>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Related Articles */}
+                    {update.related_articles && update.related_articles.length > 0 && (
+                        <div className="pl-[44px] pt-1">
+                            <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Related</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                                {update.related_articles.slice(0, 3).map((ra, i) => (
+                                    <a
+                                        key={i}
+                                        href={ra.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-md bg-secondary/40 text-foreground hover:bg-secondary/60 transition-colors"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <ExternalLink className="h-2.5 w-2.5" />
+                                        {ra.title.length > 35 ? ra.title.slice(0, 35) + "..." : ra.title}
                                     </a>
                                 ))}
                             </div>

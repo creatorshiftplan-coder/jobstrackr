@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { getExamStatusType, getBadgeConfig as getStatusBadgeConfig, ExamStatusType } from "@/lib/examStatus";
 import { TrendingUp, Users, Clock, Calendar, Lightbulb, ChevronDown, ChevronRight, Bookmark, ExternalLink, Share2, FileText, Award, BarChart3, Newspaper } from "lucide-react";
 import type { ExamUpdateItem } from "@/hooks/useExamUpdates";
-import { isFreeJobAlertUrl } from "@/lib/urlUtils";
+
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useSaveJob, useUnsaveJob, useIsJobSaved } from "@/hooks/useSavedJobs";
@@ -99,7 +99,7 @@ function getUpdateCategoryConfig(category: string): { bg: string; text: string; 
 // Inline updates strip - shared between card types
 function InlineUpdatesStrip({ updates, variant = "light" }: { updates: ExamUpdateItem[]; variant?: "light" | "dark" }) {
     if (updates.length === 0) return null;
-    const topUpdates = updates.filter((u) => !isFreeJobAlertUrl(u.url)).slice(0, 3);
+    const topUpdates = updates.slice(0, 3);
     const isDark = variant === "dark";
 
     return (

@@ -45,7 +45,7 @@ const TAB_TO_UPDATE_CATEGORY: Record<string, string | undefined> = {
     answer_key: "answer_key",
     cutoff: "cutoff",
     syllabus: "syllabus",
-    news: "latest",
+    news: "news",
 };
 
 // Tabs that only show exam_updates (no exam cards)
@@ -224,6 +224,13 @@ export default function Trending() {
     const filteredUpdates = useMemo(() => {
         if (!examUpdates) return [];
         return examUpdates;
+    }, [examUpdates]);
+
+    // Updates scraped in the last 24h — surfaced at top
+    const recentUpdates = useMemo(() => {
+        if (!examUpdates) return [];
+        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+        return examUpdates.filter((u) => new Date(u.scraped_at).getTime() > cutoff);
     }, [examUpdates]);
 
     return (
@@ -456,6 +463,22 @@ export default function Trending() {
                 ) : (
                     /* Combined view: Exam updates + Exam cards */
                     <div className="space-y-6">
+                        {/* Just Added — priority section for updates from last 24h */}
+                        {selectedTab === "all" && recentUpdates.length > 0 && (
+                            <div className="space-y-3">
+                                <h2 className="text-sm font-semibold text-green-700 uppercase tracking-wider flex items-center gap-2">
+                                    <Newspaper className="h-4 w-4" />
+                                    Just Added
+                                    <Badge variant="secondary" className="text-[10px] ml-1">{recentUpdates.length}</Badge>
+                                </h2>
+                                <div className="space-y-3">
+                                    {recentUpdates.map((update, index) => (
+                                        <ExamUpdateCard key={update.id} update={update} index={index} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Exam Updates Section (shown at top for relevant tabs) */}
                         {filteredUpdates.length > 0 && selectedTab !== "notification" && (() => {
                             const isAllTab = selectedTab === "all";

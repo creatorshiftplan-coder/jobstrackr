@@ -67,12 +67,21 @@ export interface ArticleData {
     published_date: string;
     summary: string;
     status: string;
+    full_text?: string;
     important_dates: any[];
     overview: any[];
+    vacancy_table?: { post_name: string; vacancies: string }[];
+    fee_table?: { category: string; fee: string }[];
+    eligibility_table?: { criteria: string; details: string }[];
+    cutoff_table?: { category: string; marks: string }[];
     download_links: { text: string; url: string }[];
+    official_links?: { text: string; url: string }[];
+    related_links?: { text: string; url: string }[];
     tags: string[];
-    sections: { heading: string; level: string; content: string[] }[];
+    sections: { heading: string; level: string; content: string[]; type?: string }[];
     related_articles: { title: string; url: string }[];
+    images?: string[];
+    is_rephrased?: boolean;
     error?: string;
 }
 
@@ -237,32 +246,47 @@ export function useGovtJobScraper() {
         },
     });
 
-    // ── Discover: links only ─────────────────────────────────────────
+    // ── Discover: links only (Python Vercel API) ──────────────────
 
     const scrapeLinks = useMutation({
         mutationFn: async ({ url, limit }: { url: string; limit: number }) => {
-            return callScraperFunction({ linksOnly: true, url, limit }) as Promise<{
-                links: ArticleLink[];
-                total: number;
-            }>;
+            const resp = await fetch("/api/scrape-article-links", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url, limit }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
+                throw new Error(err.error || `HTTP ${resp.status}`);
+            }
+            return resp.json() as Promise<{ links: ArticleLink[]; total: number }>;
         },
     });
 
-    // ── Discover: single article scrape ──────────────────────────────
+    // ── Discover: single article scrape (Python Vercel API) ──────────
 
     const scrapeSingleArticle = useMutation({
-        mutationFn: async (articleUrl: string) => {
-            return callScraperFunction({ articleUrl }) as Promise<{
-                status: string;
-                article: ArticleData;
-            }>;
+        mutationFn: async ({ articleUrl, rephrase = false }: { articleUrl: string; rephrase?: boolean }) => {
+            const resp = await fetch("/api/scrape-article", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: articleUrl, rephrase }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
+                throw new Error(err.error || `HTTP ${resp.status}`);
+            }
+            const data = await resp.json();
+            return { status: data.status, article: data.article as ArticleData };
         },
     });
 
     // ── Discover: save article to DB ─────────────────────────────────
 
     const saveArticle = useMutation({
-        mutationFn: async (article: ArticleData) => {
+        mutationFn: async (payload: ArticleData | { article: ArticleData; sourceId?: string }) => {
+            const article = "article" in payload ? payload.article : payload;
+            const sourceId = "article" in payload ? payload.sourceId : undefined;
             const record: Record<string, any> = {
                 url: article.url,
                 title: article.title,
@@ -270,15 +294,24 @@ export function useGovtJobScraper() {
                 status: article.status || null,
                 published_date: article.published_date || null,
                 summary: article.summary || null,
+                full_text: article.full_text || null,
                 important_dates: article.important_dates,
                 overview: article.overview,
+                vacancy_table: article.vacancy_table || null,
+                fee_table: article.fee_table || null,
+                eligibility_table: article.eligibility_table || null,
+                cutoff_table: article.cutoff_table || null,
                 download_links: article.download_links,
+                official_links: article.official_links || null,
+                related_links: article.related_links || null,
                 tags: article.tags,
                 sections: article.sections,
                 related_articles: article.related_articles,
+                images: article.images || null,
                 scraped_at: article.scraped_at,
                 updated_at: new Date().toISOString(),
             };
+            if (sourceId) record.source_id = sourceId;
 
             // Auto-match to a job listing by title
             try {

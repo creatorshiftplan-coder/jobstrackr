@@ -3,19 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { sortByTitleMatch, tokenizeTitle } from "@/lib/titleMatcher";
 import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 
-/** Strip all freejobalert URLs from an array of exam updates */
+/** Clean freejobalert URLs from nested links inside updates (but keep the updates themselves) */
 function filterFreeJobAlertFromUpdates(updates: ExamUpdateItem[]): ExamUpdateItem[] {
-  return updates
-    .filter((u) => !isFreeJobAlertUrl(u.url))
-    .map((u) => ({
-      ...u,
-      download_links: u.download_links?.filter((dl) => !isFreeJobAlertUrl(dl.url)) ?? [],
-      important_dates: u.important_dates?.map((d) => ({
-        ...d,
-        link: isFreeJobAlertUrl(d.link) ? "" : d.link,
-      })) ?? [],
-      related_articles: u.related_articles?.filter((a) => !isFreeJobAlertUrl(a.url)) ?? [],
-    }));
+  return updates.map((u) => ({
+    ...u,
+    download_links: u.download_links?.filter((dl) => !isFreeJobAlertUrl(dl.url)) ?? [],
+    important_dates: u.important_dates?.map((d) => ({
+      ...d,
+      link: isFreeJobAlertUrl(d.link) ? "" : d.link,
+    })) ?? [],
+    related_articles: u.related_articles?.filter((a) => !isFreeJobAlertUrl(a.url)) ?? [],
+  }));
 }
 
 export interface ExamUpdateItem {
@@ -33,6 +31,8 @@ export interface ExamUpdateItem {
   sections: { heading: string; level: string; content: string[] }[];
   related_articles: { title: string; url: string }[];
   scraped_at: string;
+  created_at: string;
+  updated_at: string;
   job_id: string | null;
   exam_id: string | null;
 }
