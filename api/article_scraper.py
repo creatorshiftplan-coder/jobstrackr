@@ -400,21 +400,23 @@ def scrape_article(url: str) -> Dict[str, Any]:
         if current:
             out["sections"].append(current)
 
-    # Related articles (whole page) — external links only, no freejobalert.com
-    seen_rel: set = set()
-    for a in soup.find_all("a", href=True):
-        href = _abs_url(a.get("href", ""))
-        text = _clean(a.get_text())
-        if not text or not href or href == url or href in seen_rel:
-            continue
-        if not href.startswith("http"):
-            continue
-        if "freejobalert" in href.lower():
-            continue
-        if _is_junk_link(href, text):
-            continue
-        seen_rel.add(href)
-        out["related_articles"].append({"title": text, "url": href})
+    # Related articles — external links from content body only, no freejobalert.com,
+    # no duplicates with body links already collected above
+    if body:
+        for a in body.find_all("a", href=True):
+            href = _abs_url(a.get("href", ""))
+            text = _clean(a.get_text())
+            if not text or not href or href == url:
+                continue
+            if href in seen_urls or href in {r["url"] for r in out["related_articles"]}:
+                continue
+            if not href.startswith("http"):
+                continue
+            if "freejobalert" in href.lower():
+                continue
+            if _is_junk_link(href, text):
+                continue
+            out["related_articles"].append({"title": text, "url": href})
     out["related_articles"] = out["related_articles"][:10]
 
     return out

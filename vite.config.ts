@@ -240,17 +240,12 @@ function localScrapeLinksPlugin() {
 
             const apiDir = path.resolve(__dirname, "api");
             const args = ["-c", `
-import sys, json
+import sys, json, logging
+logging.disable(logging.CRITICAL)
 sys.path.insert(0, ${JSON.stringify(apiDir)})
 from scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
 from article_scraper import detect_category, _parse_status
 
-import re as _re
-_ARTICLE_URL_RE = _re.compile(r'/\d{4,}/?$')
-def is_valid_article_url(u):
-    if not u: return False
-    if "freejobalert" in u.lower(): return bool(_ARTICLE_URL_RE.search(u))
-    return True
 def normalize(e):
     t = e.get("title", "")
     return {"title": t, "url": e.get("url", ""), "category": detect_category(t), "status": _parse_status(t), "date": e.get("update_date", "")}
@@ -281,7 +276,7 @@ seen = set()
 unique = []
 for e in all_entries:
     u = e.get("url", "")
-    if u and u not in seen and is_valid_article_url(u):
+    if u and u not in seen:
         seen.add(u)
         unique.append(e)
 

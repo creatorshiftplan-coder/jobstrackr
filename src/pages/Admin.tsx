@@ -3785,24 +3785,28 @@ export default function Admin() {
                         }}
                       />
                       <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={30}
-                          value={updatesDiscoverLimit}
-                          onChange={(e) => setUpdatesDiscoverLimit(parseInt(e.target.value) || 10)}
-                          className="w-20"
-                          title="Max links to load"
-                        />
-                        <Input
-                          type="number"
-                          min={1}
-                          max={10}
-                          value={updatesDiscoverPages}
-                          onChange={(e) => setUpdatesDiscoverPages(parseInt(e.target.value) || 1)}
-                          className="w-20"
-                          title="Pages to scan"
-                        />
+                        <div className="flex flex-col items-center gap-0.5">
+                          <Input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={updatesDiscoverLimit}
+                            onChange={(e) => setUpdatesDiscoverLimit(parseInt(e.target.value) || 10)}
+                            className="w-20"
+                          />
+                          <span className="text-[10px] text-muted-foreground">Links</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <Input
+                            type="number"
+                            min={1}
+                            max={10}
+                            value={updatesDiscoverPages}
+                            onChange={(e) => setUpdatesDiscoverPages(parseInt(e.target.value) || 1)}
+                            className="w-20"
+                          />
+                          <span className="text-[10px] text-muted-foreground">Pages</span>
+                        </div>
                         <Button
                           disabled={!updatesDiscoverUrl.trim() || govtScraper.scrapeLinks.isPending}
                           onClick={() => {

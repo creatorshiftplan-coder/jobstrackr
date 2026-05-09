@@ -7,7 +7,6 @@ Returns: { "links": [...], "total": N }
 """
 
 import json
-import re
 import sys
 import os
 
@@ -16,23 +15,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 from http.server import BaseHTTPRequestHandler
 from scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
 from article_scraper import detect_category, _parse_status
-
-_ARTICLE_URL_RE = re.compile(r'/\d{4,}/?$')
-
-
-def _is_valid_article_url(url: str) -> bool:
-    """
-    For freejobalert.com URLs, only accept article pages that end with
-    a numeric ID segment (e.g. /ssc-gd-result/12345/).
-    Trending, category, tag, and nav pages have no numeric ID and are rejected.
-    Non-freejobalert URLs always pass.
-    """
-    if not url:
-        return False
-    if "freejobalert" in url.lower():
-        return bool(_ARTICLE_URL_RE.search(url))
-    return True
-
 
 def _normalize(entry: dict) -> dict:
     """Convert scraper_v3 entry to ArticleLink shape expected by the frontend."""
@@ -91,12 +73,12 @@ class handler(BaseHTTPRequestHandler):
                         if nxt not in visited:
                             to_visit.append(nxt)
 
-            # Deduplicate by URL and filter out non-article freejobalert.com URLs
+            # Deduplicate by URL
             seen_urls: set = set()
             unique: list = []
             for e in all_entries:
                 u = e.get("url", "")
-                if u and u not in seen_urls and _is_valid_article_url(u):
+                if u and u not in seen_urls:
                     seen_urls.add(u)
                     unique.append(e)
 
