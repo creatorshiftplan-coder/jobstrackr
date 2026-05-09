@@ -12,6 +12,14 @@
       "destination": "/api/discover"
     },
     {
+      "source": "/api/scrape-article",
+      "destination": "/api/scrape-article"
+    },
+    {
+      "source": "/api/scrape-article-links",
+      "destination": "/api/scrape-article-links"
+    },
+    {
       "source": "/jobs/:slug",
       "destination": "/api/jobs/:slug"
     },

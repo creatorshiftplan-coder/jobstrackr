@@ -3,9 +3,9 @@ import { Badge } from "@/components/ui/badge";
 import { ExamUpdateItem } from "@/hooks/useExamUpdates";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { ExternalLink, FileText, Award, BarChart3, Newspaper, Calendar, Download, Key, Sparkles, ChevronDown } from "lucide-react";
+import { FileText, Award, BarChart3, Newspaper, Calendar, Download, Key, Sparkles, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { Link } from "react-router-dom";
 
 interface ExamUpdateCardProps {
     update: ExamUpdateItem;
@@ -51,191 +51,98 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
     const CatIcon = catConfig.icon;
     const timeAgo = getTimeAgo(update.scraped_at);
     const newBadge = isNew(update.created_at);
-    const [expandedSection, setExpandedSection] = useState<number | null>(null);
+
+    const topDate = update.important_dates?.[0];
+    const secondDate = update.important_dates?.[1];
+    const topLink = update.download_links?.[0];
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.4) }}
+            transition={{ duration: 0.25, delay: Math.min(index * 0.04, 0.3) }}
         >
-            <Card className={cn("overflow-hidden border shadow-md hover:shadow-lg transition-all duration-300 group", newBadge && "ring-1 ring-green-500/30")}>
+            <Card className={cn("overflow-hidden border hover:shadow-md transition-all duration-200", newBadge && "ring-1 ring-green-500/30")}>
                 {/* Gradient accent bar */}
-                <div className={cn("h-1 bg-gradient-to-r", catConfig.gradient)} />
+                <div className={cn("h-0.5 bg-gradient-to-r", catConfig.gradient)} />
 
-                <div className="p-4 space-y-3">
+                <div className="p-3 space-y-2">
                     {/* Header */}
-                    <div className="flex items-start gap-3">
-                        <div className={cn("flex-shrink-0 rounded-lg p-2", catConfig.bg)}>
-                            <CatIcon className={cn("h-5 w-5", catConfig.text)} />
+                    <div className="flex items-start gap-2.5">
+                        <div className={cn("flex-shrink-0 rounded-md p-1.5", catConfig.bg)}>
+                            <CatIcon className={cn("h-4 w-4", catConfig.text)} />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <Badge
-                                    variant="outline"
-                                    className={cn("text-[10px] font-semibold capitalize", catConfig.text, catConfig.border)}
-                                >
+                            <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                <Badge variant="outline" className={cn("text-[10px] font-semibold capitalize px-1.5 py-0", catConfig.text, catConfig.border)}>
                                     {catConfig.label}
                                 </Badge>
                                 {update.status && (
-                                    <Badge variant="secondary" className="text-[10px]">
+                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                                         {update.status}
                                     </Badge>
                                 )}
                                 {newBadge && (
-                                    <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">
-                                        <Sparkles className="h-3 w-3 mr-1" />New
+                                    <Badge className="bg-green-100 text-green-700 border-0 text-[10px] px-1.5 py-0">
+                                        <Sparkles className="h-2.5 w-2.5 mr-0.5" />New
                                     </Badge>
                                 )}
                                 {timeAgo && (
-                                    <span className="text-[11px] text-muted-foreground">{timeAgo}</span>
+                                    <span className="text-[10px] text-muted-foreground ml-auto">{timeAgo}</span>
                                 )}
                             </div>
-                            <h3 className="font-semibold text-foreground leading-tight line-clamp-2 text-sm sm:text-base">
+                            <h3 className="font-semibold text-foreground leading-snug line-clamp-2 text-sm">
                                 {update.title}
                             </h3>
-                            {update.published_date && (
-                                <p className="text-[11px] text-muted-foreground mt-0.5">
-                                    Published: {update.published_date}
-                                </p>
-                            )}
                         </div>
                     </div>
 
-                    {/* Summary */}
+                    {/* 1-line summary */}
                     {update.summary && (
-                        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 pl-[44px]">
+                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-1 pl-[34px]">
                             {update.summary}
                         </p>
                     )}
 
-                    {/* Tags */}
-                    {update.tags && update.tags.length > 0 && (
-                        <div className="pl-[44px] flex flex-wrap gap-1">
-                            {update.tags.slice(0, 6).map((tag, i) => (
-                                <Badge key={i} variant="secondary" className="text-[10px]">{tag}</Badge>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Important Dates */}
-                    {update.important_dates && update.important_dates.length > 0 && (
-                        <div className="pl-[44px] space-y-1.5">
-                            <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                Important Dates
-                            </h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                                {update.important_dates.slice(0, 4).map((d, i) => (
-                                    <div key={i} className="flex items-center gap-2 text-xs bg-secondary/40 rounded-md px-2.5 py-1.5">
-                                        <span className="text-muted-foreground flex-1 line-clamp-1">{d.event}</span>
-                                        <span className="font-medium text-foreground whitespace-nowrap">{d.date}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Overview fields */}
-                    {update.overview && update.overview.length > 0 && (
-                        <div className="pl-[44px]">
-                            <div className="grid grid-cols-2 gap-1.5">
-                                {update.overview.slice(0, 4).map((item, i) => (
-                                    <div key={i} className="text-xs bg-secondary/30 rounded-md px-2.5 py-1.5">
-                                        <span className="text-muted-foreground">{item.field}: </span>
-                                        <span className="font-medium text-foreground">{item.value}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Download Links */}
-                    {update.download_links && update.download_links.length > 0 && (
-                        <div className="pl-[44px] space-y-1.5">
-                            <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                                <Download className="h-3 w-3" />
-                                Quick Links
-                            </h4>
-                            <div className="flex flex-wrap gap-1.5">
-                                {update.download_links.slice(0, 4).map((dl, i) => (
-                                    <a
-                                        key={i}
-                                        href={dl.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <ExternalLink className="h-3 w-3" />
-                                        {dl.text.length > 30 ? dl.text.slice(0, 30) + "..." : dl.text}
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Sections — collapsible */}
-                    {update.sections && update.sections.length > 0 && (
-                        <div className="pl-[44px] space-y-1">
-                            {update.sections.slice(0, 3).map((s, i) => (
-                                <div key={i} className="border border-border/40 rounded-md overflow-hidden">
-                                    <button
-                                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-medium bg-secondary/20 hover:bg-secondary/40 transition-colors"
-                                        onClick={() => setExpandedSection(expandedSection === i ? null : i)}
-                                    >
-                                        <span className="line-clamp-1 text-left">{s.heading}</span>
-                                        <ChevronDown className={cn("h-3 w-3 shrink-0 transition-transform", expandedSection === i ? "rotate-180" : "")} />
-                                    </button>
-                                    {expandedSection === i && (
-                                        <div className="px-2.5 py-2 text-xs text-muted-foreground space-y-1 bg-secondary/10">
-                                            {s.content.map((line, li) => (
-                                                <p key={li} className="leading-relaxed">{line}</p>
-                                            ))}
-                                        </div>
-                                    )}
+                    {/* Top 2 important dates */}
+                    {(topDate || secondDate) && (
+                        <div className="pl-[34px] flex flex-wrap gap-1.5">
+                            {[topDate, secondDate].filter(Boolean).map((d, i) => (
+                                <div key={i} className="inline-flex items-center gap-1.5 text-[11px] bg-secondary/40 rounded px-2 py-1">
+                                    <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                    <span className="text-muted-foreground line-clamp-1 max-w-[110px]">{d!.event}</span>
+                                    <span className="font-medium text-foreground whitespace-nowrap">{d!.date}</span>
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {/* Related Articles */}
-                    {update.related_articles && update.related_articles.length > 0 && (
-                        <div className="pl-[44px] pt-1">
-                            <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Related</h4>
-                            <div className="flex flex-wrap gap-1.5">
-                                {update.related_articles.slice(0, 3).map((ra, i) => (
-                                    <a
-                                        key={i}
-                                        href={ra.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-md bg-secondary/40 text-foreground hover:bg-secondary/60 transition-colors"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <ExternalLink className="h-2.5 w-2.5" />
-                                        {ra.title.length > 35 ? ra.title.slice(0, 35) + "..." : ra.title}
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Footer with source link */}
-                    {update.url && (
-                        <div className="pl-[44px] pt-1 border-t border-border/40">
+                    {/* Top download link chip */}
+                    {topLink && (
+                        <div className="pl-[34px]">
                             <a
-                                href={update.url}
+                                href={topLink.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                View Full Details
-                                <ExternalLink className="h-3 w-3" />
+                                <Download className="h-3 w-3" />
+                                {topLink.text.length > 32 ? topLink.text.slice(0, 32) + "…" : topLink.text}
                             </a>
                         </div>
                     )}
+
+                    {/* Footer — internal detail link only */}
+                    <div className="pl-[34px] pt-0.5 border-t border-border/30">
+                        <Link
+                            to={`/exam-update/${update.id}`}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            View Details <ChevronRight className="h-3 w-3" />
+                        </Link>
+                    </div>
                 </div>
             </Card>
         </motion.div>

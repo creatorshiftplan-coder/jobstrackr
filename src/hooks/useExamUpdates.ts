@@ -62,6 +62,28 @@ export function useAllExamUpdates(category?: string) {
 }
 
 /**
+ * Fetch a single exam_update by its UUID (for the detail page)
+ */
+export function useExamUpdateById(id: string | undefined) {
+  return useQuery({
+    queryKey: ["exam-update-by-id", id],
+    queryFn: async (): Promise<ExamUpdateItem | null> => {
+      if (!id) return null;
+      const { data, error } = await (supabase.from as any)("exam_updates")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (error) throw error;
+      if (!data) return null;
+      const [filtered] = filterFreeJobAlertFromUpdates([data as ExamUpdateItem]);
+      return filtered;
+    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
  * Fetch exam_updates linked to a specific job (by job_id or title keyword fallback)
  */
 export function useExamUpdatesForJob(jobId: string | undefined, jobTitle: string | undefined) {
