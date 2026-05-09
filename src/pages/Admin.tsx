@@ -3912,8 +3912,7 @@ export default function Admin() {
                         </div>
                       </div>
 
-                      <div className="relative max-h-[600px] w-full overflow-y-auto rounded-md border bg-card">
-                        <div className="w-full overflow-x-auto">
+                      <div className="relative max-h-[600px] w-full overflow-auto rounded-md border bg-card">
                           <Table className="min-w-[700px] relative">
                             <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
                               <TableRow>
@@ -4227,7 +4226,6 @@ export default function Admin() {
                               })}
                             </TableBody>
                           </Table>
-                        </div>
                       </div>
                     </div>
                   )}
