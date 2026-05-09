@@ -244,18 +244,20 @@ import sys, json, logging
 logging.disable(logging.CRITICAL)
 sys.path.insert(0, ${JSON.stringify(apiDir)})
 from scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
-from article_scraper import detect_category, _parse_status
+from article_scraper import detect_category, _parse_status, collect_article_links
 
 def normalize(e):
     t = e.get("title", "")
     return {"title": t, "url": e.get("url", ""), "category": detect_category(t), "status": _parse_status(t), "date": e.get("update_date", "")}
 
+target_url = ${JSON.stringify(url)}
+limit_n = ${Number(limit) || 10}
+
 all_entries = []
 visited = set()
-to_visit = [${JSON.stringify(url)}]
+to_visit = [target_url]
 done = 0
-pages_limit = ${Math.max(1, Number(pages) || 1)}
-limit_n = ${Number(limit) || 10}
+pages_limit = 1
 
 while to_visit and done < pages_limit:
     page_url = to_visit.pop(0)
@@ -267,10 +269,11 @@ while to_visit and done < pages_limit:
     if not html:
         continue
     all_entries.extend(extract_links_from_master(html, page_url))
-    if done < pages_limit:
-        for nxt in get_pagination_urls(html, page_url):
-            if nxt not in visited:
-                to_visit.append(nxt)
+
+if not all_entries:
+    first_html = fetch_html(target_url)
+    if first_html:
+        all_entries = [{"title": e["title"], "url": e["url"], "update_date": e.get("date", "")} for e in collect_article_links(first_html, target_url, limit_n)]
 
 seen = set()
 unique = []

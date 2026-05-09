@@ -499,7 +499,6 @@ export default function Admin() {
   const [updatesEditingSource, setUpdatesEditingSource] = useState<ScraperSource | null>(null);
   const [updatesDiscoverUrl, setUpdatesDiscoverUrl] = useState("");
   const [updatesDiscoverLimit, setUpdatesDiscoverLimit] = useState(10);
-  const [updatesDiscoverPages, setUpdatesDiscoverPages] = useState(1);
   const [updatesDiscoveredLinks, setUpdatesDiscoveredLinks] = useState<ArticleLink[]>([]);
   const [updatesScrapedResults, setUpdatesScrapedResults] = useState<Record<string, ArticleData>>({});
   const [updatesScrapingUrl, setUpdatesScrapingUrl] = useState<string | null>(null);
@@ -3770,13 +3769,14 @@ export default function Admin() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && updatesDiscoverUrl && !govtScraper.scrapeLinks.isPending) {
                             govtScraper.scrapeLinks.mutate(
-                              { url: updatesDiscoverUrl, limit: updatesDiscoverLimit, pages: updatesDiscoverPages },
+                              { url: updatesDiscoverUrl, limit: updatesDiscoverLimit },
                               {
                                 onSuccess: (data) => {
                                   setUpdatesDiscoveredLinks(data.links);
                                   setUpdatesScrapedResults({});
                                   setUpdatesSavedUrls(new Set());
                                   setUpdatesExpandedUrl(null);
+                                  setUpdatesScrapingUrl(null);
                                 },
                                 onError: (e: any) => toast({ title: "Failed to load links", description: e.message, variant: "destructive" }),
                               },
@@ -3796,22 +3796,11 @@ export default function Admin() {
                           />
                           <span className="text-[10px] text-muted-foreground">Links</span>
                         </div>
-                        <div className="flex flex-col items-center gap-0.5">
-                          <Input
-                            type="number"
-                            min={1}
-                            max={10}
-                            value={updatesDiscoverPages}
-                            onChange={(e) => setUpdatesDiscoverPages(parseInt(e.target.value) || 1)}
-                            className="w-20"
-                          />
-                          <span className="text-[10px] text-muted-foreground">Pages</span>
-                        </div>
                         <Button
                           disabled={!updatesDiscoverUrl.trim() || govtScraper.scrapeLinks.isPending}
                           onClick={() => {
                             govtScraper.scrapeLinks.mutate(
-                              { url: updatesDiscoverUrl, limit: updatesDiscoverLimit, pages: updatesDiscoverPages },
+                              { url: updatesDiscoverUrl, limit: updatesDiscoverLimit },
                               {
                                 onSuccess: (data) => {
                                   setUpdatesDiscoveredLinks(data.links);

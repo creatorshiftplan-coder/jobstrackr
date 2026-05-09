@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 
 from http.server import BaseHTTPRequestHandler
 from scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
-from article_scraper import detect_category, _parse_status
+from article_scraper import detect_category, _parse_status, collect_article_links
 
 def _normalize(entry: dict) -> dict:
     """Convert scraper_v3 entry to ArticleLink shape expected by the frontend."""
@@ -72,6 +72,15 @@ class handler(BaseHTTPRequestHandler):
                     for nxt in get_pagination_urls(html, page_url):
                         if nxt not in visited:
                             to_visit.append(nxt)
+
+            # If structured scraper found nothing, fall back to collect_article_links
+            if not all_entries:
+                first_html = fetch_html(url)
+                if first_html:
+                    all_entries = [
+                        {"title": e["title"], "url": e["url"], "update_date": e.get("date", "")}
+                        for e in collect_article_links(first_html, url, limit)
+                    ]
 
             # Deduplicate by URL
             seen_urls: set = set()
