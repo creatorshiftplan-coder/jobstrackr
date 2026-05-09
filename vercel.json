@@ -13,11 +13,11 @@
     },
     {
       "source": "/api/scrape-article",
-      "destination": "/api/scrape-article"
+      "destination": "/api/scrape_article"
     },
     {
       "source": "/api/scrape-article-links",
-      "destination": "/api/scrape-article-links"
+      "destination": "/api/scrape_article_links"
     },
     {
       "source": "/jobs/:slug",
