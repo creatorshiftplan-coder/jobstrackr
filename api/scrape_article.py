@@ -24,6 +24,8 @@ class handler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
             data = json.loads(body) if body else {}
+            if not isinstance(data, dict):
+                data = {}
 
             url = data.get("url", "").strip()
             do_rephrase = data.get("rephrase", False)
@@ -36,7 +38,16 @@ class handler(BaseHTTPRequestHandler):
                 self._send_json(400, {"status": "error", "error": "URL must start with http:// or https://"})
                 return
 
-            article = scrape_article(url)
+            try:
+                article = scrape_article(url)
+            except Exception as scrape_err:
+                self._send_json(500, {"status": "error", "error": f"Scraper crash: {str(scrape_err)}"})
+                return
+
+            if not isinstance(article, dict):
+                self._send_json(500, {"status": "error", "error": "Scraper returned invalid data"})
+                return
+
             if article.get("error"):
                 self._send_json(500, {"status": "error", "error": article["error"]})
                 return

@@ -499,6 +499,7 @@ export default function Admin() {
   const [updatesEditingSource, setUpdatesEditingSource] = useState<ScraperSource | null>(null);
   const [updatesDiscoverUrl, setUpdatesDiscoverUrl] = useState("");
   const [updatesDiscoverLimit, setUpdatesDiscoverLimit] = useState(10);
+  const [updatesDiscoverPages, setUpdatesDiscoverPages] = useState(1);
   const [updatesDiscoveredLinks, setUpdatesDiscoveredLinks] = useState<ArticleLink[]>([]);
   const [updatesScrapedResults, setUpdatesScrapedResults] = useState<Record<string, ArticleData>>({});
   const [updatesScrapingUrl, setUpdatesScrapingUrl] = useState<string | null>(null);
@@ -3769,7 +3770,7 @@ export default function Admin() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && updatesDiscoverUrl && !govtScraper.scrapeLinks.isPending) {
                             govtScraper.scrapeLinks.mutate(
-                              { url: updatesDiscoverUrl, limit: updatesDiscoverLimit },
+                              { url: updatesDiscoverUrl, limit: updatesDiscoverLimit, pages: updatesDiscoverPages },
                               {
                                 onSuccess: (data) => {
                                   setUpdatesDiscoveredLinks(data.links);
@@ -3793,11 +3794,20 @@ export default function Admin() {
                           className="w-20"
                           title="Max links to load"
                         />
+                        <Input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={updatesDiscoverPages}
+                          onChange={(e) => setUpdatesDiscoverPages(parseInt(e.target.value) || 1)}
+                          className="w-20"
+                          title="Pages to scan"
+                        />
                         <Button
                           disabled={!updatesDiscoverUrl.trim() || govtScraper.scrapeLinks.isPending}
                           onClick={() => {
                             govtScraper.scrapeLinks.mutate(
-                              { url: updatesDiscoverUrl, limit: updatesDiscoverLimit },
+                              { url: updatesDiscoverUrl, limit: updatesDiscoverLimit, pages: updatesDiscoverPages },
                               {
                                 onSuccess: (data) => {
                                   setUpdatesDiscoveredLinks(data.links);

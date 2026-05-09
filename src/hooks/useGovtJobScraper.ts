@@ -249,11 +249,11 @@ export function useGovtJobScraper() {
     // ── Discover: links only (Python Vercel API) ──────────────────
 
     const scrapeLinks = useMutation({
-        mutationFn: async ({ url, limit }: { url: string; limit: number }) => {
+        mutationFn: async ({ url, limit, pages = 1 }: { url: string; limit: number; pages?: number }) => {
             const resp = await fetch("/api/scrape-article-links", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url, limit }),
+                body: JSON.stringify({ url, limit, pages }),
             });
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));

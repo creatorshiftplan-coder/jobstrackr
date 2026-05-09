@@ -6,6 +6,7 @@ Based on BeautifulSoup for robust real-world HTML parsing.
 """
 
 import re
+import sys
 import requests
 from bs4 import BeautifulSoup
 from typing import Optional, List, Dict, Any
@@ -118,11 +119,11 @@ def fetch_html(url: str, retries: int = 2) -> Optional[str]:
             resp.raise_for_status()
             return resp.text
         except requests.RequestException as e:
-            print(f"fetch_html attempt {attempt + 1} failed for {url}: {e}")
+            print(f"fetch_html attempt {attempt + 1} failed for {url}: {e}", file=sys.stderr)
             if attempt < retries:
                 import time
                 time.sleep(1.5 * (attempt + 1))
-    print(f"All retries exhausted for {url}")
+    print(f"All retries exhausted for {url}", file=sys.stderr)
     return None
 
 
@@ -282,8 +283,9 @@ def scrape_article(url: str) -> Dict[str, Any]:
         for el in body.find_all(["script", "style", "ins", "iframe"]):
             el.decompose()
         for el in body.find_all(class_=True):
-            classes = " ".join(el.get("class", [])).lower()
-            if any(j in classes for j in JUNK_CLASSES):
+            raw = el.get("class") if el.attrs else None
+            classes = " ".join(raw).lower() if raw else ""
+            if classes and any(j in classes for j in JUNK_CLASSES):
                 el.decompose()
 
         # Full text extraction
@@ -398,16 +400,21 @@ def scrape_article(url: str) -> Dict[str, Any]:
         if current:
             out["sections"].append(current)
 
-    # Related articles (whole page)
+    # Related articles (whole page) — external links only, no freejobalert.com
     seen_rel: set = set()
-    for a in soup.find_all("a", href=re.compile(r"/articles/")):
+    for a in soup.find_all("a", href=True):
         href = _abs_url(a.get("href", ""))
         text = _clean(a.get_text())
-        if text and href and href != url and href not in seen_rel and not _is_junk_link(href, text):
-            if "freejobalert" in href.lower():
-                continue
-            seen_rel.add(href)
-            out["related_articles"].append({"title": text, "url": href})
+        if not text or not href or href == url or href in seen_rel:
+            continue
+        if not href.startswith("http"):
+            continue
+        if "freejobalert" in href.lower():
+            continue
+        if _is_junk_link(href, text):
+            continue
+        seen_rel.add(href)
+        out["related_articles"].append({"title": text, "url": href})
     out["related_articles"] = out["related_articles"][:10]
 
     return out

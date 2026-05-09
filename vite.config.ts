@@ -162,27 +162,42 @@ function localScrapeArticlePlugin() {
               return;
             }
 
-            const scriptPath = path.resolve(__dirname, "api/article_scraper.py");
+            const apiDir = path.resolve(__dirname, "api");
             const args = ["-c", `
 import sys, json
-sys.path.insert(0, '${path.resolve(__dirname, "api")}')
+sys.path.insert(0, ${JSON.stringify(apiDir)})
 from article_scraper import scrape_article
-result = scrape_article(${JSON.stringify(url)})
-print(json.dumps(result))
+from rephraser import rephrase_article
+article = scrape_article(${JSON.stringify(url)})
+if article.get("error"):
+    print(json.dumps({"status": "error", "error": article["error"]}))
+else:
+    if ${rephrase ? "True" : "False"}:
+        try:
+            article = rephrase_article(article)
+        except Exception as e:
+            print(f"Rephraser error: {e}", file=sys.stderr)
+            article["is_rephrased"] = False
+    print(json.dumps({"status": "ok", "article": article}))
 `];
             execFile("python3", args, { timeout: 60000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+              if (stderr) console.error("scrape-article stderr:", stderr);
               if (err) {
                 res.writeHead(500, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({ status: "error", error: stderr || err.message }));
                 return;
               }
               try {
-                const article = JSON.parse(stdout.trim());
-                res.writeHead(200, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ status: "ok", article }));
+                // Extract the last non-empty line as JSON (in case of stray output)
+                const lines = stdout.trim().split("\n").filter((l: string) => l.trim());
+                const jsonLine = lines[lines.length - 1];
+                const result = JSON.parse(jsonLine);
+                const statusCode = result.status === "error" ? 500 : 200;
+                res.writeHead(statusCode, { "Content-Type": "application/json" });
+                res.end(JSON.stringify(result));
               } catch {
                 res.writeHead(500, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ status: "error", error: "Failed to parse scraper output" }));
+                res.end(JSON.stringify({ status: "error", error: "Failed to parse scraper output: " + stdout.slice(0, 200) }));
               }
             });
           } catch {
@@ -216,36 +231,80 @@ function localScrapeLinksPlugin() {
         req.on("data", (chunk: any) => (body += chunk));
         req.on("end", () => {
           try {
-            const { url, limit = 10 } = JSON.parse(body);
+            const { url, limit = 10, pages = 1 } = JSON.parse(body);
             if (!url) {
               res.writeHead(400, { "Content-Type": "application/json" });
               res.end(JSON.stringify({ status: "error", error: "Missing 'url' field" }));
               return;
             }
 
+            const apiDir = path.resolve(__dirname, "api");
             const args = ["-c", `
-import sys, json, urllib.request
-sys.path.insert(0, '${path.resolve(__dirname, "api")}')
-from article_scraper import collect_article_links
-req = urllib.request.Request(${JSON.stringify(url)}, headers={"User-Agent": "Mozilla/5.0"})
-with urllib.request.urlopen(req, timeout=20) as r:
-    html = r.read().decode("utf-8", errors="replace")
-links = collect_article_links(html, ${JSON.stringify(url)}, ${JSON.stringify(limit)})
-print(json.dumps({"status": "ok", "links": links, "total": len(links)}))
+import sys, json
+sys.path.insert(0, ${JSON.stringify(apiDir)})
+from scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
+from article_scraper import detect_category, _parse_status
+
+import re as _re
+_ARTICLE_URL_RE = _re.compile(r'/\d{4,}/?$')
+def is_valid_article_url(u):
+    if not u: return False
+    if "freejobalert" in u.lower(): return bool(_ARTICLE_URL_RE.search(u))
+    return True
+def normalize(e):
+    t = e.get("title", "")
+    return {"title": t, "url": e.get("url", ""), "category": detect_category(t), "status": _parse_status(t), "date": e.get("update_date", "")}
+
+all_entries = []
+visited = set()
+to_visit = [${JSON.stringify(url)}]
+done = 0
+pages_limit = ${Math.max(1, Number(pages) || 1)}
+limit_n = ${Number(limit) || 10}
+
+while to_visit and done < pages_limit:
+    page_url = to_visit.pop(0)
+    if page_url in visited:
+        continue
+    visited.add(page_url)
+    done += 1
+    html = fetch_html(page_url)
+    if not html:
+        continue
+    all_entries.extend(extract_links_from_master(html, page_url))
+    if done < pages_limit:
+        for nxt in get_pagination_urls(html, page_url):
+            if nxt not in visited:
+                to_visit.append(nxt)
+
+seen = set()
+unique = []
+for e in all_entries:
+    u = e.get("url", "")
+    if u and u not in seen and is_valid_article_url(u):
+        seen.add(u)
+        unique.append(e)
+
+links = [normalize(e) for e in unique[:limit_n]]
+print(json.dumps({"links": links, "total": len(links)}))
 `];
             execFile("python3", args, { timeout: 60000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+              if (stderr) console.error("scrape-article-links stderr:", stderr);
               if (err) {
                 res.writeHead(500, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({ status: "error", error: stderr || err.message }));
                 return;
               }
               try {
-                const result = JSON.parse(stdout.trim());
+                // Extract the last non-empty line as JSON (in case of stray output)
+                const lines = stdout.trim().split("\n").filter((l: string) => l.trim());
+                const jsonLine = lines[lines.length - 1];
+                const result = JSON.parse(jsonLine);
                 res.writeHead(200, { "Content-Type": "application/json" });
                 res.end(JSON.stringify(result));
               } catch {
                 res.writeHead(500, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ status: "error", error: "Failed to parse output" }));
+                res.end(JSON.stringify({ status: "error", error: "Failed to parse output: " + stdout.slice(0, 200) }));
               }
             });
           } catch {

@@ -2,18 +2,48 @@
 Vercel Serverless — Article Link Discovery from Listing Page
 ===============================================================
 POST /api/scrape-article-links
-Body: { "url": "https://www.freejobalert.com/admit-card/", "limit": 10 }
+Body: { "url": "https://www.freejobalert.com/admit-card/", "limit": 10, "pages": 1 }
 Returns: { "links": [...], "total": N }
 """
 
 import json
+import re
 import sys
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 
 from http.server import BaseHTTPRequestHandler
-from article_scraper import fetch_html, collect_article_links
+from scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
+from article_scraper import detect_category, _parse_status
+
+_ARTICLE_URL_RE = re.compile(r'/\d{4,}/?$')
+
+
+def _is_valid_article_url(url: str) -> bool:
+    """
+    For freejobalert.com URLs, only accept article pages that end with
+    a numeric ID segment (e.g. /ssc-gd-result/12345/).
+    Trending, category, tag, and nav pages have no numeric ID and are rejected.
+    Non-freejobalert URLs always pass.
+    """
+    if not url:
+        return False
+    if "freejobalert" in url.lower():
+        return bool(_ARTICLE_URL_RE.search(url))
+    return True
+
+
+def _normalize(entry: dict) -> dict:
+    """Convert scraper_v3 entry to ArticleLink shape expected by the frontend."""
+    title = entry.get("title", "")
+    return {
+        "title": title,
+        "url": entry.get("url", ""),
+        "category": detect_category(title),
+        "status": _parse_status(title),
+        "date": entry.get("update_date", ""),
+    }
 
 
 class handler(BaseHTTPRequestHandler):
@@ -22,9 +52,12 @@ class handler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
             data = json.loads(body) if body else {}
+            if not isinstance(data, dict):
+                data = {}
 
             url = data.get("url", "").strip()
             limit = int(data.get("limit", 10))
+            pages = max(1, int(data.get("pages", 1)))
 
             if not url:
                 self._send_json(400, {"error": "Missing 'url' field"})
@@ -34,12 +67,40 @@ class handler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "URL must start with http:// or https://"})
                 return
 
-            html = fetch_html(url)
-            if not html:
-                self._send_json(502, {"error": "Failed to fetch listing page"})
-                return
+            # Discover links across pages — same logic as discover.py
+            all_entries: list = []
+            visited: set = set()
+            to_visit = [url]
+            done = 0
 
-            links = collect_article_links(html, url, limit)
+            while to_visit and done < pages:
+                page_url = to_visit.pop(0)
+                if page_url in visited:
+                    continue
+                visited.add(page_url)
+                done += 1
+
+                html = fetch_html(page_url)
+                if not html:
+                    continue
+
+                all_entries.extend(extract_links_from_master(html, page_url))
+
+                if done < pages:
+                    for nxt in get_pagination_urls(html, page_url):
+                        if nxt not in visited:
+                            to_visit.append(nxt)
+
+            # Deduplicate by URL and filter out non-article freejobalert.com URLs
+            seen_urls: set = set()
+            unique: list = []
+            for e in all_entries:
+                u = e.get("url", "")
+                if u and u not in seen_urls and _is_valid_article_url(u):
+                    seen_urls.add(u)
+                    unique.append(e)
+
+            links = [_normalize(e) for e in unique[:limit]]
             self._send_json(200, {"links": links, "total": len(links)})
 
         except json.JSONDecodeError:
