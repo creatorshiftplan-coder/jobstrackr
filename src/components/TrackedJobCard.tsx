@@ -20,6 +20,12 @@ import {
   Edit2,
   Plus,
   ExternalLink,
+  Download,
+  Award,
+  BarChart3,
+  Key,
+  ChevronRight,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,8 +44,9 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExamCredentialsModal } from "@/components/ExamCredentialsModal";
-import { useExamUpdatesForExam } from "@/hooks/useExamUpdates";
+import { useExamUpdatesForExam, ExamUpdateItem } from "@/hooks/useExamUpdates";
 import { isFreeJobAlertUrl } from "@/lib/urlUtils";
+import { Link } from "react-router-dom";
 
 // Helper function to get phase-specific data from AI response
 const getPhaseData = (statusData: any, phaseNumber: 1 | 2): any => {
@@ -258,6 +265,130 @@ const isValidUrl = (url: string | null | undefined): boolean => {
     return false;
   }
 };
+
+// ── Scraped data helpers ─────────────────────────────────────────────
+
+interface MergedDate {
+  event: string;
+  date: string;
+  link: string;
+  isPassed: boolean;
+}
+
+interface CategorizedLink {
+  text: string;
+  url: string;
+  icon: typeof FileText;
+  color: string;
+}
+
+function getCategoryConfig(category: string): { bg: string; text: string; label: string; icon: typeof FileText } {
+  const cat = category?.toLowerCase().replace(/[_\s]+/g, "") || "";
+  if (cat.includes("result") || cat.includes("merit") || cat.includes("score"))
+    return { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", label: "Result", icon: Award };
+  if (cat.includes("admit") || cat.includes("hall") || cat.includes("ticket"))
+    return { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", label: "Admit Card", icon: FileText };
+  if (cat.includes("answer") || cat.includes("key"))
+    return { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400", label: "Answer Key", icon: Key };
+  if (cat.includes("cutoff") || cat.includes("cut"))
+    return { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400", label: "Cutoff", icon: BarChart3 };
+  if (cat.includes("syllabus") || cat.includes("pattern"))
+    return { bg: "bg-indigo-500/10", text: "text-indigo-600 dark:text-indigo-400", label: "Syllabus", icon: FileText };
+  return { bg: "bg-gray-500/10", text: "text-gray-600 dark:text-gray-400", label: "Update", icon: Newspaper };
+}
+
+/** Normalize event names for deduplication */
+function normalizeEventName(event: string): string {
+  return event.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Check if a date string represents a date that has already passed */
+function hasDatePassed(dateStr: string): boolean {
+  if (!dateStr) return false;
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return false;
+    date.setHours(23, 59, 59, 999);
+    return date < new Date();
+  } catch {
+    return false;
+  }
+}
+
+/** Merge + deduplicate important_dates from multiple ExamUpdateItems */
+function mergeImportantDates(updates: ExamUpdateItem[]): MergedDate[] {
+  const seen = new Map<string, MergedDate>();
+
+  for (const update of updates.slice(0, 5)) {
+    for (const d of (update.important_dates || [])) {
+      const key = normalizeEventName(d.event);
+      if (!key || seen.has(key)) continue;
+      seen.set(key, {
+        event: d.event,
+        date: d.date || "TBD",
+        link: (d.link && !isFreeJobAlertUrl(d.link)) ? d.link : "",
+        isPassed: hasDatePassed(d.date),
+      });
+    }
+  }
+
+  const dates = Array.from(seen.values());
+  // Sort: passed dates first, then upcoming, then TBD
+  dates.sort((a, b) => {
+    if (a.date === "TBD" && b.date !== "TBD") return 1;
+    if (a.date !== "TBD" && b.date === "TBD") return -1;
+    if (a.isPassed && !b.isPassed) return -1;
+    if (!a.isPassed && b.isPassed) return 1;
+    return 0;
+  });
+
+  return dates.slice(0, 8);
+}
+
+/** Categorize a download link by its text */
+function categorizeLinkIcon(text: string): { icon: typeof FileText; color: string } {
+  const t = text.toLowerCase();
+  if (t.includes("admit") || t.includes("hall ticket") || t.includes("call letter"))
+    return { icon: FileText, color: "text-blue-600 dark:text-blue-400" };
+  if (t.includes("result") || t.includes("score") || t.includes("merit"))
+    return { icon: Award, color: "text-green-600 dark:text-green-400" };
+  if (t.includes("answer") || t.includes("key"))
+    return { icon: Key, color: "text-purple-600 dark:text-purple-400" };
+  if (t.includes("apply") || t.includes("registration") || t.includes("application"))
+    return { icon: Edit2, color: "text-emerald-600 dark:text-emerald-400" };
+  if (t.includes("syllabus") || t.includes("pattern"))
+    return { icon: FileText, color: "text-indigo-600 dark:text-indigo-400" };
+  if (t.includes("notification") || t.includes("pdf") || t.includes("official"))
+    return { icon: FileText, color: "text-orange-600 dark:text-orange-400" };
+  return { icon: Download, color: "text-primary" };
+}
+
+/** Collect + deduplicate download links from multiple ExamUpdateItems */
+function mergeDownloadLinks(updates: ExamUpdateItem[]): CategorizedLink[] {
+  const seen = new Set<string>();
+  const links: CategorizedLink[] = [];
+
+  for (const update of updates.slice(0, 5)) {
+    for (const dl of (update.download_links || [])) {
+      if (!dl.url || seen.has(dl.url) || isFreeJobAlertUrl(dl.url)) continue;
+      seen.add(dl.url);
+      const { icon, color } = categorizeLinkIcon(dl.text);
+      links.push({
+        text: dl.text.length > 35 ? dl.text.slice(0, 35) + "…" : dl.text,
+        url: dl.url,
+        icon,
+        color,
+      });
+    }
+  }
+
+  return links.slice(0, 6);
+}
+
+// ── Component ────────────────────────────────────────────────────────
 
 interface TrackedJobCardProps {
   attempt: ExamAttempt;
@@ -837,60 +968,160 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
                 </div>
               )}
 
-              {/* Scraped Exam Updates Section */}
+              {/* ① Important Dates Timeline */}
+              {(() => {
+                const mergedDates = scrapedUpdates && scrapedUpdates.length > 0
+                  ? mergeImportantDates(scrapedUpdates)
+                  : [];
+                if (mergedDates.length === 0) return null;
+                return (
+                  <div className="bg-slate-50/80 dark:bg-card/80 rounded-xl p-3 border border-slate-200/70 dark:border-border mt-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Calendar className="h-4 w-4 text-red-500" />
+                      <span className="font-medium text-sm">Important Dates</span>
+                    </div>
+                    <div className="space-y-1">
+                      {mergedDates.map((d, i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs",
+                            i % 2 === 0 ? "bg-white/60 dark:bg-card/60" : ""
+                          )}
+                        >
+                          {/* Status dot */}
+                          <div className={cn(
+                            "h-2 w-2 rounded-full flex-shrink-0",
+                            d.isPassed
+                              ? "bg-green-500"
+                              : d.date === "TBD"
+                                ? "bg-slate-300 dark:bg-slate-600"
+                                : "bg-blue-500"
+                          )} />
+                          {/* Event name */}
+                          <span className={cn(
+                            "flex-1 truncate",
+                            d.isPassed ? "text-muted-foreground line-through" : "text-foreground"
+                          )}>
+                            {d.event}
+                          </span>
+                          {/* Date value */}
+                          <span className={cn(
+                            "font-semibold whitespace-nowrap",
+                            d.isPassed ? "text-muted-foreground" : "text-foreground"
+                          )}>
+                            {d.date}
+                          </span>
+                          {/* Link arrow */}
+                          {d.link && (
+                            <a
+                              href={d.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:text-primary/80 flex-shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ② Quick Actions – Download Links */}
+              {(() => {
+                const links = scrapedUpdates && scrapedUpdates.length > 0
+                  ? mergeDownloadLinks(scrapedUpdates)
+                  : [];
+                if (links.length === 0) return null;
+                return (
+                  <div className="bg-slate-50/80 dark:bg-card/80 rounded-xl p-3 border border-slate-200/70 dark:border-border mt-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Link2 className="h-4 w-4 text-blue-500" />
+                      <span className="font-medium text-sm">Quick Links</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {links.map((link, i) => {
+                        const IconComp = link.icon;
+                        return (
+                          <a
+                            key={i}
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <IconComp className={cn("h-3.5 w-3.5", link.color)} />
+                            {link.text}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ③ Latest News Feed */}
               {scrapedUpdates && scrapedUpdates.length > 0 && (
-                <div className="pt-2 border-t border-slate-200/80 dark:border-border bg-sky-50/80 dark:bg-sky-950/20 rounded-xl p-3 mt-2">
+                <div className="bg-slate-50/80 dark:bg-card/80 rounded-xl p-3 border border-slate-200/70 dark:border-border mt-2">
                   <div className="flex items-center gap-2 mb-3">
-                    <FileText className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                    <span className="font-medium text-sm text-sky-800 dark:text-sky-200">Scraped Updates</span>
-                    <Badge className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 border-0">Auto</Badge>
+                    <Newspaper className="h-4 w-4 text-primary" />
+                    <span className="font-medium text-sm">Latest Updates</span>
                   </div>
                   <div className="space-y-2">
-                    {scrapedUpdates.slice(0, 5).map((update, i) => (
-                      <div key={i} className="space-y-1.5">
-                        <div className="flex items-start gap-2 text-xs">
-                          <Badge className={`text-[9px] flex-shrink-0 border-0 ${
-                            update.category === 'admit_card' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
-                            update.category === 'result' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                            update.category === 'answer_key' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
-                            'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-                          }`}>
-                            {update.category === 'admit_card' ? 'Admit Card' :
-                             update.category === 'result' ? 'Result' :
-                             update.category === 'answer_key' ? 'Answer Key' :
-                             update.category === 'syllabus' ? 'Syllabus' : 'Update'}
-                          </Badge>
-                          <span className="text-muted-foreground line-clamp-2">{update.title}</span>
-                        </div>
-                        {/* Important dates from this update */}
-                        {update.important_dates?.slice(0, 3).map((d: any, j: number) => (
-                          <div key={j} className="flex items-center justify-between ml-4 text-xs bg-white/50 dark:bg-card/50 rounded px-2 py-1">
-                            <span className="text-muted-foreground truncate">{d.event}</span>
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                              <span className="font-medium">{d.date || 'TBD'}</span>
-                              {d.link && !isFreeJobAlertUrl(d.link) && (
-                                <a href={d.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80">
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
+                    {scrapedUpdates.slice(0, 3).map((update, i) => {
+                      const catConfig = getCategoryConfig(update.category);
+                      const CatIcon = catConfig.icon;
+                      let timeAgo = "";
+                      try {
+                        if (update.scraped_at) {
+                          timeAgo = formatDistanceToNow(new Date(update.scraped_at), { addSuffix: true });
+                        }
+                      } catch { /* ignore */ }
+                      return (
+                        <div
+                          key={update.id || i}
+                          className="rounded-lg border border-border/40 bg-white/60 dark:bg-card/60 p-2.5 space-y-1.5"
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className={cn("flex-shrink-0 rounded-md p-1 mt-0.5", catConfig.bg)}>
+                              <CatIcon className={cn("h-3.5 w-3.5", catConfig.text)} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className={cn("text-[10px] font-semibold uppercase tracking-wider", catConfig.text)}>
+                                  {catConfig.label}
+                                </span>
+                                {timeAgo && (
+                                  <span className="text-[10px] text-muted-foreground">{timeAgo}</span>
+                                )}
+                              </div>
+                              <p className="text-xs font-medium text-foreground line-clamp-1">
+                                {update.title}
+                              </p>
+                              {update.summary && (
+                                <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                                  {update.summary}
+                                </p>
                               )}
                             </div>
                           </div>
-                        ))}
-                        {/* Download links from this update */}
-                        {update.download_links?.filter((dl: any) => !isFreeJobAlertUrl(dl.url)).slice(0, 2).map((dl: any, j: number) => (
-                          <a
-                            key={`dl-${j}`}
-                            href={dl.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 ml-4 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                          >
-                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">{dl.text}</span>
-                          </a>
-                        ))}
-                      </div>
-                    ))}
+                          <div className="flex justify-end">
+                            <Link
+                              to={`/exam-update/${update.id}`}
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              View Details <ChevronRight className="h-3 w-3" />
+                            </Link>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

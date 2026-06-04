@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 
 export interface TrendingExam {
     id: string;
@@ -43,120 +42,104 @@ export function useTrendingExams(category?: string) {
     return useQuery({
         queryKey: ["trending_exams", category],
         queryFn: async (): Promise<TrendingExam[]> => {
-            // Fetch all exams with AI cached response (filter on client side for better matching)
-            const query = supabase
-                .from("exams")
-                .select("*")
-                .not("ai_cached_response", "is", null)
-                .eq("is_active", true)
-                .order("ai_last_updated_at", { ascending: false });
+            const res = await fetch("/api/cache/trending-exams");
+            if (!res.ok) {
+                // Fallback to direct Supabase if cache endpoint fails
+                return fallbackFetchTrendingExams();
+            }
+            const allExams: TrendingExam[] = await res.json();
 
-            const { data: exams, error: examsError } = await query;
-
-            if (examsError) throw examsError;
-            if (!exams || exams.length === 0) {
-                return [];
+            // Client-side category filtering (server returns all exams pre-processed)
+            if (!category || category === "All") {
+                return allExams;
             }
 
-            // Filter out exams with empty or incomplete AI data
-            const examsWithData = exams.filter(exam => {
-                const aiData = exam.ai_cached_response as any;
-                // Must have at least a summary or current_status to be meaningful
-                // raw_response indicates an AI parsing failure
-                if (!aiData || aiData.raw_response) return false;
-                return aiData.summary || aiData.current_status;
-            });
-
-            if (examsWithData.length === 0) {
-                return [];
-            }
-
-            // Smart category matching using exam name and conducting body
-            const categoryKeywords: Record<string, string[]> = {
-                "Banking": ["bank", "ibps", "sbi", "rbi", "nabard", "rrb clerk", "rrb po"],
-                "SSC": ["ssc", "staff selection"],
-                "Railways": ["railway", "rrb", "rpf", "ntpc", "technician", "group d"],
-                "Defence": ["defence", "defense", "army", "navy", "airforce", "nda", "cds", "capf", "afcat"],
-                "UPSC": ["upsc", "civil service", "ias", "ips", "ifs"],
-                "Teaching": ["teacher", "tet", "ctet", "teaching", "kvs", "nvs", "dsssb"],
-                "State": ["state", "psc", "bpsc", "uppsc", "mppsc", "rpsc", "gpsc", "appsc"],
-            };
-
-            // Filter exams by category using smart matching
-            let filteredExams = examsWithData;
-            if (category && category !== "All") {
-                const keywords = categoryKeywords[category] || [];
-                filteredExams = examsWithData.filter(exam => {
-                    // First check if exam has a matching category field
-                    if (exam.category?.toLowerCase() === category.toLowerCase()) return true;
-
-                    // Then check keywords in name and conducting body
-                    const searchText = `${exam.name} ${exam.conducting_body || ""}`.toLowerCase();
-                    return keywords.some(keyword => searchText.includes(keyword.toLowerCase()));
-                });
-            }
-
-            // Get tracking counts for filtered exams
-            if (filteredExams.length === 0) return [];
-
-            const examIds = filteredExams.map(e => e.id);
-            const { data: attempts, error: attemptsError } = await supabase
-                .from("exam_attempts")
-                .select("exam_id")
-                .in("exam_id", examIds);
-
-            if (attemptsError) throw attemptsError;
-
-            // Count tracking per exam
-            const trackingCounts: Record<string, number> = {};
-            attempts?.forEach(a => {
-                trackingCounts[a.exam_id] = (trackingCounts[a.exam_id] || 0) + 1;
-            });
-
-            // Helper to infer category from exam name/conducting body
-            const inferCategory = (name: string, conductingBody: string | null): string | null => {
-                const searchText = `${name} ${conductingBody || ""}`.toLowerCase();
-                for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-                    if (keywords.some(kw => searchText.includes(kw.toLowerCase()))) {
-                        return cat;
-                    }
-                }
-                return null;
-            };
-
-            // Categories that should use specific gradients (not generic "Government")
-            const specificCategories = ["Banking", "SSC", "Railways", "Defence", "UPSC", "Teaching", "State"];
-
-            // Combine data from filtered exams
-            const trendingExams: TrendingExam[] = filteredExams.map(exam => {
-                // If category is a specific known category, use it; otherwise try to infer
-                const useCategory = specificCategories.includes(exam.category || "")
-                    ? exam.category
-                    : (inferCategory(exam.name, exam.conducting_body) || exam.category);
-
-                return {
-                    id: exam.id,
-                    name: exam.name,
-                    conducting_body: exam.conducting_body,
-                    category: useCategory,
-                    description: exam.description,
-                    official_website: exam.official_website,
-                    ai_cached_response: exam.ai_cached_response as TrendingExam["ai_cached_response"],
-                    ai_last_updated_at: exam.ai_last_updated_at,
-                    tracking_count: trackingCounts[exam.id] || 0,
-                    logo_url: null,
-                    update_slug: (exam as any).update_slug || null,
-                };
-            });
-
-            // Sort by tracking count DESC, then by last updated DESC
-            return trendingExams.sort((a, b) => {
-                if (b.tracking_count !== a.tracking_count) {
-                    return b.tracking_count - a.tracking_count;
-                }
-                return new Date(b.ai_last_updated_at || 0).getTime() - new Date(a.ai_last_updated_at || 0).getTime();
+            const keywords = categoryKeywords[category] || [];
+            return allExams.filter(exam => {
+                if (exam.category?.toLowerCase() === category.toLowerCase()) return true;
+                const searchText = `${exam.name} ${exam.conducting_body || ""}`.toLowerCase();
+                return keywords.some(keyword => searchText.includes(keyword.toLowerCase()));
             });
         },
         staleTime: 1000 * 60 * 5, // 5 minutes
+    });
+}
+
+// Category keyword mapping for client-side filtering
+const categoryKeywords: Record<string, string[]> = {
+    "Banking": ["bank", "ibps", "sbi", "rbi", "nabard", "rrb clerk", "rrb po"],
+    "SSC": ["ssc", "staff selection"],
+    "Railways": ["railway", "rrb", "rpf", "ntpc", "technician", "group d"],
+    "Defence": ["defence", "defense", "army", "navy", "airforce", "nda", "cds", "capf", "afcat"],
+    "UPSC": ["upsc", "civil service", "ias", "ips", "ifs"],
+    "Teaching": ["teacher", "tet", "ctet", "teaching", "kvs", "nvs", "dsssb"],
+    "State": ["state", "psc", "bpsc", "uppsc", "mppsc", "rpsc", "gpsc", "appsc"],
+};
+
+/** Fallback: direct Supabase fetch if cache endpoint is unavailable */
+async function fallbackFetchTrendingExams(): Promise<TrendingExam[]> {
+    const { supabase } = await import("@/integrations/supabase/client");
+
+    const { data: exams, error: examsError } = await supabase
+        .from("exams")
+        .select("*")
+        .not("ai_cached_response", "is", null)
+        .eq("is_active", true)
+        .order("ai_last_updated_at", { ascending: false });
+
+    if (examsError) throw examsError;
+    if (!exams || exams.length === 0) return [];
+
+    const examsWithData = exams.filter(exam => {
+        const aiData = exam.ai_cached_response as any;
+        if (!aiData || aiData.raw_response) return false;
+        return aiData.summary || aiData.current_status;
+    });
+
+    if (examsWithData.length === 0) return [];
+
+    const examIds = examsWithData.map(e => e.id);
+    const { data: attempts } = await supabase
+        .from("exam_attempts")
+        .select("exam_id")
+        .in("exam_id", examIds);
+
+    const trackingCounts: Record<string, number> = {};
+    attempts?.forEach(a => {
+        trackingCounts[a.exam_id] = (trackingCounts[a.exam_id] || 0) + 1;
+    });
+
+    const specificCategories = ["Banking", "SSC", "Railways", "Defence", "UPSC", "Teaching", "State"];
+
+    const inferCat = (name: string, cb: string | null): string | null => {
+        const searchText = `${name} ${cb || ""}`.toLowerCase();
+        for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+            if (keywords.some(kw => searchText.includes(kw.toLowerCase()))) return cat;
+        }
+        return null;
+    };
+
+    const trendingExams: TrendingExam[] = examsWithData.map(exam => {
+        const useCategory = specificCategories.includes(exam.category || "")
+            ? exam.category
+            : (inferCat(exam.name, exam.conducting_body) || exam.category);
+        return {
+            id: exam.id,
+            name: exam.name,
+            conducting_body: exam.conducting_body,
+            category: useCategory,
+            description: exam.description,
+            official_website: exam.official_website,
+            ai_cached_response: exam.ai_cached_response as TrendingExam["ai_cached_response"],
+            ai_last_updated_at: exam.ai_last_updated_at,
+            tracking_count: trackingCounts[exam.id] || 0,
+            logo_url: null,
+            update_slug: (exam as any).update_slug || null,
+        };
+    });
+
+    return trendingExams.sort((a, b) => {
+        if (b.tracking_count !== a.tracking_count) return b.tracking_count - a.tracking_count;
+        return new Date(b.ai_last_updated_at || 0).getTime() - new Date(a.ai_last_updated_at || 0).getTime();
     });
 }

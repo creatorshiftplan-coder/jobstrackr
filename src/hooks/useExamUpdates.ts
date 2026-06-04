@@ -38,24 +38,33 @@ export interface ExamUpdateItem {
 }
 
 /**
- * Fetch all recent exam_updates for the trending page, optionally filtered by category
+ * Fetch all recent exam_updates for the trending page, optionally filtered by category.
+ * Uses Redis-cached API endpoint with direct Supabase fallback.
  */
 export function useAllExamUpdates(category?: string) {
   return useQuery({
     queryKey: ["all-exam-updates", category],
     queryFn: async (): Promise<ExamUpdateItem[]> => {
-      let query = (supabase.from as any)("exam_updates")
-        .select("*")
-        .order("scraped_at", { ascending: false })
-        .limit(100);
+      const params = category && category !== "all" ? `?category=${category}` : "";
+      const res = await fetch(`/api/cache/exam-updates${params}`);
 
-      if (category && category !== "all") {
-        query = query.eq("category", category);
+      if (!res.ok) {
+        // Fallback to direct Supabase if cache endpoint fails
+        let query = (supabase.from as any)("exam_updates")
+          .select("*")
+          .order("scraped_at", { ascending: false })
+          .limit(100);
+
+        if (category && category !== "all") {
+          query = query.eq("category", category);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return filterFreeJobAlertFromUpdates((data || []) as ExamUpdateItem[]);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return filterFreeJobAlertFromUpdates((data || []) as ExamUpdateItem[]);
+      return res.json();
     },
     staleTime: 5 * 60 * 1000,
   });

@@ -332,7 +332,7 @@ function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCard
                 {/* Inline Exam Updates Strip */}
                 {latestScrapedUpdates.length > 0 && (
                     <div className="px-4 py-3 border-t border-border/30 bg-card">
-                        <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Latest Exam Updates</h4>
+                        <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Latest Updates</h4>
                         <InlineUpdatesStrip updates={latestScrapedUpdates} variant="light" />
                     </div>
                 )}
@@ -465,7 +465,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
                         {/* Inline Exam Updates Strip (always visible) */}
                         {latestScrapedUpdates.length > 0 && (
                             <div>
-                                <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Latest Exam Updates</h4>
+                                <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Latest Updates</h4>
                                 <InlineUpdatesStrip updates={latestScrapedUpdates} variant="light" />
                             </div>
                         )}
@@ -578,7 +578,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
 
                         {latestScrapedUpdates.length > 0 && (
                             <div className="space-y-2">
-                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Scraped Exam Updates</h4>
+                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Related News</h4>
                                 <div className="space-y-2">
                                     {latestScrapedUpdates.map((update) => (
                                         <a

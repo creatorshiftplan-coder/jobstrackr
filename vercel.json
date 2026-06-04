@@ -4,6 +4,18 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/cache/jobs",
+      "destination": "/api/cache/jobs"
+    },
+    {
+      "source": "/api/cache/trending-exams",
+      "destination": "/api/cache/trending-exams"
+    },
+    {
+      "source": "/api/cache/exam-updates",
+      "destination": "/api/cache/exam-updates"
+    },
+    {
       "source": "/api/scrape",
       "destination": "/api/scrape"
     },

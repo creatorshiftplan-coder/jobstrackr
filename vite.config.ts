@@ -315,13 +315,116 @@ print(json.dumps({"links": links, "total": len(links)}))
   };
 }
 
+// Local dev plugin: proxy /api/cache/* to Supabase directly (no Redis in dev)
+function localCachePlugin() {
+  return {
+    name: "local-cache",
+    configureServer(server: any) {
+      // Helper: fetch from Supabase REST API
+      const supabaseFetch = async (path: string) => {
+        const dotenv = await import("dotenv");
+        dotenv.config();
+        const url = process.env.VITE_SUPABASE_URL;
+        const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const response = await fetch(`${url}/rest/v1/${path}`, {
+          headers: {
+            apikey: key!,
+            Authorization: `Bearer ${key}`,
+          },
+        });
+        return response.json();
+      };
+
+      // /api/cache/jobs
+      server.middlewares.use("/api/cache/jobs", async (_req: any, res: any) => {
+        try {
+          const columns = [
+            "id", "slug", "title", "department", "location",
+            "last_date", "last_date_display", "vacancies", "vacancies_display",
+            "qualification", "eligibility", "experience",
+            "salary_min", "salary_max", "age_min", "age_max",
+            "application_fee", "job_metadata", "is_featured",
+            "admin_refreshed_at", "created_at", "tags",
+          ].join(",");
+          const data = await supabaseFetch(`jobs?select=${columns}&order=created_at.desc&limit=10000`);
+          res.writeHead(200, { "Content-Type": "application/json", "X-Cache-Hit": "0" });
+          res.end(JSON.stringify(data));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+
+      // /api/cache/trending-exams
+      server.middlewares.use("/api/cache/trending-exams", async (_req: any, res: any) => {
+        try {
+          const exams = await supabaseFetch(
+            "exams?is_active=eq.true&ai_cached_response=not.is.null&select=*&order=ai_last_updated_at.desc"
+          );
+          const examsWithData = (exams || []).filter((exam: any) => {
+            const ai = exam.ai_cached_response;
+            if (!ai || ai.raw_response) return false;
+            return ai.summary || ai.current_status;
+          });
+          const examIds = examsWithData.map((e: any) => e.id);
+          const attempts = examIds.length > 0
+            ? await supabaseFetch(`exam_attempts?exam_id=in.(${examIds.join(",")})&select=exam_id`)
+            : [];
+          const counts: Record<string, number> = {};
+          (attempts || []).forEach((a: any) => { counts[a.exam_id] = (counts[a.exam_id] || 0) + 1; });
+          const result = examsWithData.map((exam: any) => ({
+            id: exam.id,
+            name: exam.name,
+            conducting_body: exam.conducting_body,
+            category: exam.category,
+            description: exam.description,
+            official_website: exam.official_website,
+            ai_cached_response: exam.ai_cached_response,
+            ai_last_updated_at: exam.ai_last_updated_at,
+            tracking_count: counts[exam.id] || 0,
+            logo_url: null,
+            update_slug: exam.update_slug || null,
+          }));
+          result.sort((a: any, b: any) => {
+            if (b.tracking_count !== a.tracking_count) return b.tracking_count - a.tracking_count;
+            return new Date(b.ai_last_updated_at || 0).getTime() - new Date(a.ai_last_updated_at || 0).getTime();
+          });
+          res.writeHead(200, { "Content-Type": "application/json", "X-Cache-Hit": "0" });
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+
+      // /api/cache/exam-updates
+      server.middlewares.use("/api/cache/exam-updates", async (req: any, res: any) => {
+        try {
+          const url = new URL(req.url || "", "http://localhost");
+          const category = url.searchParams.get("category") || "";
+          let path = "exam_updates?select=*&order=scraped_at.desc&limit=100";
+          if (category && category !== "all") {
+            path += `&category=eq.${encodeURIComponent(category)}`;
+          }
+          const data = await supabaseFetch(path);
+          res.writeHead(200, { "Content-Type": "application/json", "X-Cache-Hit": "0" });
+          res.end(JSON.stringify(data || []));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
   },
-  plugins: [localScraperPlugin(), localDiscoverPlugin(), localScrapeArticlePlugin(), localScrapeLinksPlugin(), react()],
+  plugins: [localCachePlugin(), localScraperPlugin(), localDiscoverPlugin(), localScrapeArticlePlugin(), localScrapeLinksPlugin(), react()],
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
