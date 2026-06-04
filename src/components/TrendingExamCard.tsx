@@ -15,6 +15,7 @@ import { useSaveJob, useUnsaveJob, useIsJobSaved } from "@/hooks/useSavedJobs";
 import { useAuth } from "@/hooks/useAuth";
 import { useJobForExam } from "@/hooks/useJobForExam";
 import { useExamUpdatesForExam } from "@/hooks/useExamUpdates";
+import { isWhatsAppUrl, isWhatsAppContent } from "@/lib/urlUtils";
 
 interface TrendingExamCardProps {
     exam: TrendingExam;
@@ -98,8 +99,10 @@ function getUpdateCategoryConfig(category: string): { bg: string; text: string; 
 
 // Inline updates strip - shared between card types
 function InlineUpdatesStrip({ updates, variant = "light" }: { updates: ExamUpdateItem[]; variant?: "light" | "dark" }) {
-    if (updates.length === 0) return null;
-    const topUpdates = updates.slice(0, 3);
+    // Filter out WhatsApp-related updates
+    const filtered = updates.filter((u) => !isWhatsAppUrl(u.url) && !isWhatsAppContent(u.title));
+    if (filtered.length === 0) return null;
+    const topUpdates = filtered.slice(0, 3);
     const isDark = variant === "dark";
 
     return (
@@ -198,7 +201,7 @@ function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCard
     const { data: matchingJob, isLoading: isLoadingJob } = useJobForExam(exam.name);
     const jobId = matchingJob?.id;
     const { data: examUpdates } = useExamUpdatesForExam(exam.id, exam.name);
-    const latestScrapedUpdates = (examUpdates || []).filter((update) => update.summary || update.status || update.download_links?.length).slice(0, 3);
+    const latestScrapedUpdates = (examUpdates || []).filter((update) => !isWhatsAppUrl(update.url) && !isWhatsAppContent(update.title) && (update.summary || update.status || update.download_links?.length)).slice(0, 3);
 
     // Save job functionality - use matching job ID if found
     const { mutate: saveJob, isPending: isSaving } = useSaveJob();
@@ -383,7 +386,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
     const { data: matchingJob } = useJobForExam(exam.name);
     const jobId = matchingJob?.id;
     const { data: examUpdates } = useExamUpdatesForExam(exam.id, exam.name);
-    const latestScrapedUpdates = (examUpdates || []).filter((update) => update.summary || update.status || update.download_links?.length).slice(0, 3);
+    const latestScrapedUpdates = (examUpdates || []).filter((update) => !isWhatsAppUrl(update.url) && !isWhatsAppContent(update.title) && (update.summary || update.status || update.download_links?.length)).slice(0, 3);
 
     // Sync expanded state when initialExpanded changes (e.g., from URL param)
     useEffect(() => {

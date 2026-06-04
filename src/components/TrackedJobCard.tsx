@@ -45,7 +45,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExamCredentialsModal } from "@/components/ExamCredentialsModal";
 import { useExamUpdatesForExam, ExamUpdateItem } from "@/hooks/useExamUpdates";
-import { isFreeJobAlertUrl } from "@/lib/urlUtils";
+import { isFreeJobAlertUrl, isWhatsAppUrl, isWhatsAppContent } from "@/lib/urlUtils";
 import { Link } from "react-router-dom";
 
 // Helper function to get phase-specific data from AI response
@@ -366,6 +366,45 @@ function categorizeLinkIcon(text: string): { icon: typeof FileText; color: strin
   return { icon: Download, color: "text-primary" };
 }
 
+/** Check if link text is generic/uninformative */
+function isGenericLinkText(text: string): boolean {
+  const t = text.toLowerCase().trim();
+  return (
+    t === "click here" || t === "click" || t === "here" ||
+    t === "link" || t === "download" || t === "view" ||
+    t === "open" || t === "go" || t === "visit" ||
+    t.startsWith("click here") || t.startsWith("http")
+  );
+}
+
+/** Try to infer a descriptive label from a URL */
+function inferLabelFromUrl(url: string, parentCategory?: string): string {
+  const u = url.toLowerCase();
+  if (u.includes("admit") || u.includes("hall-ticket") || u.includes("hallticket"))
+    return "Admit Card";
+  if (u.includes("result") || u.includes("score"))
+    return "Check Result";
+  if (u.includes("answer") || u.includes("key"))
+    return "Answer Key";
+  if (u.includes("apply") || u.includes("registr") || u.includes("application"))
+    return "Apply Online";
+  if (u.includes("syllabus") || u.includes("pattern"))
+    return "Syllabus";
+  if (u.includes("notification") || u.includes(".pdf"))
+    return "Notification PDF";
+  if (u.includes("cutoff") || u.includes("cut-off"))
+    return "Cutoff";
+  // Fall back to parent update category
+  if (parentCategory) {
+    const cat = parentCategory.toLowerCase().replace(/_/g, " ");
+    if (cat.includes("admit")) return "Admit Card Link";
+    if (cat.includes("result")) return "Result Link";
+    if (cat.includes("answer")) return "Answer Key Link";
+    if (cat.includes("syllabus")) return "Syllabus Link";
+  }
+  return "Official Link";
+}
+
 /** Collect + deduplicate download links from multiple ExamUpdateItems */
 function mergeDownloadLinks(updates: ExamUpdateItem[]): CategorizedLink[] {
   const seen = new Set<string>();
@@ -373,11 +412,16 @@ function mergeDownloadLinks(updates: ExamUpdateItem[]): CategorizedLink[] {
 
   for (const update of updates.slice(0, 5)) {
     for (const dl of (update.download_links || [])) {
-      if (!dl.url || seen.has(dl.url) || isFreeJobAlertUrl(dl.url)) continue;
+      if (!dl.url || seen.has(dl.url) || isFreeJobAlertUrl(dl.url) || isWhatsAppUrl(dl.url)) continue;
       seen.add(dl.url);
-      const { icon, color } = categorizeLinkIcon(dl.text);
+      // Fix generic link text
+      let displayText = dl.text;
+      if (isGenericLinkText(displayText)) {
+        displayText = inferLabelFromUrl(dl.url, update.category);
+      }
+      const { icon, color } = categorizeLinkIcon(displayText);
       links.push({
-        text: dl.text.length > 35 ? dl.text.slice(0, 35) + "…" : dl.text,
+        text: displayText.length > 35 ? displayText.slice(0, 35) + "…" : displayText,
         url: dl.url,
         icon,
         color,
@@ -1066,14 +1110,19 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
               })()}
 
               {/* ③ Latest News Feed */}
-              {scrapedUpdates && scrapedUpdates.length > 0 && (
+              {(() => {
+                const filteredUpdates = (scrapedUpdates || []).filter(
+                  (u) => !isWhatsAppUrl(u.url) && !isWhatsAppContent(u.title)
+                );
+                if (filteredUpdates.length === 0) return null;
+                return (
                 <div className="bg-slate-50/80 dark:bg-card/80 rounded-xl p-3 border border-slate-200/70 dark:border-border mt-2">
                   <div className="flex items-center gap-2 mb-3">
                     <Newspaper className="h-4 w-4 text-primary" />
                     <span className="font-medium text-sm">Latest Updates</span>
                   </div>
                   <div className="space-y-2">
-                    {scrapedUpdates.slice(0, 3).map((update, i) => {
+                    {filteredUpdates.slice(0, 3).map((update, i) => {
                       const catConfig = getCategoryConfig(update.category);
                       const CatIcon = catConfig.icon;
                       let timeAgo = "";
@@ -1124,7 +1173,8 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
                     })}
                   </div>
                 </div>
-              )}
+              );
+              })()}
 
               {/* AI Recommendations Section */}
               {statusData?.recommendations?.length > 0 && (
