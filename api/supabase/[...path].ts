@@ -1,8 +1,3 @@
-import { redis } from '@/lib/redis'; // We'll need to create a redis client utility
-
-// However, we cannot import from '@/lib/redis' because that's a client-side path.
-// Instead, we'll directly use the Upstash REST API via fetch.
-
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
@@ -40,7 +35,7 @@ async function redisCommand(command: string, args: Record<string, any> = {}): Pr
 function getCacheKey(request: Request): string {
   const url = new URL(request.url);
   // Use the path and query string after the /api/supabase/ prefix
-  const path = url.pathname.replace(/^\/api\/supabase\/, '');
+  const path = url.pathname.replace(/^\/api\/supabase\//, '');
   const search = url.search;
   return `cache:${path}${search}`;
 }
@@ -120,7 +115,7 @@ async function proxyToSupabase(request: Request): Promise<Response> {
   const url = new URL(request.url);
   let path = url.pathname; // e.g., /api/supabase/rest/v1/jobs
   // Remove the /api/supabase prefix
-  path = path.replace(/^\/api\/supabase\/, '');
+  path = path.replace(/^\/api\/supabase\//, '');
   const targetUrl = `${supabaseUrl}/rest/v1/${path}${url.search}`;
 
   // Copy headers from the original request, but replace host and possibly others
@@ -140,7 +135,6 @@ async function proxyToSupabase(request: Request): Promise<Response> {
     method: request.method,
     headers: headers,
     body: request.body,
-    // Redirect mode: manual? We'll keep default
   });
 
   return response;

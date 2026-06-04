@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { cachedFetch } from '../lib/redis';
+import { cachedFetch } from '../lib/redis.js';
 
 const CACHE_KEY = 'cache:trending-exams';
 const CACHE_TTL = 600; // 10 minutes

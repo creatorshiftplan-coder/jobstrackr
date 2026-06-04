@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { cachedFetch } from '../lib/redis';
+import { cachedFetch } from '../lib/redis.js';
 
 const CACHE_TTL = 300; // 5 minutes
 
