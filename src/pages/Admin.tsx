@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminRole } from "@/hooks/useAdminRole";
@@ -20,10 +20,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useAllExamUpdates } from "@/hooks/useExamUpdates";
+import { inferCategory } from "@/lib/jobUtils";
+import { useEffect } from "react";
 import { isFreeJobAlertUrl } from "@/lib/urlUtils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { format } from "date-fns";
 import { Job, JobMetadata } from "@/types/job";
 import { parseEligibilityProfileFromText } from "@/lib/eligibilityParser";
@@ -32,6 +35,7 @@ import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { useGovtJobScraper, type ScraperSource, type ExamUpdate, type ArticleLink, type ArticleData } from "@/hooks/useGovtJobScraper";
 import { useApiKeys, PROVIDER_PRESETS, type ApiKeyEntry, type NewApiKeyEntry } from "@/hooks/useApiKeys";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface JobFormData {
   title: string;
@@ -482,6 +486,21 @@ interface LogoQueueItem {
   similarTo?: string;
 }
 
+const getWebappBaseUrl = () => {
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://jobstrackr.in";
+  if (origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("192.168.")) {
+    return "https://jobstrackr.in";
+  }
+  return origin;
+};
+
+const getJobDeadlineDate = (job: any): Date | null => {
+  if (!job) return null;
+  const displayDate = parseJobDeadline(job.last_date_display);
+  if (displayDate) return displayDate;
+  return parseJobDeadline(job.last_date);
+};
+
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, isFullAdmin, isLoading: roleLoading } = useAdminRole();
@@ -805,12 +824,852 @@ export default function Admin() {
     return <ArrowDown className="h-4 w-4 ml-1" />;
   };
 
+  // Expired jobs states
+  const [expiredSearchQuery, setExpiredSearchQuery] = useState<string>("");
+  const [expiredYearFilter, setExpiredYearFilter] = useState<string>("all");
+  const [expiredSortField, setExpiredSortField] = useState<"last_date" | "vacancies" | "created_at" | "vacancies_and_date" | null>("last_date");
+  const [expiredSortDirection, setExpiredSortDirection] = useState<"asc" | "desc">("desc");
+  const [selectedExpiredJobs, setSelectedExpiredJobs] = useState<Set<string>>(new Set());
+
+  // Telegram Posting states
+  const [selectedTelegramSector, setSelectedTelegramSector] = useState<string>("All Jobs");
+  const [telegramSourceType, setTelegramSourceType] = useState<"jobs" | "updates">("jobs");
+  const [selectedTelegramChannelId, setSelectedTelegramChannelId] = useState<string>("");
+  const [selectedTelegramJobIds, setSelectedTelegramJobIds] = useState<string[]>([]);
+  const [selectedTelegramUpdateIds, setSelectedTelegramUpdateIds] = useState<string[]>([]);
+  const [postingToTelegram, setPostingToTelegram] = useState<boolean>(false);
+  const [showTelegramAddChannelDialog, setShowTelegramAddChannelDialog] = useState<boolean>(false);
+  const [telegramSortField, setTelegramSortField] = useState<"vacancies" | "last_date" | "created_at" | null>("created_at");
+  const [telegramSortDirection, setTelegramSortDirection] = useState<"asc" | "desc">("desc");
+
+  const [sectorSearchQuery, setSectorSearchQuery] = useState("");
+
+  const TELEGRAM_TIERS = [
+    {
+      name: "Tier 1 (Highest Search Volume)",
+      terms: [
+        "All Jobs", "SSC", "UPSC", "RRB", "Railway Jobs", "Banking Jobs", "IBPS", "SBI", "RBI", 
+        "Defence Jobs", "Army Jobs", "Navy Jobs", "Air Force Jobs", "Police Jobs", 
+        "PSU Jobs", "State Government Jobs", "Teaching Jobs", "Central Government Jobs", 
+        "Sarkari Naukri", "Government Jobs"
+      ]
+    },
+    {
+      name: "Tier 2 (Very Popular)",
+      terms: [
+        "Banking", "IBPS PO", "IBPS Clerk", "SBI PO", "SBI Clerk", "RBI Grade B", 
+        "RBI Assistant", "NABARD", "SIDBI", "Railway", "RRB NTPC", "RRB Group D", 
+        "RRB ALP", "RRB JE", "RPF", "SSC CGL", "SSC CHSL", "SSC MTS", "SSC GD", 
+        "SSC JE", "SSC CPO", "SSC Stenographer", "UPSC CSE", "IAS", "IPS", "IFS", 
+        "CDS", "NDA", "CAPF"
+      ]
+    },
+    {
+      name: "Tier 3 (Defence)",
+      terms: [
+        "Agniveer", "AFCAT", "Indian Army", "Indian Navy", "Indian Air Force", 
+        "Coast Guard", "CRPF", "BSF", "CISF", "ITBP", "SSB", "Assam Rifles"
+      ]
+    },
+    {
+      name: "Tier 4 (PSU)",
+      terms: [
+        "ONGC", "NTPC", "BHEL", "IOCL", "HPCL", "BPCL", "GAIL", "SAIL", 
+        "POWERGRID", "CIL", "BEL", "HAL", "NPCIL", "DRDO", "ISRO"
+      ]
+    },
+    {
+      name: "Tier 5 (Teaching)",
+      terms: [
+        "CTET", "TET", "UGC NET", "KVS", "NVS", "DSSSB", "Teacher Recruitment", "Assistant Professor"
+      ]
+    },
+    {
+      name: "Tier 6 (State PSC)",
+      terms: [
+        "PSC", "WBPSC", "BPSC", "UPPSC", "MPSC", "RPSC", "TNPSC", "OPSC", "APPSC", "MPPSC", "UKPSC", "HPSC"
+      ]
+    },
+    {
+      name: "Tier 7 (Healthcare)",
+      terms: [
+        "AIIMS", "ESIC", "NHM", "Staff Nurse", "Nursing Officer", "Pharmacist", "Lab Technician", "Medical Officer"
+      ]
+    },
+    {
+      name: "Tier 8 (Judiciary)",
+      terms: [
+        "High Court", "District Court", "Supreme Court", "Law Clerk", "Court Assistant"
+      ]
+    },
+    {
+      name: "Tier 9 (Popular Job Titles)",
+      terms: [
+        "Clerk", "PO", "Officer", "Assistant", "Junior Assistant", "LDC", "UDC", 
+        "DEO", "MTS", "Stenographer", "Constable", "SI", "ASI", "Inspector", 
+        "JE", "AE", "Technician", "Apprentice", "Teacher", "Professor"
+      ]
+    }
+  ];
+
+  const allUniqueSectors = useMemo(() => {
+    const sectors = new Set<string>();
+    TELEGRAM_TIERS.forEach(tier => {
+      tier.terms.forEach(term => sectors.add(term));
+    });
+    return Array.from(sectors).sort();
+  }, []);
+
+  const filteredTelegramTiers = useMemo(() => {
+    if (!sectorSearchQuery.trim()) return TELEGRAM_TIERS;
+    const q = sectorSearchQuery.toLowerCase();
+    return TELEGRAM_TIERS.map(tier => ({
+      ...tier,
+      terms: tier.terms.filter(term => term.toLowerCase().includes(q))
+    })).filter(tier => tier.terms.length > 0);
+  }, [sectorSearchQuery]);
+
+  interface TelegramChannel {
+    id: string;
+    name: string;
+    bot_token: string;
+    channel_id: string;
+    sector: string;
+  }
+
+  const [telegramChannels, setTelegramChannels] = useState<TelegramChannel[]>([]);
+  const [newTelegramChannelForm, setNewTelegramChannelForm] = useState({
+    name: "",
+    bot_token: "",
+    channel_id: "",
+    sector: "All Jobs"
+  });
+
+  // Load channels from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("jobstrackr:telegram_channels");
+    if (stored) {
+      try {
+        setTelegramChannels(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to parse telegram channels", e);
+      }
+    }
+  }, []);
+
+  // Sync channels to localStorage
+  const saveTelegramChannels = (channels: TelegramChannel[]) => {
+    setTelegramChannels(channels);
+    localStorage.setItem("jobstrackr:telegram_channels", JSON.stringify(channels));
+  };
+
+  const handleAddTelegramChannel = () => {
+    if (!newTelegramChannelForm.name.trim() || !newTelegramChannelForm.bot_token.trim() || !newTelegramChannelForm.channel_id.trim()) {
+      toast({ title: "Validation Error", description: "All fields are required", variant: "destructive" });
+      return;
+    }
+
+    const newChannel: TelegramChannel = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: newTelegramChannelForm.name.trim(),
+      bot_token: newTelegramChannelForm.bot_token.trim(),
+      channel_id: newTelegramChannelForm.channel_id.trim(),
+      sector: newTelegramChannelForm.sector
+    };
+
+    const updated = [...telegramChannels, newChannel];
+    saveTelegramChannels(updated);
+    
+    if (!selectedTelegramChannelId) {
+      setSelectedTelegramChannelId(newChannel.id);
+    }
+
+    setNewTelegramChannelForm({
+      name: "",
+      bot_token: "",
+      channel_id: "",
+      sector: "UPSC"
+    });
+    setShowTelegramAddChannelDialog(false);
+    toast({ title: "Success", description: "Telegram channel configured successfully" });
+  };
+
+  const handleDeleteTelegramChannel = (id: string) => {
+    const updated = telegramChannels.filter(c => c.id !== id);
+    saveTelegramChannels(updated);
+    if (selectedTelegramChannelId === id) {
+      setSelectedTelegramChannelId(updated[0]?.id || "");
+    }
+    toast({ title: "Deleted", description: "Channel configuration removed" });
+  };
+
+  const activeJobsForTelegram = useMemo(() => {
+    if (!jobs) return [];
+    
+    const filtered = jobs.filter(job => {
+      const lastDate = getJobDeadlineDate(job);
+      if (lastDate && lastDate < new Date()) return false;
+      
+      const textToSearch = `${job.title} ${job.department} ${job.qualification} ${job.description || ""}`.toLowerCase();
+      const sector = selectedTelegramSector.toLowerCase();
+      
+      if (sector === "sarkari naukri" || sector === "government jobs" || sector === "all jobs") return true;
+      
+      if (sector === "railway jobs" && (textToSearch.includes("railway") || textToSearch.includes("rrb"))) return true;
+      if (sector === "banking jobs" && (textToSearch.includes("bank") || textToSearch.includes("ibps") || textToSearch.includes("sbi") || textToSearch.includes("rbi"))) return true;
+      if (sector === "defence jobs" && (textToSearch.includes("defence") || textToSearch.includes("defense") || textToSearch.includes("army") || textToSearch.includes("navy") || textToSearch.includes("air force") || textToSearch.includes("afcat") || textToSearch.includes("nda") || textToSearch.includes("cds"))) return true;
+      if (sector === "army jobs" && (textToSearch.includes("army") || textToSearch.includes("agniveer"))) return true;
+      if (sector === "navy jobs" && textToSearch.includes("navy")) return true;
+      if (sector === "air force jobs" && (textToSearch.includes("air force") || textToSearch.includes("iaf"))) return true;
+      if (sector === "police jobs" && (textToSearch.includes("police") || textToSearch.includes("constable") || textToSearch.includes("sub inspector") || textToSearch.includes("si "))) return true;
+      if (sector === "psu jobs" && (textToSearch.includes("psu") || textToSearch.includes("ongc") || textToSearch.includes("ntpc") || textToSearch.includes("bhel") || textToSearch.includes("gail") || textToSearch.includes("sail") || textToSearch.includes("iocl"))) return true;
+      if (sector === "teaching jobs" && (textToSearch.includes("teacher") || textToSearch.includes("teaching") || textToSearch.includes("tgt") || textToSearch.includes("pgt") || textToSearch.includes("professor") || textToSearch.includes("lecturer"))) return true;
+      if (sector === "state government jobs" && (textToSearch.includes("state government") || textToSearch.includes("state govt") || textToSearch.includes("department of") || textToSearch.includes("government of"))) return true;
+      if (sector === "central government jobs" && (textToSearch.includes("central government") || textToSearch.includes("central govt") || textToSearch.includes("india") || textToSearch.includes("union"))) return true;
+      
+      return textToSearch.includes(sector);
+    });
+
+    if (!telegramSortField) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      let comparison = 0;
+      if (telegramSortField === "vacancies") {
+        const vacA = a.vacancies === null || a.vacancies === undefined ? 0 : a.vacancies;
+        const vacB = b.vacancies === null || b.vacancies === undefined ? 0 : b.vacancies;
+        comparison = vacA - vacB;
+      } else if (telegramSortField === "last_date") {
+        const dateA = getJobDeadlineDate(a)?.getTime() ?? 0;
+        const dateB = getJobDeadlineDate(b)?.getTime() ?? 0;
+        comparison = dateA - dateB;
+      } else if (telegramSortField === "created_at") {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        comparison = dateA - dateB;
+      }
+      return telegramSortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [jobs, selectedTelegramSector, telegramSortField, telegramSortDirection]);
+
+  const { data: rawTelegramExamUpdates, isLoading: telegramUpdatesLoading } = useAllExamUpdates();
+
+  const telegramExamUpdates = useMemo(() => {
+    if (!rawTelegramExamUpdates) return [];
+    
+    return rawTelegramExamUpdates.filter(update => {
+      const textToSearch = `${update.title} ${update.category} ${update.status || ""} ${update.summary || ""}`.toLowerCase();
+      const sector = selectedTelegramSector.toLowerCase();
+      
+      if (sector === "sarkari naukri" || sector === "government jobs" || sector === "all jobs") return true;
+      
+      if (sector === "railway jobs" && (textToSearch.includes("railway") || textToSearch.includes("rrb"))) return true;
+      if (sector === "banking jobs" && (textToSearch.includes("bank") || textToSearch.includes("ibps") || textToSearch.includes("sbi") || textToSearch.includes("rbi"))) return true;
+      if (sector === "defence jobs" && (textToSearch.includes("defence") || textToSearch.includes("defense") || textToSearch.includes("army") || textToSearch.includes("navy") || textToSearch.includes("air force") || textToSearch.includes("afcat") || textToSearch.includes("nda") || textToSearch.includes("cds"))) return true;
+      if (sector === "army jobs" && (textToSearch.includes("army") || textToSearch.includes("agniveer"))) return true;
+      if (sector === "navy jobs" && textToSearch.includes("navy")) return true;
+      if (sector === "air force jobs" && (textToSearch.includes("air force") || textToSearch.includes("iaf"))) return true;
+      if (sector === "police jobs" && (textToSearch.includes("police") || textToSearch.includes("constable") || textToSearch.includes("sub inspector") || textToSearch.includes("si "))) return true;
+      if (sector === "psu jobs" && (textToSearch.includes("psu") || textToSearch.includes("ongc") || textToSearch.includes("ntpc") || textToSearch.includes("bhel") || textToSearch.includes("gail") || textToSearch.includes("sail") || textToSearch.includes("iocl"))) return true;
+      if (sector === "teaching jobs" && (textToSearch.includes("teacher") || textToSearch.includes("teaching") || textToSearch.includes("tgt") || textToSearch.includes("pgt") || textToSearch.includes("professor") || textToSearch.includes("lecturer"))) return true;
+      if (sector === "state government jobs" && (textToSearch.includes("state government") || textToSearch.includes("state govt") || textToSearch.includes("department of") || textToSearch.includes("government of"))) return true;
+      if (sector === "central government jobs" && (textToSearch.includes("central government") || textToSearch.includes("central govt") || textToSearch.includes("india") || textToSearch.includes("union"))) return true;
+      
+      return textToSearch.includes(sector);
+    });
+  }, [rawTelegramExamUpdates, selectedTelegramSector]);
+
+  const handlePostToTelegram = async () => {
+    const channel = telegramChannels.find(c => c.id === selectedTelegramChannelId);
+    if (!channel) {
+      toast({ title: "Error", description: "Please select/configure a Telegram channel", variant: "destructive" });
+      return;
+    }
+
+    const idsToPost = telegramSourceType === "jobs" ? selectedTelegramJobIds : selectedTelegramUpdateIds;
+    if (idsToPost.length === 0) {
+      toast({ title: "Error", description: "Please select at least one item to post", variant: "destructive" });
+      return;
+    }
+
+    setPostingToTelegram(true);
+    try {
+      let successCount = 0;
+
+      for (const id of idsToPost) {
+        let messageText = "";
+
+        if (telegramSourceType === "jobs") {
+          const job = jobs?.find(j => j.id === id);
+          if (!job) continue;
+          const jobLink = `${getWebappBaseUrl()}/jobs/${job.slug || job.id}`;
+          
+          // Dynamic hashtags
+          const hashtags = ["#GovernmentJobs", "#SarkariNaukri"];
+          const titleLower = job.title.toLowerCase();
+          const deptLower = job.department.toLowerCase();
+          if (titleLower.includes("ssc") || deptLower.includes("ssc")) hashtags.unshift("#SSC");
+          else if (titleLower.includes("upsc") || deptLower.includes("upsc")) hashtags.unshift("#UPSC");
+          else if (titleLower.includes("rrb") || titleLower.includes("railway") || deptLower.includes("railway")) hashtags.unshift("#Railway");
+          else if (titleLower.includes("bank") || deptLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
+          else if (titleLower.includes("police") || deptLower.includes("police")) hashtags.unshift("#Police");
+          else if (titleLower.includes("defence") || titleLower.includes("army") || titleLower.includes("navy") || titleLower.includes("air force")) hashtags.unshift("#Defence");
+          const hashtagsStr = hashtags.join(" ");
+
+          messageText = `
+🚨 NEW RECRUITMENT ALERT
+
+📌 ${job.title}
+
+🏢 Organization: ${job.department}
+👥 Vacancies: ${job.vacancies_display || job.vacancies || "TBD"}
+🎓 Qualification: ${job.qualification}
+📅 Last Date: ${(() => {
+            const d = getJobDeadlineDate(job);
+            return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date;
+          })()}
+
+✅ Apply Online
+
+🔗 View Full Notification:
+${jobLink}
+
+━━━━━━━━━━━━━━━
+📲 Track Jobs, Exams & Applications
+🌐 https://www.jobstrackr.in
+
+${hashtagsStr}
+          `.trim();
+        } else {
+          const update = telegramExamUpdates?.find(u => u.id === id);
+          if (!update) continue;
+          const updateLink = `${getWebappBaseUrl()}/updates/${update.update_slug || update.id}`;
+          
+          const categoryLower = update.category.toLowerCase();
+          const titleLower = update.title.toLowerCase();
+
+          // Determine template type and dynamic hashtags
+          let tagCategory = "#ExamUpdate";
+          let templateType: "admit_card" | "result" | "answer_key" | "recruitment" = "recruitment";
+          
+          if (categoryLower.includes("admit") || titleLower.includes("admit") || categoryLower.includes("city") || titleLower.includes("city") || categoryLower.includes("hall") || categoryLower.includes("call") || categoryLower.includes("syllabus")) {
+            templateType = "admit_card";
+            tagCategory = "#AdmitCard";
+          } else if (categoryLower.includes("result") || titleLower.includes("result") || categoryLower.includes("cutoff") || titleLower.includes("cutoff") || categoryLower.includes("scorecard") || categoryLower.includes("merit")) {
+            templateType = "result";
+            tagCategory = "#Result";
+          } else if (categoryLower.includes("answer") || titleLower.includes("answer") || categoryLower.includes("key") || titleLower.includes("key") || categoryLower.includes("sheet")) {
+            templateType = "answer_key";
+            tagCategory = "#AnswerKey";
+          }
+
+          const hashtags = [tagCategory];
+          if (templateType === "result" || templateType === "recruitment") {
+            hashtags.push("#GovernmentJobs");
+          } else {
+            hashtags.push("#ExamUpdate");
+          }
+          
+          if (titleLower.includes("ssc")) hashtags.unshift("#SSC");
+          else if (titleLower.includes("upsc")) hashtags.unshift("#UPSC");
+          else if (titleLower.includes("rrb") || titleLower.includes("railway")) hashtags.unshift("#Railway");
+          else if (titleLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
+          else if (titleLower.includes("police")) hashtags.unshift("#Police");
+          else if (titleLower.includes("defence")) hashtags.unshift("#Defence");
+          const hashtagsStr = hashtags.join(" ");
+
+          if (templateType === "admit_card") {
+            const statusText = update.status || (titleLower.includes("city") ? "Exam City Slip Released" : "Admit Card Released");
+            const examDate = (() => {
+              if (update.important_dates && Array.isArray(update.important_dates)) {
+                const match = update.important_dates.find(d => 
+                  /exam|test|written|cbt|date/i.test(d.event) && !/admit|result|apply|registration/i.test(d.event)
+                );
+                if (match) return match.date;
+              }
+              return "Check Details";
+            })();
+
+            messageText = `
+🎫 ADMIT CARD / EXAM CITY UPDATE
+
+📌 ${update.title}
+
+📍 ${statusText}
+📅 Exam Date: ${examDate}
+
+✅ Download Now
+
+🔗 View Details:
+${updateLink}
+
+━━━━━━━━━━━━━━━
+📲 Never Miss Admit Cards & Exam Updates
+🌐 https://www.jobstrackr.in
+
+${hashtagsStr}
+            `.trim();
+          } else if (templateType === "result") {
+            messageText = `
+🏆 RESULT OUT
+
+📌 ${update.title}
+
+📢 Result Released Successfully
+
+✅ Check Your Result
+
+🔗 View Result:
+${updateLink}
+
+━━━━━━━━━━━━━━━
+📲 Track Results & Cut-Off Updates
+🌐 https://www.jobstrackr.in
+
+${hashtagsStr}
+            `.trim();
+          } else if (templateType === "answer_key") {
+            messageText = `
+📝 ANSWER KEY RELEASED
+
+📌 ${update.title}
+
+📢 Official Answer Key Available
+
+✅ Check Response Sheet & Answer Key
+
+🔗 View Details:
+${updateLink}
+
+━━━━━━━━━━━━━━━
+📲 Track Results & Cut-Off Updates
+🌐 https://www.jobstrackr.in
+
+${hashtagsStr}
+            `.trim();
+          } else {
+            // Fallback recruitment alert
+            const orgText = (() => {
+              if (titleLower.includes("ssc")) return "SSC";
+              if (titleLower.includes("upsc")) return "UPSC";
+              if (titleLower.includes("rrb") || titleLower.includes("railway")) return "RRB / Railways";
+              if (titleLower.includes("sbi")) return "SBI";
+              if (titleLower.includes("ibps")) return "IBPS";
+              const match = update.title.match(/^(.*?)\s+(recruitment|exam|vacancy|admit|result)/i);
+              if (match && match[1]) return match[1].trim();
+              return "Government Agency";
+            })();
+
+            messageText = `
+🚨 NEW RECRUITMENT ALERT
+
+📌 ${update.title}
+
+🏢 Organization: ${orgText}
+📢 Notification Details Available
+
+✅ View Notification & Apply
+
+🔗 View Details:
+${updateLink}
+
+━━━━━━━━━━━━━━━
+📲 Track Jobs, Exams & Applications
+🌐 https://www.jobstrackr.in
+
+${hashtagsStr}
+            `.trim();
+          }
+        }
+
+        const response = await fetch(`https://api.telegram.org/bot${channel.bot_token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: channel.channel_id,
+            text: messageText,
+            parse_mode: "Markdown",
+            disable_web_page_preview: false
+          })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.ok) {
+          successCount++;
+        } else {
+          console.error(`Telegram post error for ID ${id}:`, data.description);
+        }
+
+        // Add a 500ms delay between posts to prevent Telegram rate limits
+        if (idsToPost.length > 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+
+      if (successCount === idsToPost.length) {
+        toast({ title: "Success", description: `Posted ${successCount} notification(s) to Telegram channel successfully!` });
+        // Clear selection
+        if (telegramSourceType === "jobs") {
+          setSelectedTelegramJobIds([]);
+        } else {
+          setSelectedTelegramUpdateIds([]);
+        }
+      } else {
+        toast({
+          title: "Partial Success",
+          description: `Posted ${successCount} out of ${idsToPost.length} notifications. Check console for errors.`,
+          variant: "warning" as any
+        });
+      }
+    } catch (e: any) {
+      console.error("Telegram post error:", e);
+      toast({ title: "Error", description: e.message || "Failed to send message to Telegram", variant: "destructive" });
+    } finally {
+      setPostingToTelegram(false);
+    }
+  };
+
+  const getTelegramPreviewMessage = () => {
+    const ids = telegramSourceType === "jobs" ? selectedTelegramJobIds : selectedTelegramUpdateIds;
+    if (ids.length === 0) {
+      return "Select one or more items to see the live preview...";
+    }
+
+    const firstId = ids[0];
+    if (telegramSourceType === "jobs") {
+      const job = jobs?.find(j => j.id === firstId);
+      if (!job) return "Select a job to see the live preview...";
+      const jobLink = `${getWebappBaseUrl()}/jobs/${job.slug || job.id}`;
+      const prefix = ids.length > 1 ? `[Previewing 1 of ${ids.length} selected jobs]\n\n` : "";
+      
+      const hashtags = ["#GovernmentJobs", "#SarkariNaukri"];
+      const titleLower = job.title.toLowerCase();
+      const deptLower = job.department.toLowerCase();
+      if (titleLower.includes("ssc") || deptLower.includes("ssc")) hashtags.unshift("#SSC");
+      else if (titleLower.includes("upsc") || deptLower.includes("upsc")) hashtags.unshift("#UPSC");
+      else if (titleLower.includes("rrb") || titleLower.includes("railway") || deptLower.includes("railway")) hashtags.unshift("#Railway");
+      else if (titleLower.includes("bank") || deptLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
+      else if (titleLower.includes("police") || deptLower.includes("police")) hashtags.unshift("#Police");
+      else if (titleLower.includes("defence") || titleLower.includes("army") || titleLower.includes("navy") || titleLower.includes("air force")) hashtags.unshift("#Defence");
+      const hashtagsStr = hashtags.join(" ");
+
+      return `${prefix}🚨 NEW RECRUITMENT ALERT
+
+📌 ${job.title}
+
+🏢 Organization: ${job.department}
+👥 Vacancies: ${job.vacancies_display || job.vacancies || "TBD"}
+🎓 Qualification: ${job.qualification}
+📅 Last Date: ${(() => {
+        const d = getJobDeadlineDate(job);
+        return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date;
+      })()}
+
+✅ Apply Online
+
+🔗 View Full Notification:
+${jobLink}
+
+━━━━━━━━━━━━━━━
+📲 Track Jobs, Exams & Applications
+🌐 https://www.jobstrackr.in
+
+${hashtagsStr}`;
+    } else {
+      const update = telegramExamUpdates?.find(u => u.id === firstId);
+      if (!update) return "Select an update to see the live preview...";
+      const updateLink = `${getWebappBaseUrl()}/updates/${update.update_slug || update.id}`;
+      const prefix = ids.length > 1 ? `[Previewing 1 of ${ids.length} selected updates]\n\n` : "";
+
+      const categoryLower = update.category.toLowerCase();
+      const titleLower = update.title.toLowerCase();
+
+      let tagCategory = "#ExamUpdate";
+      let templateType: "admit_card" | "result" | "answer_key" | "recruitment" = "recruitment";
+      
+      if (categoryLower.includes("admit") || titleLower.includes("admit") || categoryLower.includes("city") || titleLower.includes("city") || categoryLower.includes("hall") || categoryLower.includes("call") || categoryLower.includes("syllabus")) {
+        templateType = "admit_card";
+        tagCategory = "#AdmitCard";
+      } else if (categoryLower.includes("result") || titleLower.includes("result") || categoryLower.includes("cutoff") || titleLower.includes("cutoff") || categoryLower.includes("scorecard") || categoryLower.includes("merit")) {
+        templateType = "result";
+        tagCategory = "#Result";
+      } else if (categoryLower.includes("answer") || titleLower.includes("answer") || categoryLower.includes("key") || titleLower.includes("key") || categoryLower.includes("sheet")) {
+        templateType = "answer_key";
+        tagCategory = "#AnswerKey";
+      }
+
+      const hashtags = [tagCategory];
+      if (templateType === "result" || templateType === "recruitment") {
+        hashtags.push("#GovernmentJobs");
+      } else {
+        hashtags.push("#ExamUpdate");
+      }
+      
+      if (titleLower.includes("ssc")) hashtags.unshift("#SSC");
+      else if (titleLower.includes("upsc")) hashtags.unshift("#UPSC");
+      else if (titleLower.includes("rrb") || titleLower.includes("railway")) hashtags.unshift("#Railway");
+      else if (titleLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
+      else if (titleLower.includes("police")) hashtags.unshift("#Police");
+      else if (titleLower.includes("defence")) hashtags.unshift("#Defence");
+      const hashtagsStr = hashtags.join(" ");
+
+      if (templateType === "admit_card") {
+        const statusText = update.status || (titleLower.includes("city") ? "Exam City Slip Released" : "Admit Card Released");
+        const examDate = (() => {
+          if (update.important_dates && Array.isArray(update.important_dates)) {
+            const match = update.important_dates.find(d => 
+              /exam|test|written|cbt|date/i.test(d.event) && !/admit|result|apply|registration/i.test(d.event)
+            );
+            if (match) return match.date;
+          }
+          return "Check Details";
+        })();
+
+        return `${prefix}🎫 ADMIT CARD / EXAM CITY UPDATE
+
+📌 ${update.title}
+
+📍 ${statusText}
+📅 Exam Date: ${examDate}
+
+✅ Download Now
+
+🔗 View Details:
+${updateLink}
+
+━━━━━━━━━━━━━━━
+📲 Never Miss Admit Cards & Exam Updates
+🌐 https://www.jobstrackr.in
+
+${hashtagsStr}`;
+      } else if (templateType === "result") {
+        return `${prefix}🏆 RESULT OUT
+
+📌 ${update.title}
+
+📢 Result Released Successfully
+
+✅ Check Your Result
+
+🔗 View Result:
+${updateLink}
+
+━━━━━━━━━━━━━━━
+📲 Track Results & Cut-Off Updates
+🌐 https://www.jobstrackr.in
+
+${hashtagsStr}`;
+      } else if (templateType === "answer_key") {
+        return `${prefix}📝 ANSWER KEY RELEASED
+
+📌 ${update.title}
+
+📢 Official Answer Key Available
+
+✅ Check Response Sheet & Answer Key
+
+🔗 View Details:
+${updateLink}
+
+━━━━━━━━━━━━━━━
+📲 Track Results & Cut-Off Updates
+🌐 https://www.jobstrackr.in
+
+${hashtagsStr}`;
+      } else {
+        const orgText = (() => {
+          if (titleLower.includes("ssc")) return "SSC";
+          if (titleLower.includes("upsc")) return "UPSC";
+          if (titleLower.includes("rrb") || titleLower.includes("railway")) return "RRB / Railways";
+          if (titleLower.includes("sbi")) return "SBI";
+          if (titleLower.includes("ibps")) return "IBPS";
+          const match = update.title.match(/^(.*?)\s+(recruitment|exam|vacancy|admit|result)/i);
+          if (match && match[1]) return match[1].trim();
+          return "Government Agency";
+        })();
+
+        return `${prefix}🚨 NEW RECRUITMENT ALERT
+
+📌 ${update.title}
+
+🏢 Organization: ${orgText}
+📢 Notification Details Available
+
+✅ View Notification & Apply
+
+🔗 View Details:
+${updateLink}
+
+━━━━━━━━━━━━━━━
+📲 Track Jobs, Exams & Applications
+🌐 https://www.jobstrackr.in
+
+${hashtagsStr}`;
+      }
+    }
+  };
+
+  // Get all unique years of expired jobs dynamically
+  const expiredYears = useMemo(() => {
+    if (!jobs) return [];
+    const years = new Set<number>();
+    jobs.forEach(job => {
+      const lastDate = getJobDeadlineDate(job);
+      if (lastDate && lastDate < new Date()) {
+        years.add(lastDate.getFullYear());
+      } else if (!lastDate) {
+        // fallback to created_at
+        years.add(new Date(job.created_at).getFullYear());
+      }
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [jobs]);
+  const [expiredPage, setExpiredPage] = useState<number>(1);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState<boolean>(false);
+  const [bulkDeleting, setBulkDeleting] = useState<boolean>(false);
+
+  const handleExpiredSort = (field: "last_date" | "vacancies" | "created_at") => {
+    if (expiredSortField === field) {
+      setExpiredSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setExpiredSortField(field);
+      setExpiredSortDirection("desc");
+    }
+    setExpiredPage(1); // Reset to page 1 when sort changes
+  };
+
+  const getExpiredSortIcon = (field: "last_date" | "vacancies" | "created_at") => {
+    if (expiredSortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1" />;
+    if (expiredSortDirection === "asc") return <ArrowUp className="h-4 w-4 ml-1" />;
+    return <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
+  const toggleSelectExpiredJob = (jobId: string) => {
+    setSelectedExpiredJobs(prev => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+      } else {
+        next.add(jobId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllExpiredOnPage = (currentVisibleJobs: Job[]) => {
+    const visibleIds = currentVisibleJobs.map(job => job.id);
+    const allSelected = visibleIds.every(id => selectedExpiredJobs.has(id));
+
+    setSelectedExpiredJobs(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach(id => next.delete(id));
+      } else {
+        visibleIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const handleBulkDeleteExpiredJobs = async () => {
+    if (selectedExpiredJobs.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .delete()
+        .in("id", Array.from(selectedExpiredJobs));
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `${selectedExpiredJobs.size} expired jobs deleted successfully`,
+      });
+      setSelectedExpiredJobs(new Set());
+      setExpiredPage(1);
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    } catch (error: any) {
+      toast({
+        title: "Error deleting jobs",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setBulkDeleting(false);
+      setShowBulkDeleteConfirm(false);
+    }
+  };
+
+  // Filter and sort expired jobs
+  const expiredJobs = jobs?.filter((job) => {
+    // Must be expired
+    const lastDate = getJobDeadlineDate(job);
+    if (!lastDate || lastDate >= new Date()) return false;
+
+    // Year filter
+    if (expiredYearFilter !== "all") {
+      const jobYear = lastDate ? lastDate.getFullYear().toString() : new Date(job.created_at).getFullYear().toString();
+      if (jobYear !== expiredYearFilter) return false;
+    }
+
+    // Search query filter
+    if (expiredSearchQuery.trim() !== "") {
+      const q = expiredSearchQuery.toLowerCase();
+      const titleMatch = job.title?.toLowerCase().includes(q);
+      const deptMatch = job.department?.toLowerCase().includes(q);
+      if (!titleMatch && !deptMatch) return false;
+    }
+
+    return true;
+  }).sort((a, b) => {
+    if (!expiredSortField) return 0;
+
+    if (expiredSortField === "vacancies_and_date") {
+      const vacA = a.vacancies === null || a.vacancies === undefined ? Infinity : a.vacancies;
+      const vacB = b.vacancies === null || b.vacancies === undefined ? Infinity : b.vacancies;
+      if (vacA !== vacB) {
+        return vacA - vacB;
+      }
+      const dateA = getJobDeadlineDate(a)?.getTime() ?? 0;
+      const dateB = getJobDeadlineDate(b)?.getTime() ?? 0;
+      return dateA - dateB;
+    }
+
+    if (expiredSortField === "last_date") {
+      const dateA = getJobDeadlineDate(a)?.getTime() ?? 0;
+      const dateB = getJobDeadlineDate(b)?.getTime() ?? 0;
+      return expiredSortDirection === "asc" ? dateA - dateB : dateB - dateA;
+    }
+
+    if (expiredSortField === "vacancies") {
+      const vacA = a.vacancies || 0;
+      const vacB = b.vacancies || 0;
+      return expiredSortDirection === "asc" ? vacA - vacB : vacB - vacA;
+    }
+
+    if (expiredSortField === "created_at") {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return expiredSortDirection === "asc" ? dateA - dateB : dateB - dateA;
+    }
+
+    return 0;
+  }) || [];
+
+  const expiredItemsPerPage = 50;
+  const totalExpiredPages = Math.ceil(expiredJobs.length / expiredItemsPerPage);
+  const effectiveExpiredPage = Math.max(1, Math.min(expiredPage, totalExpiredPages || 1));
+  const paginatedExpiredJobs = expiredJobs.slice(
+    (effectiveExpiredPage - 1) * expiredItemsPerPage,
+    effectiveExpiredPage * expiredItemsPerPage
+  );
+
   // Filter and sort jobs
   const filteredJobs = jobs?.filter((job) => {
     // Last date filter
     if (lastDateFilter !== "all") {
       const today = new Date();
-      const lastDate = parseJobDeadline(job.last_date);
+      const lastDate = getJobDeadlineDate(job);
       if (!lastDate) return lastDateFilter === "active"; // unparseable → treat as active
 
       if (lastDateFilter === "expired" && lastDate >= today) return false;
@@ -854,8 +1713,8 @@ export default function Admin() {
     if (!sortField) return 0;
 
     if (sortField === "last_date") {
-      const dateA = parseJobDeadline(a.last_date)?.getTime() ?? 0;
-      const dateB = parseJobDeadline(b.last_date)?.getTime() ?? 0;
+      const dateA = getJobDeadlineDate(a)?.getTime() ?? 0;
+      const dateB = getJobDeadlineDate(b)?.getTime() ?? 0;
       return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
     }
 
@@ -1855,6 +2714,14 @@ export default function Admin() {
                 <Briefcase className="h-4 w-4" />
                 <span className="hidden sm:inline">Jobs</span>
               </TabsTrigger>
+              <TabsTrigger value="expired" className="gap-1 min-w-[44px] h-10">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <span className="hidden sm:inline">Expired Jobs</span>
+              </TabsTrigger>
+              <TabsTrigger value="telegram" className="gap-1 min-w-[44px] h-10">
+                <Send className="h-4 w-4 text-primary" />
+                <span className="hidden sm:inline">Telegram</span>
+              </TabsTrigger>
               {isFullAdmin && (
                 <TabsTrigger value="users" className="gap-1 min-w-[44px] h-10">
                   <Users className="h-4 w-4" />
@@ -2071,8 +2938,8 @@ export default function Admin() {
                               <TableCell className="font-medium max-w-[200px] truncate">{job.title}</TableCell>
                               <TableCell className="max-w-[150px] truncate">{job.department}</TableCell>
                               <TableCell>
-                                <span className={(() => { const d = parseJobDeadline(job.last_date); return d && d < new Date() ? "text-destructive" : ""; })()}>
-                                  {(() => { const d = parseJobDeadline(job.last_date); return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date; })()}
+                                <span className={(() => { const d = getJobDeadlineDate(job); return d && d < new Date() ? "text-destructive" : ""; })()}>
+                                  {(() => { const d = getJobDeadlineDate(job); return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date; })()}
                                 </span>
                               </TableCell>
                               <TableCell>{job.vacancies || 1}</TableCell>
@@ -2145,6 +3012,649 @@ export default function Admin() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Expired Jobs Tab */}
+          <TabsContent value="expired">
+            <Card className="border-0 shadow-card">
+              <CardHeader className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle>Expired Jobs ({expiredJobs.length})</CardTitle>
+                    <CardDescription>Manage and bulk-delete expired job listings</CardDescription>
+                  </div>
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row items-center">
+                    {selectedExpiredJobs.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="w-full sm:w-auto gap-2 animate-fade-in"
+                        onClick={() => setShowBulkDeleteConfirm(true)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete Selected ({selectedExpiredJobs.size})
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-wrap gap-3 items-center">
+                  <div className="relative w-full sm:w-[300px]">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search expired jobs..."
+                      value={expiredSearchQuery}
+                      onChange={(e) => {
+                        setExpiredSearchQuery(e.target.value);
+                        setExpiredPage(1);
+                      }}
+                      className="pl-8 h-9 w-full"
+                    />
+                  </div>
+
+                  <Select value={expiredYearFilter} onValueChange={(val) => { setExpiredYearFilter(val); setExpiredPage(1); }}>
+                    <SelectTrigger className="w-[150px] h-9">
+                      <SelectValue placeholder="Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      {expiredYears.map(year => (
+                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {(expiredSearchQuery !== "" || expiredYearFilter !== "all") && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setExpiredSearchQuery("");
+                        setExpiredYearFilter("all");
+                        setExpiredPage(1);
+                      }}
+                      className="text-muted-foreground"
+                    >
+                      Clear filters
+                    </Button>
+                  )}
+
+                  <Button
+                    variant={expiredSortField === "vacancies_and_date" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      if (expiredSortField === "vacancies_and_date") {
+                        setExpiredSortField("last_date");
+                        setExpiredSortDirection("desc");
+                      } else {
+                        setExpiredSortField("vacancies_and_date");
+                        setExpiredSortDirection("asc");
+                      }
+                      setExpiredPage(1);
+                    }}
+                    className="h-9 gap-1"
+                  >
+                    <ArrowUpDown className="h-4 w-4" />
+                    Sort by Min Vacancies & Oldest Date
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {jobsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[550px] w-full">
+                    <div className="min-w-[800px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[50px] text-center">
+                              <input
+                                type="checkbox"
+                                className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                                checked={
+                                  paginatedExpiredJobs.length > 0 &&
+                                  paginatedExpiredJobs.every((job) => selectedExpiredJobs.has(job.id))
+                                }
+                                onChange={() => handleSelectAllExpiredOnPage(paginatedExpiredJobs)}
+                              />
+                            </TableHead>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Department</TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleExpiredSort("vacancies")}
+                            >
+                              <div className="flex items-center">
+                                Vacancies
+                                {getExpiredSortIcon("vacancies")}
+                              </div>
+                            </TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleExpiredSort("last_date")}
+                            >
+                              <div className="flex items-center">
+                                Last Date
+                                {getExpiredSortIcon("last_date")}
+                              </div>
+                            </TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleExpiredSort("created_at")}
+                            >
+                              <div className="flex items-center">
+                                Uploaded
+                                {getExpiredSortIcon("created_at")}
+                              </div>
+                            </TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedExpiredJobs.map((job) => (
+                            <TableRow key={job.id} className={selectedExpiredJobs.has(job.id) ? "bg-muted/40" : ""}>
+                              <TableCell className="text-center">
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                                  checked={selectedExpiredJobs.has(job.id)}
+                                  onChange={() => toggleSelectExpiredJob(job.id)}
+                                />
+                              </TableCell>
+                              <TableCell className="font-medium max-w-[250px] truncate">{job.title}</TableCell>
+                              <TableCell className="max-w-[150px] truncate">{job.department}</TableCell>
+                              <TableCell>{job.vacancies_display || job.vacancies || "TBD"}</TableCell>
+                              <TableCell>
+                                <span className="text-destructive font-medium">
+                                  {(() => {
+                                    const d = getJobDeadlineDate(job);
+                                    return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date;
+                                  })()}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                {format(new Date(job.created_at), "dd MMM yyyy")}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button variant="ghost" size="icon" onClick={() => openEditDialog(job)} title="Edit Job">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleDeleteJob(job.id)} title="Delete Job">
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {expiredJobs.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                No expired jobs found
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
+                )}
+
+                {/* Pagination Footer */}
+                {totalExpiredPages > 1 && (
+                  <div className="flex items-center justify-between border-t border-border px-4 py-4 sm:px-6">
+                    <div className="flex flex-1 justify-between sm:hidden">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={effectiveExpiredPage === 1}
+                        onClick={() => setExpiredPage(prev => Math.max(1, prev - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={effectiveExpiredPage === totalExpiredPages}
+                        onClick={() => setExpiredPage(prev => Math.min(totalExpiredPages, prev + 1))}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                    <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          Showing <span className="font-medium">{((effectiveExpiredPage - 1) * expiredItemsPerPage) + 1}</span> to{" "}
+                          <span className="font-medium">
+                            {Math.min(effectiveExpiredPage * expiredItemsPerPage, expiredJobs.length)}
+                          </span>{" "}
+                          of <span className="font-medium">{expiredJobs.length}</span> expired jobs
+                        </p>
+                      </div>
+                      <div>
+                        <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="rounded-l-md"
+                            disabled={effectiveExpiredPage === 1}
+                            onClick={() => setExpiredPage(prev => Math.max(1, prev - 1))}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          {Array.from({ length: totalExpiredPages }, (_, i) => i + 1)
+                            .filter((p) => {
+                              return (
+                                p === 1 ||
+                                p === totalExpiredPages ||
+                                Math.abs(p - effectiveExpiredPage) <= 1
+                              );
+                            })
+                            .map((p, index, arr) => {
+                              const showEllipsisBefore = index > 0 && p - arr[index - 1] > 1;
+                              return (
+                                <div key={p} className="flex items-center">
+                                  {showEllipsisBefore && (
+                                    <span className="inline-flex items-center px-4 py-2 text-sm font-semibold text-muted-foreground">
+                                      ...
+                                    </span>
+                                  )}
+                                  <Button
+                                    variant={effectiveExpiredPage === p ? "default" : "outline"}
+                                    className="h-10 w-10 p-0"
+                                    onClick={() => setExpiredPage(p)}
+                                  >
+                                    {p}
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="rounded-r-md"
+                            disabled={effectiveExpiredPage === totalExpiredPages}
+                            onClick={() => setExpiredPage(prev => Math.min(totalExpiredPages, prev + 1))}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </nav>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Telegram Posting Tab */}
+          <TabsContent value="telegram">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Left Column: Channels Configuration */}
+              <div className="lg:col-span-4 space-y-6">
+                <Card>
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                      <CardTitle className="text-lg">Telegram Channels</CardTitle>
+                      <CardDescription>Configure bot credentials per sector</CardDescription>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowTelegramAddChannelDialog(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Add
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {telegramChannels.length === 0 ? (
+                      <div className="text-center py-6 border border-dashed rounded-lg text-muted-foreground text-sm">
+                        No Telegram channels configured yet. Click 'Add' to configure one.
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                        {telegramChannels.map((channel) => (
+                          <div
+                            key={channel.id}
+                            className={`p-2 border rounded-lg hover:border-primary/50 transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                              selectedTelegramChannelId === channel.id ? "border-primary bg-primary/5" : "bg-card"
+                            }`}
+                            onClick={() => setSelectedTelegramChannelId(channel.id)}
+                          >
+                            <div className="min-w-0 flex-1 flex items-center gap-2">
+                              <h4 className="font-semibold text-xs truncate" title={channel.name}>{channel.name}</h4>
+                              <Badge variant="secondary" className="text-[9px] py-0 px-1.5 h-4 flex-shrink-0">
+                                {channel.sector}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-[9px] text-muted-foreground font-mono truncate max-w-[80px]" title={`Chat ID: ${channel.channel_id}`}>
+                                {channel.channel_id}
+                              </span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteTelegramChannel(channel.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Middle Column: Jobs/Updates Selector */}
+              <div className="lg:col-span-4 space-y-6">
+                <Card className="h-full flex flex-col">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Publish Selection</CardTitle>
+                    <CardDescription>Select job or update to broadcast</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 flex-1 flex flex-col min-h-0">
+                    <div className="space-y-2">
+                      <Label htmlFor="telegram-sector">Select Sector/Search Term</Label>
+                      <div className="space-y-1.5">
+                        <Input
+                          placeholder="Type to filter sectors..."
+                          value={sectorSearchQuery}
+                          onChange={(e) => setSectorSearchQuery(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                        <Select value={selectedTelegramSector} onValueChange={(val) => {
+                          setSelectedTelegramSector(val);
+                          setSelectedTelegramJobIds([]);
+                          setSelectedTelegramUpdateIds([]);
+                          const matched = telegramChannels.find(c => c.sector.toLowerCase() === val.toLowerCase());
+                          if (matched) setSelectedTelegramChannelId(matched.id);
+                        }}>
+                          <SelectTrigger id="telegram-sector">
+                            <SelectValue placeholder="Sector" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px]">
+                            {filteredTelegramTiers.length === 0 ? (
+                              <div className="text-center py-4 text-muted-foreground text-xs">No matching sectors</div>
+                            ) : (
+                              filteredTelegramTiers.map((tier) => (
+                                <SelectGroup key={tier.name}>
+                                  <SelectLabel className="font-bold text-primary text-xs bg-muted/40 px-2 py-1 sticky top-0 z-10">{tier.name}</SelectLabel>
+                                  {tier.terms.map((term) => (
+                                    <SelectItem key={term} value={term}>{term}</SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Content Type</Label>
+                      <RadioGroup
+                        defaultValue="jobs"
+                        value={telegramSourceType}
+                        onValueChange={(val: "jobs" | "updates") => {
+                          setTelegramSourceType(val);
+                          setSelectedTelegramJobIds([]);
+                          setSelectedTelegramUpdateIds([]);
+                        }}
+                        className="flex gap-4"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="jobs" id="tele-jobs" />
+                          <Label htmlFor="tele-jobs" className="cursor-pointer">Active Jobs</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="updates" id="tele-updates" />
+                          <Label htmlFor="tele-updates" className="cursor-pointer">Job Updates</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+
+                    <div className="flex-1 flex flex-col min-h-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label>
+                          {telegramSourceType === "jobs" ? "Available Active Jobs" : "Available Updates"}
+                        </Label>
+                        {(telegramSourceType === "jobs" ? activeJobsForTelegram.length > 0 : (!telegramUpdatesLoading && telegramExamUpdates && telegramExamUpdates.length > 0)) && (
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="select-all-telegram"
+                              checked={
+                                telegramSourceType === "jobs"
+                                  ? activeJobsForTelegram.length > 0 && activeJobsForTelegram.every(j => selectedTelegramJobIds.includes(j.id))
+                                  : !!(telegramExamUpdates && telegramExamUpdates.length > 0 && telegramExamUpdates.every(u => selectedTelegramUpdateIds.includes(u.id)))
+                              }
+                              onCheckedChange={(checked) => {
+                                if (telegramSourceType === "jobs") {
+                                  if (checked) {
+                                    setSelectedTelegramJobIds(activeJobsForTelegram.map(j => j.id));
+                                  } else {
+                                    setSelectedTelegramJobIds([]);
+                                  }
+                                } else {
+                                  if (checked && telegramExamUpdates) {
+                                    setSelectedTelegramUpdateIds(telegramExamUpdates.map(u => u.id));
+                                  } else {
+                                    setSelectedTelegramUpdateIds([]);
+                                  }
+                                }
+                              }}
+                            />
+                            <Label htmlFor="select-all-telegram" className="text-xs cursor-pointer font-normal text-muted-foreground select-none">
+                              Select All ({telegramSourceType === "jobs" ? activeJobsForTelegram.length : telegramExamUpdates?.length || 0})
+                            </Label>
+                          </div>
+                        )}
+                      </div>
+
+                      {telegramSourceType === "jobs" && activeJobsForTelegram.length > 0 && (
+                        <div className="flex items-center gap-2 mb-2 bg-muted/20 p-2 rounded border text-xs">
+                          <span className="text-muted-foreground font-medium">Sort:</span>
+                          <Select
+                            value={telegramSortField || ""}
+                            onValueChange={(val: any) => {
+                              setTelegramSortField(val);
+                            }}
+                          >
+                            <SelectTrigger className="h-7 text-xs w-[140px] bg-background">
+                              <SelectValue placeholder="Sort by" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="created_at">Date Added (Newest)</SelectItem>
+                              <SelectItem value="last_date">Deadline Date</SelectItem>
+                              <SelectItem value="vacancies">Vacancies (Highest)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setTelegramSortDirection(prev => prev === "asc" ? "desc" : "asc");
+                            }}
+                          >
+                            {telegramSortDirection === "asc" ? (
+                              <ArrowUp className="h-3.5 w-3.5 text-muted-foreground" />
+                            ) : (
+                              <ArrowDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                      
+                      <div className="flex-1 border rounded-md overflow-y-auto max-h-[350px]">
+                        {telegramSourceType === "jobs" ? (
+                          activeJobsForTelegram.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground text-sm">
+                              No active jobs in this sector.
+                            </div>
+                          ) : (
+                            <div className="divide-y">
+                              {activeJobsForTelegram.map((job) => (
+                                <div
+                                  key={job.id}
+                                  className={`p-3 text-xs hover:bg-muted/40 cursor-pointer transition-colors flex items-start gap-2.5 ${
+                                    selectedTelegramJobIds.includes(job.id) ? "bg-muted/60 font-medium" : ""
+                                  }`}
+                                  onClick={() => {
+                                    setSelectedTelegramJobIds(prev =>
+                                      prev.includes(job.id) ? prev.filter(id => id !== job.id) : [...prev, job.id]
+                                    );
+                                  }}
+                                >
+                                  <Checkbox
+                                    checked={selectedTelegramJobIds.includes(job.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onCheckedChange={(checked) => {
+                                      setSelectedTelegramJobIds(prev =>
+                                        checked
+                                          ? [...prev, job.id]
+                                          : prev.filter(id => id !== job.id)
+                                      );
+                                    }}
+                                    className="mt-0.5"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-semibold text-sm line-clamp-1">{job.title}</div>
+                                    <div className="text-muted-foreground mt-1 line-clamp-1">{job.department}</div>
+                                    <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5">
+                                      <span>Vacancies: {job.vacancies_display || job.vacancies || "TBD"}</span>
+                                      <span>Last Date: {(() => {
+                                        const d = getJobDeadlineDate(job);
+                                        if (d) {
+                                          const isCurrentYear = d.getFullYear() === new Date().getFullYear();
+                                          return format(d, isCurrentYear ? "dd MMM" : "dd MMM yyyy");
+                                        }
+                                        return job.last_date_display || job.last_date;
+                                      })()}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        ) : (
+                          telegramUpdatesLoading ? (
+                            <div className="flex items-center justify-center py-12">
+                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                            </div>
+                          ) : !telegramExamUpdates || telegramExamUpdates.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground text-sm">
+                              No updates found in this sector.
+                            </div>
+                          ) : (
+                            <div className="divide-y">
+                              {telegramExamUpdates.map((update) => (
+                                <div
+                                  key={update.id}
+                                  className={`p-3 text-xs hover:bg-muted/40 cursor-pointer transition-colors flex items-start gap-2.5 ${
+                                    selectedTelegramUpdateIds.includes(update.id) ? "bg-muted/60 font-medium" : ""
+                                  }`}
+                                  onClick={() => {
+                                    setSelectedTelegramUpdateIds(prev =>
+                                      prev.includes(update.id) ? prev.filter(id => id !== update.id) : [...prev, update.id]
+                                    );
+                                  }}
+                                >
+                                  <Checkbox
+                                    checked={selectedTelegramUpdateIds.includes(update.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onCheckedChange={(checked) => {
+                                      setSelectedTelegramUpdateIds(prev =>
+                                        checked
+                                          ? [...prev, update.id]
+                                          : prev.filter(id => id !== update.id)
+                                      );
+                                    }}
+                                    className="mt-0.5"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-semibold text-sm line-clamp-1">{update.title}</div>
+                                    <div className="text-muted-foreground mt-1">Status: {update.status || "N/A"}</div>
+                                    <div className="text-[10px] text-muted-foreground mt-1.5">
+                                      Published: {update.published_date || format(new Date(update.created_at), "dd MMM yyyy")}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right Column: Live Preview & Action */}
+              <div className="lg:col-span-4 space-y-6">
+                <Card className="h-full flex flex-col">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Message Live Preview</CardTitle>
+                    <CardDescription>Verification before broadcasting</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col justify-between space-y-4">
+                    <div className="flex-1 bg-muted/30 border rounded-lg p-4 font-mono text-xs overflow-y-auto whitespace-pre-wrap max-h-[350px]">
+                      {getTelegramPreviewMessage()}
+                    </div>
+                    <div className="space-y-3 border-t pt-4">
+                      {selectedTelegramChannelId ? (
+                        <div className="text-xs text-muted-foreground bg-primary/5 p-2.5 rounded border border-primary/20 flex flex-col gap-1">
+                          <div>
+                            <strong>Sending To:</strong> {telegramChannels.find(c => c.id === selectedTelegramChannelId)?.name}
+                          </div>
+                          <div>
+                            <strong>Chat ID:</strong> {telegramChannels.find(c => c.id === selectedTelegramChannelId)?.channel_id}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-destructive bg-destructive/5 p-2.5 rounded border border-destructive/20">
+                          Please select or configure a Telegram channel first.
+                        </div>
+                      )}
+                      
+                      <Button
+                        className="w-full gap-2 h-11"
+                        disabled={
+                          postingToTelegram ||
+                          !selectedTelegramChannelId ||
+                          (telegramSourceType === "jobs" ? selectedTelegramJobIds.length === 0 : selectedTelegramUpdateIds.length === 0)
+                        }
+                        onClick={handlePostToTelegram}
+                      >
+                        {postingToTelegram ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Posting notification...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4" />
+                            Publish to Telegram
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Users Tab */}
@@ -4935,6 +6445,78 @@ export default function Admin() {
         </DialogContent>
       </Dialog>
 
+      {/* Configure Telegram Channel Dialog */}
+      <Dialog open={showTelegramAddChannelDialog} onOpenChange={setShowTelegramAddChannelDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configure Telegram Channel</DialogTitle>
+            <DialogDescription>
+              Connect a bot and chat ID to a job sector.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="chan-name">Channel Name / Alias</Label>
+              <Input
+                id="chan-name"
+                placeholder="e.g. UPSC Jobs Channel"
+                value={newTelegramChannelForm.name}
+                onChange={(e) => setNewTelegramChannelForm({ ...newTelegramChannelForm, name: e.target.value })}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="chan-sector">Mapped Job Sector</Label>
+              <Select
+                value={newTelegramChannelForm.sector}
+                onValueChange={(val) => setNewTelegramChannelForm({ ...newTelegramChannelForm, sector: val })}
+              >
+                <SelectTrigger id="chan-sector">
+                  <SelectValue placeholder="Sector" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[200px]">
+                  {allUniqueSectors.map((sector) => (
+                    <SelectItem key={sector} value={sector}>{sector}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bot-token">Telegram Bot Token</Label>
+              <Input
+                id="bot-token"
+                type="password"
+                placeholder="e.g. 123456:ABC-DEF1234ghIkl-zyx"
+                value={newTelegramChannelForm.bot_token}
+                onChange={(e) => setNewTelegramChannelForm({ ...newTelegramChannelForm, bot_token: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="chat-id">Telegram Channel / Chat ID</Label>
+              <Input
+                id="chat-id"
+                placeholder="e.g. @upscjobalerts or -100123456789"
+                value={newTelegramChannelForm.channel_id}
+                onChange={(e) => setNewTelegramChannelForm({ ...newTelegramChannelForm, channel_id: e.target.value })}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                For public channels, use their @handle. For private channels, use their numerical ID starting with -100.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTelegramAddChannelDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddTelegramChannel}>
+              Save Channel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Bulk Upload Preview Dialog */}
       <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -5088,6 +6670,29 @@ export default function Admin() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Expired Jobs Confirmation AlertDialog */}
+      <AlertDialog open={showBulkDeleteConfirm} onOpenChange={(open) => !open && setShowBulkDeleteConfirm(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bulk Delete Expired Jobs</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the {selectedExpiredJobs.size} selected expired jobs? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDeleteExpiredJobs}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
