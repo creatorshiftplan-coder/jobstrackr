@@ -99,7 +99,7 @@ export default function ResetPassword() {
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <img src={logoColor} alt="JobsTrackr" className="h-16 w-auto mx-auto mb-4" />
+            <img src={logoColor} alt="JobsTrackr" className="h-16 w-auto mx-auto mb-4 invert dark:invert-0" />
             <CardTitle className="text-xl text-foreground">Invalid or Expired Link</CardTitle>
             <CardDescription>
               This password reset link is invalid or has expired. Please request a new one.
@@ -119,7 +119,7 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <img src={logoColor} alt="JobsTrackr" className="h-16 w-auto mx-auto mb-4" />
+          <img src={logoColor} alt="JobsTrackr" className="h-16 w-auto mx-auto mb-4 invert dark:invert-0" />
           <CardTitle className="text-xl text-foreground">Set New Password</CardTitle>
           <CardDescription>
             Enter your new password below

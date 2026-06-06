@@ -69,10 +69,10 @@ export default function RefundPolicy() {
                 <Section title="3. Refund Requests">
                     <p>To request a refund, contact:</p>
                     <a
-                        href="mailto:support@jobstrackr.in"
+                        href="mailto:contact@jobstrackr.in"
                         className="text-[hsl(var(--blue-600))] font-medium hover:underline"
                     >
-                        support@jobstrackr.in
+                        contact@jobstrackr.in
                     </a>
                 </Section>
 
@@ -88,10 +88,10 @@ export default function RefundPolicy() {
                                 For any queries, support, or legal concerns:
                             </p>
                             <a
-                                href="mailto:support@jobstrackr.in"
+                                href="mailto:contact@jobstrackr.in"
                                 className="text-sm text-[hsl(var(--blue-600))] font-medium hover:underline"
                             >
-                                support@jobstrackr.in
+                                contact@jobstrackr.in
                             </a>
                         </div>
                     </CardContent>

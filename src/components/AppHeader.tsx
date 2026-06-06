@@ -92,7 +92,7 @@ export function AppHeader({
                             <SheetContent side="left" className="w-72">
                                 <SheetHeader className="pb-6">
                                     <div className="flex items-center gap-3">
-                                        <img src={logoColor} alt="JobsTrackr" className="h-10 w-10 dark:hidden" />
+                                        <img src={logoColor} alt="JobsTrackr" className="h-10 w-10 dark:hidden invert dark:invert-0" />
                                         <img src={logoWhite} alt="JobsTrackr" className="h-10 w-10 hidden dark:block" />
                                         <SheetTitle className="text-xl font-bold">JobsTrackr</SheetTitle>
                                     </div>
@@ -135,7 +135,7 @@ export function AppHeader({
                     <div className="flex items-center gap-2">
                         {showTitleLogo && (
                             <>
-                                <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
+                                <img src={logoColor} alt="JobsTrackr" className={cn("h-7 w-7 object-contain dark:hidden", variant === "primary" ? "" : "invert dark:invert-0")} />
                                 <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
                             </>
                         )}
@@ -159,7 +159,7 @@ export function AppHeader({
                             <img
                                 src={logoColor}
                                 alt="JobsTrackr"
-                                className="h-8 w-8 object-contain dark:hidden"
+                                className={cn("h-8 w-8 object-contain dark:hidden", variant === "primary" ? "" : "invert dark:invert-0")}
                             />
                             <img
                                 src={logoWhite}

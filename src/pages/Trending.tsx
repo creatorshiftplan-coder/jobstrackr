@@ -13,6 +13,7 @@ import { TrendingUp, X, Check, ChevronDown, MapPin, Grid3X3, Clock, Newspaper } 
 import { cn } from "@/lib/utils";
 import { getExamStatusType, getBadgeConfig } from "@/lib/examStatus";
 import { useAllExamUpdates } from "@/hooks/useExamUpdates";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, useScroll, AnimatePresence } from "framer-motion";
 import {
     DropdownMenu,
@@ -98,6 +99,33 @@ export default function Trending() {
     // Fetch exam updates from the updates tab (scraped data)
     const updateCategory = TAB_TO_UPDATE_CATEGORY[selectedTab];
     const { data: examUpdates, isLoading: updatesLoading } = useAllExamUpdates(updateCategory);
+    const queryClient = useQueryClient();
+
+    // Prefetch homepage jobs data when idle (P7: cross-page prefetching)
+    useEffect(() => {
+        let idleId: number | undefined;
+        const prefetchHomepage = () => {
+            queryClient.prefetchQuery({
+                queryKey: ["homepage-bundle"],
+                queryFn: async () => {
+                    const res = await fetch("/api/cache/homepage");
+                    if (!res.ok) return [];
+                    return res.json();
+                },
+                staleTime: 1000 * 60 * 5,
+            });
+        };
+        if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+            idleId = window.requestIdleCallback(prefetchHomepage, { timeout: 3000 });
+        } else {
+            idleId = window.setTimeout(prefetchHomepage, 2000) as unknown as number;
+        }
+        return () => {
+            if (idleId !== undefined && "cancelIdleCallback" in window) {
+                window.cancelIdleCallback(idleId);
+            }
+        };
+    }, [queryClient]);
 
     // Scroll tracking for hide/show filter bar
     const containerRef = useRef<HTMLDivElement>(null);

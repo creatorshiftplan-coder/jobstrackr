@@ -140,6 +140,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.setHeader('X-Cache-Hit', cacheHit ? '1' : '0');
     res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');
+    res.setHeader('CDN-Cache-Control', 'public, max-age=600');
     res.setHeader('Access-Control-Allow-Origin', '*');
     return res.status(200).json(data);
   } catch (err: any) {

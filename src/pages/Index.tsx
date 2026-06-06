@@ -9,13 +9,14 @@ import { ActiveExamCard } from "@/components/ActiveExamCard";
 import { BottomNav } from "@/components/BottomNav";
 import { SectorPreferenceCard } from "@/components/SectorPreferenceCard";
 import { QuickActions } from "@/components/QuickActions";
-import { useJobs } from "@/hooks/useJobs";
+import { useHomepageData } from "@/hooks/useHomepageData";
 import { useAuth } from "@/hooks/useAuth";
 import { useExams } from "@/hooks/useExams";
 import { useProfile } from "@/hooks/useProfile";
 import { useRecommendations } from "@/hooks/useRecommendations";
 import { useSimilarJobs } from "@/hooks/useSimilarJobs";
 import { useForYouJobs } from "@/hooks/useForYouJobs";
+import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Briefcase, ChevronLeft, ChevronRight, MapPin, Target } from "lucide-react";
@@ -82,23 +83,63 @@ const Index = () => {
       ref.current.scrollBy({ left: cardWidth, behavior: 'smooth' });
     }
   };
-  const { data: jobs, isLoading, error } = useJobs();
-  const { userExams } = useExams();
+  const { data: homepageData, isLoading: homepageLoading, error: homepageError } = useHomepageData();
+  const jobs = homepageData?.allJobs;
+  const isLoading = homepageLoading;
+  const error = homepageError;
+  const { userExams } = useExams({ includeExamCatalog: false });
   const { profile, isLoading: profileLoading } = useProfile();
-  const { recommended: hybridRecommended, examMatched, hasTrackedExams } = useRecommendations(10, personalizedSectionsReady);
-  const { forYouJobs, hasWizardAnswers } = useForYouJobs(5, personalizedSectionsReady);
+  const { recommended: hybridRecommended, examMatched, hasTrackedExams } = useRecommendations(10, personalizedSectionsReady, jobs);
+  const { forYouJobs, hasWizardAnswers } = useForYouJobs(5, personalizedSectionsReady, jobs);
+  const queryClient = useQueryClient();
+
+  // Prefetch explore page data when idle (P7: cross-page prefetching)
+  useEffect(() => {
+    let idleId: number | undefined;
+    const prefetchExplore = () => {
+      queryClient.prefetchQuery({
+        queryKey: ["trending_exams", "All"],
+        queryFn: async () => {
+          const res = await fetch("/api/cache/trending-exams");
+          if (!res.ok) return [];
+          return res.json();
+        },
+        staleTime: 1000 * 60 * 5,
+      });
+      queryClient.prefetchQuery({
+        queryKey: ["all-exam-updates", undefined],
+        queryFn: async () => {
+          const res = await fetch("/api/cache/exam-updates");
+          if (!res.ok) return [];
+          return res.json();
+        },
+        staleTime: 1000 * 60 * 5,
+      });
+    };
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(prefetchExplore, { timeout: 3000 });
+    } else {
+      idleId = window.setTimeout(prefetchExplore, 2000) as unknown as number;
+    }
+    return () => {
+      if (idleId !== undefined && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+    };
+  }, [queryClient]);
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
     return jobs;
   }, [jobs]);
 
-  // Show the 7 most recently uploaded jobs that haven't expired (already sorted by created_at DESC from useJobs)
+  // Show the 7 most recently uploaded jobs that haven't expired
   const newJobs = useMemo(() => {
-    return filteredJobs
+    const list = homepageData?.recentJobs || filteredJobs;
+    return list
       .filter((job) => isJobActive(job.last_date))
       .slice(0, 7);
-  }, [filteredJobs]);
+  }, [homepageData?.recentJobs, filteredJobs]);
 
   // Hybrid recommended jobs (from useRecommendations hook)
   const recommendedJobs = useMemo(() => {

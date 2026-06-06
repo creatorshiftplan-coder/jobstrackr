@@ -5,29 +5,38 @@ if (!REDIS_URL || !REDIS_TOKEN) {
   console.warn('Upstash Redis credentials not configured');
 }
 
-// Helper to make Redis REST API calls
-async function redisCommand(command: string, args: Record<string, any> = {}): Promise<any> {
-  if (!REDIS_URL || !REDIS_TOKEN) {
-    return null;
-  }
+// Helper: Redis GET via Upstash REST API (URL-path format)
+async function redisGet(key: string): Promise<string | null> {
+  if (!REDIS_URL || !REDIS_TOKEN) return null;
   try {
-    const response = await fetch(`${REDIS_URL}/${command}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${REDIS_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(args),
+    const response = await fetch(`${REDIS_URL}/get/${encodeURIComponent(key)}`, {
+      headers: { 'Authorization': `Bearer ${REDIS_TOKEN}` },
     });
     if (!response.ok) {
-      console.error(`Redis ${command} failed:`, response.status, response.statusText);
+      console.error(`Redis GET failed: ${response.status} ${response.statusText}`);
       return null;
     }
     const data = await response.json();
     return data.result;
   } catch (error) {
-    console.error(`Redis ${command} error:`, error);
+    console.error('Redis GET error:', error);
     return null;
+  }
+}
+
+// Helper: Redis SET with EX via Upstash REST API (URL-path format)
+async function redisSetEx(key: string, value: string, ttlSeconds: number): Promise<void> {
+  if (!REDIS_URL || !REDIS_TOKEN) return;
+  try {
+    const response = await fetch(
+      `${REDIS_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}?EX=${ttlSeconds}`,
+      { headers: { 'Authorization': `Bearer ${REDIS_TOKEN}` } },
+    );
+    if (!response.ok) {
+      console.error(`Redis SET failed: ${response.status} ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Redis SET error:', error);
   }
 }
 
@@ -54,7 +63,7 @@ export default async function handler(request: Request) {
   const cacheKey = getCacheKey(request);
 
   // Try to get from Redis cache
-  const cached = await redisCommand('get', { key: cacheKey });
+  const cached = await redisGet(cacheKey);
   if (cached !== null && cached !== '') {
     // cached is a stringified JSON object we stored: {body: string}
     try {
@@ -79,11 +88,7 @@ export default async function handler(request: Request) {
   if (response.ok) {
     const body = await response.text();
     try {
-      await redisCommand('set', {
-        key: cacheKey,
-        value: JSON.stringify({ body }),
-        ex: 300, // 5 minutes TTL
-      });
+      await redisSetEx(cacheKey, JSON.stringify({ body }), 300);
     } catch (e) {
       console.error('Failed to cache response:', e);
     }

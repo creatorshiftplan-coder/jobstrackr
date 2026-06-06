@@ -414,6 +414,93 @@ function localCachePlugin() {
           res.end(JSON.stringify({ error: err.message }));
         }
       });
+
+      // /api/cache/homepage
+      server.middlewares.use("/api/cache/homepage", async (_req: any, res: any) => {
+        try {
+          const columns = [
+            "id", "slug", "title", "department", "location",
+            "last_date", "last_date_display", "vacancies", "vacancies_display",
+            "qualification", "eligibility", "experience",
+            "salary_min", "salary_max", "age_min", "age_max",
+            "application_fee", "job_metadata", "is_featured",
+            "admin_refreshed_at", "created_at", "tags",
+          ].join(",");
+          const [allJobs, exams] = await Promise.all([
+            supabaseFetch(`jobs?select=${columns}&order=created_at.desc&limit=10000`),
+            supabaseFetch("exams?select=*&is_active=eq.true&order=name"),
+          ]);
+          const recentJobs = (allJobs || []).slice(0, 50);
+          res.writeHead(200, { "Content-Type": "application/json", "X-Cache-Hit": "0" });
+          res.end(JSON.stringify({
+            recentJobs,
+            allJobs: allJobs || [],
+            exams: exams || [],
+          }));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+
+      // /api/cache/logos
+      server.middlewares.use("/api/cache/logos", async (_req: any, res: any) => {
+        try {
+          const dotenv = await import("dotenv");
+          dotenv.config();
+          const url = process.env.VITE_SUPABASE_URL;
+          const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+          const listUrl = `${url}/storage/v1/object/list/logos`;
+          const response = await fetch(listUrl, {
+            method: "POST",
+            headers: {
+              apikey: key!,
+              Authorization: `Bearer ${key}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              prefix: "conducting-bodies/",
+              limit: 1000,
+              sortBy: { column: "name", order: "asc" },
+            }),
+          });
+
+          if (!response.ok) {
+            res.writeHead(response.status, { "Content-Type": "application/json" });
+            return res.end(JSON.stringify({ error: "Storage list failed" }));
+          }
+
+          const files: any[] = await response.json();
+          if (!files || files.length === 0) {
+            res.writeHead(200, { "Content-Type": "application/json", "X-Cache-Hit": "0" });
+            return res.end(JSON.stringify([]));
+          }
+
+          const imageRegex = /\.(png|jpg|jpeg|webp|svg)$/i;
+          const logos = files
+            .filter((file) => file.name !== ".emptyFolderPlaceholder" && imageRegex.test(file.name))
+            .map((file) => {
+              const nameWithoutExt = file.name.replace(/\.(png|jpg|jpeg|webp|svg)$/i, "");
+              const publicUrl = `${url}/storage/v1/object/public/logos/conducting-bodies/${file.name}`;
+
+              return {
+                id: file.id || file.name,
+                name: nameWithoutExt.replace(/-/g, " ").replace(/_/g, " "),
+                slug: nameWithoutExt.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
+                logo_url: publicUrl,
+                category: null,
+                created_at: file.created_at || new Date().toISOString(),
+              };
+            });
+
+          res.writeHead(200, { "Content-Type": "application/json", "X-Cache-Hit": "0" });
+          res.end(JSON.stringify(logos));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
     },
   };
 }

@@ -18,59 +18,63 @@ export interface ConductingBodyLogo {
     created_at: string;
 }
 
+/** Fallback: direct Supabase Storage fetch if cache endpoint is unavailable */
+async function fallbackFetchLogos(): Promise<ConductingBodyLogo[]> {
+    try {
+        const { data: files, error } = await supabase
+            .storage
+            .from("logos")
+            .list("conducting-bodies", {
+                limit: 1000,
+                sortBy: { column: "name", order: "asc" },
+            });
+
+        if (error || !files || files.length === 0) return [];
+
+        return files
+            .filter(file => file.name !== ".emptyFolderPlaceholder" && /\.(png|jpg|jpeg|webp|svg)$/i.test(file.name))
+            .map((file) => {
+                const nameWithoutExt = file.name.replace(/\.(png|jpg|jpeg|webp|svg)$/i, "");
+                const { data: urlData } = supabase.storage
+                    .from("logos")
+                    .getPublicUrl(`conducting-bodies/${file.name}`);
+
+                return {
+                    id: file.id || file.name,
+                    name: nameWithoutExt.replace(/-/g, " ").replace(/_/g, " "),
+                    slug: nameWithoutExt.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
+                    logo_url: urlData.publicUrl,
+                    category: null,
+                    created_at: file.created_at || new Date().toISOString(),
+                };
+            });
+    } catch {
+        return [];
+    }
+}
+
 export function useConductingBodyLogos() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
 
-    // Fetch all logos
+    // Fetch all logos via Redis-cached API endpoint
     const logosQuery = useQuery({
         queryKey: ["conducting_body_logos"],
         queryFn: async (): Promise<ConductingBodyLogo[]> => {
-            // Since we might not have the table yet, we'll use Supabase Storage listing
-            // and store metadata in a JSON file or use the file names as keys
             try {
-                const { data: files, error } = await supabase
-                    .storage
-                    .from("logos")
-                    .list("conducting-bodies", {
-                        limit: 1000,
-                        sortBy: { column: "name", order: "asc" },
-                    });
-
-                if (error) {
-                    console.error("Error fetching logos:", error);
-                    return [];
+                // Try cached API endpoint first
+                const res = await fetch("/api/cache/logos");
+                if (res.ok) {
+                    return res.json();
                 }
-
-                if (!files || files.length === 0) return [];
-
-                // Map files to logo objects — filter out placeholder files and non-image entries
-                const logos: ConductingBodyLogo[] = files
-                    .filter(file => file.name !== ".emptyFolderPlaceholder" && /\.(png|jpg|jpeg|webp|svg)$/i.test(file.name))
-                    .map((file) => {
-                        const nameWithoutExt = file.name.replace(/\.(png|jpg|jpeg|webp|svg)$/i, "");
-                        const { data: urlData } = supabase.storage
-                            .from("logos")
-                            .getPublicUrl(`conducting-bodies/${file.name}`);
-
-                        return {
-                            id: file.id || file.name,
-                            name: nameWithoutExt.replace(/-/g, " ").replace(/_/g, " "),
-                            // Normalize slug same way as upload: lowercase, spaces→dashes, strip non-alphanumeric
-                            slug: nameWithoutExt.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
-                            logo_url: urlData.publicUrl,
-                            category: null,
-                            created_at: file.created_at || new Date().toISOString(),
-                        };
-                    });
-
-                return logos;
+                // Fallback to direct Supabase Storage if cache endpoint fails
+                return fallbackFetchLogos();
             } catch (error) {
-                console.error("Error in logos query:", error);
-                return [];
+                console.error("Error fetching logos:", error);
+                return fallbackFetchLogos();
             }
         },
-        staleTime: 1000 * 60 * 10, // 10 minutes
+        staleTime: 1000 * 60 * 30, // 30 minutes — logos rarely change
     });
 
     // Upload a new logo

@@ -26,6 +26,7 @@ export function useJobs(options: UseJobsOptions = {}) {
       return res.json();
     },
     enabled,
+    staleTime: 1000 * 60 * 5, // 5 minutes — matches Redis cache TTL
   });
 }
 

@@ -67,6 +67,7 @@ export function useExams(options: UseExamsOptions = {}) {
       return data || [];
     },
     enabled: enabled && includeExamCatalog,
+    staleTime: 1000 * 60 * 10, // 10 minutes — exam catalog changes infrequently
   });
 
   const userExamsQuery = useQuery({
@@ -84,6 +85,7 @@ export function useExams(options: UseExamsOptions = {}) {
       return data || [];
     },
     enabled: enabled && includeUserExams && !!user?.id,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   const addExamAttempt = useMutation({

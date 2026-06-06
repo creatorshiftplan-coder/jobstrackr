@@ -67,6 +67,7 @@ export function useProfile(options: UseProfileOptions = {}) {
       return data;
     },
     enabled: enabled && !!user?.id,
+    staleTime: 1000 * 60 * 10, // 10 minutes — profile changes infrequently
   });
 
   const upsertProfile = useMutation({

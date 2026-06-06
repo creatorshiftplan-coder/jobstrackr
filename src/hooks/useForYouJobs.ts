@@ -56,9 +56,10 @@ function readStoredAnswers(userId: string | null | undefined): Record<string, st
  * Reads wizard answers from localStorage and runs full matchAndSort + hybridRecommend.
  * Only returns results if the user has completed the wizard (has stored preferences).
  */
-export function useForYouJobs(limit: number = 5, enabled: boolean = true) {
+export function useForYouJobs(limit: number = 5, enabled: boolean = true, initialJobs?: Job[]) {
   const { user } = useAuth();
-  const { data: jobs, isLoading: jobsLoading } = useJobs({ enabled });
+  const { data: jobs, isLoading: jobsLoading } = useJobs({ enabled: enabled && !initialJobs });
+  const resolvedJobs = initialJobs || jobs;
   const { profile, isLoading: profileLoading } = useProfile({ enabled });
   const { education, isLoading: educationLoading } = useEducation({ enabled });
   const { userExams } = useExams({ enabled, includeExamCatalog: false });
@@ -133,9 +134,9 @@ export function useForYouJobs(limit: number = 5, enabled: boolean = true) {
   }, [answers, profile, highestEducation, inferredStream]);
 
   const forYouJobs = useMemo((): Job[] => {
-    if (!enabled || !hasWizardAnswers || !jobs || jobs.length === 0) return [];
+    if (!enabled || !hasWizardAnswers || !resolvedJobs || resolvedJobs.length === 0) return [];
 
-    const matched = matchAndSort(jobs, preferences);
+    const matched = matchAndSort(resolvedJobs, preferences);
     const eligible = matched.filter((m) => m.eligibility.eligible && m.eligibility.skillsMissing.length === 0);
     const qualTag = qualificationToTag(preferences.qualificationType);
 
@@ -148,11 +149,11 @@ export function useForYouJobs(limit: number = 5, enabled: boolean = true) {
     );
 
     return hybrid.map((h) => h.job);
-  }, [enabled, hasWizardAnswers, jobs, preferences, answers.sectors, profile?.preferred_sectors, userExams, limit]);
+  }, [enabled, hasWizardAnswers, resolvedJobs, preferences, answers.sectors, profile?.preferred_sectors, userExams, limit]);
 
   return {
     forYouJobs,
     hasWizardAnswers,
-    isLoading: enabled && (jobsLoading || profileLoading || educationLoading),
+    isLoading: enabled && (((!initialJobs && jobsLoading) || profileLoading || educationLoading)),
   };
 }

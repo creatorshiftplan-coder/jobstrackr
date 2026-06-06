@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square, ChevronLeft, ChevronRight, Send } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square, ChevronLeft, ChevronRight, Send, Terminal } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAllExamUpdates } from "@/hooks/useExamUpdates";
 import { inferCategory } from "@/lib/jobUtils";
@@ -103,6 +103,31 @@ const parseVacancies = (value: string | number | null | undefined): number | nul
   if (isTBDValue(value)) return null;
   const parsed = parseInt(value, 10);
   return isNaN(parsed) ? null : parsed;
+};
+
+// Helper to extract vacancies from job title
+const extractVacanciesFromTitle = (title: string): number | null => {
+  if (!title) return null;
+  // Match numbers followed by vacancy-like keywords
+  // Examples: 17727 Vacancies, 2000 Posts, 18,799 Post, 150 Vacancy, 123 Vacant, 456 Positions
+  const regex = /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:vacanc(?:y|ies)|posts?|vacant|positions?)/i;
+  const match = title.match(regex);
+  if (match) {
+    const numStr = match[1].replace(/,/g, "");
+    const parsed = parseInt(numStr, 10);
+    return isNaN(parsed) ? null : parsed;
+  }
+  
+  // Also check alternative formats: e.g. "Vacancy: 500"
+  const revRegex = /(?:vacanc(?:y|ies)|posts?|vacant|positions?):\s*(\d{1,3}(?:,\d{3})*|\d+)/i;
+  const revMatch = title.match(revRegex);
+  if (revMatch) {
+    const numStr = revMatch[1].replace(/,/g, "");
+    const parsed = parseInt(numStr, 10);
+    return isNaN(parsed) ? null : parsed;
+  }
+  
+  return null;
 };
 
 // Helper to parse date - returns a far future date for TBD-like values so the job remains active
@@ -824,6 +849,114 @@ export default function Admin() {
     return <ArrowDown className="h-4 w-4 ml-1" />;
   };
 
+  // Vacancy Checker state
+  const [showVacancyChecker, setShowVacancyChecker] = useState(false);
+  const [vacancyMismatches, setVacancyMismatches] = useState<{
+    jobId: string;
+    jobTitle: string;
+    storedVacancy: number | null;
+    extractedVacancy: number;
+    vacancies_display: string | null;
+  }[]>([]);
+  const [selectedVacancyUpdates, setSelectedVacancyUpdates] = useState<Set<string>>(new Set());
+  const [updatingVacancies, setUpdatingVacancies] = useState(false);
+  const [checkingVacancies, setCheckingVacancies] = useState(false);
+
+  const handleCheckVacancies = useCallback(() => {
+    if (!jobs || jobs.length === 0) {
+      toast({
+        title: "No jobs loaded",
+        description: "Please wait for jobs to finish loading or check your connection.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const mismatches: typeof vacancyMismatches = [];
+    for (const job of jobs) {
+      const extracted = extractVacanciesFromTitle(job.title);
+      if (extracted !== null && extracted !== job.vacancies) {
+        mismatches.push({
+          jobId: job.id,
+          jobTitle: job.title,
+          storedVacancy: job.vacancies,
+          extractedVacancy: extracted,
+          vacancies_display: job.vacancies_display,
+        });
+      }
+    }
+
+    if (mismatches.length === 0) {
+      toast({
+        title: "No vacancy mismatches",
+        description: "All job vacancies match the numbers in their titles.",
+      });
+      return;
+    }
+
+    setVacancyMismatches(mismatches);
+    // Select all mismatches by default
+    setSelectedVacancyUpdates(new Set(mismatches.map(m => m.jobId)));
+    setShowVacancyChecker(true);
+  }, [jobs, toast]);
+
+  const handleApproveVacancyChanges = async () => {
+    if (selectedVacancyUpdates.size === 0) {
+      toast({
+        title: "No selection",
+        description: "Please select at least one job to update.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUpdatingVacancies(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      const selectedMismatches = vacancyMismatches.filter(m => selectedVacancyUpdates.has(m.jobId));
+      
+      for (const item of selectedMismatches) {
+        const { error } = await supabase
+          .from("jobs")
+          .update({
+            vacancies: item.extractedVacancy,
+            vacancies_display: String(item.extractedVacancy),
+          })
+          .eq("id", item.jobId);
+
+        if (error) {
+          console.error(`Error updating vacancy for job ${item.jobId}:`, error);
+          failCount++;
+        } else {
+          successCount++;
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+
+      toast({
+        title: "Vacancy updates complete",
+        description: `Successfully updated ${successCount} job(s).${failCount > 0 ? ` Failed to update ${failCount} job(s).` : ""}`,
+      });
+
+      // Close the modal
+      setShowVacancyChecker(false);
+      setVacancyMismatches([]);
+      setSelectedVacancyUpdates(new Set());
+    } catch (err: any) {
+      toast({
+        title: "Update failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingVacancies(false);
+    }
+  };
+
   // Expired jobs states
   const [expiredSearchQuery, setExpiredSearchQuery] = useState<string>("");
   const [expiredYearFilter, setExpiredYearFilter] = useState<string>("all");
@@ -841,6 +974,118 @@ export default function Admin() {
   const [showTelegramAddChannelDialog, setShowTelegramAddChannelDialog] = useState<boolean>(false);
   const [telegramSortField, setTelegramSortField] = useState<"vacancies" | "last_date" | "created_at" | null>("created_at");
   const [telegramSortDirection, setTelegramSortDirection] = useState<"asc" | "desc">("desc");
+  const [telegramConsoleLogs, setTelegramConsoleLogs] = useState<string[]>([]);
+  const consoleBottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll the Telegram console to the bottom when new logs are added
+  useEffect(() => {
+    if (consoleBottomRef.current) {
+      consoleBottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [telegramConsoleLogs]);
+
+  interface TelegramSentJobLog {
+    id: string;
+    sent_at: string;
+    status: string;
+    error_message: string | null;
+    channel_id: string;
+    job_id: string | null;
+    update_id: string | null;
+    telegram_channels: {
+      name: string;
+      sector: string;
+      channel_id: string;
+    } | null;
+    jobs: {
+      title: string;
+      department: string;
+    } | null;
+    exam_updates: {
+      title: string;
+    } | null;
+  }
+
+  const [telegramLogs, setTelegramLogs] = useState<TelegramSentJobLog[]>([]);
+  const [loadingTelegramLogs, setLoadingTelegramLogs] = useState(false);
+  const [channelStats, setChannelStats] = useState<Record<string, { total: number; lastSent: string | null; lastTitle: string | null; lastStatus: string | null }>>({});
+
+  const fetchChannelStats = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("telegram_sent_jobs")
+        .select(`
+          channel_id,
+          status,
+          sent_at,
+          jobs (title),
+          exam_updates (title)
+        `)
+        .order("sent_at", { ascending: false });
+
+      if (error) throw error;
+
+      const stats: Record<string, { total: number; lastSent: string | null; lastTitle: string | null; lastStatus: string | null }> = {};
+      
+      data?.forEach((item: any) => {
+        const cId = item.channel_id;
+        if (!stats[cId]) {
+          stats[cId] = { total: 0, lastSent: null, lastTitle: null, lastStatus: null };
+        }
+        
+        if (item.status === "success") {
+          stats[cId].total += 1;
+          if (!stats[cId].lastSent) {
+            stats[cId].lastSent = item.sent_at;
+            stats[cId].lastTitle = item.jobs?.title || item.exam_updates?.title || "Unknown Item";
+            stats[cId].lastStatus = "success";
+          }
+        } else if (!stats[cId].lastSent) {
+          stats[cId].lastSent = item.sent_at;
+          stats[cId].lastTitle = item.jobs?.title || item.exam_updates?.title || "Unknown Item";
+          stats[cId].lastStatus = item.status;
+        }
+      });
+      
+      setChannelStats(stats);
+    } catch (err) {
+      console.error("Failed to fetch channel stats:", err);
+    }
+  }, []);
+
+  const fetchTelegramLogs = useCallback(async () => {
+    setLoadingTelegramLogs(true);
+    try {
+      const { data, error } = await supabase
+        .from("telegram_sent_jobs")
+        .select(`
+          id,
+          sent_at,
+          status,
+          error_message,
+          channel_id,
+          job_id,
+          update_id,
+          telegram_channels (name, sector, channel_id),
+          jobs (title, department),
+          exam_updates (title)
+        `)
+        .order("sent_at", { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setTelegramLogs((data as any) || []);
+      await fetchChannelStats();
+    } catch (err: any) {
+      console.error("Failed to fetch Telegram logs:", err);
+    } finally {
+      setLoadingTelegramLogs(false);
+    }
+  }, [fetchChannelStats]);
+
+  useEffect(() => {
+    fetchTelegramLogs();
+  }, [fetchTelegramLogs]);
 
   const [sectorSearchQuery, setSectorSearchQuery] = useState("");
 
@@ -945,62 +1190,123 @@ export default function Admin() {
     sector: "All Jobs"
   });
 
-  // Load channels from localStorage on mount
+  // Load channels from database on mount (with localStorage fallback)
   useEffect(() => {
-    const stored = localStorage.getItem("jobstrackr:telegram_channels");
-    if (stored) {
+    const fetchChannels = async () => {
       try {
-        setTelegramChannels(JSON.parse(stored));
-      } catch (e) {
-        console.error("Failed to parse telegram channels", e);
+        const { data, error } = await supabase
+          .from("telegram_channels")
+          .select("*")
+          .order("created_at", { ascending: true });
+        
+        if (error) throw error;
+        
+        if (data) {
+          setTelegramChannels(data);
+          localStorage.setItem("jobstrackr:telegram_channels", JSON.stringify(data));
+        }
+      } catch (err) {
+        console.error("Failed to fetch telegram channels from DB, falling back to localStorage:", err);
+        const stored = localStorage.getItem("jobstrackr:telegram_channels");
+        if (stored) {
+          try {
+            setTelegramChannels(JSON.parse(stored));
+          } catch (e) {
+            console.error("Failed to parse telegram channels from localStorage", e);
+          }
+        }
       }
-    }
+    };
+    fetchChannels();
   }, []);
 
-  // Sync channels to localStorage
-  const saveTelegramChannels = (channels: TelegramChannel[]) => {
-    setTelegramChannels(channels);
-    localStorage.setItem("jobstrackr:telegram_channels", JSON.stringify(channels));
-  };
-
-  const handleAddTelegramChannel = () => {
+  const handleAddTelegramChannel = async () => {
     if (!newTelegramChannelForm.name.trim() || !newTelegramChannelForm.bot_token.trim() || !newTelegramChannelForm.channel_id.trim()) {
       toast({ title: "Validation Error", description: "All fields are required", variant: "destructive" });
       return;
     }
 
-    const newChannel: TelegramChannel = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: newTelegramChannelForm.name.trim(),
-      bot_token: newTelegramChannelForm.bot_token.trim(),
-      channel_id: newTelegramChannelForm.channel_id.trim(),
-      sector: newTelegramChannelForm.sector
-    };
+    try {
+      let rawChannelId = newTelegramChannelForm.channel_id.replace(/[^a-zA-Z0-9_@-]/g, "").trim();
+      let formattedChannelId = rawChannelId;
+      if (/^\d+$/.test(rawChannelId)) {
+        formattedChannelId = `-100${rawChannelId}`;
+      } else if (/^-\d+$/.test(rawChannelId) && !rawChannelId.startsWith("-100")) {
+        formattedChannelId = `-100${rawChannelId.substring(1)}`;
+      } else if (/^[a-zA-Z][a-zA-Z0-9_]*$/.test(rawChannelId)) {
+        formattedChannelId = `@${rawChannelId}`;
+      }
 
-    const updated = [...telegramChannels, newChannel];
-    saveTelegramChannels(updated);
-    
-    if (!selectedTelegramChannelId) {
-      setSelectedTelegramChannelId(newChannel.id);
+      const cleanedBotToken = newTelegramChannelForm.bot_token.replace(/[^a-zA-Z0-9_:-]/g, "").trim();
+
+      const channelData = {
+        name: newTelegramChannelForm.name.trim(),
+        bot_token: cleanedBotToken,
+        channel_id: formattedChannelId,
+        sector: newTelegramChannelForm.sector
+      };
+
+      const { data, error } = await supabase
+        .from("telegram_channels")
+        .insert(channelData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const updated = [...telegramChannels, data];
+        setTelegramChannels(updated);
+        localStorage.setItem("jobstrackr:telegram_channels", JSON.stringify(updated));
+
+        if (!selectedTelegramChannelId) {
+          setSelectedTelegramChannelId(data.id);
+        }
+      }
+
+      setNewTelegramChannelForm({
+        name: "",
+        bot_token: "",
+        channel_id: "",
+        sector: "UPSC"
+      });
+      setShowTelegramAddChannelDialog(false);
+      toast({ title: "Success", description: "Telegram channel configured successfully" });
+    } catch (e: any) {
+      console.error("Failed to save telegram channel:", e);
+      toast({
+        title: "Error",
+        description: e.message || "Failed to save Telegram channel configuration",
+        variant: "destructive"
+      });
     }
-
-    setNewTelegramChannelForm({
-      name: "",
-      bot_token: "",
-      channel_id: "",
-      sector: "UPSC"
-    });
-    setShowTelegramAddChannelDialog(false);
-    toast({ title: "Success", description: "Telegram channel configured successfully" });
   };
 
-  const handleDeleteTelegramChannel = (id: string) => {
-    const updated = telegramChannels.filter(c => c.id !== id);
-    saveTelegramChannels(updated);
-    if (selectedTelegramChannelId === id) {
-      setSelectedTelegramChannelId(updated[0]?.id || "");
+  const handleDeleteTelegramChannel = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("telegram_channels")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      const updated = telegramChannels.filter(c => c.id !== id);
+      setTelegramChannels(updated);
+      localStorage.setItem("jobstrackr:telegram_channels", JSON.stringify(updated));
+
+      if (selectedTelegramChannelId === id) {
+        setSelectedTelegramChannelId(updated[0]?.id || "");
+      }
+      toast({ title: "Deleted", description: "Channel configuration removed" });
+    } catch (e: any) {
+      console.error("Failed to delete telegram channel:", e);
+      toast({
+        title: "Error",
+        description: e.message || "Failed to remove Telegram channel configuration",
+        variant: "destructive"
+      });
     }
-    toast({ title: "Deleted", description: "Channel configuration removed" });
   };
 
   const activeJobsForTelegram = useMemo(() => {
@@ -1092,15 +1398,42 @@ export default function Admin() {
     }
 
     setPostingToTelegram(true);
+    setTelegramConsoleLogs([
+      `[${format(new Date(), "HH:mm:ss")}] 🚀 Starting dispatch to Telegram channel: "${channel.name}"`,
+      `[${format(new Date(), "HH:mm:ss")}] 📋 Found ${idsToPost.length} selected item(s) to process`
+    ]);
+
     try {
+      // Fetch already sent items to prevent duplicate posts
+      let sentIds = new Set<string>();
+      try {
+        const { data: sentItems } = await supabase
+          .from("telegram_sent_jobs")
+          .select("job_id, update_id")
+          .eq("channel_id", channel.id)
+          .eq("status", "success");
+
+        if (sentItems) {
+          sentItems.forEach(item => {
+            const sentId = telegramSourceType === "jobs" ? item.job_id : item.update_id;
+            if (sentId) sentIds.add(sentId);
+          });
+        }
+      } catch (err) {
+        console.error("Failed to check duplicate postings", err);
+      }
+
       let successCount = 0;
 
-      for (const id of idsToPost) {
+      for (let i = 0; i < idsToPost.length; i++) {
+        const id = idsToPost[i];
         let messageText = "";
+        let itemTitle = "";
 
         if (telegramSourceType === "jobs") {
           const job = jobs?.find(j => j.id === id);
           if (!job) continue;
+          itemTitle = job.title;
           const jobLink = `${getWebappBaseUrl()}/jobs/${job.slug || job.id}`;
           
           // Dynamic hashtags
@@ -1116,13 +1449,12 @@ export default function Admin() {
           const hashtagsStr = hashtags.join(" ");
 
           messageText = `
-🚨 NEW RECRUITMENT ALERT
+*🚨 NEW RECRUITMENT ALERT*
 
-📌 ${job.title}
+*📌 ${job.title}*
 
 🏢 Organization: ${job.department}
 👥 Vacancies: ${job.vacancies_display || job.vacancies || "TBD"}
-🎓 Qualification: ${job.qualification}
 📅 Last Date: ${(() => {
             const d = getJobDeadlineDate(job);
             return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date;
@@ -1133,15 +1465,12 @@ export default function Admin() {
 🔗 View Full Notification:
 ${jobLink}
 
-━━━━━━━━━━━━━━━
-📲 Track Jobs, Exams & Applications
-🌐 https://www.jobstrackr.in
-
 ${hashtagsStr}
           `.trim();
         } else {
           const update = telegramExamUpdates?.find(u => u.id === id);
           if (!update) continue;
+          itemTitle = update.title;
           const updateLink = `${getWebappBaseUrl()}/updates/${update.update_slug || update.id}`;
           
           const categoryLower = update.category.toLowerCase();
@@ -1190,9 +1519,9 @@ ${hashtagsStr}
             })();
 
             messageText = `
-🎫 ADMIT CARD / EXAM CITY UPDATE
+*🔔 IMPORTANT UPDATE*
 
-📌 ${update.title}
+*📌 ${update.title}*
 
 📍 ${statusText}
 📅 Exam Date: ${examDate}
@@ -1202,17 +1531,13 @@ ${hashtagsStr}
 🔗 View Details:
 ${updateLink}
 
-━━━━━━━━━━━━━━━
-📲 Never Miss Admit Cards & Exam Updates
-🌐 https://www.jobstrackr.in
-
 ${hashtagsStr}
             `.trim();
           } else if (templateType === "result") {
             messageText = `
-🏆 RESULT OUT
+*🔔 IMPORTANT UPDATE*
 
-📌 ${update.title}
+*📌 ${update.title}*
 
 📢 Result Released Successfully
 
@@ -1221,17 +1546,13 @@ ${hashtagsStr}
 🔗 View Result:
 ${updateLink}
 
-━━━━━━━━━━━━━━━
-📲 Track Results & Cut-Off Updates
-🌐 https://www.jobstrackr.in
-
 ${hashtagsStr}
             `.trim();
           } else if (templateType === "answer_key") {
             messageText = `
-📝 ANSWER KEY RELEASED
+*🔔 IMPORTANT UPDATE*
 
-📌 ${update.title}
+*📌 ${update.title}*
 
 📢 Official Answer Key Available
 
@@ -1239,10 +1560,6 @@ ${hashtagsStr}
 
 🔗 View Details:
 ${updateLink}
-
-━━━━━━━━━━━━━━━
-📲 Track Results & Cut-Off Updates
-🌐 https://www.jobstrackr.in
 
 ${hashtagsStr}
             `.trim();
@@ -1260,9 +1577,9 @@ ${hashtagsStr}
             })();
 
             messageText = `
-🚨 NEW RECRUITMENT ALERT
+*🔔 IMPORTANT UPDATE*
 
-📌 ${update.title}
+*📌 ${update.title}*
 
 🏢 Organization: ${orgText}
 📢 Notification Details Available
@@ -1272,40 +1589,98 @@ ${hashtagsStr}
 🔗 View Details:
 ${updateLink}
 
-━━━━━━━━━━━━━━━
-📲 Track Jobs, Exams & Applications
-🌐 https://www.jobstrackr.in
-
 ${hashtagsStr}
             `.trim();
           }
         }
 
-        const response = await fetch(`https://api.telegram.org/bot${channel.bot_token}/sendMessage`, {
+        setTelegramConsoleLogs(prev => [
+          ...prev,
+          `[${format(new Date(), "HH:mm:ss")}] Preparing message for: "${itemTitle}"`
+        ]);
+
+        // Prevent duplicate sending
+        if (sentIds.has(id)) {
+          setTelegramConsoleLogs(prev => [
+            ...prev,
+            `[${format(new Date(), "HH:mm:ss")}] ⚠️ Skipped duplicate: "${itemTitle}" already successfully sent to this channel.`
+          ]);
+          successCount++;
+          continue;
+        }
+
+        let rawChannelId = (channel.channel_id || "").replace(/[^a-zA-Z0-9_@-]/g, "").trim();
+        let formattedChannelId = rawChannelId;
+        if (/^\d+$/.test(rawChannelId)) {
+          formattedChannelId = `-100${rawChannelId}`;
+        } else if (/^-\d+$/.test(rawChannelId) && !rawChannelId.startsWith("-100")) {
+          formattedChannelId = `-100${rawChannelId.substring(1)}`;
+        } else if (/^[a-zA-Z][a-zA-Z0-9_]*$/.test(rawChannelId)) {
+          formattedChannelId = `@${rawChannelId}`;
+        }
+
+        const cleanedBotToken = (channel.bot_token || "").replace(/[^a-zA-Z0-9_:-]/g, "").trim();
+
+        const response = await fetch(`https://api.telegram.org/bot${cleanedBotToken}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            chat_id: channel.channel_id,
+            chat_id: formattedChannelId,
             text: messageText,
             parse_mode: "Markdown",
-            disable_web_page_preview: false
+            disable_web_page_preview: true,
+            link_preview_options: { is_disabled: true }
           })
         });
 
         const data = await response.json();
         if (response.ok && data.ok) {
           successCount++;
+          setTelegramConsoleLogs(prev => [
+            ...prev,
+            `[${format(new Date(), "HH:mm:ss")}] ✅ Successfully posted to Telegram! (${successCount}/${idsToPost.length})`
+          ]);
+
+          // Log success to DB
+          await supabase.from("telegram_sent_jobs").insert({
+            channel_id: channel.id,
+            [telegramSourceType === "jobs" ? "job_id" : "update_id"]: id,
+            status: "success"
+          });
         } else {
           console.error(`Telegram post error for ID ${id}:`, data.description);
+          setTelegramConsoleLogs(prev => [
+            ...prev,
+            `[${format(new Date(), "HH:mm:ss")}] ❌ Error posting "${itemTitle}": ${data.description || "Unknown error"}`
+          ]);
+
+          // Log failure to DB
+          await supabase.from("telegram_sent_jobs").insert({
+            channel_id: channel.id,
+            [telegramSourceType === "jobs" ? "job_id" : "update_id"]: id,
+            status: "failed",
+            error_message: data.description || "Unknown Telegram API error"
+          });
         }
 
-        // Add a 500ms delay between posts to prevent Telegram rate limits
-        if (idsToPost.length > 1) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
+        // Add a 1000ms delay between posts to prevent Telegram rate limits
+        if (i < idsToPost.length - 1) {
+          setTelegramConsoleLogs(prev => [
+            ...prev,
+            `[${format(new Date(), "HH:mm:ss")}] 🕒 Delaying 1.0s to respect Telegram API rate limits...`
+          ]);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
 
+      // Refresh logs history
+      fetchTelegramLogs();
+
       if (successCount === idsToPost.length) {
+        setTelegramConsoleLogs(prev => [
+          ...prev,
+          `[${format(new Date(), "HH:mm:ss")}] 🎉 Completed broadcasting. All ${successCount} messages posted successfully!`
+        ]);
         toast({ title: "Success", description: `Posted ${successCount} notification(s) to Telegram channel successfully!` });
         // Clear selection
         if (telegramSourceType === "jobs") {
@@ -1314,6 +1689,10 @@ ${hashtagsStr}
           setSelectedTelegramUpdateIds([]);
         }
       } else {
+        setTelegramConsoleLogs(prev => [
+          ...prev,
+          `[${format(new Date(), "HH:mm:ss")}] ⚠️ Completed broadcasting with errors. ${successCount} out of ${idsToPost.length} messages sent.`
+        ]);
         toast({
           title: "Partial Success",
           description: `Posted ${successCount} out of ${idsToPost.length} notifications. Check console for errors.`,
@@ -1322,6 +1701,10 @@ ${hashtagsStr}
       }
     } catch (e: any) {
       console.error("Telegram post error:", e);
+      setTelegramConsoleLogs(prev => [
+        ...prev,
+        `[${format(new Date(), "HH:mm:ss")}] 🚨 System Exception: ${e.message || "Failed to communicate with Telegram API"}`
+      ]);
       toast({ title: "Error", description: e.message || "Failed to send message to Telegram", variant: "destructive" });
     } finally {
       setPostingToTelegram(false);
@@ -1352,13 +1735,12 @@ ${hashtagsStr}
       else if (titleLower.includes("defence") || titleLower.includes("army") || titleLower.includes("navy") || titleLower.includes("air force")) hashtags.unshift("#Defence");
       const hashtagsStr = hashtags.join(" ");
 
-      return `${prefix}🚨 NEW RECRUITMENT ALERT
+      return `${prefix}*🚨 NEW RECRUITMENT ALERT*
 
-📌 ${job.title}
+*📌 ${job.title}*
 
 🏢 Organization: ${job.department}
 👥 Vacancies: ${job.vacancies_display || job.vacancies || "TBD"}
-🎓 Qualification: ${job.qualification}
 📅 Last Date: ${(() => {
         const d = getJobDeadlineDate(job);
         return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date;
@@ -1368,10 +1750,6 @@ ${hashtagsStr}
 
 🔗 View Full Notification:
 ${jobLink}
-
-━━━━━━━━━━━━━━━
-📲 Track Jobs, Exams & Applications
-🌐 https://www.jobstrackr.in
 
 ${hashtagsStr}`;
     } else {
@@ -1424,9 +1802,9 @@ ${hashtagsStr}`;
           return "Check Details";
         })();
 
-        return `${prefix}🎫 ADMIT CARD / EXAM CITY UPDATE
+        return `${prefix}*🔔 IMPORTANT UPDATE*
 
-📌 ${update.title}
+*📌 ${update.title}*
 
 📍 ${statusText}
 📅 Exam Date: ${examDate}
@@ -1436,15 +1814,11 @@ ${hashtagsStr}`;
 🔗 View Details:
 ${updateLink}
 
-━━━━━━━━━━━━━━━
-📲 Never Miss Admit Cards & Exam Updates
-🌐 https://www.jobstrackr.in
-
 ${hashtagsStr}`;
       } else if (templateType === "result") {
-        return `${prefix}🏆 RESULT OUT
+        return `${prefix}*🔔 IMPORTANT UPDATE*
 
-📌 ${update.title}
+*📌 ${update.title}*
 
 📢 Result Released Successfully
 
@@ -1453,15 +1827,11 @@ ${hashtagsStr}`;
 🔗 View Result:
 ${updateLink}
 
-━━━━━━━━━━━━━━━
-📲 Track Results & Cut-Off Updates
-🌐 https://www.jobstrackr.in
-
 ${hashtagsStr}`;
       } else if (templateType === "answer_key") {
-        return `${prefix}📝 ANSWER KEY RELEASED
+        return `${prefix}*🔔 IMPORTANT UPDATE*
 
-📌 ${update.title}
+*📌 ${update.title}*
 
 📢 Official Answer Key Available
 
@@ -1469,10 +1839,6 @@ ${hashtagsStr}`;
 
 🔗 View Details:
 ${updateLink}
-
-━━━━━━━━━━━━━━━
-📲 Track Results & Cut-Off Updates
-🌐 https://www.jobstrackr.in
 
 ${hashtagsStr}`;
       } else {
@@ -1487,9 +1853,9 @@ ${hashtagsStr}`;
           return "Government Agency";
         })();
 
-        return `${prefix}🚨 NEW RECRUITMENT ALERT
+        return `${prefix}*🔔 IMPORTANT UPDATE*
 
-📌 ${update.title}
+*📌 ${update.title}*
 
 🏢 Organization: ${orgText}
 📢 Notification Details Available
@@ -1498,10 +1864,6 @@ ${hashtagsStr}`;
 
 🔗 View Details:
 ${updateLink}
-
-━━━━━━━━━━━━━━━
-📲 Track Jobs, Exams & Applications
-🌐 https://www.jobstrackr.in
 
 ${hashtagsStr}`;
       }
@@ -2798,6 +3160,16 @@ ${hashtagsStr}`;
                       {backfillingEligibility ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                       Backfill Eligibility
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      onClick={handleCheckVacancies}
+                      disabled={jobsLoading || updatingVacancies}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Check Vacancies
+                    </Button>
                     <Button size="sm" className="w-full sm:w-auto" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Job
@@ -3293,368 +3665,568 @@ ${hashtagsStr}`;
           </TabsContent>
 
           {/* Telegram Posting Tab */}
+          {/* Telegram Posting Tab */}
           <TabsContent value="telegram">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <Tabs defaultValue="poster" className="space-y-4">
+              <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+                <TabsTrigger value="poster">Manual Poster</TabsTrigger>
+                <TabsTrigger value="history" onClick={fetchTelegramLogs}>Posting History & Status</TabsTrigger>
+              </TabsList>
               
-              {/* Left Column: Channels Configuration */}
-              <div className="lg:col-span-4 space-y-6">
-                <Card>
-                  <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-                    <div>
-                      <CardTitle className="text-lg">Telegram Channels</CardTitle>
-                      <CardDescription>Configure bot credentials per sector</CardDescription>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowTelegramAddChannelDialog(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Add
-                    </Button>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {telegramChannels.length === 0 ? (
-                      <div className="text-center py-6 border border-dashed rounded-lg text-muted-foreground text-sm">
-                        No Telegram channels configured yet. Click 'Add' to configure one.
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                        {telegramChannels.map((channel) => (
-                          <div
-                            key={channel.id}
-                            className={`p-2 border rounded-lg hover:border-primary/50 transition-all flex items-center justify-between gap-3 cursor-pointer ${
-                              selectedTelegramChannelId === channel.id ? "border-primary bg-primary/5" : "bg-card"
-                            }`}
-                            onClick={() => setSelectedTelegramChannelId(channel.id)}
+              <TabsContent value="poster" className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  
+                  {/* Left Column: Channels Configuration */}
+                  <div className="lg:col-span-4 space-y-6">
+                    <Card>
+                      <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                        <div>
+                          <CardTitle className="text-lg">Telegram Channels</CardTitle>
+                          <CardDescription>Configure bot credentials per sector</CardDescription>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowTelegramAddChannelDialog(true)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" /> Add
+                        </Button>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {telegramChannels.length === 0 ? (
+                          <div className="text-center py-6 border border-dashed rounded-lg text-muted-foreground text-sm">
+                            No Telegram channels configured yet. Click 'Add' to configure one.
+                          </div>
+                        ) : (
+                          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                            {telegramChannels.map((channel) => (
+                              <div
+                                key={channel.id}
+                                className={`p-2 border rounded-lg hover:border-primary/50 transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                                  selectedTelegramChannelId === channel.id ? "border-primary bg-primary/5" : "bg-card"
+                                }`}
+                                onClick={() => setSelectedTelegramChannelId(channel.id)}
+                              >
+                                <div className="min-w-0 flex-1 flex items-center gap-2">
+                                  <h4 className="font-semibold text-xs truncate" title={channel.name}>{channel.name}</h4>
+                                  <Badge variant="secondary" className="text-[9px] py-0 px-1.5 h-4 flex-shrink-0">
+                                    {channel.sector}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="text-[9px] text-muted-foreground font-mono truncate max-w-[80px]" title={`Chat ID: ${channel.channel_id}`}>
+                                    {channel.channel_id}
+                                  </span>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteTelegramChannel(channel.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Middle Column: Jobs/Updates Selector */}
+                  <div className="lg:col-span-4 space-y-6">
+                    <Card className="h-full flex flex-col">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg">Publish Selection</CardTitle>
+                        <CardDescription>Select job or update to broadcast</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4 flex-1 flex flex-col min-h-0">
+                        <div className="space-y-2">
+                          <Label htmlFor="telegram-sector">Select Sector/Search Term</Label>
+                          <div className="space-y-1.5">
+                            <Input
+                              placeholder="Type to filter sectors..."
+                              value={sectorSearchQuery}
+                              onChange={(e) => setSectorSearchQuery(e.target.value)}
+                              className="h-8 text-xs"
+                            />
+                            <Select value={selectedTelegramSector} onValueChange={(val) => {
+                              setSelectedTelegramSector(val);
+                              setSelectedTelegramJobIds([]);
+                              setSelectedTelegramUpdateIds([]);
+                              const matched = telegramChannels.find(c => c.sector.toLowerCase() === val.toLowerCase());
+                              if (matched) setSelectedTelegramChannelId(matched.id);
+                            }}>
+                              <SelectTrigger id="telegram-sector">
+                                <SelectValue placeholder="Sector" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-[300px]">
+                                {filteredTelegramTiers.length === 0 ? (
+                                  <div className="text-center py-4 text-muted-foreground text-xs">No matching sectors</div>
+                                ) : (
+                                  filteredTelegramTiers.map((tier) => (
+                                    <SelectGroup key={tier.name}>
+                                      <SelectLabel className="font-bold text-primary text-xs bg-muted/40 px-2 py-1 sticky top-0 z-10">{tier.name}</SelectLabel>
+                                      {tier.terms.map((term) => (
+                                        <SelectItem key={term} value={term}>{term}</SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Content Type</Label>
+                          <RadioGroup
+                            defaultValue="jobs"
+                            value={telegramSourceType}
+                            onValueChange={(val: "jobs" | "updates") => {
+                              setTelegramSourceType(val);
+                              setSelectedTelegramJobIds([]);
+                              setSelectedTelegramUpdateIds([]);
+                            }}
+                            className="flex gap-4"
                           >
-                            <div className="min-w-0 flex-1 flex items-center gap-2">
-                              <h4 className="font-semibold text-xs truncate" title={channel.name}>{channel.name}</h4>
-                              <Badge variant="secondary" className="text-[9px] py-0 px-1.5 h-4 flex-shrink-0">
-                                {channel.sector}
-                              </Badge>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="jobs" id="tele-jobs" />
+                              <Label htmlFor="tele-jobs" className="cursor-pointer">Active Jobs</Label>
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="text-[9px] text-muted-foreground font-mono truncate max-w-[80px]" title={`Chat ID: ${channel.channel_id}`}>
-                                {channel.channel_id}
-                              </span>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteTelegramChannel(channel.id);
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="updates" id="tele-updates" />
+                              <Label htmlFor="tele-updates" className="cursor-pointer">Job Updates</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+
+                        <div className="flex-1 flex flex-col min-h-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label>
+                              {telegramSourceType === "jobs" ? "Available Active Jobs" : "Available Updates"}
+                            </Label>
+                            {(telegramSourceType === "jobs" ? activeJobsForTelegram.length > 0 : (!telegramUpdatesLoading && telegramExamUpdates && telegramExamUpdates.length > 0)) && (
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id="select-all-telegram"
+                                  checked={
+                                    telegramSourceType === "jobs"
+                                      ? activeJobsForTelegram.length > 0 && activeJobsForTelegram.every(j => selectedTelegramJobIds.includes(j.id))
+                                      : !!(telegramExamUpdates && telegramExamUpdates.length > 0 && telegramExamUpdates.every(u => selectedTelegramUpdateIds.includes(u.id)))
+                                  }
+                                  onCheckedChange={(checked) => {
+                                    if (telegramSourceType === "jobs") {
+                                      if (checked) {
+                                        setSelectedTelegramJobIds(activeJobsForTelegram.map(j => j.id));
+                                      } else {
+                                        setSelectedTelegramJobIds([]);
+                                      }
+                                    } else {
+                                      if (checked && telegramExamUpdates) {
+                                        setSelectedTelegramUpdateIds(telegramExamUpdates.map(u => u.id));
+                                      } else {
+                                        setSelectedTelegramUpdateIds([]);
+                                      }
+                                    }
+                                  }}
+                                />
+                                <Label htmlFor="select-all-telegram" className="text-xs cursor-pointer font-normal text-muted-foreground select-none">
+                                  Select All ({telegramSourceType === "jobs" ? activeJobsForTelegram.length : telegramExamUpdates?.length || 0})
+                                </Label>
+                              </div>
+                            )}
+                          </div>
+
+                          {telegramSourceType === "jobs" && activeJobsForTelegram.length > 0 && (
+                            <div className="flex items-center gap-2 mb-2 bg-muted/20 p-2 rounded border text-xs">
+                              <span className="text-muted-foreground font-medium">Sort:</span>
+                              <Select
+                                value={telegramSortField || ""}
+                                onValueChange={(val: any) => {
+                                  setTelegramSortField(val);
                                 }}
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <SelectTrigger className="h-7 text-xs w-[140px] bg-background">
+                                  <SelectValue placeholder="Sort by" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="created_at">Date Added (Newest)</SelectItem>
+                                  <SelectItem value="last_date">Deadline Date</SelectItem>
+                                  <SelectItem value="vacancies">Vacancies (Highest)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setTelegramSortDirection(prev => prev === "asc" ? "desc" : "asc");
+                                }}
+                              >
+                                {telegramSortDirection === "asc" ? (
+                                  <ArrowUp className="h-3.5 w-3.5 text-muted-foreground" />
+                                ) : (
+                                  <ArrowDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
                               </Button>
                             </div>
+                          )}
+                          
+                          <div className="flex-1 border rounded-md overflow-y-auto max-h-[350px]">
+                            {telegramSourceType === "jobs" ? (
+                              activeJobsForTelegram.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground text-sm">
+                                  No active jobs in this sector.
+                                </div>
+                              ) : (
+                                <div className="divide-y">
+                                  {activeJobsForTelegram.map((job) => (
+                                    <div
+                                      key={job.id}
+                                      className={`p-3 text-xs hover:bg-muted/40 cursor-pointer transition-colors flex items-start gap-2.5 ${
+                                        selectedTelegramJobIds.includes(job.id) ? "bg-muted/60 font-medium" : ""
+                                      }`}
+                                      onClick={() => {
+                                        setSelectedTelegramJobIds(prev =>
+                                          prev.includes(job.id) ? prev.filter(id => id !== job.id) : [...prev, job.id]
+                                        );
+                                      }}
+                                    >
+                                      <Checkbox
+                                        checked={selectedTelegramJobIds.includes(job.id)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onCheckedChange={(checked) => {
+                                          setSelectedTelegramJobIds(prev =>
+                                            checked
+                                              ? [...prev, job.id]
+                                              : prev.filter(id => id !== job.id)
+                                          );
+                                        }}
+                                        className="mt-0.5"
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-sm line-clamp-1">{job.title}</div>
+                                        <div className="text-muted-foreground mt-1 line-clamp-1">{job.department}</div>
+                                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5">
+                                          <span>Vacancies: {job.vacancies_display || job.vacancies || "TBD"}</span>
+                                          <span>Last Date: {(() => {
+                                            const d = getJobDeadlineDate(job);
+                                            if (d) {
+                                              const isCurrentYear = d.getFullYear() === new Date().getFullYear();
+                                              return format(d, isCurrentYear ? "dd MMM" : "dd MMM yyyy");
+                                            }
+                                            return job.last_date_display || job.last_date;
+                                          })()}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )
+                            ) : (
+                              telegramUpdatesLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                </div>
+                              ) : !telegramExamUpdates || telegramExamUpdates.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground text-sm">
+                                  No updates found in this sector.
+                                </div>
+                              ) : (
+                                <div className="divide-y">
+                                  {telegramExamUpdates.map((update) => (
+                                    <div
+                                      key={update.id}
+                                      className={`p-3 text-xs hover:bg-muted/40 cursor-pointer transition-colors flex items-start gap-2.5 ${
+                                        selectedTelegramUpdateIds.includes(update.id) ? "bg-muted/60 font-medium" : ""
+                                      }`}
+                                      onClick={() => {
+                                        setSelectedTelegramUpdateIds(prev =>
+                                          prev.includes(update.id) ? prev.filter(id => id !== update.id) : [...prev, update.id]
+                                        );
+                                      }}
+                                    >
+                                      <Checkbox
+                                        checked={selectedTelegramUpdateIds.includes(update.id)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onCheckedChange={(checked) => {
+                                          setSelectedTelegramUpdateIds(prev =>
+                                            checked
+                                              ? [...prev, update.id]
+                                              : prev.filter(id => id !== update.id)
+                                          );
+                                        }}
+                                        className="mt-0.5"
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-sm line-clamp-1">{update.title}</div>
+                                        <div className="text-muted-foreground mt-1">Status: {update.status || "N/A"}</div>
+                                        <div className="text-[10px] text-muted-foreground mt-1.5">
+                                          Published: {update.published_date || format(new Date(update.created_at), "dd MMM yyyy")}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )
+                            )}
                           </div>
-                        ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Right Column: Live Preview & Action */}
+                  <div className="lg:col-span-4 space-y-6">
+                    <Card className="flex flex-col">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg">Message Live Preview</CardTitle>
+                        <CardDescription>Verification before broadcasting</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex-1 flex flex-col justify-between space-y-4">
+                        <div className="flex-1 bg-muted/30 border rounded-lg p-4 font-mono text-xs overflow-y-auto whitespace-pre-wrap max-h-[350px]">
+                          {getTelegramPreviewMessage()}
+                        </div>
+                        <div className="space-y-3 border-t pt-4">
+                          {selectedTelegramChannelId ? (
+                            <div className="text-xs text-muted-foreground bg-primary/5 p-2.5 rounded border border-primary/20 flex flex-col gap-1">
+                              <div>
+                                <strong>Sending To:</strong> {telegramChannels.find(c => c.id === selectedTelegramChannelId)?.name}
+                              </div>
+                              <div>
+                                <strong>Chat ID:</strong> {telegramChannels.find(c => c.id === selectedTelegramChannelId)?.channel_id}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-destructive bg-destructive/5 p-2.5 rounded border border-destructive/20">
+                              Please select or configure a Telegram channel first.
+                            </div>
+                          )}
+                          
+                          <Button
+                            className="w-full gap-2 h-11"
+                            disabled={
+                              postingToTelegram ||
+                              !selectedTelegramChannelId ||
+                              (telegramSourceType === "jobs" ? selectedTelegramJobIds.length === 0 : selectedTelegramUpdateIds.length === 0)
+                            }
+                            onClick={handlePostToTelegram}
+                          >
+                            {postingToTelegram ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Posting notification...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-4 w-4" />
+                                Publish to Telegram
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="flex flex-col">
+                      <CardHeader className="pb-3 pt-4">
+                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                          <Terminal className="h-4 w-4 text-primary" />
+                          Execution Console
+                        </CardTitle>
+                        <CardDescription className="text-[10px]">Real-time Telegram posting logs</CardDescription>
+                      </CardHeader>
+                      <CardContent className="pb-4 pt-0">
+                        <div className="bg-black/95 text-green-400 font-mono text-[10px] p-3 rounded border border-border/40 min-h-[120px] max-h-[180px] overflow-y-auto">
+                          {telegramConsoleLogs.length === 0 ? (
+                            <span className="text-muted-foreground italic">Idle. Console waiting for execution...</span>
+                          ) : (
+                            telegramConsoleLogs.map((log, index) => (
+                              <div key={index} className="line-clamp-2 leading-relaxed">
+                                {log}
+                              </div>
+                            ))
+                          )}
+                          <div ref={consoleBottomRef} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Posting History & Status Tab */}
+              <TabsContent value="history" className="space-y-6">
+                {/* Channels Grid with statistics */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {telegramChannels.map(channel => {
+                    const stats = channelStats[channel.id] || { total: 0, lastSent: null, lastTitle: null, lastStatus: null };
+                    return (
+                      <Card key={channel.id} className="bg-card hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                              <Globe className="h-4 w-4 text-primary" />
+                              {channel.name}
+                            </CardTitle>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {channel.sector}
+                            </Badge>
+                          </div>
+                          <CardDescription className="text-[11px] font-mono truncate">
+                            ID: {channel.channel_id}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2.5 text-xs">
+                          <div className="flex justify-between items-center border-b pb-1.5">
+                            <span className="text-muted-foreground">Total Broadcasts:</span>
+                            <span className="font-semibold text-primary">{stats.total} successful</span>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-muted-foreground block text-[11px]">Last Sent Item:</span>
+                            {stats.lastSent ? (
+                              <div className="bg-muted/30 p-1.5 rounded text-[11px] space-y-1">
+                                <div className="font-medium line-clamp-1 text-foreground">
+                                  {stats.lastTitle}
+                                </div>
+                                <div className="flex justify-between text-[10px] text-muted-foreground">
+                                  <span>{format(new Date(stats.lastSent), "dd MMM yyyy, HH:mm")}</span>
+                                  <span>
+                                    {stats.lastStatus === "success" ? (
+                                      <Badge variant="outline" className="bg-green-500/10 text-green-500 hover:bg-green-500/10 text-[9px] py-0 px-1 border-none">
+                                        Success
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="destructive" className="text-[9px] py-0 px-1 border-none">
+                                        Failed
+                                      </Badge>
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic text-[11px]">No posts yet</span>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* History Logs Table */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-md flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        Recent Broadcast History
+                      </CardTitle>
+                      <CardDescription>
+                        Real-time duplicate-checking and dispatch log of the last 100 posts
+                      </CardDescription>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={fetchTelegramLogs}
+                      disabled={loadingTelegramLogs}
+                      className="gap-1.5"
+                    >
+                      {loadingTelegramLogs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                      Refresh logs
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingTelegramLogs ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : telegramLogs.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground text-sm">
+                        No posting logs found. Successful and failed Telegram broadcasts will be logged here.
+                      </div>
+                    ) : (
+                      <div className="border rounded-md overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Broadcast Date</TableHead>
+                              <TableHead>Channel Name</TableHead>
+                              <TableHead>Sector</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead className="min-w-[200px]">Item Title</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="max-w-[180px]">Details/Errors</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody className="text-xs">
+                            {telegramLogs.map((log) => {
+                              const title = log.jobs?.title || log.exam_updates?.title || "Unknown Title";
+                              const subtitle = log.jobs?.department || "";
+                              return (
+                                <TableRow key={log.id}>
+                                  <TableCell className="font-mono text-[10px] text-muted-foreground">
+                                    {format(new Date(log.sent_at), "dd MMM yyyy, HH:mm")}
+                                  </TableCell>
+                                  <TableCell className="font-semibold">
+                                    {log.telegram_channels?.name || "Deleted Channel"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-[10px]">
+                                      {log.telegram_channels?.sector || "N/A"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {log.job_id ? (
+                                      <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-none text-[10px]">Job</Badge>
+                                    ) : (
+                                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 border-none text-[10px]">Update</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="font-medium line-clamp-1">{title}</div>
+                                    {subtitle && (
+                                      <div className="text-[10px] text-muted-foreground line-clamp-1">{subtitle}</div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {log.status === "success" ? (
+                                      <Badge variant="outline" className="bg-green-500/10 text-green-600 border-none text-[10px] flex items-center gap-1 w-fit">
+                                        <Check className="h-3 w-3" /> Success
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="destructive" className="text-[10px] flex items-center gap-1 w-fit">
+                                        <X className="h-3 w-3" /> Failed
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground max-w-[180px] truncate" title={log.error_message || ""}>
+                                    {log.status === "success" ? (
+                                      <span className="text-[10px] text-green-600 flex items-center gap-1 font-medium">
+                                        <CheckCircle className="h-3.5 w-3.5" /> Delivered
+                                      </span>
+                                    ) : (
+                                      log.error_message || "Unknown error"
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
                       </div>
                     )}
                   </CardContent>
                 </Card>
-              </div>
-
-              {/* Middle Column: Jobs/Updates Selector */}
-              <div className="lg:col-span-4 space-y-6">
-                <Card className="h-full flex flex-col">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">Publish Selection</CardTitle>
-                    <CardDescription>Select job or update to broadcast</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4 flex-1 flex flex-col min-h-0">
-                    <div className="space-y-2">
-                      <Label htmlFor="telegram-sector">Select Sector/Search Term</Label>
-                      <div className="space-y-1.5">
-                        <Input
-                          placeholder="Type to filter sectors..."
-                          value={sectorSearchQuery}
-                          onChange={(e) => setSectorSearchQuery(e.target.value)}
-                          className="h-8 text-xs"
-                        />
-                        <Select value={selectedTelegramSector} onValueChange={(val) => {
-                          setSelectedTelegramSector(val);
-                          setSelectedTelegramJobIds([]);
-                          setSelectedTelegramUpdateIds([]);
-                          const matched = telegramChannels.find(c => c.sector.toLowerCase() === val.toLowerCase());
-                          if (matched) setSelectedTelegramChannelId(matched.id);
-                        }}>
-                          <SelectTrigger id="telegram-sector">
-                            <SelectValue placeholder="Sector" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[300px]">
-                            {filteredTelegramTiers.length === 0 ? (
-                              <div className="text-center py-4 text-muted-foreground text-xs">No matching sectors</div>
-                            ) : (
-                              filteredTelegramTiers.map((tier) => (
-                                <SelectGroup key={tier.name}>
-                                  <SelectLabel className="font-bold text-primary text-xs bg-muted/40 px-2 py-1 sticky top-0 z-10">{tier.name}</SelectLabel>
-                                  {tier.terms.map((term) => (
-                                    <SelectItem key={term} value={term}>{term}</SelectItem>
-                                  ))}
-                                </SelectGroup>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Content Type</Label>
-                      <RadioGroup
-                        defaultValue="jobs"
-                        value={telegramSourceType}
-                        onValueChange={(val: "jobs" | "updates") => {
-                          setTelegramSourceType(val);
-                          setSelectedTelegramJobIds([]);
-                          setSelectedTelegramUpdateIds([]);
-                        }}
-                        className="flex gap-4"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="jobs" id="tele-jobs" />
-                          <Label htmlFor="tele-jobs" className="cursor-pointer">Active Jobs</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="updates" id="tele-updates" />
-                          <Label htmlFor="tele-updates" className="cursor-pointer">Job Updates</Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-
-                    <div className="flex-1 flex flex-col min-h-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <Label>
-                          {telegramSourceType === "jobs" ? "Available Active Jobs" : "Available Updates"}
-                        </Label>
-                        {(telegramSourceType === "jobs" ? activeJobsForTelegram.length > 0 : (!telegramUpdatesLoading && telegramExamUpdates && telegramExamUpdates.length > 0)) && (
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id="select-all-telegram"
-                              checked={
-                                telegramSourceType === "jobs"
-                                  ? activeJobsForTelegram.length > 0 && activeJobsForTelegram.every(j => selectedTelegramJobIds.includes(j.id))
-                                  : !!(telegramExamUpdates && telegramExamUpdates.length > 0 && telegramExamUpdates.every(u => selectedTelegramUpdateIds.includes(u.id)))
-                              }
-                              onCheckedChange={(checked) => {
-                                if (telegramSourceType === "jobs") {
-                                  if (checked) {
-                                    setSelectedTelegramJobIds(activeJobsForTelegram.map(j => j.id));
-                                  } else {
-                                    setSelectedTelegramJobIds([]);
-                                  }
-                                } else {
-                                  if (checked && telegramExamUpdates) {
-                                    setSelectedTelegramUpdateIds(telegramExamUpdates.map(u => u.id));
-                                  } else {
-                                    setSelectedTelegramUpdateIds([]);
-                                  }
-                                }
-                              }}
-                            />
-                            <Label htmlFor="select-all-telegram" className="text-xs cursor-pointer font-normal text-muted-foreground select-none">
-                              Select All ({telegramSourceType === "jobs" ? activeJobsForTelegram.length : telegramExamUpdates?.length || 0})
-                            </Label>
-                          </div>
-                        )}
-                      </div>
-
-                      {telegramSourceType === "jobs" && activeJobsForTelegram.length > 0 && (
-                        <div className="flex items-center gap-2 mb-2 bg-muted/20 p-2 rounded border text-xs">
-                          <span className="text-muted-foreground font-medium">Sort:</span>
-                          <Select
-                            value={telegramSortField || ""}
-                            onValueChange={(val: any) => {
-                              setTelegramSortField(val);
-                            }}
-                          >
-                            <SelectTrigger className="h-7 text-xs w-[140px] bg-background">
-                              <SelectValue placeholder="Sort by" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="created_at">Date Added (Newest)</SelectItem>
-                              <SelectItem value="last_date">Deadline Date</SelectItem>
-                              <SelectItem value="vacancies">Vacancies (Highest)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => {
-                              setTelegramSortDirection(prev => prev === "asc" ? "desc" : "asc");
-                            }}
-                          >
-                            {telegramSortDirection === "asc" ? (
-                              <ArrowUp className="h-3.5 w-3.5 text-muted-foreground" />
-                            ) : (
-                              <ArrowDown className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                      
-                      <div className="flex-1 border rounded-md overflow-y-auto max-h-[350px]">
-                        {telegramSourceType === "jobs" ? (
-                          activeJobsForTelegram.length === 0 ? (
-                            <div className="text-center py-12 text-muted-foreground text-sm">
-                              No active jobs in this sector.
-                            </div>
-                          ) : (
-                            <div className="divide-y">
-                              {activeJobsForTelegram.map((job) => (
-                                <div
-                                  key={job.id}
-                                  className={`p-3 text-xs hover:bg-muted/40 cursor-pointer transition-colors flex items-start gap-2.5 ${
-                                    selectedTelegramJobIds.includes(job.id) ? "bg-muted/60 font-medium" : ""
-                                  }`}
-                                  onClick={() => {
-                                    setSelectedTelegramJobIds(prev =>
-                                      prev.includes(job.id) ? prev.filter(id => id !== job.id) : [...prev, job.id]
-                                    );
-                                  }}
-                                >
-                                  <Checkbox
-                                    checked={selectedTelegramJobIds.includes(job.id)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onCheckedChange={(checked) => {
-                                      setSelectedTelegramJobIds(prev =>
-                                        checked
-                                          ? [...prev, job.id]
-                                          : prev.filter(id => id !== job.id)
-                                      );
-                                    }}
-                                    className="mt-0.5"
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-semibold text-sm line-clamp-1">{job.title}</div>
-                                    <div className="text-muted-foreground mt-1 line-clamp-1">{job.department}</div>
-                                    <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5">
-                                      <span>Vacancies: {job.vacancies_display || job.vacancies || "TBD"}</span>
-                                      <span>Last Date: {(() => {
-                                        const d = getJobDeadlineDate(job);
-                                        if (d) {
-                                          const isCurrentYear = d.getFullYear() === new Date().getFullYear();
-                                          return format(d, isCurrentYear ? "dd MMM" : "dd MMM yyyy");
-                                        }
-                                        return job.last_date_display || job.last_date;
-                                      })()}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )
-                        ) : (
-                          telegramUpdatesLoading ? (
-                            <div className="flex items-center justify-center py-12">
-                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                            </div>
-                          ) : !telegramExamUpdates || telegramExamUpdates.length === 0 ? (
-                            <div className="text-center py-12 text-muted-foreground text-sm">
-                              No updates found in this sector.
-                            </div>
-                          ) : (
-                            <div className="divide-y">
-                              {telegramExamUpdates.map((update) => (
-                                <div
-                                  key={update.id}
-                                  className={`p-3 text-xs hover:bg-muted/40 cursor-pointer transition-colors flex items-start gap-2.5 ${
-                                    selectedTelegramUpdateIds.includes(update.id) ? "bg-muted/60 font-medium" : ""
-                                  }`}
-                                  onClick={() => {
-                                    setSelectedTelegramUpdateIds(prev =>
-                                      prev.includes(update.id) ? prev.filter(id => id !== update.id) : [...prev, update.id]
-                                    );
-                                  }}
-                                >
-                                  <Checkbox
-                                    checked={selectedTelegramUpdateIds.includes(update.id)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onCheckedChange={(checked) => {
-                                      setSelectedTelegramUpdateIds(prev =>
-                                        checked
-                                          ? [...prev, update.id]
-                                          : prev.filter(id => id !== update.id)
-                                      );
-                                    }}
-                                    className="mt-0.5"
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-semibold text-sm line-clamp-1">{update.title}</div>
-                                    <div className="text-muted-foreground mt-1">Status: {update.status || "N/A"}</div>
-                                    <div className="text-[10px] text-muted-foreground mt-1.5">
-                                      Published: {update.published_date || format(new Date(update.created_at), "dd MMM yyyy")}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Right Column: Live Preview & Action */}
-              <div className="lg:col-span-4 space-y-6">
-                <Card className="h-full flex flex-col">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">Message Live Preview</CardTitle>
-                    <CardDescription>Verification before broadcasting</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-1 flex flex-col justify-between space-y-4">
-                    <div className="flex-1 bg-muted/30 border rounded-lg p-4 font-mono text-xs overflow-y-auto whitespace-pre-wrap max-h-[350px]">
-                      {getTelegramPreviewMessage()}
-                    </div>
-                    <div className="space-y-3 border-t pt-4">
-                      {selectedTelegramChannelId ? (
-                        <div className="text-xs text-muted-foreground bg-primary/5 p-2.5 rounded border border-primary/20 flex flex-col gap-1">
-                          <div>
-                            <strong>Sending To:</strong> {telegramChannels.find(c => c.id === selectedTelegramChannelId)?.name}
-                          </div>
-                          <div>
-                            <strong>Chat ID:</strong> {telegramChannels.find(c => c.id === selectedTelegramChannelId)?.channel_id}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-destructive bg-destructive/5 p-2.5 rounded border border-destructive/20">
-                          Please select or configure a Telegram channel first.
-                        </div>
-                      )}
-                      
-                      <Button
-                        className="w-full gap-2 h-11"
-                        disabled={
-                          postingToTelegram ||
-                          !selectedTelegramChannelId ||
-                          (telegramSourceType === "jobs" ? selectedTelegramJobIds.length === 0 : selectedTelegramUpdateIds.length === 0)
-                        }
-                        onClick={handlePostToTelegram}
-                      >
-                        {postingToTelegram ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Posting notification...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="h-4 w-4" />
-                            Publish to Telegram
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           {/* Users Tab */}
@@ -3691,45 +4263,82 @@ ${hashtagsStr}`;
                   </div>
                 ) : (
                   <ScrollArea className="h-[500px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Qualification</TableHead>
-                          <TableHead>API Calls</TableHead>
-                          <TableHead>Joined</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {userStats.allUsers.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell className="font-medium">{user.full_name || "Not set"}</TableCell>
-                            <TableCell>{user.email || "Not set"}</TableCell>
-                            <TableCell>
-                              {user.highest_qualification ? (
-                                <Badge variant="secondary">{user.highest_qualification}</Badge>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={user.api_call_count > 0 ? "default" : "outline"}>
-                                {user.api_call_count}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{format(new Date(user.created_at), "dd MMM yyyy")}</TableCell>
-                          </TableRow>
-                        ))}
-                        {userStats.allUsers.length === 0 && (
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block">
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                              No registered users yet
-                            </TableCell>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Qualification</TableHead>
+                            <TableHead>API Calls</TableHead>
+                            <TableHead>Joined</TableHead>
                           </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {userStats.allUsers.map((user) => (
+                            <TableRow key={user.id}>
+                              <TableCell className="font-medium">{user.full_name || "Not set"}</TableCell>
+                              <TableCell>{user.email || "Not set"}</TableCell>
+                              <TableCell>
+                                {user.highest_qualification ? (
+                                  <Badge variant="secondary">{user.highest_qualification}</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={user.api_call_count > 0 ? "default" : "outline"}>
+                                  {user.api_call_count}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{format(new Date(user.created_at), "dd MMM yyyy")}</TableCell>
+                            </TableRow>
+                          ))}
+                          {userStats.allUsers.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                No registered users yet
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    {/* Mobile Card List View */}
+                    <div className="block md:hidden divide-y">
+                      {userStats.allUsers.map((user) => (
+                        <div key={user.id} className="p-4 space-y-3 bg-card hover:bg-muted/10 transition-colors">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-semibold text-sm text-foreground truncate">{user.full_name || "Not set"}</h4>
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate">{user.email || "Not set"}</p>
+                            </div>
+                            <Badge variant={user.api_call_count > 0 ? "default" : "outline"} className="text-[9px] py-0 px-1.5 h-4.5 flex-shrink-0">
+                              {user.api_call_count} API Calls
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/40">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-muted-foreground">Qual:</span>
+                              {user.highest_qualification ? (
+                                <Badge variant="secondary" className="text-[9px] py-0 px-1 border-none">{user.highest_qualification}</Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-[10px] font-mono">-</span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">Joined: {format(new Date(user.created_at), "dd MMM yyyy")}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {userStats.allUsers.length === 0 && (
+                        <div className="text-center text-muted-foreground py-12 text-xs bg-card">
+                          No registered users yet
+                        </div>
+                      )}
+                    </div>
                   </ScrollArea>
                 )}
                 <div className="p-4 border-t text-sm text-muted-foreground">
@@ -7007,6 +7616,103 @@ ${hashtagsStr}`;
                   ? `Add ${scrapedJobs.filter(j => j.selected && !j.isDuplicate).length} Jobs`
                   : "Process Selected"
                 }
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vacancy Checker Dialog */}
+      <Dialog open={showVacancyChecker} onOpenChange={(open) => { if (!open) setShowVacancyChecker(false); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Job Vacancy Mismatch Detector
+            </DialogTitle>
+            <DialogDescription>
+              The following jobs have vacancy counts mentioned in their title that mismatch with the vacancies stored in the database.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto my-4 border rounded-md">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background z-10">
+                <TableRow>
+                  <TableHead className="w-[50px] p-4">
+                    <Checkbox
+                      checked={
+                        vacancyMismatches.length > 0 &&
+                        selectedVacancyUpdates.size === vacancyMismatches.length
+                      }
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedVacancyUpdates(new Set(vacancyMismatches.map(m => m.jobId)));
+                        } else {
+                          setSelectedVacancyUpdates(new Set());
+                        }
+                      }}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead>Job Title</TableHead>
+                  <TableHead className="text-center w-[120px]">Stored Vacancy</TableHead>
+                  <TableHead className="text-center w-[120px]">Title Vacancy</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vacancyMismatches.map((item) => (
+                  <TableRow key={item.jobId} className="hover:bg-muted/50">
+                    <TableCell className="p-4">
+                      <Checkbox
+                        checked={selectedVacancyUpdates.has(item.jobId)}
+                        onCheckedChange={(checked) => {
+                          const next = new Set(selectedVacancyUpdates);
+                          if (checked) {
+                            next.add(item.jobId);
+                          } else {
+                            next.delete(item.jobId);
+                          }
+                          setSelectedVacancyUpdates(next);
+                        }}
+                        aria-label={`Select job ${item.jobTitle}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium text-xs sm:text-sm">
+                      {item.jobTitle}
+                    </TableCell>
+                    <TableCell className="text-center text-xs sm:text-sm font-semibold text-muted-foreground">
+                      {item.storedVacancy !== null ? item.storedVacancy : "—"}
+                    </TableCell>
+                    <TableCell className="text-center text-xs sm:text-sm font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20">
+                      {item.extractedVacancy}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter className="flex items-center justify-between sm:justify-between border-t pt-4">
+            <div className="text-xs sm:text-sm text-muted-foreground">
+              {selectedVacancyUpdates.size} of {vacancyMismatches.length} job(s) selected
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowVacancyChecker(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={selectedVacancyUpdates.size === 0 || updatingVacancies}
+                onClick={handleApproveVacancyChanges}
+              >
+                {updatingVacancies ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Updating...
+                  </>
+                ) : (
+                  "Approve Selected Changes"
+                )}
               </Button>
             </div>
           </DialogFooter>

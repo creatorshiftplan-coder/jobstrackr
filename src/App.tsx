@@ -16,6 +16,7 @@ import { TopBar } from "@/components/TopBar";
 import { Loader2 } from "lucide-react";
 
 import { SplashScreen, shouldShowSplash } from "@/components/SplashScreen";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 // Eager load critical routes
 import Welcome from "./pages/Welcome";
@@ -37,6 +38,9 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const FormMate = lazy(() => import("./pages/FormMate"));
 const Documents = lazy(() => import("./pages/Documents"));
 const Help = lazy(() => import("./pages/Help"));
+const UserManual = lazy(() => import("./pages/UserManual"));
+const FAQ = lazy(() => import("./pages/FAQ"));
+const TelegramAlerts = lazy(() => import("./pages/TelegramAlerts"));
 const EditSectorPreferences = lazy(() => import("./pages/EditSectorPreferences"));
 const Trending = lazy(() => import("./pages/Trending"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -82,6 +86,7 @@ const App = () => {
               <ScrollRestoration />
               <AnalyticsProvider>
                 <AuthRequiredProvider>
+                  <InstallPrompt />
                   <SidebarProvider defaultOpen={true}>
                     <div className="flex min-h-screen w-full">
                       <DesktopSidebar />
@@ -102,6 +107,9 @@ const App = () => {
                       <Route path="/formmate" element={<FormMate />} />
                       <Route path="/documents" element={<Documents />} />
                       <Route path="/help" element={<Help />} />
+                      <Route path="/user-manual" element={<UserManual />} />
+                      <Route path="/faq" element={<FAQ />} />
+                      <Route path="/settings/notifications" element={<TelegramAlerts />} />
                       <Route path="/more" element={<More />} />
                       <Route path="/auth" element={<Auth />} />
                       <Route path="/reset-password" element={<ResetPassword />} />

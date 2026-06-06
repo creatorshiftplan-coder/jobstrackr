@@ -58,7 +58,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
           <img
             src={logoColor}
             alt="JobsTrackr"
-            className="absolute inset-0 m-auto w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-md"
+            className="absolute inset-0 m-auto w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-md invert dark:invert-0"
             style={{ zIndex: 1 }}
           />
         </div>

@@ -21,9 +21,10 @@ import { isJobActive } from "@/lib/jobUtils";
  * This is a simpler path than the full Recommendations wizard.
  * It uses profile data directly (no 8-step wizard answers needed).
  */
-export function useRecommendations(limit: number = 10, enabled: boolean = true) {
+export function useRecommendations(limit: number = 10, enabled: boolean = true, initialJobs?: Job[]) {
   const { user, isGuestMode } = useAuth();
-  const { data: jobs, isLoading: jobsLoading } = useJobs({ enabled });
+  const { data: jobs, isLoading: jobsLoading } = useJobs({ enabled: enabled && !initialJobs });
+  const resolvedJobs = initialJobs || jobs;
   const { profile, isLoading: profileLoading } = useProfile({ enabled });
   const { userExams } = useExams({ enabled, includeExamCatalog: false });
 
@@ -45,12 +46,12 @@ export function useRecommendations(limit: number = 10, enabled: boolean = true) 
 
   // Run full pipeline
   const { recommended, examMatched } = useMemo(() => {
-    if (!enabled || !jobs || jobs.length === 0) {
+    if (!enabled || !resolvedJobs || resolvedJobs.length === 0) {
       return { recommended: [] as HybridMatchedJob[], examMatched: [] as HybridMatchedJob[] };
     }
 
     // Step 1: Filter expired jobs (lightweight — no qualification filter without wizard)
-    const activeJobs = jobs.filter((job) => isJobActive(job.last_date));
+    const activeJobs = resolvedJobs.filter((job) => isJobActive(job.last_date));
 
     // Step 2: Run matchAndSort with lightweight preferences
     // Since we don't have qualification type from wizard, this mainly filters by salary/grade/expiry
@@ -74,7 +75,7 @@ export function useRecommendations(limit: number = 10, enabled: boolean = true) 
       recommended: recommendedJobs,
       examMatched: examMatchedJobs,
     };
-  }, [enabled, jobs, preferences, profile?.preferred_sectors, userExams, limit]);
+  }, [enabled, resolvedJobs, preferences, profile?.preferred_sectors, userExams, limit]);
 
   return {
     /** Jobs matching user's tracked exams — highest priority */
@@ -82,7 +83,7 @@ export function useRecommendations(limit: number = 10, enabled: boolean = true) 
     /** Jobs recommended based on sectors, tags, recency — general recommendations */
     recommended,
     /** Whether data is still loading */
-    isLoading: enabled && (jobsLoading || profileLoading),
+    isLoading: enabled && ((!initialJobs && jobsLoading) || profileLoading),
     /** Whether user has tracked exams */
     hasTrackedExams: enabled && userExams.length > 0,
     /** Whether user has set sector preferences */

@@ -3,7 +3,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { User, HelpCircle, LogOut, ChevronRight, Shield, ShieldCheck, CreditCard, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key, Sparkles, SearchCheck, Target } from "lucide-react";
+import { User, HelpCircle, LogOut, ChevronRight, Shield, ShieldCheck, CreditCard, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key, Sparkles, SearchCheck, Target, Share2, BookOpen, MessageSquare, Bell, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -40,6 +40,35 @@ export default function More() {
       return;
     }
     navigate("/tracker");
+  };
+
+  const handleShareApp = async () => {
+    const shareText = `Jobstrackr – Your Smart Government Job Companion.\n\nLatest Govt Jobs • Exam Tracking • AI Recommendations • FormMate • OCR Documents\n\n🔗 https://www.jobstrackr.in/`;
+    
+    const shareData = {
+      title: "JobsTrackr App",
+      text: shareText,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare?.(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Link Copied",
+          description: "App share details copied to clipboard!",
+        });
+      }
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Link Copied",
+          description: "App share details copied to clipboard!",
+        });
+      }
+    }
   };
 
   const handleLogout = async () => {
@@ -282,25 +311,52 @@ export default function More() {
         <Card className="bg-white dark:bg-card border-border/50 shadow-md overflow-hidden">
           <CardContent className="p-0">
             {[
-              ...(user ? [{ icon: Sparkles, label: "Sector Preferences", path: "/edit-sector-preferences" }] : []),
-              { icon: HelpCircle, label: "Help & Support", path: "/help" },
+              ...(user ? [
+                { icon: Sparkles, label: "Sector Preferences", path: "/edit-sector-preferences" },
+                { icon: Send, label: "Telegram Alerts", path: "/settings/notifications" }
+              ] : []),
+              { icon: BookOpen, label: "User Manual", path: "/user-manual" },
+              { icon: HelpCircle, label: "Frequently Asked Questions", path: "/faq" },
+              { icon: MessageSquare, label: "Help & Support", path: "/help" },
+              { icon: Share2, label: "Share this App", onClick: handleShareApp },
               { icon: ShieldCheck, label: "Privacy Policy", path: "/privacy-policy" },
               { icon: CreditCard, label: "Refund Policy", path: "/refund-policy" },
               { icon: FileText, label: "Terms of Service", path: "/terms-of-service" },
               ...(user && isAdmin ? [{ icon: Shield, label: "Admin Panel", path: "/admin" }] : []),
-            ].map(({ icon: Icon, label, path }) => (
-              <Link
-                key={path}
-                to={path}
-                className="flex items-center justify-between p-4 hover:bg-secondary/50 transition-colors border-b border-border last:border-0"
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-medium text-foreground">{label}</span>
+            ].map((item) => {
+              const Icon = item.icon;
+              const content = (
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3">
+                    <Icon className="h-5 w-5 text-muted-foreground" />
+                    <span className="font-medium text-foreground">{item.label}</span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-              </Link>
-            ))}
+              );
+
+              if ('onClick' in item) {
+                return (
+                  <button
+                    key={item.label}
+                    onClick={item.onClick}
+                    className="w-full flex items-center justify-between p-4 hover:bg-secondary/50 transition-colors border-b border-border last:border-0 text-left"
+                  >
+                    {content}
+                  </button>
+                );
+              }
+
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className="flex items-center justify-between p-4 hover:bg-secondary/50 transition-colors border-b border-border last:border-0"
+                >
+                  {content}
+                </Link>
+              );
+            })}
           </CardContent>
         </Card>
 

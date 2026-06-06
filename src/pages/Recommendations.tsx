@@ -1084,7 +1084,7 @@ export default function Recommendations() {
             <ArrowLeft className="h-4 w-4 text-foreground" />
           </button>
           <div className="flex items-center gap-2">
-            <img src={logoColor} alt="JobsTrackr" className="h-5 w-5 object-contain dark:hidden" />
+            <img src={logoColor} alt="JobsTrackr" className="h-5 w-5 object-contain dark:hidden invert dark:invert-0" />
             <img src={logoWhite} alt="JobsTrackr" className="h-5 w-5 object-contain hidden dark:block" />
             <span className="font-display font-bold text-sm text-foreground">JobsTrackr</span>
           </div>

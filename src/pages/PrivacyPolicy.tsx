@@ -160,10 +160,10 @@ export default function PrivacyPolicy() {
                         <p>
                             📧 Email:{" "}
                             <a
-                                href="mailto:support@jobstrackr.in"
+                                href="mailto:contact@jobstrackr.in"
                                 className="text-[hsl(var(--blue-600))] font-medium hover:underline"
                             >
-                                support@jobstrackr.in
+                                contact@jobstrackr.in
                             </a>
                         </p>
                         <p>

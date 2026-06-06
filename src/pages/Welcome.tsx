@@ -65,7 +65,7 @@ const Welcome = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center px-6 py-6 gap-4">
         {/* Logo */}
-        <img src={logoColor} alt="JobsTrackr" className="h-16 sm:h-20 w-auto" />
+        <img src={logoColor} alt="JobsTrackr" className="h-16 sm:h-20 w-auto invert dark:invert-0" />
 
         {/* App Name */}
         <h2 className="text-lg sm:text-2xl font-bold text-primary tracking-wider">

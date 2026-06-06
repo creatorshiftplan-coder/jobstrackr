@@ -101,8 +101,8 @@ export default function TermsOfService() {
                         <BulletPoint>If you experience technical issues preventing use, contact support within 7 days for a prorated refund.</BulletPoint>
                         <BulletPoint>
                             Refund requests:{" "}
-                            <a href="mailto:support@jobstrackr.in" className="text-[hsl(var(--blue-600))] font-medium hover:underline">
-                                support@jobstrackr.in
+                            <a href="mailto:contact@jobstrackr.in" className="text-[hsl(var(--blue-600))] font-medium hover:underline">
+                                contact@jobstrackr.in
                             </a>
                         </BulletPoint>
                     </div>
