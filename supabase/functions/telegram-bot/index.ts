@@ -71,6 +71,17 @@ Deno.serve(async (req) => {
         const userId = match[1];
         console.log(`[telegram-bot] Linking user ${userId} to chat ${chatId}`);
 
+        // Fetch name from profiles
+        let userName = "Aspirant";
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (profile?.full_name) {
+          userName = profile.full_name;
+        }
+
         // Save connection in supabase (upsert)
         const { error } = await supabase
           .from("telegram_connections")
@@ -93,18 +104,7 @@ Deno.serve(async (req) => {
         } else {
           // Success Response
           const successMessage = `
-🎉 *Account Connected!*
-
-Your Telegram account has been successfully linked to JobsTrackr. 
-
-You will now receive instant alerts for:
-• New Vacancies 🚨
-• Admit Cards 🎫
-• Result Declarations 🏆
-• Answer Keys 🔑
-
-Configure your detailed job alerts, qualifications, and state preferences at:
-https://www.jobstrackr.in/settings/notifications
+Welcome *${userName}*! You are subscribed to the latest job notification and updates personalised just for you.
           `.trim();
           await sendTelegramMessage(chatId, successMessage);
         }
