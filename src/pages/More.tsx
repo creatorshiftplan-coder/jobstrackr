@@ -284,6 +284,26 @@ export default function More() {
           </Card>
         </div>
 
+        {/* Telegram Alerts Card */}
+        {user && (
+          <div onClick={() => navigate("/settings/notifications")} className="block cursor-pointer">
+            <Card className="bg-white dark:bg-card border-border/50 shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                    <Send className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-foreground">Telegram Alerts</h4>
+                    <p className="text-xs text-muted-foreground">Configure job categories, qualifications, and state alerts</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Day/Night Mode Toggle */}
         <Card className="bg-white dark:bg-card border-border/50 shadow-md">
           <CardContent className="p-4 flex items-center justify-between">
@@ -312,8 +332,7 @@ export default function More() {
           <CardContent className="p-0">
             {[
               ...(user ? [
-                { icon: Sparkles, label: "Sector Preferences", path: "/edit-sector-preferences" },
-                { icon: Send, label: "Telegram Alerts", path: "/settings/notifications" }
+                { icon: Sparkles, label: "Sector Preferences", path: "/edit-sector-preferences" }
               ] : []),
               { icon: BookOpen, label: "User Manual", path: "/user-manual" },
               { icon: HelpCircle, label: "Frequently Asked Questions", path: "/faq" },
