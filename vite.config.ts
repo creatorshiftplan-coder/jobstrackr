@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { execFile } from "child_process";
@@ -316,16 +316,14 @@ print(json.dumps({"links": links, "total": len(links)}))
 }
 
 // Local dev plugin: proxy /api/cache/* to Supabase directly (no Redis in dev)
-function localCachePlugin() {
+function localCachePlugin(env: Record<string, string>) {
   return {
     name: "local-cache",
     configureServer(server: any) {
       // Helper: fetch from Supabase REST API
       const supabaseFetch = async (path: string) => {
-        const dotenv = await import("dotenv");
-        dotenv.config();
-        const url = process.env.VITE_SUPABASE_URL;
-        const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const url = env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        const key = env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         const response = await fetch(`${url}/rest/v1/${path}`, {
           headers: {
             apikey: key!,
@@ -446,10 +444,8 @@ function localCachePlugin() {
       // /api/cache/logos
       server.middlewares.use("/api/cache/logos", async (_req: any, res: any) => {
         try {
-          const dotenv = await import("dotenv");
-          dotenv.config();
-          const url = process.env.VITE_SUPABASE_URL;
-          const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+          const url = env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+          const key = env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
           const listUrl = `${url}/storage/v1/object/list/logos`;
           const response = await fetch(listUrl, {
@@ -506,12 +502,14 @@ function localCachePlugin() {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  plugins: [localCachePlugin(), localScraperPlugin(), localDiscoverPlugin(), localScrapeArticlePlugin(), localScrapeLinksPlugin(), react()],
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  return {
+    server: {
+      host: "::",
+      port: 8080,
+    },
+    plugins: [localCachePlugin(env), localScraperPlugin(), localDiscoverPlugin(), localScrapeArticlePlugin(), localScrapeLinksPlugin(), react()],
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
@@ -532,4 +530,5 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-}));
+  };
+});

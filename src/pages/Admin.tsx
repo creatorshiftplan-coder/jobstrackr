@@ -1542,6 +1542,9 @@ export default function Admin() {
   const [cleaningQueue, setCleaningQueue] = useState(false);
   const [runningMatcherId, setRunningMatcherId] = useState<string | null>(null);
   const [runningBroadcastId, setRunningBroadcastId] = useState<string | null>(null);
+  const [runningBatchMatcher, setRunningBatchMatcher] = useState<"job" | "update" | null>(null);
+  const [runningBatchBroadcast, setRunningBatchBroadcast] = useState<"job" | "update" | null>(null);
+  const [selectedDiagDate, setSelectedDiagDate] = useState<string>("");
 
   const fetchQueueStats = useCallback(async () => {
     setLoadingQueueStats(true);
@@ -1637,46 +1640,71 @@ export default function Admin() {
     }
   };
 
+  // Helper to run matcher for a single item (returns payload, throws on error)
+  const runMatcherItem = async (type: "job" | "update", item: any) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    let payload = {};
+    if (type === "job") {
+      payload = {
+        type: "job",
+        job_id: item.id,
+        title: item.title,
+        department: item.department,
+        location: item.location,
+        qualification: item.qualification,
+        vacancies_display: item.vacancies_display || (item.vacancies ? `${item.vacancies} Posts` : "Not Published"),
+        last_date_display: item.last_date_display || (item.last_date ? String(item.last_date) : "Check Website"),
+        slug: item.slug
+      };
+    } else {
+      payload = {
+        type: "exam_update",
+        update_id: item.id,
+        title: item.title,
+        category: item.category,
+        summary: item.summary
+      };
+    }
+
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-telegram-queue`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session?.access_token || ""}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const resData = await response.json();
+    if (!response.ok) throw new Error(resData.error || "Failed to trigger matcher");
+    return resData;
+  };
+
+  // Helper to run broadcast for a single item (returns payload, throws on error)
+  const runBroadcastItem = async (type: "job" | "update", item: any) => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    const payload = type === "job" ? { job: item } : { exam_update: item };
+
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-auto-post`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session?.access_token || ""}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const resData = await response.json();
+    if (!response.ok) throw new Error(resData.error || "Failed to broadcast");
+    return resData;
+  };
+
   const handleTriggerMatcher = async (type: "job" | "update", item: any) => {
     setRunningMatcherId(item.id);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      let payload = {};
-      if (type === "job") {
-        payload = {
-          type: "job",
-          job_id: item.id,
-          title: item.title,
-          department: item.department,
-          location: item.location,
-          qualification: item.qualification,
-          vacancies_display: item.vacancies_display || (item.vacancies ? `${item.vacancies} Posts` : "Not Published"),
-          last_date_display: item.last_date_display || (item.last_date ? String(item.last_date) : "Check Website"),
-          slug: item.slug
-        };
-      } else {
-        payload = {
-          type: "exam_update",
-          update_id: item.id,
-          title: item.title,
-          category: item.category,
-          summary: item.summary
-        };
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-telegram-queue`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session?.access_token || ""}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const resData = await response.json();
-      if (!response.ok) throw new Error(resData.error || "Failed to trigger matcher");
-
+      const resData = await runMatcherItem(type, item);
       toast({
         title: "Matching Completed",
         description: `Preferences matched. Queued new notifications: ${resData.sent || 0} sent/failed in this run.`,
@@ -1696,22 +1724,7 @@ export default function Admin() {
   const handleTriggerBroadcast = async (type: "job" | "update", item: any) => {
     setRunningBroadcastId(item.id);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const payload = type === "job" ? { job: item } : { exam_update: item };
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-auto-post`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session?.access_token || ""}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const resData = await response.json();
-      if (!response.ok) throw new Error(resData.error || "Failed to broadcast");
-
+      const resData = await runBroadcastItem(type, item);
       toast({
         title: "Broadcast Complete",
         description: `Successfully posted to ${resData.postedCount || 0}/${resData.totalCount || 0} channels.`,
@@ -1727,19 +1740,112 @@ export default function Admin() {
     }
   };
 
+  const handleTriggerAllMatchers = async (type: "job" | "update") => {
+    const items = type === "job" ? recentJobs : recentUpdates;
+    if (items.length === 0) return;
+
+    setRunningBatchMatcher(type);
+    let successCount = 0;
+    let failCount = 0;
+    let totalSent = 0;
+
+    try {
+      for (const item of items) {
+        setRunningMatcherId(item.id);
+        try {
+          const resData = await runMatcherItem(type, item);
+          successCount++;
+          totalSent += resData.sent || 0;
+        } catch (err: any) {
+          console.error(`Batch Matcher failed for ${item.title || item.id}:`, err);
+          failCount++;
+        }
+      }
+
+      toast({
+        title: "Batch Matching Completed",
+        description: `Successfully matched ${successCount}/${items.length} items. Total queued notifications: ${totalSent}.${failCount > 0 ? ` (${failCount} failed)` : ""}`,
+      });
+      fetchQueueStats();
+    } catch (err: any) {
+      toast({
+        title: "Batch Matching Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setRunningMatcherId(null);
+      setRunningBatchMatcher(null);
+    }
+  };
+
+  const handleTriggerAllBroadcasts = async (type: "job" | "update") => {
+    const items = type === "job" ? recentJobs : recentUpdates;
+    if (items.length === 0) return;
+
+    setRunningBatchBroadcast(type);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const item of items) {
+        setRunningBroadcastId(item.id);
+        try {
+          await runBroadcastItem(type, item);
+          successCount++;
+        } catch (err: any) {
+          console.error(`Batch Broadcast failed for ${item.title || item.id}:`, err);
+          failCount++;
+        }
+      }
+
+      toast({
+        title: "Batch Broadcast Completed",
+        description: `Successfully broadcasted ${successCount}/${items.length} items.${failCount > 0 ? ` (${failCount} failed)` : ""}`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Batch Broadcast Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setRunningBroadcastId(null);
+      setRunningBatchBroadcast(null);
+    }
+  };
+
   const recentJobs = useMemo(() => {
     if (!jobs) return [];
-    return [...jobs]
-      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-      .slice(0, 5);
-  }, [jobs]);
+    let list = [...jobs];
+    if (selectedDiagDate) {
+      list = list.filter(job => {
+        try {
+          return format(new Date(job.created_at), "yyyy-MM-dd") === selectedDiagDate;
+        } catch {
+          return false;
+        }
+      });
+    }
+    const sorted = list.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    return selectedDiagDate ? sorted : sorted.slice(0, 5);
+  }, [jobs, selectedDiagDate]);
 
   const recentUpdates = useMemo(() => {
     if (!rawTelegramExamUpdates) return [];
-    return [...rawTelegramExamUpdates]
-      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-      .slice(0, 5);
-  }, [rawTelegramExamUpdates]);
+    let list = [...rawTelegramExamUpdates];
+    if (selectedDiagDate) {
+      list = list.filter(update => {
+        try {
+          return format(new Date(update.created_at), "yyyy-MM-dd") === selectedDiagDate;
+        } catch {
+          return false;
+        }
+      });
+    }
+    const sorted = list.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    return selectedDiagDate ? sorted : sorted.slice(0, 5);
+  }, [rawTelegramExamUpdates, selectedDiagDate]);
 
   useEffect(() => {
     fetchTelegramLogs();
@@ -4860,7 +4966,7 @@ ${hashtagsStr}`;
           {/* Telegram Posting Tab */}
           <TabsContent value="telegram">
             <Tabs defaultValue="poster" className="space-y-4">
-              <TabsList className="grid w-full max-w-[600px] grid-cols-3">
+              <TabsList className="flex flex-col sm:grid w-full max-w-full sm:max-w-[600px] sm:grid-cols-3 h-auto sm:h-10 gap-1 sm:gap-0">
                 <TabsTrigger value="poster">Manual Poster</TabsTrigger>
                 <TabsTrigger value="history" onClick={fetchTelegramLogs}>Posting History & Status</TabsTrigger>
                 <TabsTrigger value="controls" onClick={fetchQueueStats}>Queue & Diagnostics</TabsTrigger>
@@ -5493,6 +5599,40 @@ ${hashtagsStr}`;
                   </Card>
                 </div>
 
+                {/* Date Filter Panel */}
+                <Card className="bg-card border-primary/20 shadow-sm overflow-hidden">
+                  <div className="bg-gradient-to-r from-primary/10 via-transparent to-transparent h-1.5 w-full" />
+                  <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                        <Filter className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-sm">Filter Operations by Upload Date</div>
+                        <p className="text-xs text-muted-foreground">Select a date to show and operate on jobs/updates uploaded on that day. Clear to see recent items.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="date"
+                        className="w-full sm:w-[200px] bg-background border-input"
+                        value={selectedDiagDate}
+                        onChange={(e) => setSelectedDiagDate(e.target.value)}
+                      />
+                      {selectedDiagDate && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
+                          onClick={() => setSelectedDiagDate("")}
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Queue Actions / Flush Controls */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <Card className="md:col-span-1">
@@ -5553,9 +5693,46 @@ ${hashtagsStr}`;
 
                   {/* Manual Broadcast / Matching triggering */}
                   <Card className="md:col-span-2">
-                    <CardHeader>
-                      <CardTitle className="text-md font-semibold">Recent Job Operations</CardTitle>
-                      <CardDescription>Manually trigger matching notifications or public channel broadcasts</CardDescription>
+                    <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-md font-semibold">Recent Job Operations</CardTitle>
+                        <CardDescription>
+                          {selectedDiagDate 
+                            ? `Showing all ${recentJobs.length} jobs uploaded on ${format(new Date(selectedDiagDate), "dd MMM yyyy")}`
+                            : "Manually trigger matching notifications or public channel broadcasts"
+                          }
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs gap-1"
+                          disabled={runningMatcherId !== null || runningBroadcastId !== null || runningBatchMatcher !== null || runningBatchBroadcast !== null || recentJobs.length === 0}
+                          onClick={() => handleTriggerAllMatchers("job")}
+                        >
+                          {runningBatchMatcher === "job" ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5 text-primary" />
+                          )}
+                          Match All
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs gap-1"
+                          disabled={runningMatcherId !== null || runningBroadcastId !== null || runningBatchMatcher !== null || runningBatchBroadcast !== null || recentJobs.length === 0}
+                          onClick={() => handleTriggerAllBroadcasts("job")}
+                        >
+                          {runningBatchBroadcast === "job" ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5 text-emerald-500" />
+                          )}
+                          Broadcast All
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent className="p-0">
                       {recentJobs.length === 0 ? (
@@ -5575,7 +5752,7 @@ ${hashtagsStr}`;
                                   size="sm"
                                   variant="outline"
                                   className="h-8 text-[11px] gap-1 px-2.5"
-                                  disabled={runningMatcherId !== null}
+                                  disabled={runningMatcherId !== null || runningBroadcastId !== null || runningBatchMatcher !== null || runningBatchBroadcast !== null}
                                   onClick={() => handleTriggerMatcher("job", job)}
                                 >
                                   {runningMatcherId === job.id ? (
@@ -5589,7 +5766,7 @@ ${hashtagsStr}`;
                                   size="sm"
                                   variant="outline"
                                   className="h-8 text-[11px] gap-1 px-2.5"
-                                  disabled={runningBroadcastId !== null}
+                                  disabled={runningMatcherId !== null || runningBroadcastId !== null || runningBatchMatcher !== null || runningBatchBroadcast !== null}
                                   onClick={() => handleTriggerBroadcast("job", job)}
                                 >
                                   {runningBroadcastId === job.id ? (
@@ -5611,9 +5788,46 @@ ${hashtagsStr}`;
                 {/* Recent Updates Controls */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <Card className="md:col-span-3">
-                    <CardHeader>
-                      <CardTitle className="text-md font-semibold">Recent Update Operations</CardTitle>
-                      <CardDescription>Manually trigger subscriber preference matching or public channel broadcasts for updates</CardDescription>
+                    <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-md font-semibold">Recent Update Operations</CardTitle>
+                        <CardDescription>
+                          {selectedDiagDate 
+                            ? `Showing all ${recentUpdates.length} updates uploaded on ${format(new Date(selectedDiagDate), "dd MMM yyyy")}`
+                            : "Manually trigger subscriber preference matching or public channel broadcasts for updates"
+                          }
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs gap-1"
+                          disabled={runningMatcherId !== null || runningBroadcastId !== null || runningBatchMatcher !== null || runningBatchBroadcast !== null || recentUpdates.length === 0}
+                          onClick={() => handleTriggerAllMatchers("update")}
+                        >
+                          {runningBatchMatcher === "update" ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5 text-primary" />
+                          )}
+                          Match All
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs gap-1"
+                          disabled={runningMatcherId !== null || runningBroadcastId !== null || runningBatchMatcher !== null || runningBatchBroadcast !== null || recentUpdates.length === 0}
+                          onClick={() => handleTriggerAllBroadcasts("update")}
+                        >
+                          {runningBatchBroadcast === "update" ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5 text-emerald-500" />
+                          )}
+                          Broadcast All
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent className="p-0">
                       {recentUpdates.length === 0 ? (
@@ -5633,7 +5847,7 @@ ${hashtagsStr}`;
                                   size="sm"
                                   variant="outline"
                                   className="h-8 text-[11px] gap-1 px-2.5"
-                                  disabled={runningMatcherId !== null}
+                                  disabled={runningMatcherId !== null || runningBroadcastId !== null || runningBatchMatcher !== null || runningBatchBroadcast !== null}
                                   onClick={() => handleTriggerMatcher("update", update)}
                                 >
                                   {runningMatcherId === update.id ? (
@@ -5647,7 +5861,7 @@ ${hashtagsStr}`;
                                   size="sm"
                                   variant="outline"
                                   className="h-8 text-[11px] gap-1 px-2.5"
-                                  disabled={runningBroadcastId !== null}
+                                  disabled={runningMatcherId !== null || runningBroadcastId !== null || runningBatchMatcher !== null || runningBatchBroadcast !== null}
                                   onClick={() => handleTriggerBroadcast("update", update)}
                                 >
                                   {runningBroadcastId === update.id ? (
@@ -5672,7 +5886,7 @@ ${hashtagsStr}`;
           {/* Facebook Posting Tab */}
           <TabsContent value="facebook">
             <Tabs defaultValue="poster" className="space-y-4">
-              <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+              <TabsList className="flex flex-col sm:grid w-full max-w-full sm:max-w-[400px] sm:grid-cols-2 h-auto sm:h-10 gap-1 sm:gap-0">
                 <TabsTrigger value="poster">Manual Poster</TabsTrigger>
                 <TabsTrigger value="history" onClick={fetchFacebookLogs}>Posting History & Status</TabsTrigger>
               </TabsList>
