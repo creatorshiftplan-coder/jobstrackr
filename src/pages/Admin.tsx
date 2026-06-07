@@ -5531,7 +5531,7 @@ ${hashtagsStr}`;
                         ) : (
                           <>
                             <Trash2 className="h-4 w-4" />
-                            Clear Logs (> 7 days)
+                            Clear Logs (&gt; 7 days)
                           </>
                         )}
                       </Button>
