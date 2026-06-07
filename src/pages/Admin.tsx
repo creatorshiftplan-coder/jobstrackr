@@ -1219,10 +1219,7 @@ export default function Admin() {
     }
   }, [fetchChannelStats]);
 
-  useEffect(() => {
-    fetchTelegramLogs();
-    fetchQueueStats();
-  }, [fetchTelegramLogs, fetchQueueStats]);
+
 
   const [sectorSearchQuery, setSectorSearchQuery] = useState("");
 
@@ -1743,6 +1740,11 @@ export default function Admin() {
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
       .slice(0, 5);
   }, [rawTelegramExamUpdates]);
+
+  useEffect(() => {
+    fetchTelegramLogs();
+    fetchQueueStats();
+  }, [fetchTelegramLogs, fetchQueueStats]);
 
   const handlePostToTelegram = async () => {
     const channel = telegramChannels.find(c => c.id === selectedTelegramChannelId);
