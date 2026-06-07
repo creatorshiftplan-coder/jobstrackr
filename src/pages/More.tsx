@@ -240,8 +240,8 @@ export default function More() {
               </Card>
             )}
 
-            {/* Dark Mode Card */}
-            <Card className="bg-white dark:bg-card border-border/50 shadow-md">
+            {/* Dark Mode Card (Desktop Only) */}
+            <Card className="hidden md:block bg-white dark:bg-card border-border/50 shadow-md">
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center flex-shrink-0">
@@ -264,12 +264,12 @@ export default function More() {
               </CardContent>
             </Card>
 
-            {/* Session Actions (Reset Password & Logout) */}
+            {/* Session Actions (Reset Password & Logout) (Desktop Only) */}
             {user && (
-              <div className="space-y-3 pt-2">
+              <div className="hidden md:block space-y-3 pt-2">
                 <Button
-                  variant="outline"
-                  className="w-full shadow-sm hover:bg-muted"
+                  variant="default"
+                  className="w-full bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 font-medium transition-colors shadow-sm"
                   onClick={handleResetPassword}
                 >
                   <Key className="mr-2 h-4 w-4" />
@@ -277,8 +277,8 @@ export default function More() {
                 </Button>
 
                 <Button
-                  variant="outline"
-                  className="w-full text-destructive hover:text-destructive hover:bg-destructive/5 shadow-sm"
+                  variant="default"
+                  className="w-full bg-destructive/5 hover:bg-destructive/10 text-destructive border border-destructive/20 font-medium transition-colors shadow-sm"
                   onClick={handleLogout}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
@@ -442,6 +442,32 @@ export default function More() {
                   </div>
                 )}
 
+                {/* Dark Mode Card (Mobile Only) */}
+                <div className="block md:hidden sm:col-span-2">
+                  <Card className="bg-white dark:bg-card border-border/50 shadow-md">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          {theme === "dark" ? (
+                            <Moon className="h-5 w-5 text-primary" />
+                          ) : (
+                            <Sun className="h-5 w-5 text-primary" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-foreground text-sm">Dark Mode</h4>
+                          <p className="text-xs text-muted-foreground">{theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}</p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={theme === "dark"}
+                        onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                        className="data-[state=checked]:bg-primary"
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+
               </div>
             </div>
 
@@ -464,6 +490,29 @@ export default function More() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Session Actions (Reset Password & Logout) (Mobile Only, Bottom of Page) */}
+            {user && (
+              <div className="block md:hidden space-y-3 pt-6 pb-2">
+                <Button
+                  variant="default"
+                  className="w-full bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 font-medium transition-colors shadow-sm"
+                  onClick={handleResetPassword}
+                >
+                  <Key className="mr-2 h-4 w-4" />
+                  Reset Password
+                </Button>
+
+                <Button
+                  variant="default"
+                  className="w-full bg-destructive/5 hover:bg-destructive/10 text-destructive border border-destructive/20 font-medium transition-colors shadow-sm"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
+              </div>
+            )}
 
           </div>
 
