@@ -364,6 +364,48 @@ const parseAgeLimit = (ageLimit?: string | null): { age_min: number; age_max: nu
   return { age_min: 18, age_max: 65 };
 };
 
+// Sanitize numeric fields to prevent database constraint/overflow errors
+const sanitizeJobRecord = (record: Record<string, any>) => {
+  const clean = { ...record };
+  if (clean.age_min !== undefined && clean.age_min !== null && clean.age_min !== "") {
+    const val = Number(clean.age_min);
+    clean.age_min = isNaN(val) ? null : Math.max(1, Math.min(100, val));
+  } else {
+    clean.age_min = null;
+  }
+
+  if (clean.age_max !== undefined && clean.age_max !== null && clean.age_max !== "") {
+    const val = Number(clean.age_max);
+    clean.age_max = isNaN(val) ? null : Math.max(1, Math.min(100, val));
+  } else {
+    clean.age_max = null;
+  }
+
+  if (clean.salary_min !== undefined && clean.salary_min !== null && clean.salary_min !== "") {
+    const val = Number(clean.salary_min);
+    clean.salary_min = isNaN(val) ? null : Math.max(0, val);
+  } else {
+    clean.salary_min = null;
+  }
+
+  if (clean.salary_max !== undefined && clean.salary_max !== null && clean.salary_max !== "") {
+    const val = Number(clean.salary_max);
+    clean.salary_max = isNaN(val) ? null : Math.max(0, val);
+  } else {
+    clean.salary_max = null;
+  }
+
+  if (clean.vacancies !== undefined && clean.vacancies !== null && clean.vacancies !== "") {
+    const val = Number(clean.vacancies);
+    clean.vacancies = isNaN(val) ? null : Math.max(0, Math.min(10000000, val));
+  } else {
+    clean.vacancies = null;
+  }
+
+  return clean;
+};
+
+
 // Calculate similarity score between two strings (0-100%)
 const calculateSimilarity = (str1: string, str2: string): number => {
   const s1 = str1.toLowerCase().trim();
@@ -3593,7 +3635,7 @@ ${hashtagsStr}`;
         return false;
       }
 
-      const { data: newJob, error } = await supabase.from("jobs").insert(jobRecord).select("id").single();
+      const { data: newJob, error } = await supabase.from("jobs").insert(sanitizeJobRecord(jobRecord)).select("id").single();
       if (error) throw error;
 
       setDiscoverSavedUrls(prev => new Set(prev).add(url));
@@ -3907,16 +3949,18 @@ ${hashtagsStr}`;
       // Insert new jobs and get their IDs
       if (newJobs.length > 0) {
         const cleanNewJobs = newJobs.map(({ isDuplicate, duplicateOf, matchType, similarityScore, ...job }) => job);
-        const { data: insertedJobs, error } = await supabase
-          .from("jobs")
-          .insert(cleanNewJobs)
-          .select("id");
-        if (error) throw error;
-        insertedCount = cleanNewJobs.length;
-
-        // Collect IDs for auto-verification
-        if (insertedJobs) {
-          newJobIds.push(...insertedJobs.map(j => j.id));
+        for (const job of cleanNewJobs) {
+          const { data, error } = await supabase
+            .from("jobs")
+            .insert(sanitizeJobRecord(job))
+            .select("id")
+            .single();
+          if (error) throw error;
+          if (data) {
+            newJobIds.push(data.id);
+          }
+          insertedCount++;
+          await new Promise(r => setTimeout(r, 500));
         }
       }
 
@@ -3925,7 +3969,7 @@ ${hashtagsStr}`;
         for (const dupJob of duplicateJobs) {
           const { isDuplicate, duplicateOf, matchType, similarityScore, ...jobData } = dupJob;
           if (duplicateOf) {
-            const { error } = await supabase.from("jobs").update(jobData).eq("id", duplicateOf);
+            const { error } = await supabase.from("jobs").update(sanitizeJobRecord(jobData)).eq("id", duplicateOf);
             if (error) throw error;
             updatedCount++;
           }
@@ -3942,7 +3986,7 @@ ${hashtagsStr}`;
             // Insert as new and get ID
             const { data: replacedJob, error } = await supabase
               .from("jobs")
-              .insert(jobData)
+              .insert(sanitizeJobRecord(jobData))
               .select("id")
               .single();
             if (error) throw error;
@@ -3952,6 +3996,7 @@ ${hashtagsStr}`;
             if (replacedJob?.id) {
               newJobIds.push(replacedJob.id);
             }
+            await new Promise(r => setTimeout(r, 500));
           }
         }
       }

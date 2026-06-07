@@ -1,6 +1,48 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+// Sanitize numeric fields to prevent database constraint/overflow errors
+const sanitizeJobRecord = (record: Record<string, any>) => {
+  const clean = { ...record };
+  if (clean.age_min !== undefined && clean.age_min !== null && clean.age_min !== "") {
+    const val = Number(clean.age_min);
+    clean.age_min = isNaN(val) ? null : Math.max(1, Math.min(100, val));
+  } else {
+    clean.age_min = null;
+  }
+
+  if (clean.age_max !== undefined && clean.age_max !== null && clean.age_max !== "") {
+    const val = Number(clean.age_max);
+    clean.age_max = isNaN(val) ? null : Math.max(1, Math.min(100, val));
+  } else {
+    clean.age_max = null;
+  }
+
+  if (clean.salary_min !== undefined && clean.salary_min !== null && clean.salary_min !== "") {
+    const val = Number(clean.salary_min);
+    clean.salary_min = isNaN(val) ? null : Math.max(0, val);
+  } else {
+    clean.salary_min = null;
+  }
+
+  if (clean.salary_max !== undefined && clean.salary_max !== null && clean.salary_max !== "") {
+    const val = Number(clean.salary_max);
+    clean.salary_max = isNaN(val) ? null : Math.max(0, val);
+  } else {
+    clean.salary_max = null;
+  }
+
+  if (clean.vacancies !== undefined && clean.vacancies !== null && clean.vacancies !== "") {
+    const val = Number(clean.vacancies);
+    clean.vacancies = isNaN(val) ? null : Math.max(0, Math.min(10000000, val));
+  } else {
+    clean.vacancies = null;
+  }
+
+  return clean;
+};
+
+
 interface JobFromDiscovery {
     title: string;
     company: string;
@@ -272,14 +314,24 @@ export function useAutoDiscover() {
                 };
             });
 
-            // Batch insert for better performance
-            const { data: insertedJobs, error } = await supabase
-                .from("jobs")
-                .insert(jobRecords)
-                .select("id");
-
-            if (error) throw error;
-            const insertedJobIds = insertedJobs?.map(j => j.id) || [];
+            // Sequential inserts with 500ms delay to prevent trigger storms and DB connection timeouts
+            const insertedJobs: { id: string }[] = [];
+            for (const job of jobRecords) {
+                const { data, error } = await supabase
+                    .from("jobs")
+                    .insert(sanitizeJobRecord(job))
+                    .select("id")
+                    .single();
+                if (error) {
+                    console.error("AutoDiscover insert failed for job:", job.title, error);
+                    continue;
+                }
+                if (data) {
+                    insertedJobs.push(data);
+                }
+                await new Promise(r => setTimeout(r, 500));
+            }
+            const insertedJobIds = insertedJobs.map(j => j.id);
 
             // Trigger auto-verification with staggered delays (2s between each)
             const { data: { session } } = await supabase.auth.getSession();
