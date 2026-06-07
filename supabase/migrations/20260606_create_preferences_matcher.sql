@@ -1,20 +1,42 @@
 -- Migration: Preferences matching triggers and queue trigger logic
 -- ==============================================================================
 
+-- Add teaching, judiciary, and stenographer preference columns to notification_preferences table if it exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'notification_preferences') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_preferences' AND column_name='teaching') THEN
+      ALTER TABLE public.notification_preferences ADD COLUMN teaching BOOLEAN DEFAULT FALSE NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_preferences' AND column_name='judiciary') THEN
+      ALTER TABLE public.notification_preferences ADD COLUMN judiciary BOOLEAN DEFAULT FALSE NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_preferences' AND column_name='stenographer') THEN
+      ALTER TABLE public.notification_preferences ADD COLUMN stenographer BOOLEAN DEFAULT FALSE NOT NULL;
+    END IF;
+  END IF;
+END $$;
+
 -- 1. Helper function to queue notification processing
 CREATE OR REPLACE FUNCTION public.invoke_telegram_queue_processor()
 RETURNS void AS $$
+DECLARE
+  supabase_url TEXT;
+  service_role_key TEXT;
 BEGIN
-  PERFORM net.http_post(
-    url := (SELECT CONCAT(decrypted_secret, '/functions/v1/process-telegram-queue')
-            FROM vault.decrypted_secrets
-            WHERE name = 'supabase_url'),
-    headers := jsonb_build_object(
-        'Authorization', CONCAT('Bearer ', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key')),
-        'Content-Type', 'application/json'
-    ),
-    body := '{}'::jsonb
-  );
+  SELECT decrypted_secret INTO supabase_url FROM vault.decrypted_secrets WHERE name = 'supabase_url';
+  SELECT decrypted_secret INTO service_role_key FROM vault.decrypted_secrets WHERE name = 'service_role_key';
+
+  IF supabase_url IS NOT NULL AND service_role_key IS NOT NULL THEN
+    PERFORM net.http_post(
+      url := CONCAT(supabase_url, '/functions/v1/process-telegram-queue'),
+      headers := jsonb_build_object(
+          'Authorization', CONCAT('Bearer ', service_role_key),
+          'Content-Type', 'application/json'
+      ),
+      body := '{}'::jsonb
+    );
+  END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -22,7 +44,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.process_job_notification_trigger()
 RETURNS TRIGGER AS $$
 DECLARE
-  pref RECORD;
+  pref_row RECORD;
   msg TEXT;
   job_url TEXT;
   vacancies_str TEXT;
@@ -64,7 +86,7 @@ BEGIN
   date_esc  := replace(replace(replace(last_date_str, '&', '&amp;'), '<', '&lt;'), '>', '&gt;');
 
   -- Loop through active telegram connections and check preference matches
-  FOR pref IN 
+  FOR pref_row IN 
     SELECT conn.telegram_chat_id, pref.* 
     FROM public.telegram_connections conn
     JOIN public.notification_preferences pref ON conn.user_id = pref.user_id
@@ -72,19 +94,22 @@ BEGIN
   LOOP
     -- 1. Category matching
     IF (
-      (pref.ssc AND (val LIKE '%ssc%' OR val LIKE '%staff selection%')) OR
-      (pref.upsc AND (val LIKE '%upsc%' OR val LIKE '%union public%')) OR
-      (pref.railway AND (val LIKE '%railway%' OR val LIKE '%rrb%')) OR
-      (pref.banking AND (val LIKE '%bank%' OR val LIKE '%ibps%' OR val LIKE '%sbi%')) OR
-      (pref.defence AND (val LIKE '%defence%' OR val LIKE '%army%' OR val LIKE '%navy%' OR val LIKE '%police%' OR val LIKE '%constable%' OR val LIKE '%military%' OR val LIKE '%bsf%' OR val LIKE '%crpf%' OR val LIKE '%cisf%')) OR
-      (pref.psu AND (val LIKE '%psu%' OR val LIKE '%ongc%' OR val LIKE '%ntpc%' OR val LIKE '%sail%' OR val LIKE '%bhel%' OR val LIKE '%iocl%' OR val LIKE '%gail%')) OR
-      (pref.state_psc AND (val LIKE '%psc%' OR val LIKE '%public service commission%')) OR
-      (pref.healthcare AND (val LIKE '%healthcare%' OR val LIKE '%medical%' OR val LIKE '%nurse%' OR val LIKE '%doctor%' OR val LIKE '%health%'))
+      (pref_row.ssc AND (val LIKE '%ssc%' OR val LIKE '%staff selection%')) OR
+      (pref_row.upsc AND (val LIKE '%upsc%' OR val LIKE '%union public%')) OR
+      (pref_row.railway AND (val LIKE '%railway%' OR val LIKE '%rrb%')) OR
+      (pref_row.banking AND (val LIKE '%bank%' OR val LIKE '%ibps%' OR val LIKE '%sbi%')) OR
+      (pref_row.defence AND (val LIKE '%defence%' OR val LIKE '%army%' OR val LIKE '%navy%' OR val LIKE '%police%' OR val LIKE '%constable%' OR val LIKE '%military%' OR val LIKE '%bsf%' OR val LIKE '%crpf%' OR val LIKE '%cisf%')) OR
+      (pref_row.psu AND (val LIKE '%psu%' OR val LIKE '%ongc%' OR val LIKE '%ntpc%' OR val LIKE '%sail%' OR val LIKE '%bhel%' OR val LIKE '%iocl%' OR val LIKE '%gail%')) OR
+      (pref_row.state_psc AND (val LIKE '%psc%' OR val LIKE '%public service commission%')) OR
+      (pref_row.healthcare AND (val LIKE '%healthcare%' OR val LIKE '%medical%' OR val LIKE '%nurse%' OR val LIKE '%doctor%' OR val LIKE '%health%')) OR
+      (pref_row.teaching AND (val LIKE '%kvs%' OR val LIKE '%kendriya vidyalaya%' OR val LIKE '%nvs%' OR val LIKE '%navodaya vidyalaya%' OR val LIKE '%ctet%' OR val LIKE '%tet%' OR val LIKE '%ugc net%' OR val LIKE '%assistant professor%' OR val LIKE '%associate professor%' OR val LIKE '%lecturer%' OR val LIKE '%prt%' OR val LIKE '%tgt%' OR val LIKE '%pgt%')) OR
+      (pref_row.judiciary AND (val LIKE '%supreme court%' OR val LIKE '%high court%' OR val LIKE '%district court%' OR val LIKE '%law clerk%' OR val LIKE '%judicial assistant%' OR val LIKE '%court master%')) OR
+      (pref_row.stenographer AND (val LIKE '%stenographer%' OR val LIKE '%steno%' OR val LIKE '%stenographer grade c%' OR val LIKE '%stenographer grade d%' OR val LIKE '%junior stenographer%' OR val LIKE '%senior stenographer%' OR val LIKE '%hindi stenographer%' OR val LIKE '%english stenographer%' OR val LIKE '%personal assistant%' OR val LIKE '%pa%' OR val LIKE '%personal secretary%' OR val LIKE '%ps%' OR val LIKE '%court stenographer%' OR val LIKE '%steno typist%' OR val LIKE '%steno-typist%' OR val LIKE '%stenographer recruitment%'))
     ) THEN
       -- 2. Location/State matching (Allow All India, empty state pref, literal match, or checking that location has no other state)
       IF (
-        'All India' = ANY(pref.preferred_states) OR
-        cardinality(pref.preferred_states) = 0 OR
+        'All India' = ANY(pref_row.preferred_states) OR
+        cardinality(pref_row.preferred_states) = 0 OR
         LOWER(NEW.location) LIKE '%all india%' OR 
         LOWER(NEW.location) LIKE '%across india%' OR 
         LOWER(NEW.location) LIKE '%pan india%' OR 
@@ -93,25 +118,25 @@ BEGIN
         LOWER(NEW.location) LIKE '%nationwide%' OR
         EXISTS (
           SELECT 1 
-          FROM unnest(pref.preferred_states) AS s
+          FROM unnest(pref_row.preferred_states) AS s
           WHERE POSITION(LOWER(s) IN LOWER(NEW.location)) > 0 OR POSITION(LOWER(NEW.location) IN LOWER(s)) > 0
         ) OR
         NOT EXISTS (
           SELECT 1 FROM unnest(ARRAY['Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Andaman and Nicobar', 'Chandigarh', 'Dadra and Nagar', 'Daman and Diu', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry']) AS other_state
           WHERE (POSITION(LOWER(other_state) IN LOWER(NEW.location)) > 0 OR POSITION(LOWER(NEW.location) IN LOWER(other_state)) > 0)
-            AND NOT (other_state = ANY(pref.preferred_states))
+            AND NOT (other_state = ANY(pref_row.preferred_states))
         )
       ) THEN
         -- 3. Qualification matching (Hierarchical check based on user checked boxes)
         IF (
           NEW.qualification IS NULL OR
           job_level = 0.0 OR
-          (job_level = 5.0 AND pref.postgraduate) OR
-          (job_level = 4.0 AND pref.graduate) OR
-          (job_level = 3.5 AND (pref.graduate OR pref.twelfth_pass)) OR
-          (job_level = 3.0 AND pref.twelfth_pass) OR
-          (job_level = 2.0 AND pref.tenth_pass) OR
-          (job_level = 1.0 AND pref.tenth_pass)
+          (job_level = 5.0 AND pref_row.postgraduate) OR
+          (job_level = 4.0 AND pref_row.graduate) OR
+          (job_level = 3.5 AND (pref_row.graduate OR pref_row.twelfth_pass)) OR
+          (job_level = 3.0 AND pref_row.twelfth_pass) OR
+          (job_level = 2.0 AND pref_row.tenth_pass) OR
+          (job_level = 1.0 AND pref_row.tenth_pass)
         ) THEN
           -- Build HTML message
           msg := CONCAT(
@@ -125,9 +150,17 @@ BEGIN
             '🔗 <b><a href="', job_url, '">View Details on Website</a></b>'
           );
           
-          -- Queue notification
-          INSERT INTO public.telegram_notifications_queue (user_id, telegram_chat_id, job_id, message_text)
-          VALUES (pref.user_id, pref.telegram_chat_id, NEW.id, msg);
+          -- Check if already queued to this user to prevent duplicates
+          IF NOT EXISTS (
+            SELECT 1 
+            FROM public.telegram_notifications_queue 
+            WHERE telegram_chat_id = pref_row.telegram_chat_id 
+              AND job_id = NEW.id
+          ) THEN
+            -- Queue notification
+            INSERT INTO public.telegram_notifications_queue (user_id, telegram_chat_id, job_id, message_text)
+            VALUES (pref_row.user_id, pref_row.telegram_chat_id, NEW.id, msg);
+          END IF;
         END IF;
       END IF;
     END IF;
@@ -149,7 +182,7 @@ CREATE TRIGGER on_job_inserted_queue
 CREATE OR REPLACE FUNCTION public.process_exam_update_notification_trigger()
 RETURNS TRIGGER AS $$
 DECLARE
-  pref RECORD;
+  pref_row RECORD;
   msg TEXT;
   update_url TEXT;
   alert_title TEXT;
@@ -179,41 +212,44 @@ BEGIN
   sum_esc   := replace(replace(replace(COALESCE(NEW.summary, 'New update published.'), '&', '&amp;'), '<', '&lt;'), '>', '&gt;');
 
   -- Loop through active telegram connections and check matches
-  FOR pref IN 
+  FOR pref_row IN 
     SELECT conn.telegram_chat_id, pref.* 
     FROM public.telegram_connections conn
     JOIN public.notification_preferences pref ON conn.user_id = pref.user_id
     WHERE conn.is_active = TRUE
   LOOP
     -- Category alert enabled check
-    IF (NEW.category = 'admit_card' AND pref.admit_card_notifications = TRUE) OR
-       (NEW.category = 'result' AND pref.result_notifications = TRUE) OR
-       (NEW.category = 'answer_key' AND pref.answer_key_notifications = TRUE) THEN
+    IF (NEW.category = 'admit_card' AND pref_row.admit_card_notifications = TRUE) OR
+       (NEW.category = 'result' AND pref_row.result_notifications = TRUE) OR
+       (NEW.category = 'answer_key' AND pref_row.answer_key_notifications = TRUE) THEN
        
       -- Category text match (SSC, UPSC, etc.)
       category_match := (
-        (pref.ssc AND (val LIKE '%ssc%' OR val LIKE '%staff selection%')) OR
-        (pref.upsc AND (val LIKE '%upsc%' OR val LIKE '%union public%')) OR
-        (pref.railway AND (val LIKE '%railway%' OR val LIKE '%rrb%')) OR
-        (pref.banking AND (val LIKE '%bank%' OR val LIKE '%ibps%' OR val LIKE '%sbi%')) OR
-        (pref.defence AND (val LIKE '%defence%' OR val LIKE '%army%' OR val LIKE '%navy%' OR val LIKE '%police%' OR val LIKE '%constable%' OR val LIKE '%military%' OR val LIKE '%bsf%' OR val LIKE '%crpf%' OR val LIKE '%cisf%')) OR
-        (pref.psu AND (val LIKE '%psu%' OR val LIKE '%ongc%' OR val LIKE '%ntpc%' OR val LIKE '%sail%' OR val LIKE '%bhel%' OR val LIKE '%iocl%' OR val LIKE '%gail%')) OR
-        (pref.state_psc AND (val LIKE '%psc%' OR val LIKE '%public service commission%')) OR
-        (pref.healthcare AND (val LIKE '%healthcare%' OR val LIKE '%medical%' OR val LIKE '%nurse%' OR val LIKE '%doctor%' OR val LIKE '%health%'))
+        (pref_row.ssc AND (val LIKE '%ssc%' OR val LIKE '%staff selection%')) OR
+        (pref_row.upsc AND (val LIKE '%upsc%' OR val LIKE '%union public%')) OR
+        (pref_row.railway AND (val LIKE '%railway%' OR val LIKE '%rrb%')) OR
+        (pref_row.banking AND (val LIKE '%bank%' OR val LIKE '%ibps%' OR val LIKE '%sbi%')) OR
+        (pref_row.defence AND (val LIKE '%defence%' OR val LIKE '%army%' OR val LIKE '%navy%' OR val LIKE '%police%' OR val LIKE '%constable%' OR val LIKE '%military%' OR val LIKE '%bsf%' OR val LIKE '%crpf%' OR val LIKE '%cisf%')) OR
+        (pref_row.psu AND (val LIKE '%psu%' OR val LIKE '%ongc%' OR val LIKE '%ntpc%' OR val LIKE '%sail%' OR val LIKE '%bhel%' OR val LIKE '%iocl%' OR val LIKE '%gail%')) OR
+        (pref_row.state_psc AND (val LIKE '%psc%' OR val LIKE '%public service commission%')) OR
+        (pref_row.healthcare AND (val LIKE '%healthcare%' OR val LIKE '%medical%' OR val LIKE '%nurse%' OR val LIKE '%doctor%' OR val LIKE '%health%')) OR
+        (pref_row.teaching AND (val LIKE '%kvs%' OR val LIKE '%kendriya vidyalaya%' OR val LIKE '%nvs%' OR val LIKE '%navodaya vidyalaya%' OR val LIKE '%ctet%' OR val LIKE '%tet%' OR val LIKE '%ugc net%' OR val LIKE '%assistant professor%' OR val LIKE '%associate professor%' OR val LIKE '%lecturer%' OR val LIKE '%prt%' OR val LIKE '%tgt%' OR val LIKE '%pgt%')) OR
+        (pref_row.judiciary AND (val LIKE '%supreme court%' OR val LIKE '%high court%' OR val LIKE '%district court%' OR val LIKE '%law clerk%' OR val LIKE '%judicial assistant%' OR val LIKE '%court master%')) OR
+        (pref_row.stenographer AND (val LIKE '%stenographer%' OR val LIKE '%steno%' OR val LIKE '%stenographer grade c%' OR val LIKE '%stenographer grade d%' OR val LIKE '%junior stenographer%' OR val LIKE '%senior stenographer%' OR val LIKE '%hindi stenographer%' OR val LIKE '%english stenographer%' OR val LIKE '%personal assistant%' OR val LIKE '%pa%' OR val LIKE '%personal secretary%' OR val LIKE '%ps%' OR val LIKE '%court stenographer%' OR val LIKE '%steno typist%' OR val LIKE '%steno-typist%' OR val LIKE '%stenographer recruitment%'))
       );
       
       -- Send notification if category matches or user follows All India updates
-      IF category_match OR 'All India' = ANY(pref.preferred_states) OR cardinality(pref.preferred_states) = 0 THEN
+      IF category_match OR 'All India' = ANY(pref_row.preferred_states) OR cardinality(pref_row.preferred_states) = 0 THEN
         
         -- State location match in title
-        IF 'All India' = ANY(pref.preferred_states) OR cardinality(pref.preferred_states) = 0 OR EXISTS (
+        IF 'All India' = ANY(pref_row.preferred_states) OR cardinality(pref_row.preferred_states) = 0 OR EXISTS (
           SELECT 1 
-          FROM unnest(pref.preferred_states) AS s
+          FROM unnest(pref_row.preferred_states) AS s
           WHERE POSITION(LOWER(s) IN LOWER(NEW.title)) > 0
         ) OR NOT EXISTS (
           SELECT 1 FROM unnest(ARRAY['Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Andaman and Nicobar', 'Chandigarh', 'Dadra and Nagar', 'Daman and Diu', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry']) AS other_state
           WHERE POSITION(LOWER(other_state) IN LOWER(NEW.title)) > 0
-            AND NOT (other_state = ANY(pref.preferred_states))
+            AND NOT (other_state = ANY(pref_row.preferred_states))
         ) THEN
           -- Build message
           msg := CONCAT(
@@ -223,9 +259,17 @@ BEGIN
             '🔗 <b><a href="', update_url, '">View Details on Website</a></b>'
           );
           
-          -- Queue notification
-          INSERT INTO public.telegram_notifications_queue (user_id, telegram_chat_id, update_id, message_text)
-          VALUES (pref.user_id, pref.telegram_chat_id, NEW.id, msg);
+          -- Check if already queued to this user to prevent duplicates
+          IF NOT EXISTS (
+            SELECT 1 
+            FROM public.telegram_notifications_queue 
+            WHERE telegram_chat_id = pref_row.telegram_chat_id 
+              AND update_id = NEW.id
+          ) THEN
+            -- Queue notification
+            INSERT INTO public.telegram_notifications_queue (user_id, telegram_chat_id, update_id, message_text)
+            VALUES (pref_row.user_id, pref_row.telegram_chat_id, NEW.id, msg);
+          END IF;
         END IF;
       END IF;
     END IF;

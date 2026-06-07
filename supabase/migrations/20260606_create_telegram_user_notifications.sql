@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS public.notification_preferences (
     psu BOOLEAN DEFAULT FALSE NOT NULL,
     state_psc BOOLEAN DEFAULT FALSE NOT NULL,
     healthcare BOOLEAN DEFAULT FALSE NOT NULL,
+    teaching BOOLEAN DEFAULT FALSE NOT NULL,
+    judiciary BOOLEAN DEFAULT FALSE NOT NULL,
+    stenographer BOOLEAN DEFAULT FALSE NOT NULL,
     
     -- Alert Types
     job_notifications BOOLEAN DEFAULT TRUE NOT NULL,

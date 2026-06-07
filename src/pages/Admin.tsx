@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminRole } from "@/hooks/useAdminRole";
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square, ChevronLeft, ChevronRight, Send, Terminal } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square, ChevronLeft, ChevronRight, Send, Terminal, Facebook } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAllExamUpdates } from "@/hooks/useExamUpdates";
 import { inferCategory } from "@/lib/jobUtils";
@@ -526,6 +526,99 @@ const getJobDeadlineDate = (job: any): Date | null => {
   return parseJobDeadline(job.last_date);
 };
 
+const matchTagFilter = (title: string, tag: string): boolean => {
+  if (!title) return false;
+  const t = title.toLowerCase();
+  
+  switch (tag.toLowerCase()) {
+    case "all jobs":
+      return true;
+      
+    case "ssc":
+      return /\bssc\b/i.test(title);
+      
+    case "railway jobs":
+      const railwayTerms = [
+        "rrb", "rrc", "railway recruitment board", "railway recruitment cell", 
+        "ntpc", "group d", "alp", "assistant loco pilot", "rpf", 
+        "railway protection force", "rrb je", "railway apprentice"
+      ];
+      return railwayTerms.some(term => t.includes(term));
+      
+    case "banking jobs":
+      const bankingTerms = [
+        "ibps", "sbi", "rbi", "nabard", "sidbi", "ecgc", "niacl", "uiic", 
+        "bank of baroda", "bank of india", "punjab national bank", 
+        "canara bank", "indian bank", "central bank of india"
+      ];
+      return bankingTerms.some(term => t.includes(term));
+      
+    case "upsc":
+      return /\bupsc\b/i.test(title);
+      
+    case "defence jobs":
+      const defenceTerms = [
+        "agniveer", "agnipath", "afcat", "indian army", "indian navy", 
+        "indian air force", "coast guard", "navik", "yantrik", "tes", 
+        "ssc tech", "military nursing service", "mns", "delhi police", 
+        "kolkata police", "west bengal police", "up police", "bihar police", 
+        "crpf", "bsf", "cisf", "itbp", "ssb", "assam rifles"
+      ];
+      return defenceTerms.some(term => t.includes(term));
+      
+    case "psu":
+      const psuTerms = [
+        "ongc", "ntpc", "bhel", "iocl", "hpcl", "bpcl", "gail", "sail", 
+        "powergrid", "bel", "hal", "cil", "coal india", "npcil", "drdo", 
+        "isro", "nlc"
+      ];
+      return psuTerms.some(term => t.includes(term));
+      
+    case "state psc":
+      const statePscTerms = [
+        "wbpsc", "uppsc", "bpsc", "mpsc", "rpsc", "tnpsc", "opsc", "gpsc", 
+        "kpsc", "appsc", "tspsc", "mppsc", "ukpsc", "hpsc", "jkpsc"
+      ];
+      return statePscTerms.some(term => t.includes(term)) && !/\bupsc\b/i.test(title);
+      
+    case "healthcare":
+      const healthcareTerms = [
+        "aiims", "esic", "nhm", "national health mission", "cho", 
+        "community health officer", "nursing officer", "staff nurse", 
+        "anm", "gnm", "medical officer", "pharmacist", "lab technician"
+      ];
+      return healthcareTerms.some(term => t.includes(term));
+      
+    case "teaching":
+      const teachingTerms = [
+        "kvs", "kendriya vidyalaya", "nvs", "navodaya vidyalaya", "ctet", 
+        "tet", "ugc net", "assistant professor", "associate professor", 
+        "lecturer", "prt", "tgt", "pgt"
+      ];
+      return teachingTerms.some(term => t.includes(term));
+      
+    case "judiciary":
+      const judiciaryTerms = [
+        "supreme court", "high court", "district court", "law clerk", 
+        "judicial assistant", "court master"
+      ];
+      return judiciaryTerms.some(term => t.includes(term));
+      
+    case "stenographer":
+      const stenographerTerms = [
+        "stenographer", "steno", "stenographer grade c", "stenographer grade d", 
+        "junior stenographer", "senior stenographer", "hindi stenographer", 
+        "english stenographer", "personal assistant", "pa", "personal secretary", 
+        "ps", "court stenographer", "steno typist", "steno-typist", 
+        "stenographer recruitment"
+      ];
+      return stenographerTerms.some(term => t.includes(term));
+      
+    default:
+      return true;
+  }
+};
+
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, isFullAdmin, isLoading: roleLoading } = useAdminRole();
@@ -966,6 +1059,7 @@ export default function Admin() {
 
   // Telegram Posting states
   const [selectedTelegramSector, setSelectedTelegramSector] = useState<string>("All Jobs");
+  const [selectedTelegramTag, setSelectedTelegramTag] = useState<string>("All Jobs");
   const [telegramSourceType, setTelegramSourceType] = useState<"jobs" | "updates">("jobs");
   const [selectedTelegramChannelId, setSelectedTelegramChannelId] = useState<string>("");
   const [selectedTelegramJobIds, setSelectedTelegramJobIds] = useState<string[]>([]);
@@ -1309,12 +1403,25 @@ export default function Admin() {
     }
   };
 
+  const handleTelegramTagSelect = (tag: string) => {
+    setSelectedTelegramTag(tag);
+    setSelectedTelegramJobIds([]);
+    setSelectedTelegramUpdateIds([]);
+    if (tag !== "All Jobs") {
+      setSelectedTelegramSector("All Jobs");
+    }
+  };
+
   const activeJobsForTelegram = useMemo(() => {
     if (!jobs) return [];
     
     const filtered = jobs.filter(job => {
       const lastDate = getJobDeadlineDate(job);
       if (lastDate && lastDate < new Date()) return false;
+      
+      if (selectedTelegramTag !== "All Jobs") {
+        return matchTagFilter(job.title, selectedTelegramTag);
+      }
       
       const textToSearch = `${job.title} ${job.department} ${job.qualification} ${job.description || ""}`.toLowerCase();
       const sector = selectedTelegramSector.toLowerCase();
@@ -1355,7 +1462,7 @@ export default function Admin() {
       }
       return telegramSortDirection === "asc" ? comparison : -comparison;
     });
-  }, [jobs, selectedTelegramSector, telegramSortField, telegramSortDirection]);
+  }, [jobs, selectedTelegramSector, selectedTelegramTag, telegramSortField, telegramSortDirection]);
 
   const { data: rawTelegramExamUpdates, isLoading: telegramUpdatesLoading } = useAllExamUpdates();
 
@@ -1363,6 +1470,10 @@ export default function Admin() {
     if (!rawTelegramExamUpdates) return [];
     
     return rawTelegramExamUpdates.filter(update => {
+      if (selectedTelegramTag !== "All Jobs") {
+        return matchTagFilter(update.title, selectedTelegramTag);
+      }
+      
       const textToSearch = `${update.title} ${update.category} ${update.status || ""} ${update.summary || ""}`.toLowerCase();
       const sector = selectedTelegramSector.toLowerCase();
       
@@ -1382,7 +1493,7 @@ export default function Admin() {
       
       return textToSearch.includes(sector);
     });
-  }, [rawTelegramExamUpdates, selectedTelegramSector]);
+  }, [rawTelegramExamUpdates, selectedTelegramSector, selectedTelegramTag]);
 
   const handlePostToTelegram = async () => {
     const channel = telegramChannels.find(c => c.id === selectedTelegramChannelId);
@@ -1446,6 +1557,9 @@ export default function Admin() {
           else if (titleLower.includes("bank") || deptLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
           else if (titleLower.includes("police") || deptLower.includes("police")) hashtags.unshift("#Police");
           else if (titleLower.includes("defence") || titleLower.includes("army") || titleLower.includes("navy") || titleLower.includes("air force")) hashtags.unshift("#Defence");
+          else if (titleLower.includes("teacher") || titleLower.includes("teaching")) hashtags.unshift("#TeachingJobs");
+          else if (titleLower.includes("court") || titleLower.includes("judic")) hashtags.unshift("#Judiciary");
+          else if (titleLower.includes("steno")) hashtags.unshift("#Stenographer");
           const hashtagsStr = hashtags.join(" ");
 
           messageText = `
@@ -1867,6 +1981,825 @@ ${updateLink}
 
 ${hashtagsStr}`;
       }
+    }
+  };
+
+  // Facebook Posting states
+  const [selectedFacebookSector, setSelectedFacebookSector] = useState<string>("All Jobs");
+  const [selectedFacebookTag, setSelectedFacebookTag] = useState<string>("All Jobs");
+  const [facebookSourceType, setFacebookSourceType] = useState<"jobs" | "updates">("jobs");
+  const [selectedFacebookPageId, setSelectedFacebookPageId] = useState<string>("");
+  const [selectedFacebookJobIds, setSelectedFacebookJobIds] = useState<string[]>([]);
+  const [selectedFacebookUpdateIds, setSelectedFacebookUpdateIds] = useState<string[]>([]);
+  const [postingToFacebook, setPostingToFacebook] = useState<boolean>(false);
+  const [showFacebookAddPageDialog, setShowFacebookAddPageDialog] = useState<boolean>(false);
+  const [facebookSortField, setFacebookSortField] = useState<"vacancies" | "last_date" | "created_at" | null>("created_at");
+  const [facebookSortDirection, setFacebookSortDirection] = useState<"asc" | "desc">("desc");
+  const [facebookConsoleLogs, setFacebookConsoleLogs] = useState<string[]>([]);
+  const facebookConsoleBottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll the Facebook console to the bottom when new logs are added
+  useEffect(() => {
+    if (facebookConsoleBottomRef.current) {
+      facebookConsoleBottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [facebookConsoleLogs]);
+
+  interface FacebookPage {
+    id: string;
+    name: string;
+    access_token: string;
+    page_id: string;
+    sector: string;
+  }
+
+  interface FacebookSentJobLog {
+    id: string;
+    sent_at: string;
+    status: string;
+    error_message: string | null;
+    page_id: string;
+    job_id: string | null;
+    update_id: string | null;
+    facebook_pages: {
+      name: string;
+      sector: string;
+      page_id: string;
+    } | null;
+    jobs: {
+      title: string;
+      department: string;
+    } | null;
+    exam_updates: {
+      title: string;
+    } | null;
+  }
+
+  const [facebookPages, setFacebookPages] = useState<FacebookPage[]>([]);
+  const [newFacebookPageForm, setNewFacebookPageForm] = useState({
+    name: "",
+    access_token: "",
+    page_id: "",
+    sector: "All Jobs"
+  });
+
+  const [facebookLogs, setFacebookLogs] = useState<FacebookSentJobLog[]>([]);
+  const [loadingFacebookLogs, setLoadingFacebookLogs] = useState(false);
+  const [facebookPageStats, setFacebookPageStats] = useState<Record<string, { total: number; lastSent: string | null; lastTitle: string | null; lastStatus: string | null }>>({});
+
+  const fetchFacebookPageStats = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("facebook_sent_jobs")
+        .select(`
+          page_id,
+          status,
+          sent_at,
+          jobs (title),
+          exam_updates (title)
+        `)
+        .order("sent_at", { ascending: false });
+
+      if (error) throw error;
+
+      const stats: Record<string, { total: number; lastSent: string | null; lastTitle: string | null; lastStatus: string | null }> = {};
+      
+      data?.forEach((item: any) => {
+        const pId = item.page_id;
+        if (!stats[pId]) {
+          stats[pId] = { total: 0, lastSent: null, lastTitle: null, lastStatus: null };
+        }
+        
+        if (item.status === "success") {
+          stats[pId].total += 1;
+          if (!stats[pId].lastSent) {
+            stats[pId].lastSent = item.sent_at;
+            stats[pId].lastTitle = item.jobs?.title || item.exam_updates?.title || "Unknown Item";
+            stats[pId].lastStatus = "success";
+          }
+        } else if (!stats[pId].lastSent) {
+          stats[pId].lastSent = item.sent_at;
+          stats[pId].lastTitle = item.jobs?.title || item.exam_updates?.title || "Unknown Item";
+          stats[pId].lastStatus = item.status;
+        }
+      });
+      
+      setFacebookPageStats(stats);
+    } catch (err) {
+      console.error("Failed to fetch facebook page stats:", err);
+    }
+  }, []);
+
+  const fetchFacebookLogs = useCallback(async () => {
+    setLoadingFacebookLogs(true);
+    try {
+      const { data, error } = await supabase
+        .from("facebook_sent_jobs")
+        .select(`
+          id,
+          sent_at,
+          status,
+          error_message,
+          page_id,
+          job_id,
+          update_id,
+          facebook_pages (name, sector, page_id),
+          jobs (title, department),
+          exam_updates (title)
+        `)
+        .order("sent_at", { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setFacebookLogs((data as any) || []);
+      await fetchFacebookPageStats();
+    } catch (err: any) {
+      console.error("Failed to fetch Facebook logs:", err);
+    } finally {
+      setLoadingFacebookLogs(false);
+    }
+  }, [fetchFacebookPageStats]);
+
+  // Fetch Facebook pages from database on mount (with localStorage fallback)
+  const fetchFacebookPages = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("facebook_pages")
+        .select("*")
+        .order("created_at", { ascending: true });
+      
+      if (error) throw error;
+      
+      if (data) {
+        setFacebookPages(data);
+        localStorage.setItem("jobstrackr:facebook_pages", JSON.stringify(data));
+        if (data.length > 0 && !selectedFacebookPageId) {
+          setSelectedFacebookPageId(data[0].id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch facebook pages from DB, falling back to localStorage:", err);
+      const stored = localStorage.getItem("jobstrackr:facebook_pages");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setFacebookPages(parsed);
+          if (parsed.length > 0 && !selectedFacebookPageId) {
+            setSelectedFacebookPageId(parsed[0].id);
+          }
+        } catch (e) {
+          console.error("Failed to parse facebook pages from localStorage", e);
+        }
+      }
+    }
+  }, [selectedFacebookPageId]);
+
+  useEffect(() => {
+    fetchFacebookPages();
+    fetchFacebookLogs();
+  }, [fetchFacebookPages, fetchFacebookLogs]);
+
+  const handleAddFacebookPage = async () => {
+    if (!newFacebookPageForm.name.trim() || !newFacebookPageForm.access_token.trim() || !newFacebookPageForm.page_id.trim()) {
+      toast({ title: "Validation Error", description: "All fields are required", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const pageData = {
+        name: newFacebookPageForm.name.trim(),
+        access_token: newFacebookPageForm.access_token.trim(),
+        page_id: newFacebookPageForm.page_id.trim(),
+        sector: newFacebookPageForm.sector
+      };
+
+      const { data, error } = await supabase
+        .from("facebook_pages")
+        .insert(pageData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const updated = [...facebookPages, data];
+        setFacebookPages(updated);
+        localStorage.setItem("jobstrackr:facebook_pages", JSON.stringify(updated));
+
+        if (!selectedFacebookPageId) {
+          setSelectedFacebookPageId(data.id);
+        }
+      }
+
+      setNewFacebookPageForm({
+        name: "",
+        access_token: "",
+        page_id: "",
+        sector: "All Jobs"
+      });
+      setShowFacebookAddPageDialog(false);
+      toast({ title: "Success", description: "Facebook page configured successfully" });
+      await fetchFacebookPages();
+    } catch (e: any) {
+      console.error("Failed to save facebook page:", e);
+      toast({
+        title: "Error",
+        description: e.message || "Failed to save Facebook page configuration",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteFacebookPage = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("facebook_pages")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      const updated = facebookPages.filter(p => p.id !== id);
+      setFacebookPages(updated);
+      localStorage.setItem("jobstrackr:facebook_pages", JSON.stringify(updated));
+
+      if (selectedFacebookPageId === id) {
+        setSelectedFacebookPageId(updated[0]?.id || "");
+      }
+      toast({ title: "Deleted", description: "Facebook page configuration removed" });
+      await fetchFacebookPages();
+    } catch (e: any) {
+      console.error("Failed to delete facebook page:", e);
+      toast({
+        title: "Error",
+        description: e.message || "Failed to remove Facebook page configuration",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFacebookTagSelect = (tag: string) => {
+    setSelectedFacebookTag(tag);
+    setSelectedFacebookJobIds([]);
+    setSelectedFacebookUpdateIds([]);
+    if (tag !== "All Jobs") {
+      setSelectedFacebookSector("All Jobs");
+    }
+  };
+
+  const activeJobsForFacebook = useMemo(() => {
+    if (!jobs) return [];
+    
+    const filtered = jobs.filter(job => {
+      const lastDate = getJobDeadlineDate(job);
+      if (lastDate && lastDate < new Date()) return false;
+      
+      if (selectedFacebookTag !== "All Jobs") {
+        return matchTagFilter(job.title, selectedFacebookTag);
+      }
+      
+      const textToSearch = `${job.title} ${job.department} ${job.qualification} ${job.description || ""}`.toLowerCase();
+      const sector = selectedFacebookSector.toLowerCase();
+      
+      if (sector === "sarkari naukri" || sector === "government jobs" || sector === "all jobs") return true;
+      
+      if (sector === "railway jobs" && (textToSearch.includes("railway") || textToSearch.includes("rrb"))) return true;
+      if (sector === "banking jobs" && (textToSearch.includes("bank") || textToSearch.includes("ibps") || textToSearch.includes("sbi") || textToSearch.includes("rbi"))) return true;
+      if (sector === "defence jobs" && (textToSearch.includes("defence") || textToSearch.includes("defense") || textToSearch.includes("army") || textToSearch.includes("navy") || textToSearch.includes("air force") || textToSearch.includes("afcat") || textToSearch.includes("nda") || textToSearch.includes("cds"))) return true;
+      if (sector === "army jobs" && (textToSearch.includes("army") || textToSearch.includes("agniveer"))) return true;
+      if (sector === "navy jobs" && textToSearch.includes("navy")) return true;
+      if (sector === "air force jobs" && (textToSearch.includes("air force") || textToSearch.includes("iaf"))) return true;
+      if (sector === "police jobs" && (textToSearch.includes("police") || textToSearch.includes("constable") || textToSearch.includes("sub inspector") || textToSearch.includes("si "))) return true;
+      if (sector === "psu jobs" && (textToSearch.includes("psu") || textToSearch.includes("ongc") || textToSearch.includes("ntpc") || textToSearch.includes("bhel") || textToSearch.includes("gail") || textToSearch.includes("sail") || textToSearch.includes("iocl"))) return true;
+      if (sector === "teaching jobs" && (textToSearch.includes("teacher") || textToSearch.includes("teaching") || textToSearch.includes("tgt") || textToSearch.includes("pgt") || textToSearch.includes("professor") || textToSearch.includes("lecturer"))) return true;
+      if (sector === "state government jobs" && (textToSearch.includes("state government") || textToSearch.includes("state govt") || textToSearch.includes("department of") || textToSearch.includes("government of"))) return true;
+      if (sector === "central government jobs" && (textToSearch.includes("central government") || textToSearch.includes("central govt") || textToSearch.includes("india") || textToSearch.includes("union"))) return true;
+      
+      return textToSearch.includes(sector);
+    });
+
+    if (!facebookSortField) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      let comparison = 0;
+      if (facebookSortField === "vacancies") {
+        const vacA = a.vacancies === null || a.vacancies === undefined ? 0 : a.vacancies;
+        const vacB = b.vacancies === null || b.vacancies === undefined ? 0 : b.vacancies;
+        comparison = vacA - vacB;
+      } else if (facebookSortField === "last_date") {
+        const dateA = getJobDeadlineDate(a)?.getTime() ?? 0;
+        const dateB = getJobDeadlineDate(b)?.getTime() ?? 0;
+        comparison = dateA - dateB;
+      } else if (facebookSortField === "created_at") {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        comparison = dateA - dateB;
+      }
+      return facebookSortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [jobs, selectedFacebookSector, selectedFacebookTag, facebookSortField, facebookSortDirection]);
+
+  const facebookExamUpdates = useMemo(() => {
+    if (!rawTelegramExamUpdates) return [];
+    
+    return rawTelegramExamUpdates.filter(update => {
+      if (selectedFacebookTag !== "All Jobs") {
+        return matchTagFilter(update.title, selectedFacebookTag);
+      }
+      
+      const textToSearch = `${update.title} ${update.category} ${update.status || ""} ${update.summary || ""}`.toLowerCase();
+      const sector = selectedFacebookSector.toLowerCase();
+      
+      if (sector === "sarkari naukri" || sector === "government jobs" || sector === "all jobs") return true;
+      
+      if (sector === "railway jobs" && (textToSearch.includes("railway") || textToSearch.includes("rrb"))) return true;
+      if (sector === "banking jobs" && (textToSearch.includes("bank") || textToSearch.includes("ibps") || textToSearch.includes("sbi") || textToSearch.includes("rbi"))) return true;
+      if (sector === "defence jobs" && (textToSearch.includes("defence") || textToSearch.includes("defense") || textToSearch.includes("army") || textToSearch.includes("navy") || textToSearch.includes("air force") || textToSearch.includes("afcat") || textToSearch.includes("nda") || textToSearch.includes("cds"))) return true;
+      if (sector === "army jobs" && (textToSearch.includes("army") || textToSearch.includes("agniveer"))) return true;
+      if (sector === "navy jobs" && textToSearch.includes("navy")) return true;
+      if (sector === "air force jobs" && (textToSearch.includes("air force") || textToSearch.includes("iaf"))) return true;
+      if (sector === "police jobs" && (textToSearch.includes("police") || textToSearch.includes("constable") || textToSearch.includes("sub inspector") || textToSearch.includes("si "))) return true;
+      if (sector === "psu jobs" && (textToSearch.includes("psu") || textToSearch.includes("ongc") || textToSearch.includes("ntpc") || textToSearch.includes("bhel") || textToSearch.includes("gail") || textToSearch.includes("sail") || textToSearch.includes("iocl"))) return true;
+      if (sector === "teaching jobs" && (textToSearch.includes("teacher") || textToSearch.includes("teaching") || textToSearch.includes("tgt") || textToSearch.includes("pgt") || textToSearch.includes("professor") || textToSearch.includes("lecturer"))) return true;
+      if (sector === "state government jobs" && (textToSearch.includes("state government") || textToSearch.includes("state govt") || textToSearch.includes("department of") || textToSearch.includes("government of"))) return true;
+      if (sector === "central government jobs" && (textToSearch.includes("central government") || textToSearch.includes("central govt") || textToSearch.includes("india") || textToSearch.includes("union"))) return true;
+      
+      return textToSearch.includes(sector);
+    });
+  }, [rawTelegramExamUpdates, selectedFacebookSector, selectedFacebookTag]);
+
+  const getFacebookPreviewMessage = () => {
+    const ids = facebookSourceType === "jobs" ? selectedFacebookJobIds : selectedFacebookUpdateIds;
+    if (ids.length === 0) {
+      return "Select one or more items to see the live preview...";
+    }
+
+    const firstId = ids[0];
+    if (facebookSourceType === "jobs") {
+      const job = jobs?.find(j => j.id === firstId);
+      if (!job) return "Select a job to see the live preview...";
+      const jobLink = `${getWebappBaseUrl()}/jobs/${job.slug || job.id}`;
+      const prefix = ids.length > 1 ? `[Previewing 1 of ${ids.length} selected jobs]\n\n` : "";
+      
+      const hashtags = ["#GovernmentJobs", "#SarkariNaukri"];
+      const titleLower = job.title.toLowerCase();
+      const deptLower = job.department.toLowerCase();
+      if (titleLower.includes("ssc") || deptLower.includes("ssc")) hashtags.unshift("#SSC");
+      else if (titleLower.includes("upsc") || deptLower.includes("upsc")) hashtags.unshift("#UPSC");
+      else if (titleLower.includes("rrb") || titleLower.includes("railway") || deptLower.includes("railway")) hashtags.unshift("#Railway");
+      else if (titleLower.includes("bank") || deptLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
+      else if (titleLower.includes("police") || deptLower.includes("police")) hashtags.unshift("#Police");
+      else if (titleLower.includes("defence") || titleLower.includes("army") || titleLower.includes("navy") || titleLower.includes("air force")) hashtags.unshift("#Defence");
+      else if (titleLower.includes("teacher") || titleLower.includes("teaching")) hashtags.unshift("#TeachingJobs");
+      else if (titleLower.includes("court") || titleLower.includes("judic")) hashtags.unshift("#Judiciary");
+      else if (titleLower.includes("steno")) hashtags.unshift("#Stenographer");
+      const hashtagsStr = hashtags.join(" ");
+
+      return `${prefix}NEW RECRUITMENT ALERT
+
+📌 ${job.title}
+
+🏢 Organization: ${job.department}
+👥 Vacancies: ${job.vacancies_display || job.vacancies || "TBD"}
+📅 Last Date: ${(() => {
+        const d = getJobDeadlineDate(job);
+        return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date;
+      })()}
+
+✅ Apply Online
+
+🔗 View Full Notification:
+${jobLink}
+
+${hashtagsStr}`;
+    } else {
+      const update = facebookExamUpdates?.find(u => u.id === firstId);
+      if (!update) return "Select an update to see the live preview...";
+      const updateLink = `${getWebappBaseUrl()}/updates/${update.update_slug || update.id}`;
+      const prefix = ids.length > 1 ? `[Previewing 1 of ${ids.length} selected updates]\n\n` : "";
+
+      const categoryLower = update.category.toLowerCase();
+      const titleLower = update.title.toLowerCase();
+
+      let tagCategory = "#ExamUpdate";
+      let templateType: "admit_card" | "result" | "answer_key" | "recruitment" = "recruitment";
+      
+      if (categoryLower.includes("admit") || titleLower.includes("admit") || categoryLower.includes("city") || titleLower.includes("city") || categoryLower.includes("hall") || categoryLower.includes("call") || categoryLower.includes("syllabus")) {
+        templateType = "admit_card";
+        tagCategory = "#AdmitCard";
+      } else if (categoryLower.includes("result") || titleLower.includes("result") || categoryLower.includes("cutoff") || titleLower.includes("cutoff") || categoryLower.includes("scorecard") || categoryLower.includes("merit")) {
+        templateType = "result";
+        tagCategory = "#Result";
+      } else if (categoryLower.includes("answer") || titleLower.includes("answer") || categoryLower.includes("key") || titleLower.includes("key") || categoryLower.includes("sheet")) {
+        templateType = "answer_key";
+        tagCategory = "#AnswerKey";
+      }
+
+      const hashtags = [tagCategory];
+      if (templateType === "result" || templateType === "recruitment") {
+        hashtags.push("#GovernmentJobs");
+      } else {
+        hashtags.push("#ExamUpdate");
+      }
+      
+      if (titleLower.includes("ssc")) hashtags.unshift("#SSC");
+      else if (titleLower.includes("upsc")) hashtags.unshift("#UPSC");
+      else if (titleLower.includes("rrb") || titleLower.includes("railway")) hashtags.unshift("#Railway");
+      else if (titleLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
+      else if (titleLower.includes("police")) hashtags.unshift("#Police");
+      else if (titleLower.includes("defence")) hashtags.unshift("#Defence");
+      else if (titleLower.includes("teacher") || titleLower.includes("teaching")) hashtags.unshift("#TeachingJobs");
+      else if (titleLower.includes("court") || titleLower.includes("judic")) hashtags.unshift("#Judiciary");
+      else if (titleLower.includes("steno")) hashtags.unshift("#Stenographer");
+      const hashtagsStr = hashtags.join(" ");
+
+      if (templateType === "admit_card") {
+        const statusText = update.status || (titleLower.includes("city") ? "Exam City Slip Released" : "Admit Card Released");
+        const examDate = (() => {
+          if (update.important_dates && Array.isArray(update.important_dates)) {
+            const match = update.important_dates.find(d => 
+              /exam|test|written|cbt|date/i.test(d.event) && !/admit|result|apply|registration/i.test(d.event)
+            );
+            if (match) return match.date;
+          }
+          return "Check Details";
+        })();
+
+        return `${prefix}IMPORTANT UPDATE
+
+📌 ${update.title}
+
+📍 ${statusText}
+📅 Exam Date: ${examDate}
+
+✅ Download Now
+
+🔗 View Details:
+${updateLink}
+
+${hashtagsStr}`;
+      } else if (templateType === "result") {
+        return `${prefix}IMPORTANT UPDATE
+
+📌 ${update.title}
+
+📢 Result Released Successfully
+
+✅ Check Your Result
+
+🔗 View Result:
+${updateLink}
+
+${hashtagsStr}`;
+      } else if (templateType === "answer_key") {
+        return `${prefix}IMPORTANT UPDATE
+
+📌 ${update.title}
+
+📢 Official Answer Key Available
+
+✅ Check Response Sheet & Answer Key
+
+🔗 View Details:
+${updateLink}
+
+${hashtagsStr}`;
+      } else {
+        const orgText = (() => {
+          if (titleLower.includes("ssc")) return "SSC";
+          if (titleLower.includes("upsc")) return "UPSC";
+          if (titleLower.includes("rrb") || titleLower.includes("railway")) return "RRB / Railways";
+          if (titleLower.includes("sbi")) return "SBI";
+          if (titleLower.includes("ibps")) return "IBPS";
+          const match = update.title.match(/^(.*?)\s+(recruitment|exam|vacancy|admit|result)/i);
+          if (match && match[1]) return match[1].trim();
+          return "Government Agency";
+        })();
+
+        return `${prefix}IMPORTANT UPDATE
+
+📌 ${update.title}
+
+🏢 Organization: ${orgText}
+📢 Notification Details Available
+
+✅ View Notification & Apply
+
+🔗 View Details:
+${updateLink}
+
+${hashtagsStr}`;
+      }
+    }
+  };
+
+  const handlePostToFacebook = async () => {
+    const page = facebookPages.find(p => p.id === selectedFacebookPageId);
+    if (!page) {
+      toast({ title: "Error", description: "Please select/configure a Facebook Page", variant: "destructive" });
+      return;
+    }
+
+    const idsToPost = facebookSourceType === "jobs" ? selectedFacebookJobIds : selectedFacebookUpdateIds;
+    if (idsToPost.length === 0) {
+      toast({ title: "Error", description: "Please select at least one item to post", variant: "destructive" });
+      return;
+    }
+
+    setPostingToFacebook(true);
+    setFacebookConsoleLogs([
+      `[${format(new Date(), "HH:mm:ss")}] 🚀 Starting dispatch to Facebook page: "${page.name}"`,
+      `[${format(new Date(), "HH:mm:ss")}] 📋 Found ${idsToPost.length} selected item(s) to process`
+    ]);
+
+    try {
+      // Fetch already sent items to prevent duplicate posts
+      let sentIds = new Set<string>();
+      try {
+        const { data: sentItems } = await supabase
+          .from("facebook_sent_jobs")
+          .select("job_id, update_id")
+          .eq("page_id", page.id)
+          .eq("status", "success");
+
+        if (sentItems) {
+          sentItems.forEach(item => {
+            const sentId = facebookSourceType === "jobs" ? item.job_id : item.update_id;
+            if (sentId) sentIds.add(sentId);
+          });
+        }
+      } catch (err) {
+        console.error("Failed to check duplicate postings", err);
+      }
+
+      let successCount = 0;
+
+      for (let i = 0; i < idsToPost.length; i++) {
+        const id = idsToPost[i];
+        let messageText = "";
+        let itemTitle = "";
+
+        if (facebookSourceType === "jobs") {
+          const job = jobs?.find(j => j.id === id);
+          if (!job) continue;
+          itemTitle = job.title;
+          const jobLink = `${getWebappBaseUrl()}/jobs/${job.slug || job.id}`;
+          
+          // Dynamic hashtags
+          const hashtags = ["#GovernmentJobs", "#SarkariNaukri"];
+          const titleLower = job.title.toLowerCase();
+          const deptLower = job.department.toLowerCase();
+          if (titleLower.includes("ssc") || deptLower.includes("ssc")) hashtags.unshift("#SSC");
+          else if (titleLower.includes("upsc") || deptLower.includes("upsc")) hashtags.unshift("#UPSC");
+          else if (titleLower.includes("rrb") || titleLower.includes("railway") || deptLower.includes("railway")) hashtags.unshift("#Railway");
+          else if (titleLower.includes("bank") || deptLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
+          else if (titleLower.includes("police") || deptLower.includes("police")) hashtags.unshift("#Police");
+          else if (titleLower.includes("defence") || titleLower.includes("army") || titleLower.includes("navy") || titleLower.includes("air force")) hashtags.unshift("#Defence");
+          else if (titleLower.includes("teacher") || titleLower.includes("teaching")) hashtags.unshift("#TeachingJobs");
+          else if (titleLower.includes("court") || titleLower.includes("judic")) hashtags.unshift("#Judiciary");
+          else if (titleLower.includes("steno")) hashtags.unshift("#Stenographer");
+          const hashtagsStr = hashtags.join(" ");
+
+          messageText = `NEW RECRUITMENT ALERT
+
+📌 ${job.title}
+
+🏢 Organization: ${job.department}
+👥 Vacancies: ${job.vacancies_display || job.vacancies || "TBD"}
+📅 Last Date: ${(() => {
+            const d = getJobDeadlineDate(job);
+            return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date;
+          })()}
+
+✅ Apply Online
+
+🔗 View Full Notification:
+${jobLink}
+
+${hashtagsStr}`;
+        } else {
+          const update = facebookExamUpdates?.find(u => u.id === id);
+          if (!update) continue;
+          itemTitle = update.title;
+          const updateLink = `${getWebappBaseUrl()}/updates/${update.update_slug || update.id}`;
+          
+          const categoryLower = update.category.toLowerCase();
+          const titleLower = update.title.toLowerCase();
+
+          // Determine template type and dynamic hashtags
+          let tagCategory = "#ExamUpdate";
+          let templateType: "admit_card" | "result" | "answer_key" | "recruitment" = "recruitment";
+          
+          if (categoryLower.includes("admit") || titleLower.includes("admit") || categoryLower.includes("city") || titleLower.includes("city") || categoryLower.includes("hall") || categoryLower.includes("call") || categoryLower.includes("syllabus")) {
+            templateType = "admit_card";
+            tagCategory = "#AdmitCard";
+          } else if (categoryLower.includes("result") || titleLower.includes("result") || categoryLower.includes("cutoff") || titleLower.includes("cutoff") || categoryLower.includes("scorecard") || categoryLower.includes("merit")) {
+            templateType = "result";
+            tagCategory = "#Result";
+          } else if (categoryLower.includes("answer") || titleLower.includes("answer") || categoryLower.includes("key") || titleLower.includes("key") || categoryLower.includes("sheet")) {
+            templateType = "answer_key";
+            tagCategory = "#AnswerKey";
+          }
+
+          const hashtags = [tagCategory];
+          if (templateType === "result" || templateType === "recruitment") {
+            hashtags.push("#GovernmentJobs");
+          } else {
+            hashtags.push("#ExamUpdate");
+          }
+          
+          if (titleLower.includes("ssc")) hashtags.unshift("#SSC");
+          else if (titleLower.includes("upsc")) hashtags.unshift("#UPSC");
+          else if (titleLower.includes("rrb") || titleLower.includes("railway")) hashtags.unshift("#Railway");
+          else if (titleLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
+          else if (titleLower.includes("police")) hashtags.unshift("#Police");
+          else if (titleLower.includes("defence")) hashtags.unshift("#Defence");
+          else if (titleLower.includes("teacher") || titleLower.includes("teaching")) hashtags.unshift("#TeachingJobs");
+          else if (titleLower.includes("court") || titleLower.includes("judic")) hashtags.unshift("#Judiciary");
+          else if (titleLower.includes("steno")) hashtags.unshift("#Stenographer");
+          const hashtagsStr = hashtags.join(" ");
+
+          if (templateType === "admit_card") {
+            const statusText = update.status || (titleLower.includes("city") ? "Exam City Slip Released" : "Admit Card Released");
+            const examDate = (() => {
+              if (update.important_dates && Array.isArray(update.important_dates)) {
+                const match = update.important_dates.find(d => 
+                  /exam|test|written|cbt|date/i.test(d.event) && !/admit|result|apply|registration/i.test(d.event)
+                );
+                if (match) return match.date;
+              }
+              return "Check Details";
+            })();
+
+            messageText = `IMPORTANT UPDATE
+
+📌 ${update.title}
+
+📍 ${statusText}
+📅 Exam Date: ${examDate}
+
+✅ Download Now
+
+🔗 View Details:
+${updateLink}
+
+${hashtagsStr}`;
+          } else if (templateType === "result") {
+            messageText = `IMPORTANT UPDATE
+
+📌 ${update.title}
+
+📢 Result Released Successfully
+
+✅ Check Your Result
+
+🔗 View Result:
+${updateLink}
+
+${hashtagsStr}`;
+          } else if (templateType === "answer_key") {
+            messageText = `IMPORTANT UPDATE
+
+📌 ${update.title}
+
+📢 Official Answer Key Available
+
+✅ Check Response Sheet & Answer Key
+
+🔗 View Details:
+${updateLink}
+
+${hashtagsStr}`;
+          } else {
+            // Fallback recruitment alert
+            const orgText = (() => {
+              if (titleLower.includes("ssc")) return "SSC";
+              if (titleLower.includes("upsc")) return "UPSC";
+              if (titleLower.includes("rrb") || titleLower.includes("railway")) return "RRB / Railways";
+              if (titleLower.includes("sbi")) return "SBI";
+              if (titleLower.includes("ibps")) return "IBPS";
+              const match = update.title.match(/^(.*?)\s+(recruitment|exam|vacancy|admit|result)/i);
+              if (match && match[1]) return match[1].trim();
+              return "Government Agency";
+            })();
+
+            messageText = `IMPORTANT UPDATE
+
+📌 ${update.title}
+
+🏢 Organization: ${orgText}
+📢 Notification Details Available
+
+✅ View Notification & Apply
+
+🔗 View Details:
+${updateLink}
+
+${hashtagsStr}`;
+          }
+        }
+
+        setFacebookConsoleLogs(prev => [
+          ...prev,
+          `[${format(new Date(), "HH:mm:ss")}] Preparing message for: "${itemTitle}"`
+        ]);
+
+        // Prevent duplicate sending
+        if (sentIds.has(id)) {
+          setFacebookConsoleLogs(prev => [
+            ...prev,
+            `[${format(new Date(), "HH:mm:ss")}] ⚠️ Skipped duplicate: "${itemTitle}" already successfully posted to this page.`
+          ]);
+          successCount++;
+          continue;
+        }
+
+        const response = await fetch(`https://graph.facebook.com/v19.0/${page.page_id}/feed`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: messageText,
+            access_token: page.access_token
+          })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.id) {
+          successCount++;
+          setFacebookConsoleLogs(prev => [
+            ...prev,
+            `[${format(new Date(), "HH:mm:ss")}] ✅ Successfully posted to Facebook Page! Post ID: ${data.id} (${successCount}/${idsToPost.length})`
+          ]);
+
+          // Log success to DB
+          await supabase.from("facebook_sent_jobs").insert({
+            page_id: page.id,
+            [facebookSourceType === "jobs" ? "job_id" : "update_id"]: id,
+            status: "success"
+          });
+        } else {
+          const errMsg = data?.error?.message || "Unknown error";
+          console.error(`Facebook post error for ID ${id}:`, errMsg);
+          setFacebookConsoleLogs(prev => [
+            ...prev,
+            `[${format(new Date(), "HH:mm:ss")}] ❌ Error posting "${itemTitle}": ${errMsg}`
+          ]);
+
+          // Log failure to DB
+          await supabase.from("facebook_sent_jobs").insert({
+            page_id: page.id,
+            [facebookSourceType === "jobs" ? "job_id" : "update_id"]: id,
+            status: "failed",
+            error_message: errMsg
+          });
+        }
+
+        // Add a 1000ms delay between posts to prevent rate limits
+        if (i < idsToPost.length - 1) {
+          setFacebookConsoleLogs(prev => [
+            ...prev,
+            `[${format(new Date(), "HH:mm:ss")}] 🕒 Delaying 1.0s to respect Facebook API rate limits...`
+          ]);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+
+      // Refresh logs history
+      fetchFacebookLogs();
+
+      if (successCount === idsToPost.length) {
+        setFacebookConsoleLogs(prev => [
+          ...prev,
+          `[${format(new Date(), "HH:mm:ss")}] 🎉 Completed broadcasting. All ${successCount} messages posted successfully!`
+        ]);
+        toast({ title: "Success", description: `Posted ${successCount} notification(s) to Facebook Page successfully!` });
+        // Clear selection
+        if (facebookSourceType === "jobs") {
+          setSelectedFacebookJobIds([]);
+        } else {
+          setSelectedFacebookUpdateIds([]);
+        }
+      } else {
+        const failedCount = idsToPost.length - successCount;
+        setFacebookConsoleLogs(prev => [
+          ...prev,
+          `[${format(new Date(), "HH:mm:ss")}] ⚠️ Completed with errors. ${successCount} posted, ${failedCount} failed.`
+        ]);
+        toast({
+          title: "Partial Success",
+          description: `Successfully posted ${successCount} items. ${failedCount} items failed to post.`,
+          variant: "destructive"
+        });
+      }
+    } catch (e: any) {
+      console.error("Facebook post system exception:", e);
+      setFacebookConsoleLogs(prev => [
+        ...prev,
+        `[${format(new Date(), "HH:mm:ss")}] 🚨 System Exception: ${e.message || "Failed to communicate with Facebook Graph API"}`
+      ]);
+      toast({ title: "Error", description: e.message || "Failed to send message to Facebook", variant: "destructive" });
+    } finally {
+      setPostingToFacebook(false);
     }
   };
 
@@ -2529,9 +3462,9 @@ ${hashtagsStr}`;
     }
   };
 
-  const handleDiscoverSaveJob = async (url: string) => {
+  const handleDiscoverSaveJob = async (url: string): Promise<boolean> => {
     const r = discoverScrapedResults[url];
-    if (!r) return;
+    if (!r) return false;
     setDiscoverSavingUrl(url);
 
     try {
@@ -2612,6 +3545,36 @@ ${hashtagsStr}`;
         job_metadata: Object.keys(metadata).length > 0 ? metadata : null,
       };
 
+      // Check for duplicates locally first using checkJobSimilarity
+      let isDuplicate = false;
+      let duplicateJobTitle = "";
+      if (jobs) {
+        for (const existingJob of jobs) {
+          const similarity = checkJobSimilarity({
+            ...emptyFormData,
+            title: jobRecord.title,
+            department: jobRecord.department,
+            location: jobRecord.location,
+          }, existingJob);
+          if (similarity.isSimilar) {
+            isDuplicate = true;
+            duplicateJobTitle = existingJob.title;
+            break;
+          }
+        }
+      }
+
+      if (isDuplicate) {
+        toast({
+          title: "Duplicate detected!",
+          description: `Similar to: "${duplicateJobTitle}". Save blocked.`,
+          variant: "destructive",
+        });
+        setDiscoverSavedUrls(prev => new Set(prev).add(url));
+        setDiscoverSavingUrl(null);
+        return false;
+      }
+
       // Check for duplicate by title before inserting
       const { data: existingJobs } = await supabase
         .from("jobs")
@@ -2625,18 +3588,26 @@ ${hashtagsStr}`;
           description: `"${existingJobs[0].title}" already exists in the database. Skipped.`,
           variant: "destructive",
         });
+        setDiscoverSavedUrls(prev => new Set(prev).add(url));
         setDiscoverSavingUrl(null);
-        return;
+        return false;
       }
 
-      const { error } = await supabase.from("jobs").insert(jobRecord).select("id").single();
+      const { data: newJob, error } = await supabase.from("jobs").insert(jobRecord).select("id").single();
       if (error) throw error;
 
       setDiscoverSavedUrls(prev => new Set(prev).add(url));
       queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
       toast({ title: "Saved!", description: `${jobRecord.title} added to database.` });
+
+      if (newJob?.id) {
+        autoVerifyJob(newJob.id);
+      }
+      return true;
     } catch (error: any) {
       toast({ title: "Save failed", description: error.message, variant: "destructive" });
+      return false;
     } finally {
       setDiscoverSavingUrl(null);
     }
@@ -3083,6 +4054,10 @@ ${hashtagsStr}`;
               <TabsTrigger value="telegram" className="gap-1 min-w-[44px] h-10">
                 <Send className="h-4 w-4 text-primary" />
                 <span className="hidden sm:inline">Telegram</span>
+              </TabsTrigger>
+              <TabsTrigger value="facebook" className="gap-1 min-w-[44px] h-10">
+                <Facebook className="h-4 w-4 text-blue-600" />
+                <span className="hidden sm:inline">Facebook</span>
               </TabsTrigger>
               {isFullAdmin && (
                 <TabsTrigger value="users" className="gap-1 min-w-[44px] h-10">
@@ -3745,6 +4720,34 @@ ${hashtagsStr}`;
                         <CardDescription>Select job or update to broadcast</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4 flex-1 flex flex-col min-h-0">
+                        {/* Search Tag Filter Row */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Filter by Tag</Label>
+                          <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto pr-1 pb-1">
+                            {[
+                              "All Jobs", "SSC", "Railway Jobs", "Banking Jobs", "UPSC", 
+                              "Defence Jobs", "PSU", "State PSC", "Healthcare", "Teaching", 
+                              "Judiciary", "Stenographer"
+                            ].map((tag) => {
+                              const isActive = selectedTelegramTag === tag;
+                              return (
+                                <Badge
+                                  key={tag}
+                                  variant={isActive ? "default" : "outline"}
+                                  className={`cursor-pointer transition-all duration-200 py-1 px-2.5 rounded-full select-none text-[11px] font-medium ${
+                                    isActive
+                                      ? "bg-primary text-primary-foreground shadow-sm scale-105"
+                                      : "bg-background hover:bg-secondary/80 hover:text-foreground text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/60"
+                                  }`}
+                                  onClick={() => handleTelegramTagSelect(tag)}
+                                >
+                                  {tag}
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        </div>
+
                         <div className="space-y-2">
                           <Label htmlFor="telegram-sector">Select Sector/Search Term</Label>
                           <div className="space-y-1.5">
@@ -3756,6 +4759,7 @@ ${hashtagsStr}`;
                             />
                             <Select value={selectedTelegramSector} onValueChange={(val) => {
                               setSelectedTelegramSector(val);
+                              setSelectedTelegramTag("All Jobs");
                               setSelectedTelegramJobIds([]);
                               setSelectedTelegramUpdateIds([]);
                               const matched = telegramChannels.find(c => c.sector.toLowerCase() === val.toLowerCase());
@@ -4181,6 +5185,599 @@ ${hashtagsStr}`;
                                   <TableCell>
                                     <Badge variant="outline" className="text-[10px]">
                                       {log.telegram_channels?.sector || "N/A"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {log.job_id ? (
+                                      <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-none text-[10px]">Job</Badge>
+                                    ) : (
+                                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 border-none text-[10px]">Update</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="font-medium line-clamp-1">{title}</div>
+                                    {subtitle && (
+                                      <div className="text-[10px] text-muted-foreground line-clamp-1">{subtitle}</div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {log.status === "success" ? (
+                                      <Badge variant="outline" className="bg-green-500/10 text-green-600 border-none text-[10px] flex items-center gap-1 w-fit">
+                                        <Check className="h-3 w-3" /> Success
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="destructive" className="text-[10px] flex items-center gap-1 w-fit">
+                                        <X className="h-3 w-3" /> Failed
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground max-w-[180px] truncate" title={log.error_message || ""}>
+                                    {log.status === "success" ? (
+                                      <span className="text-[10px] text-green-600 flex items-center gap-1 font-medium">
+                                        <CheckCircle className="h-3.5 w-3.5" /> Delivered
+                                      </span>
+                                    ) : (
+                                      log.error_message || "Unknown error"
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
+          {/* Facebook Posting Tab */}
+          <TabsContent value="facebook">
+            <Tabs defaultValue="poster" className="space-y-4">
+              <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+                <TabsTrigger value="poster">Manual Poster</TabsTrigger>
+                <TabsTrigger value="history" onClick={fetchFacebookLogs}>Posting History & Status</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="poster" className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  
+                  {/* Left Column: Pages Configuration */}
+                  <div className="lg:col-span-4 space-y-6">
+                    <Card>
+                      <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                        <div>
+                          <CardTitle className="text-lg">Facebook Pages</CardTitle>
+                          <CardDescription>Configure Page Access Tokens per sector</CardDescription>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowFacebookAddPageDialog(true)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" /> Add
+                        </Button>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {facebookPages.length === 0 ? (
+                          <div className="text-center py-6 border border-dashed rounded-lg text-muted-foreground text-sm">
+                            No Facebook pages configured yet. Click 'Add' to configure one.
+                          </div>
+                        ) : (
+                          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                            {facebookPages.map((page) => (
+                              <div
+                                key={page.id}
+                                className={`p-2 border rounded-lg hover:border-primary/50 transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                                  selectedFacebookPageId === page.id ? "border-primary bg-primary/5" : "bg-card"
+                                }`}
+                                onClick={() => setSelectedFacebookPageId(page.id)}
+                              >
+                                <div className="min-w-0 flex-1 flex items-center gap-2">
+                                  <h4 className="font-semibold text-xs truncate" title={page.name}>{page.name}</h4>
+                                  <Badge variant="secondary" className="text-[9px] py-0 px-1.5 h-4 flex-shrink-0">
+                                    {page.sector}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="text-[9px] text-muted-foreground font-mono truncate max-w-[80px]" title={`Page ID: ${page.page_id}`}>
+                                    {page.page_id}
+                                  </span>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteFacebookPage(page.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Middle Column: Jobs/Updates Selector */}
+                  <div className="lg:col-span-4 space-y-6">
+                    <Card className="h-full flex flex-col">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg">Publish Selection</CardTitle>
+                        <CardDescription>Select job or update to broadcast</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4 flex-1 flex flex-col min-h-0">
+                        {/* Search Tag Filter Row */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Filter by Tag</Label>
+                          <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto pr-1 pb-1">
+                            {[
+                              "All Jobs", "SSC", "Railway Jobs", "Banking Jobs", "UPSC", 
+                              "Defence Jobs", "PSU", "State PSC", "Healthcare", "Teaching", 
+                              "Judiciary", "Stenographer"
+                            ].map((tag) => {
+                              const isActive = selectedFacebookTag === tag;
+                              return (
+                                <Badge
+                                  key={tag}
+                                  variant={isActive ? "default" : "outline"}
+                                  className={`cursor-pointer transition-all duration-200 py-1 px-2.5 rounded-full select-none text-[11px] font-medium ${
+                                    isActive
+                                      ? "bg-primary text-primary-foreground shadow-sm scale-105"
+                                      : "bg-background hover:bg-secondary/80 hover:text-foreground text-muted-foreground border-muted-foreground/30 hover:border-muted-foreground/60"
+                                  }`}
+                                  onClick={() => handleFacebookTagSelect(tag)}
+                                >
+                                  {tag}
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="facebook-sector">Select Sector/Search Term</Label>
+                          <div className="space-y-1.5">
+                            <Input
+                              placeholder="Type to filter sectors..."
+                              value={sectorSearchQuery}
+                              onChange={(e) => setSectorSearchQuery(e.target.value)}
+                              className="h-8 text-xs"
+                            />
+                            <Select value={selectedFacebookSector} onValueChange={(val) => {
+                              setSelectedFacebookSector(val);
+                              setSelectedFacebookTag("All Jobs");
+                              setSelectedFacebookJobIds([]);
+                              setSelectedFacebookUpdateIds([]);
+                              const matched = facebookPages.find(p => p.sector.toLowerCase() === val.toLowerCase());
+                              if (matched) setSelectedFacebookPageId(matched.id);
+                            }}>
+                              <SelectTrigger id="facebook-sector">
+                                <SelectValue placeholder="Sector" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-[300px]">
+                                {filteredTelegramTiers.length === 0 ? (
+                                  <div className="text-center py-4 text-muted-foreground text-xs">No matching sectors</div>
+                                ) : (
+                                  filteredTelegramTiers.map((tier) => (
+                                    <SelectGroup key={tier.name}>
+                                      <SelectLabel className="font-bold text-primary text-xs bg-muted/40 px-2 py-1 sticky top-0 z-10">{tier.name}</SelectLabel>
+                                      {tier.terms.map((term) => (
+                                        <SelectItem key={term} value={term}>{term}</SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Content Type</Label>
+                          <RadioGroup
+                            defaultValue="jobs"
+                            value={facebookSourceType}
+                            onValueChange={(val: "jobs" | "updates") => {
+                              setFacebookSourceType(val);
+                              setSelectedFacebookJobIds([]);
+                              setSelectedFacebookUpdateIds([]);
+                            }}
+                            className="flex gap-4"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="jobs" id="fb-source-jobs" />
+                              <Label htmlFor="fb-source-jobs" className="cursor-pointer">Active Jobs</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="updates" id="fb-source-updates" />
+                              <Label htmlFor="fb-source-updates" className="cursor-pointer">Job Updates</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+
+                        <div className="flex-1 flex flex-col min-h-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label>
+                              {facebookSourceType === "jobs" ? "Available Active Jobs" : "Available Updates"}
+                            </Label>
+                            {(facebookSourceType === "jobs" ? activeJobsForFacebook.length > 0 : (facebookExamUpdates && facebookExamUpdates.length > 0)) && (
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id="select-all-facebook"
+                                  checked={
+                                    facebookSourceType === "jobs"
+                                      ? activeJobsForFacebook.length > 0 && activeJobsForFacebook.every(j => selectedFacebookJobIds.includes(j.id))
+                                      : !!(facebookExamUpdates && facebookExamUpdates.length > 0 && facebookExamUpdates.every(u => selectedFacebookUpdateIds.includes(u.id)))
+                                  }
+                                  onCheckedChange={(checked) => {
+                                    if (facebookSourceType === "jobs") {
+                                      if (checked) {
+                                        setSelectedFacebookJobIds(activeJobsForFacebook.map(j => j.id));
+                                      } else {
+                                        setSelectedFacebookJobIds([]);
+                                      }
+                                    } else {
+                                      if (checked && facebookExamUpdates) {
+                                        setSelectedFacebookUpdateIds(facebookExamUpdates.map(u => u.id));
+                                      } else {
+                                        setSelectedFacebookUpdateIds([]);
+                                      }
+                                    }
+                                  }}
+                                />
+                                <Label htmlFor="select-all-facebook" className="text-xs cursor-pointer font-normal text-muted-foreground select-none">
+                                  Select All ({facebookSourceType === "jobs" ? activeJobsForFacebook.length : facebookExamUpdates?.length || 0})
+                                </Label>
+                              </div>
+                            )}
+                          </div>
+
+                          {facebookSourceType === "jobs" && activeJobsForFacebook.length > 0 && (
+                            <div className="flex items-center gap-2 mb-2 bg-muted/20 p-2 rounded border text-xs">
+                              <span className="text-muted-foreground font-medium">Sort:</span>
+                              <Select
+                                value={facebookSortField || ""}
+                                onValueChange={(val: any) => {
+                                  setFacebookSortField(val);
+                                }}
+                              >
+                                <SelectTrigger className="h-7 text-xs w-[140px] bg-background">
+                                  <SelectValue placeholder="Sort by" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="created_at">Date Added (Newest)</SelectItem>
+                                  <SelectItem value="last_date">Deadline Date</SelectItem>
+                                  <SelectItem value="vacancies">Vacancies (Highest)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setFacebookSortDirection(prev => prev === "asc" ? "desc" : "asc");
+                                }}
+                              >
+                                {facebookSortDirection === "asc" ? (
+                                  <ArrowUp className="h-3.5 w-3.5 text-muted-foreground" />
+                                ) : (
+                                  <ArrowDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                          
+                          <div className="flex-1 border rounded-md overflow-y-auto max-h-[350px]">
+                            {facebookSourceType === "jobs" ? (
+                              activeJobsForFacebook.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground text-sm">
+                                  No active jobs in this sector.
+                                </div>
+                              ) : (
+                                <div className="divide-y">
+                                  {activeJobsForFacebook.map((job) => (
+                                    <div
+                                      key={job.id}
+                                      className={`p-3 text-xs hover:bg-muted/40 cursor-pointer transition-colors flex items-start gap-2.5 ${
+                                        selectedFacebookJobIds.includes(job.id) ? "bg-muted/60 font-medium" : ""
+                                      }`}
+                                      onClick={() => {
+                                        setSelectedFacebookJobIds(prev =>
+                                          prev.includes(job.id) ? prev.filter(id => id !== job.id) : [...prev, job.id]
+                                        );
+                                      }}
+                                    >
+                                      <Checkbox
+                                        checked={selectedFacebookJobIds.includes(job.id)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onCheckedChange={(checked) => {
+                                          setSelectedFacebookJobIds(prev =>
+                                            checked
+                                              ? [...prev, job.id]
+                                              : prev.filter(id => id !== job.id)
+                                          );
+                                        }}
+                                        className="mt-0.5"
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-sm line-clamp-1">{job.title}</div>
+                                        <div className="text-muted-foreground mt-1 line-clamp-1">{job.department}</div>
+                                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5">
+                                          <span>Vacancies: {job.vacancies_display || job.vacancies || "TBD"}</span>
+                                          <span>Last Date: {(() => {
+                                            const d = getJobDeadlineDate(job);
+                                            if (d) {
+                                              const isCurrentYear = d.getFullYear() === new Date().getFullYear();
+                                              return format(d, isCurrentYear ? "dd MMM" : "dd MMM yyyy");
+                                            }
+                                            return job.last_date_display || job.last_date;
+                                          })()}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )
+                            ) : (
+                              telegramUpdatesLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                </div>
+                              ) : !facebookExamUpdates || facebookExamUpdates.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground text-sm">
+                                  No updates found in this sector.
+                                </div>
+                              ) : (
+                                <div className="divide-y">
+                                  {facebookExamUpdates.map((update) => (
+                                    <div
+                                      key={update.id}
+                                      className={`p-3 text-xs hover:bg-muted/40 cursor-pointer transition-colors flex items-start gap-2.5 ${
+                                        selectedFacebookUpdateIds.includes(update.id) ? "bg-muted/60 font-medium" : ""
+                                      }`}
+                                      onClick={() => {
+                                        setSelectedFacebookUpdateIds(prev =>
+                                          prev.includes(update.id) ? prev.filter(id => id !== update.id) : [...prev, update.id]
+                                        );
+                                      }}
+                                    >
+                                      <Checkbox
+                                        checked={selectedFacebookUpdateIds.includes(update.id)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onCheckedChange={(checked) => {
+                                          setSelectedFacebookUpdateIds(prev =>
+                                            checked
+                                              ? [...prev, update.id]
+                                              : prev.filter(id => id !== update.id)
+                                          );
+                                        }}
+                                        className="mt-0.5"
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-sm line-clamp-1">{update.title}</div>
+                                        <div className="text-muted-foreground mt-1">Status: {update.status || "N/A"}</div>
+                                        <div className="text-[10px] text-muted-foreground mt-1.5">
+                                          Published: {update.published_date || format(new Date(update.created_at), "dd MMM yyyy")}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Right Column: Live Preview & Action */}
+                  <div className="lg:col-span-4 space-y-6">
+                    <Card className="flex flex-col">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg">Message Live Preview</CardTitle>
+                        <CardDescription>Verification before broadcasting</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex-1 flex flex-col justify-between space-y-4">
+                        <div className="flex-1 bg-muted/30 border rounded-lg p-4 font-mono text-xs overflow-y-auto whitespace-pre-wrap max-h-[350px]">
+                          {getFacebookPreviewMessage()}
+                        </div>
+                        <div className="space-y-3 border-t pt-4">
+                          {selectedFacebookPageId ? (
+                            <div className="text-xs text-muted-foreground bg-primary/5 p-2.5 rounded border border-primary/20 flex flex-col gap-1">
+                              <div>
+                                <strong>Sending To:</strong> {facebookPages.find(p => p.id === selectedFacebookPageId)?.name}
+                              </div>
+                              <div>
+                                <strong>Page ID:</strong> {facebookPages.find(p => p.id === selectedFacebookPageId)?.page_id}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-destructive bg-destructive/5 p-2.5 rounded border border-destructive/20">
+                              Please select or configure a Facebook page first.
+                            </div>
+                          )}
+                          
+                          <Button
+                            className="w-full gap-2 h-11"
+                            disabled={
+                              postingToFacebook ||
+                              !selectedFacebookPageId ||
+                              (facebookSourceType === "jobs" ? selectedFacebookJobIds.length === 0 : selectedFacebookUpdateIds.length === 0)
+                            }
+                            onClick={handlePostToFacebook}
+                          >
+                            {postingToFacebook ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Posting notification...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-4 w-4" />
+                                Publish to Facebook
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="flex flex-col">
+                      <CardHeader className="pb-3 pt-4">
+                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                          <Terminal className="h-4 w-4 text-primary" />
+                          Execution Console
+                        </CardTitle>
+                        <CardDescription className="text-[10px]">Real-time Facebook posting logs</CardDescription>
+                      </CardHeader>
+                      <CardContent className="pb-4 pt-0">
+                        <div className="bg-black/95 text-green-400 font-mono text-[10px] p-3 rounded border border-border/40 min-h-[120px] max-h-[180px] overflow-y-auto">
+                          {facebookConsoleLogs.length === 0 ? (
+                            <span className="text-muted-foreground italic">Idle. Console waiting for execution...</span>
+                          ) : (
+                            facebookConsoleLogs.map((log, index) => (
+                              <div key={index} className="line-clamp-2 leading-relaxed">
+                                {log}
+                              </div>
+                            ))
+                          )}
+                          <div ref={facebookConsoleBottomRef} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Posting History & Status Tab */}
+              <TabsContent value="history" className="space-y-6">
+                {/* Pages Grid with statistics */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {facebookPages.map(page => {
+                    const stats = facebookPageStats[page.id] || { total: 0, lastSent: null, lastTitle: null, lastStatus: null };
+                    return (
+                      <Card key={page.id} className="bg-card hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                              <Globe className="h-4 w-4 text-primary" />
+                              {page.name}
+                            </CardTitle>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {page.sector}
+                            </Badge>
+                          </div>
+                          <CardDescription className="text-[11px] font-mono truncate">
+                            ID: {page.page_id}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2.5 text-xs">
+                          <div className="flex justify-between items-center border-b pb-1.5">
+                            <span className="text-muted-foreground">Total Broadcasts:</span>
+                            <span className="font-semibold text-primary">{stats.total} successful</span>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-muted-foreground block text-[11px]">Last Sent Item:</span>
+                            {stats.lastSent ? (
+                              <div className="bg-muted/30 p-1.5 rounded text-[11px] space-y-1">
+                                <div className="font-medium line-clamp-1 text-foreground">
+                                  {stats.lastTitle}
+                                </div>
+                                <div className="flex justify-between text-[10px] text-muted-foreground">
+                                  <span>{format(new Date(stats.lastSent), "dd MMM yyyy, HH:mm")}</span>
+                                  <span>
+                                    {stats.lastStatus === "success" ? (
+                                      <Badge variant="outline" className="bg-green-500/10 text-green-500 hover:bg-green-500/10 text-[9px] py-0 px-1 border-none">
+                                        Success
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="destructive" className="text-[9px] py-0 px-1 border-none">
+                                        Failed
+                                      </Badge>
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic text-[11px]">No posts yet</span>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* History Logs Table */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-md flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        Recent Broadcast History
+                      </CardTitle>
+                      <CardDescription>
+                        Real-time duplicate-checking and dispatch log of the last 100 posts
+                      </CardDescription>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={fetchFacebookLogs}
+                      disabled={loadingFacebookLogs}
+                      className="gap-1.5"
+                    >
+                      {loadingFacebookLogs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                      Refresh logs
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingFacebookLogs ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : facebookLogs.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground text-sm">
+                        No posting logs found. Successful and failed Facebook broadcasts will be logged here.
+                      </div>
+                    ) : (
+                      <div className="border rounded-md overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Broadcast Date</TableHead>
+                              <TableHead>Page Name</TableHead>
+                              <TableHead>Sector</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead className="min-w-[200px]">Item Title</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="max-w-[180px]">Details/Errors</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody className="text-xs">
+                            {facebookLogs.map((log) => {
+                              const title = log.jobs?.title || log.exam_updates?.title || "Unknown Title";
+                              const subtitle = log.jobs?.department || "";
+                              return (
+                                <TableRow key={log.id}>
+                                  <TableCell className="font-mono text-[10px] text-muted-foreground">
+                                    {format(new Date(log.sent_at), "dd MMM yyyy, HH:mm")}
+                                  </TableCell>
+                                  <TableCell className="font-semibold">
+                                    {log.facebook_pages?.name || "Deleted Page"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-[10px]">
+                                      {log.facebook_pages?.sector || "N/A"}
                                     </Badge>
                                   </TableCell>
                                   <TableCell>
@@ -5282,8 +6879,8 @@ ${hashtagsStr}`;
                             const unsaved = discoveredLinks.filter(l => discoverScrapedResults[l.url] && !discoverSavedUrls.has(l.url));
                             let saved = 0;
                             for (const link of unsaved) {
-                              await handleDiscoverSaveJob(link.url);
-                              saved++;
+                              const success = await handleDiscoverSaveJob(link.url);
+                              if (success) saved++;
                             }
                             setDiscoverSavingAll(false);
                             toast({ title: "Save All complete", description: `${saved} job${saved !== 1 ? "s" : ""} saved.` });
@@ -5316,7 +6913,7 @@ ${hashtagsStr}`;
                               const isExpanded = discoverExpandedUrl === link.url;
 
                               return (
-                                <>
+                                <React.Fragment key={link.url}>
                                   <TableRow key={link.url} className={isScraped ? "bg-green-50/50 dark:bg-green-950/10" : ""}>
                                     <TableCell className="text-xs text-muted-foreground font-mono">{idx + 1}</TableCell>
                                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{link.update_date}</TableCell>
@@ -5435,7 +7032,7 @@ ${hashtagsStr}`;
                                       </TableCell>
                                     </TableRow>
                                   )}
-                                </>
+                                </React.Fragment>
                               );
                             })}
                           </TableBody>
@@ -6051,7 +7648,7 @@ ${hashtagsStr}`;
                                 const isSaving = updatesSavingUrl === link.url;
 
                                 return (
-                                  <>
+                                  <React.Fragment key={link.url}>
                                     <TableRow key={link.url} className={isScraped ? "bg-green-50/50 dark:bg-green-950/10" : ""}>
                                       <TableCell className="text-xs text-muted-foreground font-mono">{idx + 1}</TableCell>
                                       <TableCell>
@@ -6340,7 +7937,7 @@ ${hashtagsStr}`;
                                         </TableCell>
                                       </TableRow>
                                     )}
-                                  </>
+                                  </React.Fragment>
                                 );
                               })}
                             </TableBody>
@@ -7073,7 +8670,7 @@ ${hashtagsStr}`;
                 onChange={(e) => setNewTelegramChannelForm({ ...newTelegramChannelForm, name: e.target.value })}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="chan-sector">Mapped Job Sector</Label>
               <Select
@@ -7121,6 +8718,75 @@ ${hashtagsStr}`;
             </Button>
             <Button onClick={handleAddTelegramChannel}>
               Save Channel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Configure Facebook Page Dialog */}
+      <Dialog open={showFacebookAddPageDialog} onOpenChange={setShowFacebookAddPageDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configure Facebook Page</DialogTitle>
+            <DialogDescription>
+              Connect a page ID and page access token to a job sector.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="fb-page-name">Page Name / Alias</Label>
+              <Input
+                id="fb-page-name"
+                placeholder="e.g. UPSC Jobs Page"
+                value={newFacebookPageForm.name}
+                onChange={(e) => setNewFacebookPageForm({ ...newFacebookPageForm, name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fb-page-sector">Mapped Job Sector</Label>
+              <Select
+                value={newFacebookPageForm.sector}
+                onValueChange={(val) => setNewFacebookPageForm({ ...newFacebookPageForm, sector: val })}
+              >
+                <SelectTrigger id="fb-page-sector">
+                  <SelectValue placeholder="Sector" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[200px]">
+                  {allUniqueSectors.map((sector) => (
+                    <SelectItem key={sector} value={sector}>{sector}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fb-page-token">Facebook Page Access Token</Label>
+              <Input
+                id="fb-page-token"
+                type="password"
+                placeholder="Page Access Token from Graph API"
+                value={newFacebookPageForm.access_token}
+                onChange={(e) => setNewFacebookPageForm({ ...newFacebookPageForm, access_token: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fb-page-id">Facebook Page ID</Label>
+              <Input
+                id="fb-page-id"
+                placeholder="e.g. 104847385930193"
+                value={newFacebookPageForm.page_id}
+                onChange={(e) => setNewFacebookPageForm({ ...newFacebookPageForm, page_id: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFacebookAddPageDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddFacebookPage}>
+              Save Page
             </Button>
           </DialogFooter>
         </DialogContent>

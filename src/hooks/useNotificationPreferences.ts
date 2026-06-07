@@ -13,6 +13,9 @@ export interface NotificationPreferences {
   psu: boolean;
   state_psc: boolean;
   healthcare: boolean;
+  teaching: boolean;
+  judiciary: boolean;
+  stenographer: boolean;
   job_notifications: boolean;
   admit_card_notifications: boolean;
   result_notifications: boolean;

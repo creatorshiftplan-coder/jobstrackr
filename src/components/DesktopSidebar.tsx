@@ -17,12 +17,16 @@ import {
   Shield,
   Moon,
   Sun,
+  Send,
+  MessageSquare,
+  Share2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { useTheme } from "next-themes";
+import { useToast } from "@/hooks/use-toast";
 import {
   Sidebar,
   SidebarContent,
@@ -46,28 +50,62 @@ const navItems = [
   { title: "Profile", url: "/profile", icon: User },
 ];
 
-const toolItems = [
-  { title: "Jobs For You", url: "/for-you", icon: Briefcase },
-  { title: "Syllabus Finder", url: "/syllabus", icon: BookOpen },
-  { title: "Application Guide", url: "/formmate", icon: ClipboardList },
-  { title: "Upload Documents", url: "/documents", icon: Upload },
-  { title: "Sector Preferences", url: "/edit-sector-preferences", icon: Settings },
-];
-
-const supportItems = [
-  { title: "Help & Support", url: "/help", icon: HelpCircle },
-  { title: "Privacy Policy", url: "/privacy-policy", icon: ShieldCheck },
-  { title: "Refund Policy", url: "/refund-policy", icon: CreditCard },
-  { title: "Terms of Service", url: "/terms-of-service", icon: FileText },
-];
-
 export function DesktopSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const { isAdmin } = useAdminRole();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleShareApp = async () => {
+    const shareText = `Jobstrackr – Your Smart Government Job Companion.\n\nLatest Govt Jobs • Exam Tracking • AI Recommendations • FormMate • OCR Documents\n\n🔗 https://www.jobstrackr.in/`;
+    
+    const shareData = {
+      title: "JobsTrackr App",
+      text: shareText,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare?.(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Link Copied",
+          description: "App share details copied to clipboard!",
+        });
+      }
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Link Copied",
+          description: "App share details copied to clipboard!",
+        });
+      }
+    }
+  };
+
+  const toolItems = [
+    { title: "Jobs For You", url: "/for-you", icon: Briefcase },
+    { title: "Syllabus Finder", url: "/syllabus", icon: BookOpen },
+    { title: "Application Guide", url: "/formmate", icon: ClipboardList },
+    { title: "Upload Documents", url: "/documents", icon: Upload },
+    { title: "Sector Preferences", url: "/edit-sector-preferences", icon: Settings },
+    ...(user ? [{ title: "Telegram Alerts", url: "/settings/notifications", icon: Send }] : []),
+  ];
+
+  const supportItems = [
+    { title: "User Manual", url: "/user-manual", icon: BookOpen },
+    { title: "Frequently Asked Questions", url: "/faq", icon: HelpCircle },
+    { title: "Help & Support", url: "/help", icon: MessageSquare },
+    { title: "Share this App", onClick: handleShareApp, icon: Share2 },
+    { title: "Privacy Policy", url: "/privacy-policy", icon: ShieldCheck },
+    { title: "Refund Policy", url: "/refund-policy", icon: CreditCard },
+    { title: "Terms of Service", url: "/terms-of-service", icon: FileText },
+  ];
 
   const handleLogout = async () => {
     await signOut();
@@ -166,20 +204,33 @@ export function DesktopSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {supportItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      activeClassName="bg-sidebar-accent text-primary font-semibold"
-                    >
-                      <item.icon className="h-[18px] w-[18px] shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {supportItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    {'onClick' in item ? (
+                      <SidebarMenuButton
+                        onClick={item.onClick}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer"
+                      >
+                        <Icon className="h-[18px] w-[18px] shrink-0" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </SidebarMenuButton>
+                    ) : (
+                      <SidebarMenuButton asChild>
+                        <NavLink
+                          to={item.url!}
+                          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          activeClassName="bg-sidebar-accent text-primary font-semibold"
+                        >
+                          <Icon className="h-[18px] w-[18px] shrink-0" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

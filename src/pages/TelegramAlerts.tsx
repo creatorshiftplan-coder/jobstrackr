@@ -35,6 +35,9 @@ export default function TelegramAlerts() {
     psu: false,
     state_psc: false,
     healthcare: false,
+    teaching: false,
+    judiciary: false,
+    stenographer: false,
   });
 
   const [alerts, setAlerts] = useState({
@@ -74,6 +77,9 @@ export default function TelegramAlerts() {
         psu: preferences.psu,
         state_psc: preferences.state_psc,
         healthcare: preferences.healthcare,
+        teaching: preferences.teaching || false,
+        judiciary: preferences.judiciary || false,
+        stenographer: preferences.stenographer || false,
       });
 
       setAlerts({
@@ -288,6 +294,9 @@ export default function TelegramAlerts() {
                 { key: "psu", label: "PSU" },
                 { key: "state_psc", label: "State PSC" },
                 { key: "healthcare", label: "Healthcare" },
+                { key: "teaching", label: "Teaching" },
+                { key: "judiciary", label: "Judiciary" },
+                { key: "stenographer", label: "Stenographer" },
               ].map((cat) => {
                 const isActive = categories[cat.key as keyof typeof categories];
                 return (
