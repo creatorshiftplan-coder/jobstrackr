@@ -4,8 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Check, Loader2, Send, ShieldCheck, X, AlertTriangle, Plus } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Send, ShieldCheck, X, AlertTriangle, Plus, Bell, BellOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+import {
+  isPushSupported,
+  requestNotificationPermission,
+  subscribeUserToPush,
+  syncPushSubscriptionToBackend,
+  unsubscribeUserFromPush
+} from "@/utils/pushNotifications";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { INDIAN_STATES } from "@/constants/filters";
 import { BottomNav } from "@/components/BottomNav";
@@ -24,6 +32,93 @@ export default function TelegramAlerts() {
     toggleTelegramActive,
     disconnectTelegram,
   } = useNotificationPreferences();
+
+  // Web Push local states
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
+  const [pushLoading, setPushLoading] = useState(false);
+  const [webPushAlerts, setWebPushAlerts] = useState({
+    job_alerts: true,
+    exam_reminders: true,
+    admit_card_alerts: true,
+    result_alerts: true,
+  });
+
+  useEffect(() => {
+    const supported = isPushSupported();
+    setPushSupported(supported);
+    if (supported) {
+      setPushPermission(Notification.permission);
+      const savedWebPush = localStorage.getItem("jobstrackr_web_push_alerts");
+      if (savedWebPush) {
+        try {
+          setWebPushAlerts(JSON.parse(savedWebPush));
+        } catch (e) {}
+      }
+    }
+  }, []);
+
+  const handleWebPushToggle = async (key: keyof typeof webPushAlerts) => {
+    const updated = { ...webPushAlerts, [key]: !webPushAlerts[key] };
+    setWebPushAlerts(updated);
+    localStorage.setItem("jobstrackr_web_push_alerts", JSON.stringify(updated));
+
+    if (pushPermission === "granted" && user?.id) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await syncPushSubscriptionToBackend(user.id, sub, updated);
+        }
+      } catch (err) {
+        console.error("Failed to sync push settings:", err);
+      }
+    }
+  };
+
+  const handleEnableWebPush = async () => {
+    if (!user?.id) {
+      navigate("/auth");
+      return;
+    }
+    setPushLoading(true);
+    try {
+      const permission = await requestNotificationPermission();
+      setPushPermission(permission);
+      
+      if (permission === "granted") {
+        const VAPID_PUBLIC_KEY = "BEl625sKc2RnM4T9u8X5hC_7v6a83Fv95x2u4hB_Z6y2v5h94w1w5v4h8x1u2h9_y2u3h5v_z2w4v5y6h1u9a8";
+        const sub = await subscribeUserToPush(VAPID_PUBLIC_KEY);
+        await syncPushSubscriptionToBackend(user.id, sub, webPushAlerts);
+        toast.success("Browser notifications enabled successfully!");
+      } else if (permission === "denied") {
+        toast.error("Notification permission denied. Please enable them in browser settings.");
+      }
+    } catch (err: any) {
+      console.error("Error enabling web push:", err);
+      toast.error(err.message || "Failed to enable notifications");
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const handleDisableWebPush = async () => {
+    setPushLoading(true);
+    try {
+      const success = await unsubscribeUserFromPush();
+      if (success) {
+        setPushPermission("default");
+        toast.success("Browser notifications disabled.");
+      } else {
+        toast.error("Failed to unsubscribe.");
+      }
+    } catch (err) {
+      console.error("Error disabling web push:", err);
+      toast.error("Error disabling notifications");
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   // Local States for preferences editing
   const [categories, setCategories] = useState({
@@ -271,6 +366,118 @@ export default function TelegramAlerts() {
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
                   Pressing Connect redirects you to our verified bot. Tap "Start" in Telegram to finalize connection.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Browser Push Notifications Card */}
+        <Card className="border-0 shadow-card bg-white dark:bg-card overflow-hidden">
+          <CardHeader className="bg-primary/5 dark:bg-primary/10 border-b border-border/50">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Bell className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-semibold text-foreground">Browser Push Alerts</CardTitle>
+                <CardDescription className="text-xs">Receive real-time alerts directly on your browser or phone screen</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 space-y-4">
+            {!pushSupported ? (
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-xs border border-amber-500/20">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold">Not Supported:</span> Web Push is not fully supported by your browser or configuration. If you are using an iOS device, please make sure you have installed this app to your home screen using Safari's "Add to Home Screen" option before enabling permissions.
+                </div>
+              </div>
+            ) : pushPermission === "denied" ? (
+              <div className="space-y-4">
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-destructive/10 text-destructive text-xs border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">Notification Blocked:</span> You have blocked notifications for this site. To receive alerts, please reset the notification permission in your browser or device settings (click the lock icon in the URL bar).
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.reload()}
+                  className="w-full text-xs rounded-xl"
+                >
+                  Reload Page to Check Permission
+                </Button>
+              </div>
+            ) : pushPermission === "granted" ? (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                      <span className="font-semibold text-sm text-emerald-800 dark:text-emerald-300">Browser Alerts Active</span>
+                    </div>
+                    <p className="text-[10px] text-emerald-600/90 dark:text-emerald-400/90 mt-1">
+                      Your browser is registered to receive push notification updates
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs text-destructive hover:bg-destructive/10 border-destructive/20 shrink-0"
+                    onClick={handleDisableWebPush}
+                    disabled={pushLoading}
+                  >
+                    {pushLoading ? "Processing..." : "Disable Alerts"}
+                  </Button>
+                </div>
+
+                {/* Sub-Preferences for Web Push */}
+                <div className="space-y-3.5 border-t pt-4">
+                  <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Configure Push Topics</h4>
+                  {[
+                    { key: "job_alerts", label: "Job Alerts", desc: "Get real-time alerts as soon as a new recruitment is posted" },
+                    { key: "exam_reminders", label: "Exam Reminders", desc: "Get updates on registration dates and exam deadlines" },
+                    { key: "admit_card_alerts", label: "Admit Cards", desc: "Get updates when hall tickets and admit cards are released" },
+                    { key: "result_alerts", label: "Results & Keys", desc: "Get notified when exam answers and results are published" },
+                  ].map((topic) => (
+                    <div key={topic.key} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary/10 transition-colors">
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-medium text-foreground">{topic.label}</span>
+                        <p className="text-[10px] text-muted-foreground">{topic.desc}</p>
+                      </div>
+                      <Switch
+                        checked={webPushAlerts[topic.key as keyof typeof webPushAlerts]}
+                        onCheckedChange={() => handleWebPushToggle(topic.key as keyof typeof webPushAlerts)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 py-2">
+                <p className="text-sm text-muted-foreground">
+                  Get real-time exam notifications, application updates, and result alerts pushed directly to your screen, even when you aren't browsing the app.
+                </p>
+                <Button
+                  onClick={handleEnableWebPush}
+                  disabled={pushLoading}
+                  className="w-full flex items-center justify-center gap-2 py-5 text-sm rounded-xl shadow-md"
+                >
+                  {pushLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Enabling alerts...
+                    </>
+                  ) : (
+                    <>
+                      <Bell className="h-4 w-4" />
+                      Enable Browser Alerts
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  You can unsubscribe or manage individual notification topics at any time here.
                 </p>
               </div>
             )}

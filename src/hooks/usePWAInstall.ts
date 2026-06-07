@@ -130,7 +130,7 @@ export function usePWAInstall() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Criteria 2: User visits 3 pages in their session
+  // Criteria 2: User visits 2 pages in their session
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -143,7 +143,7 @@ export function usePWAInstall() {
 
     const handlePathChange = () => {
       const currentViews = incrementPageView();
-      if (currentViews >= 3) {
+      if (currentViews >= 2) {
         setPageViewsEnough(true);
       }
     };

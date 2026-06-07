@@ -17,6 +17,7 @@ import { Loader2 } from "lucide-react";
 
 import { SplashScreen, shouldShowSplash } from "@/components/SplashScreen";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 // Eager load critical routes
 import Welcome from "./pages/Welcome";
@@ -86,6 +87,7 @@ const App = () => {
               <ScrollRestoration />
               <AnalyticsProvider>
                 <AuthRequiredProvider>
+                  <OfflineIndicator />
                   <InstallPrompt />
                   <SidebarProvider defaultOpen={true}>
                     <div className="flex min-h-screen w-full">

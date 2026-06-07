@@ -214,16 +214,20 @@ export async function callWithRotation(
 
         // Update success stats (non-blocking)
         if (!key.id.startsWith("env-")) {
-          supabase
-            .from("api_keys_config")
-            .update({
-              last_used_at: new Date().toISOString(),
-              total_calls: (key.total_calls || 0) + 1,
-              last_error: null,
-            })
-            .eq("id", key.id)
-            .then(() => {})
-            .catch((e: any) => console.warn("Failed to update key stats:", e));
+          (async () => {
+            try {
+              await supabase
+                .from("api_keys_config")
+                .update({
+                  last_used_at: new Date().toISOString(),
+                  total_calls: (key.total_calls || 0) + 1,
+                  last_error: null,
+                })
+                .eq("id", key.id);
+            } catch (e: any) {
+              console.warn("Failed to update key stats:", e);
+            }
+          })();
         }
 
         console.log(`Key ${i + 1} succeeded (${key.provider}/${key.model_name})`);
@@ -240,15 +244,19 @@ export async function callWithRotation(
 
         // Update error stats
         if (!key.id.startsWith("env-")) {
-          supabase
-            .from("api_keys_config")
-            .update({
-              last_error: `${statusCode}: rate limited / exhausted`,
-              total_errors: (key.total_errors || 0) + 1,
-            })
-            .eq("id", key.id)
-            .then(() => {})
-            .catch(() => {});
+          (async () => {
+            try {
+              await supabase
+                .from("api_keys_config")
+                .update({
+                  last_error: `${statusCode}: rate limited / exhausted`,
+                  total_errors: (key.total_errors || 0) + 1,
+                })
+                .eq("id", key.id);
+            } catch {
+              // ignore
+            }
+          })();
         }
         continue;
       }
@@ -264,16 +272,20 @@ export async function callWithRotation(
         lastError = `Key ${key.label || key.provider} invalid or blocked (${statusCode})`;
 
         if (!key.id.startsWith("env-")) {
-          supabase
-            .from("api_keys_config")
-            .update({
-              is_active: false,
-              last_error: `${statusCode}: ${errorText.slice(0, 200)}`,
-              total_errors: (key.total_errors || 0) + 1,
-            })
-            .eq("id", key.id)
-            .then(() => {})
-            .catch(() => {});
+          (async () => {
+            try {
+              await supabase
+                .from("api_keys_config")
+                .update({
+                  is_active: false,
+                  last_error: `${statusCode}: ${errorText.slice(0, 200)}`,
+                  total_errors: (key.total_errors || 0) + 1,
+                })
+                .eq("id", key.id);
+            } catch {
+              // ignore
+            }
+          })();
         }
         continue;
       }
@@ -283,15 +295,19 @@ export async function callWithRotation(
       lastError = `API error ${statusCode}: ${errorText.slice(0, 100)}`;
 
       if (!key.id.startsWith("env-")) {
-        supabase
-          .from("api_keys_config")
-          .update({
-            last_error: `${statusCode}: ${errorText.slice(0, 200)}`,
-            total_errors: (key.total_errors || 0) + 1,
-          })
-          .eq("id", key.id)
-          .then(() => {})
-          .catch(() => {});
+        (async () => {
+          try {
+            await supabase
+              .from("api_keys_config")
+              .update({
+                last_error: `${statusCode}: ${errorText.slice(0, 200)}`,
+                total_errors: (key.total_errors || 0) + 1,
+              })
+              .eq("id", key.id);
+          } catch {
+            // ignore
+          }
+        })();
       }
       break;
 

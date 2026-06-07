@@ -5,7 +5,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN") || "8585881447:AAE1_z-hAnsPujKTsjwForq1bQcvmVZEqhY";
+const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+if (!BOT_TOKEN) {
+  throw new Error("TELEGRAM_BOT_TOKEN environment variable is missing!");
+}
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 async function sendTelegramMessage(chatId: string | number, text: string, replyMarkup?: object) {
@@ -34,6 +37,21 @@ async function sendTelegramMessage(chatId: string | number, text: string, replyM
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Validate Telegram webhook secret token to prevent notification hijacking
+  const webhookSecret = Deno.env.get("TELEGRAM_WEBHOOK_SECRET");
+  if (webhookSecret) {
+    const receivedSecret = req.headers.get("X-Telegram-Bot-API-Secret-Token");
+    if (receivedSecret !== webhookSecret) {
+      console.error("Security Alert: Unauthorized Telegram bot webhook invocation attempt.");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized access" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  } else {
+    console.warn("TELEGRAM_WEBHOOK_SECRET is not configured. Webhook secret validation is bypassed.");
   }
 
   try {
@@ -80,6 +98,18 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (profile?.full_name) {
           userName = profile.full_name;
+        }
+
+        // Ensure notification preferences row exists for this user to satisfy foreign key constraints
+        const { error: prefError } = await supabase
+          .from("notification_preferences")
+          .upsert(
+            { user_id: userId },
+            { onConflict: "user_id", ignoreDuplicates: true }
+          );
+
+        if (prefError) {
+          console.error("[telegram-bot] Preference initialization error:", prefError);
         }
 
         // Save connection in supabase (upsert)

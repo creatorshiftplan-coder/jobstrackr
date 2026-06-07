@@ -54,3 +54,7 @@ verify_jwt = true
 
 [functions.syllabus-search]
 verify_jwt = true
+
+[functions.telegram-bot]
+verify_jwt = false
+

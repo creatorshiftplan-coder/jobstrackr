@@ -1,9 +1,13 @@
 {
   "version": "5",
+  "redirects": {
+    "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2.100.0"
+  },
   "remote": {
     "https://deno.land/std@0.224.0/dotenv/mod.ts": "0180eaeedaaf88647318811cdaa418cc64dc51fb08354f91f5f480d0a1309f7d",
     "https://deno.land/std@0.224.0/dotenv/parse.ts": "09977ff88dfd1f24f9973a338f0f91bbdb9307eb5ff6085446e7c423e4c7ba0c",
-    "https://deno.land/std@0.224.0/dotenv/stringify.ts": "275da322c409170160440836342eaa7cf012a1d11a7e700d8ca4e7f2f8aa4615"
+    "https://deno.land/std@0.224.0/dotenv/stringify.ts": "275da322c409170160440836342eaa7cf012a1d11a7e700d8ca4e7f2f8aa4615",
+    "https://esm.sh/@supabase/supabase-js@2.100.0": "e3f8cd4f9df4df6e8dbf724810f5146414a7f4b4351d2403fa44a82d84dc8336"
   },
   "workspace": {
     "packageJson": {
@@ -40,10 +44,12 @@
         "npm:@supabase/supabase-js@^2.86.2",
         "npm:@tailwindcss/typography@~0.5.16",
         "npm:@tanstack/react-query@^5.83.0",
-        "npm:@types/node@^22.16.5",
+        "npm:@types/node@^22.19.15",
         "npm:@types/react-dom@^18.3.7",
         "npm:@types/react@^18.3.23",
+        "npm:@vercel/node@^5.5.16",
         "npm:@vitejs/plugin-react-swc@^3.11.0",
+        "npm:@xenova/transformers@^2.17.2",
         "npm:autoprefixer@^10.4.21",
         "npm:class-variance-authority@~0.7.1",
         "npm:clsx@^2.1.1",
@@ -53,6 +59,7 @@
         "npm:eslint-plugin-react-hooks@^5.2.0",
         "npm:eslint-plugin-react-refresh@~0.4.20",
         "npm:eslint@^9.32.0",
+        "npm:framer-motion@^12.23.26",
         "npm:globals@^15.15.0",
         "npm:input-otp@^1.4.2",
         "npm:lottie-react@^2.4.1",
@@ -79,4 +86,3 @@
     }
   }
 }
-       

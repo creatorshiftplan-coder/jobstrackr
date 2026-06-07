@@ -5,7 +5,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN") || "8585881447:AAE1_z-hAnsPujKTsjwForq1bQcvmVZEqhY";
+const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+if (!BOT_TOKEN) {
+  throw new Error("TELEGRAM_BOT_TOKEN environment variable is missing!");
+}
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 interface QueueItem {
@@ -369,9 +372,52 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Validate Authorization Header
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    console.error("Security Alert: Missing authorization header on queue processor.");
+    return new Response(
+      JSON.stringify({ error: "Authorization required" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const token = authHeader.replace("Bearer ", "");
+  let isAuthorized = false;
+
+  // 1. Check if authorized via service role key (webhook/db trigger)
+  if (token === supabaseKey) {
+    isAuthorized = true;
+  } else {
+    // 2. Authenticate user JWT from frontend (Admin panel actions)
+    try {
+      const supabaseUserClient = createClient(supabaseUrl, supabaseKey);
+      const { data: { user }, error: authError } = await supabaseUserClient.auth.getUser(token);
+      if (!authError && user) {
+        // Query user's admin role using has_any_admin_role RPC
+        const { data: isAdmin, error: roleError } = await supabaseUserClient.rpc("has_any_admin_role", {
+          _user_id: user.id
+        });
+        if (!roleError && isAdmin === true) {
+          isAuthorized = true;
+        }
+      }
+    } catch (err) {
+      console.error("[process-telegram-queue] Auth verification exception:", err);
+    }
+  }
+
+  if (!isAuthorized) {
+    console.error("Security Alert: Unauthorized access attempt to queue processor.");
+    return new Response(
+      JSON.stringify({ error: "Unauthorized access" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log("[process-telegram-queue] Worker started...");

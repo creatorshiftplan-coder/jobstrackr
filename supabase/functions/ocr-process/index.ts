@@ -153,6 +153,23 @@ Deno.serve(async (req) => {
 
     console.log(`Extracted file path: ${filePath}`);
 
+    // Validate that the file belongs to the calling user (prevent IDOR)
+    const cleanFilePath = filePath.replace(/^\/+/, "");
+    const pathParts = cleanFilePath.split("/");
+    const fileOwnerId = pathParts[0];
+    if (fileOwnerId !== user.id && !isAdmin) {
+      console.error(`Security Alert: User ${user.id} attempted to access file owned by ${fileOwnerId}`);
+      await supabase
+        .from("documents")
+        .update({ ocr_status: "failed" })
+        .eq("id", document_id)
+        .eq("user_id", user.id);
+      return new Response(
+        JSON.stringify({ data: null, error: "Access denied: You do not have permission to access this document.", success: false }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { data: fileData, error: downloadError } = await supabase.storage
       .from("documents")
       .download(filePath);

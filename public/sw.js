@@ -1,8 +1,9 @@
-const CACHE_NAME = 'jobstrackr-pwa-cache-v1';
+const CACHE_NAME = 'jobstrackr-pwa-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/site.webmanifest',
+  '/manifest.json',
+  '/offline.html',
   '/logo.png',
   '/favicon.ico',
   '/favicon-96x96.png',
@@ -40,28 +41,52 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Stale-while-revalidate for assets, Network-first for routes
+// Fetch Event
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
-  // Skip API requests and external telemetry/Supabase requests
-  if (
-    event.request.url.includes('/api/') || 
-    event.request.url.includes('supabase.co') ||
-    event.request.method !== 'GET'
-  ) {
+  // Skip non-GET requests and external Supabase REST requests that aren't API cache calls
+  if (event.request.method !== 'GET' || event.request.url.includes('supabase.co/rest/v1/')) {
     return;
   }
 
-  // HTML Page Navigation - Network first, fall back to offline index
+  // Network-First for API cache endpoints to support offline listings, recommendations, and tracking
+  if (
+    requestUrl.origin === self.location.origin &&
+    (
+      event.request.url.includes('/api/cache/homepage') ||
+      event.request.url.includes('/api/cache/jobs') ||
+      event.request.url.includes('/api/cache/trending-exams') ||
+      event.request.url.includes('/api/cache/exam-updates')
+    )
+  ) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // HTML Page Navigation - Network first, fallback to cached index.html shell, then offline.html
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
-        return caches.match('/').then((response) => {
-          return response || new Response('Offline. Please check your internet connection.', {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: new Headers({ 'Content-Type': 'text/html' })
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          return caches.match('/index.html').then((indexResponse) => {
+            if (indexResponse) return indexResponse;
+            return caches.match('/offline.html');
           });
         });
       })
@@ -101,5 +126,68 @@ self.addEventListener('fetch', (event) => {
         return networkResponse;
       });
     })
+  );
+});
+
+// Push Notification Event Listener (Architecture Foundation)
+self.addEventListener('push', (event) => {
+  let data = {
+    title: 'JobsTrackr Alert',
+    body: 'New government job notification or exam update available!',
+    icon: '/icon-192x192.png',
+    badge: '/favicon-96x96.png',
+    data: { url: '/' }
+  };
+
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      data = { ...data, ...payload };
+    } catch (e) {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || '/icon-192x192.png',
+    badge: data.badge || '/favicon-96x96.png',
+    vibrate: [100, 50, 100],
+    data: data.data || { url: '/' },
+    actions: [
+      { action: 'open', title: 'Open App' },
+      { action: 'close', title: 'Dismiss' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Notification Click Event Listener (Architecture Foundation)
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'close') {
+    return;
+  }
+
+  const targetUrl = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // If a window is already open, focus it and navigate to target URL
+        for (const client of clientList) {
+          if (client.url === targetUrl && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // If no window is open, open a new tab/window
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(targetUrl);
+        }
+      })
   );
 });
