@@ -333,27 +333,7 @@ export function useAutoDiscover() {
             }
             const insertedJobIds = insertedJobs.map(j => j.id);
 
-            // Trigger auto-verification with staggered delays (2s between each)
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.access_token && insertedJobIds.length > 0) {
-                const VERIFY_DELAY_MS = 2000;
-                for (let i = 0; i < insertedJobIds.length; i++) {
-                    setTimeout(() => {
-                        fetch(
-                            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/refresh-job-data`,
-                            {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json",
-                                    "Authorization": `Bearer ${session.access_token}`,
-                                },
-                                body: JSON.stringify({ jobId: insertedJobIds[i], autoApply: true }),
-                            }
-                        ).catch(err => console.error("Auto-verify trigger error:", err));
-                    }, i * VERIFY_DELAY_MS);
-                }
-            }
-
+            // Return count of inserted jobs
             return { inserted: jobsToAdd.length };
         },
         onSuccess: () => {

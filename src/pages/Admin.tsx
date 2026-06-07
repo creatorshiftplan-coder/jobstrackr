@@ -3192,19 +3192,14 @@ ${hashtagsStr}`;
         if (error) throw error;
         toast({ title: "Job updated successfully!" });
       } else {
-        // Insert and get the new job ID for auto-verification
+        // Insert
         const { data: newJob, error } = await supabase
           .from("jobs")
           .insert(payload)
           .select("id")
           .single();
         if (error) throw error;
-        toast({ title: "Job created!", description: "Verifying in background..." });
-
-        // Trigger auto-verification in background (non-blocking)
-        if (newJob?.id) {
-          autoVerifyJob(newJob.id);
-        }
+        toast({ title: "Job created!" });
       }
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       setShowAddDialog(false);
@@ -3642,10 +3637,6 @@ ${hashtagsStr}`;
       queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       toast({ title: "Saved!", description: `${jobRecord.title} added to database.` });
-
-      if (newJob?.id) {
-        autoVerifyJob(newJob.id);
-      }
       return true;
     } catch (error: any) {
       toast({ title: "Save failed", description: error.message, variant: "destructive" });
@@ -3845,15 +3836,10 @@ ${hashtagsStr}`;
 
       toast({
         title: "Job added successfully!",
-        description: `${jobRecord.title}. Verifying in background...`,
+        description: `${jobRecord.title}.`,
       });
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
-
-      // Auto-verify in background
-      if (newJob?.id) {
-        autoVerifyJob(newJob.id);
-      }
 
       // Clear scraper state
       setScraperResult(null);
@@ -4009,37 +3995,14 @@ ${hashtagsStr}`;
         messages.push(`${duplicateJobs.length} duplicates skipped`);
       }
 
-      // Show toast with verification info
-      const verifyingText = newJobIds.length > 0 ? `. Verifying ${newJobIds.length} job(s) in background...` : "";
-      toast({ title: messages.join(", ") + "!" + verifyingText });
+      // Show toast
+      toast({ title: messages.join(", ") + "!" });
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       setShowBulkDialog(false);
       setBulkJobs([]);
       setJsonText("");
       setDuplicateMode("skip");
-
-      // Trigger auto-verification with staggered delays (2s between each) to prevent rate limiting
-      const VERIFY_DELAY_MS = 2000;
-      let successCount = 0;
-      let pendingCount = newJobIds.length;
-
-      for (let i = 0; i < newJobIds.length; i++) {
-        setTimeout(async () => {
-          const success = await autoVerifyJob(newJobIds[i], false);
-          if (success) successCount++;
-          pendingCount--;
-
-          // Show final summary when all complete
-          if (pendingCount === 0) {
-            queryClient.invalidateQueries({ queryKey: ["jobs"] });
-            toast({
-              title: `Verification complete`,
-              description: `${successCount}/${newJobIds.length} jobs verified successfully.`,
-            });
-          }
-        }, i * VERIFY_DELAY_MS);
-      }
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
