@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS public.suggestions_grievances (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Ensure ip_hash column exists in case the table was created without it in a previous run
+ALTER TABLE public.suggestions_grievances ADD COLUMN IF NOT EXISTS ip_hash TEXT;
+
 -- 2. Enable Row-Level Security
 ALTER TABLE public.suggestions_grievances ENABLE ROW LEVEL SECURITY;
 
