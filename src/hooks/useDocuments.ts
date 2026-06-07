@@ -58,6 +58,18 @@ export function useDocuments() {
     mutationFn: async ({ file, documentType }: { file: File; documentType: string }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
+      // 1. Enforce file size limits (10MB maximum)
+      const maxSizeBytes = 10 * 1024 * 1024;
+      if (file.size > maxSizeBytes) {
+        throw new Error("File size exceeds the 10MB limit.");
+      }
+
+      // 2. Enforce allowed MIME types (JPEG, PNG, WebP, and PDF)
+      const allowedMimes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+      if (!allowedMimes.includes(file.type)) {
+        throw new Error("Invalid file type. Only JPEG, PNG, WebP, and PDF are allowed.");
+      }
+
       const fileExt = file.name.split(".").pop();
       const filePath = `${user.id}/${Date.now()}.${fileExt}`;
 

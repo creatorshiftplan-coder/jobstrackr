@@ -16,11 +16,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 from http.server import BaseHTTPRequestHandler
 from article_scraper import scrape_article
 from rephraser import rephrase_article
+from auth import is_request_authorized, is_domain_allowed
 
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
+            # 1. Enforce Authentication and Role Checking
+            auth_header = self.headers.get("Authorization", "")
+            if not is_request_authorized(auth_header):
+                self._send_json(401, {"status": "error", "error": "Unauthorized access"})
+                return
+
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
             data = json.loads(body) if body else {}
@@ -36,6 +43,11 @@ class handler(BaseHTTPRequestHandler):
 
             if not url.startswith("http"):
                 self._send_json(400, {"status": "error", "error": "URL must start with http:// or https://"})
+                return
+
+            # 2. Enforce Domain Allowlist (SSRF Protection)
+            if not is_domain_allowed(url):
+                self._send_json(403, {"status": "error", "error": "Forbidden: Target URL domain is not allowed"})
                 return
 
             try:
