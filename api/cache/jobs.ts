@@ -44,11 +44,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       });
 
-      if (!response.ok) {
-        throw new Error(`Supabase fetch failed: ${response.status} ${response.statusText}`);
-      }
-
-      return response.json();
+      const rawJobs = await response.json();
+      return (rawJobs || []).map((job: any) => {
+        if (job.job_metadata) {
+          const {
+            eligibility_profile,
+            overview,
+            selection_process,
+            vacancies_detail,
+            important_dates,
+            ...rest
+          } = job.job_metadata;
+          job.job_metadata = rest;
+        }
+        return job;
+      });
     });
 
     res.setHeader('X-Cache-Hit', cacheHit ? '1' : '0');

@@ -68,7 +68,7 @@ export function useApiKeys() {
   const query = useQuery({
     queryKey: ["api-keys-config"],
     queryFn: async (): Promise<ApiKeyEntry[]> => {
-      const { data, error } = await (supabase.from as any)("api_keys_config")
+      const { data, error } = await (supabase.from as any)("decrypted_api_keys_config")
         .select("*")
         .order("priority", { ascending: true })
         .order("created_at", { ascending: true });

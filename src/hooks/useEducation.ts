@@ -45,6 +45,7 @@ export function useEducation(options: UseEducationOptions = {}) {
       return (data || []) as EducationQualification[];
     },
     enabled: enabled && !!user?.id,
+    staleTime: 1000 * 60 * 10, // 10 minutes — education changes infrequently
   });
 
   const addEducation = useMutation({

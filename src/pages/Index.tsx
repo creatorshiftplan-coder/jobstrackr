@@ -13,6 +13,7 @@ import { useHomepageData } from "@/hooks/useHomepageData";
 import { useAuth } from "@/hooks/useAuth";
 import { useExams } from "@/hooks/useExams";
 import { useProfile } from "@/hooks/useProfile";
+import { useEducation } from "@/hooks/useEducation";
 import { useRecommendations } from "@/hooks/useRecommendations";
 import { useSimilarJobs } from "@/hooks/useSimilarJobs";
 import { useForYouJobs } from "@/hooks/useForYouJobs";
@@ -28,7 +29,6 @@ const colorVariants = ["pink", "blue", "green", "orange"] as const;
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, isGuestMode } = useAuth();
-  const [personalizedSectionsReady, setPersonalizedSectionsReady] = useState(false);
 
   useEffect(() => {
     // Allow access if user is logged in OR is in guest mode
@@ -37,25 +37,20 @@ const Index = () => {
     }
   }, [user, authLoading, isGuestMode, navigate]);
 
+  // Defer similar_jobs RPC to after idle — it's an enhancement, not critical
+  const [similarJobsReady, setSimilarJobsReady] = useState(false);
   useEffect(() => {
-    let timeoutId: number | undefined;
     let idleId: number | undefined;
-
-    const enablePersonalizedSections = () => setPersonalizedSectionsReady(true);
-
+    let timeoutId: number | undefined;
+    const enable = () => setSimilarJobsReady(true);
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(enablePersonalizedSections, { timeout: 400 });
+      idleId = window.requestIdleCallback(enable, { timeout: 1500 });
     } else {
-      timeoutId = window.setTimeout(enablePersonalizedSections, 250);
+      timeoutId = window.setTimeout(enable, 800);
     }
-
     return () => {
-      if (idleId !== undefined && "cancelIdleCallback" in window) {
-        window.cancelIdleCallback(idleId);
-      }
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
-      }
+      if (idleId !== undefined && "cancelIdleCallback" in window) window.cancelIdleCallback(idleId);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     };
   }, []);
 
@@ -83,15 +78,27 @@ const Index = () => {
       ref.current.scrollBy({ left: cardWidth, behavior: 'smooth' });
     }
   };
+
+  // ── Core data: single bundled API call ──
   const { data: homepageData, isLoading: homepageLoading, error: homepageError } = useHomepageData();
   const jobs = homepageData?.allJobs;
   const isLoading = homepageLoading;
   const error = homepageError;
+
+  // ── Shared user data: fetched once, passed to all personalization hooks ──
   const { userExams } = useExams({ includeExamCatalog: false });
   const { profile, isLoading: profileLoading } = useProfile();
-  const { recommended: hybridRecommended, examMatched, hasTrackedExams } = useRecommendations(10, personalizedSectionsReady, jobs);
-  const { forYouJobs, hasWizardAnswers } = useForYouJobs(5, personalizedSectionsReady, jobs);
+  const { education } = useEducation();
   const queryClient = useQueryClient();
+
+  // ── Personalization hooks: use shared data to avoid redundant fetches ──
+  const sharedOptions = { initialProfile: profile, initialUserExams: userExams };
+  const { recommended: hybridRecommended, examMatched, hasTrackedExams } = useRecommendations(
+    10, true, jobs, sharedOptions,
+  );
+  const { forYouJobs, hasWizardAnswers } = useForYouJobs(
+    5, true, jobs, { ...sharedOptions, initialEducation: education },
+  );
 
   // Prefetch explore page data when idle (P7: cross-page prefetching)
   useEffect(() => {
@@ -146,9 +153,9 @@ const Index = () => {
     return hybridRecommended.map((r) => r.job).slice(0, 5);
   }, [hybridRecommended]);
 
-  // Similar jobs based on top recommendation or newest job
+  // Similar jobs based on top recommendation or newest job (deferred to idle)
   const seedJobId = recommendedJobs[0]?.id || newJobs[0]?.id;
-  const { data: similarJobs = [] } = useSimilarJobs(seedJobId, 5, personalizedSectionsReady);
+  const { data: similarJobs = [] } = useSimilarJobs(seedJobId, 5, similarJobsReady);
 
   // Jobs matching user's tracked exams
   const examMatchedJobs = useMemo(() => {

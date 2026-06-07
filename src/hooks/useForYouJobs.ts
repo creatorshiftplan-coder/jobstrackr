@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useJobs } from "@/hooks/useJobs";
-import { useProfile } from "@/hooks/useProfile";
-import { useEducation } from "@/hooks/useEducation";
-import { useExams } from "@/hooks/useExams";
+import { useProfile, Profile } from "@/hooks/useProfile";
+import { useEducation, EducationQualification } from "@/hooks/useEducation";
+import { useExams, ExamAttempt } from "@/hooks/useExams";
 import { useAuth } from "@/hooks/useAuth";
 import { Job } from "@/types/job";
 import {
@@ -51,18 +51,45 @@ function readStoredAnswers(userId: string | null | undefined): Record<string, st
   }
 }
 
+interface UseForYouJobsOptions {
+  /** Pre-fetched profile to avoid a redundant Supabase call */
+  initialProfile?: Profile | null;
+  /** Pre-fetched education to avoid a redundant Supabase call */
+  initialEducation?: EducationQualification[];
+  /** Pre-fetched user exams to avoid a redundant Supabase call */
+  initialUserExams?: ExamAttempt[];
+}
+
 /**
  * Hook that replicates the /for-you page matching logic for the homepage.
  * Reads wizard answers from localStorage and runs full matchAndSort + hybridRecommend.
  * Only returns results if the user has completed the wizard (has stored preferences).
+ *
+ * Performance: When called from the homepage, pass initialJobs/initialProfile/initialEducation/initialUserExams
+ * to avoid 4 redundant Supabase queries.
  */
-export function useForYouJobs(limit: number = 5, enabled: boolean = true, initialJobs?: Job[]) {
+export function useForYouJobs(
+  limit: number = 5,
+  enabled: boolean = true,
+  initialJobs?: Job[],
+  options?: UseForYouJobsOptions,
+) {
   const { user } = useAuth();
+
+  // Only fetch if not provided externally
+  const hasInitialProfile = options?.initialProfile !== undefined;
+  const hasInitialEducation = options?.initialEducation !== undefined;
+  const hasInitialExams = options?.initialUserExams !== undefined;
+
   const { data: jobs, isLoading: jobsLoading } = useJobs({ enabled: enabled && !initialJobs });
   const resolvedJobs = initialJobs || jobs;
-  const { profile, isLoading: profileLoading } = useProfile({ enabled });
-  const { education, isLoading: educationLoading } = useEducation({ enabled });
-  const { userExams } = useExams({ enabled, includeExamCatalog: false });
+  const { profile: fetchedProfile, isLoading: profileLoading } = useProfile({ enabled: enabled && !hasInitialProfile });
+  const { education: fetchedEducation, isLoading: educationLoading } = useEducation({ enabled: enabled && !hasInitialEducation });
+  const { userExams: fetchedExams } = useExams({ enabled: enabled && !hasInitialExams, includeExamCatalog: false });
+
+  const profile = hasInitialProfile ? options!.initialProfile : fetchedProfile;
+  const education = hasInitialEducation ? options!.initialEducation! : fetchedEducation;
+  const userExams = hasInitialExams ? options!.initialUserExams! : fetchedExams;
 
   const answers = useMemo(() => readStoredAnswers(user?.id), [user?.id]);
   const hasWizardAnswers = Object.keys(answers).length > 0;
@@ -154,6 +181,7 @@ export function useForYouJobs(limit: number = 5, enabled: boolean = true, initia
   return {
     forYouJobs,
     hasWizardAnswers,
-    isLoading: enabled && (((!initialJobs && jobsLoading) || profileLoading || educationLoading)),
+    isLoading: enabled && (((!initialJobs && jobsLoading) || (!hasInitialProfile && profileLoading) || (!hasInitialEducation && educationLoading))),
   };
 }
+

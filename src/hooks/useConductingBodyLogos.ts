@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useRef, useCallback, useMemo } from "react";
+import { useRef, useCallback, useMemo, useState, useEffect } from "react";
 import {
     MANUAL_DEPARTMENT_ALIASES,
     ORGANIZATION_ALIAS_LOOKUP,
@@ -57,6 +57,38 @@ export function useConductingBodyLogos() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
 
+    // Check if logos are already in the cache to avoid unnecessary deferrals
+    const isCached = useMemo(() => {
+        return !!queryClient.getQueryData(["conducting_body_logos"]);
+    }, [queryClient]);
+
+    const [deferredEnabled, setDeferredEnabled] = useState(isCached);
+
+    useEffect(() => {
+        if (isCached) return;
+
+        let idleId: any;
+        const enableFetch = () => setDeferredEnabled(true);
+
+        if (typeof window !== "undefined") {
+            if ("requestIdleCallback" in window) {
+                idleId = window.requestIdleCallback(enableFetch, { timeout: 2000 });
+            } else {
+                idleId = window.setTimeout(enableFetch, 1000);
+            }
+        }
+
+        return () => {
+            if (idleId !== undefined) {
+                if ("cancelIdleCallback" in window) {
+                    window.cancelIdleCallback(idleId);
+                } else {
+                    window.clearTimeout(idleId);
+                }
+            }
+        };
+    }, [isCached]);
+
     // Fetch all logos via Redis-cached API endpoint
     const logosQuery = useQuery({
         queryKey: ["conducting_body_logos"],
@@ -75,6 +107,7 @@ export function useConductingBodyLogos() {
             }
         },
         staleTime: 1000 * 60 * 30, // 30 minutes — logos rarely change
+        enabled: deferredEnabled,
     });
 
     // Upload a new logo

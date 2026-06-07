@@ -453,13 +453,7 @@ export default function Trending() {
                 ref={containerRef}
                 className="mx-auto flex-1 w-full max-w-6xl overflow-y-auto px-4 py-6 pb-24 md:px-6 lg:px-8"
             >
-                {(isLoading || updatesLoading) ? (
-                    <div className="space-y-4">
-                        {[1, 2, 3].map((i) => (
-                            <Skeleton key={i} className="h-48 w-full rounded-2xl" />
-                        ))}
-                    </div>
-                ) : error ? (
+                {error ? (
                     <div className="text-center py-12">
                         <p className="text-destructive">Failed to load trending exams</p>
                         <button
@@ -471,7 +465,13 @@ export default function Trending() {
                     </div>
                 ) : isUpdatesOnlyTab ? (
                     /* Updates-only tabs (Answer Key, Cutoff, Syllabus, News) */
-                    filteredUpdates.length > 0 ? (
+                    updatesLoading ? (
+                        <div className="space-y-4">
+                            {[1, 2, 3].map((i) => (
+                                <Skeleton key={i} className="h-32 w-full rounded-2xl" />
+                            ))}
+                        </div>
+                    ) : filteredUpdates.length > 0 ? (
                         <div className="space-y-4">
                             {filteredUpdates.map((update, index) => (
                                 <ExamUpdateCard key={update.id} update={update} index={index} />
@@ -491,57 +491,86 @@ export default function Trending() {
                 ) : (
                     /* Combined view: Exam updates + Exam cards */
                     <div className="space-y-6">
-                        {/* Just Added — priority section for updates from last 24h */}
-                        {selectedTab === "all" && recentUpdates.length > 0 && (
+                        {/* Exam Updates Section / Skeleton */}
+                        {updatesLoading ? (
                             <div className="space-y-3">
-                                <h2 className="text-sm font-semibold text-green-700 uppercase tracking-wider flex items-center gap-2">
+                                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                                     <Newspaper className="h-4 w-4" />
-                                    Just Added
-                                    <Badge variant="secondary" className="text-[10px] ml-1">{recentUpdates.length}</Badge>
+                                    Loading Latest Updates...
                                 </h2>
                                 <div className="space-y-3">
-                                    {recentUpdates.map((update, index) => (
-                                        <ExamUpdateCard key={update.id} update={update} index={index} />
+                                    {[1, 2].map((i) => (
+                                        <Skeleton key={i} className="h-32 w-full rounded-2xl animate-pulse" />
                                     ))}
                                 </div>
                             </div>
+                        ) : (
+                            <>
+                                {/* Just Added — priority section for updates from last 24h */}
+                                {selectedTab === "all" && recentUpdates.length > 0 && (
+                                    <div className="space-y-3">
+                                        <h2 className="text-sm font-semibold text-green-700 uppercase tracking-wider flex items-center gap-2">
+                                            <Newspaper className="h-4 w-4" />
+                                            Just Added
+                                            <Badge variant="secondary" className="text-[10px] ml-1">{recentUpdates.length}</Badge>
+                                        </h2>
+                                        <div className="space-y-3">
+                                            {recentUpdates.map((update, index) => (
+                                                <ExamUpdateCard key={update.id} update={update} index={index} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Exam Updates Section (shown at top for relevant tabs) */}
+                                {filteredUpdates.length > 0 && selectedTab !== "notification" && (() => {
+                                    const isAllTab = selectedTab === "all";
+                                    const visibleLimit = isAllTab && !showAllUpdates ? 10 : filteredUpdates.length;
+                                    const visibleUpdates = filteredUpdates.slice(0, visibleLimit);
+                                    const hasMore = isAllTab && !showAllUpdates && filteredUpdates.length > 10;
+
+                                    return (
+                                        <div className="space-y-3">
+                                            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                                <Newspaper className="h-4 w-4" />
+                                                {isAllTab ? "Latest Updates" : `${selectedTab.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())} Updates`}
+                                                <Badge variant="secondary" className="text-[10px] ml-1">{filteredUpdates.length}</Badge>
+                                            </h2>
+                                            <div className="space-y-3">
+                                                {visibleUpdates.map((update, index) => (
+                                                    <ExamUpdateCard key={update.id} update={update} index={index} />
+                                                ))}
+                                            </div>
+                                            {hasMore && (
+                                                <button
+                                                    onClick={() => setShowAllUpdates(true)}
+                                                    className="w-full py-2.5 text-sm font-medium text-primary hover:text-primary/80 bg-secondary/40 hover:bg-secondary/60 rounded-xl transition-colors"
+                                                >
+                                                    Show all {filteredUpdates.length} updates
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+                            </>
                         )}
 
-                        {/* Exam Updates Section (shown at top for relevant tabs) */}
-                        {filteredUpdates.length > 0 && selectedTab !== "notification" && (() => {
-                            const isAllTab = selectedTab === "all";
-                            const visibleLimit = isAllTab && !showAllUpdates ? 10 : filteredUpdates.length;
-                            const visibleUpdates = filteredUpdates.slice(0, visibleLimit);
-                            const hasMore = isAllTab && !showAllUpdates && filteredUpdates.length > 10;
-
-                            return (
-                                <div className="space-y-3">
-                                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                                        <Newspaper className="h-4 w-4" />
-                                        {isAllTab ? "Latest Updates" : `${selectedTab.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())} Updates`}
-                                        <Badge variant="secondary" className="text-[10px] ml-1">{filteredUpdates.length}</Badge>
-                                    </h2>
-                                    <div className="space-y-3">
-                                        {visibleUpdates.map((update, index) => (
-                                            <ExamUpdateCard key={update.id} update={update} index={index} />
-                                        ))}
-                                    </div>
-                                    {hasMore && (
-                                        <button
-                                            onClick={() => setShowAllUpdates(true)}
-                                            className="w-full py-2.5 text-sm font-medium text-primary hover:text-primary/80 bg-secondary/40 hover:bg-secondary/60 rounded-xl transition-colors"
-                                        >
-                                            Show all {filteredUpdates.length} updates
-                                        </button>
-                                    )}
+                        {/* Exam Cards Section / Skeleton */}
+                        {isLoading ? (
+                            <div className="space-y-3 pt-2">
+                                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                    <TrendingUp className="h-4 w-4" />
+                                    Loading Tracked Exams...
+                                </h2>
+                                <div className="space-y-4">
+                                    {[1, 2].map((i) => (
+                                        <Skeleton key={i} className="h-48 w-full rounded-2xl animate-pulse" />
+                                    ))}
                                 </div>
-                            );
-                        })()}
-
-                        {/* Exam Cards Section */}
-                        {filteredExams.length > 0 ? (
+                            </div>
+                        ) : filteredExams.length > 0 ? (
                             <div className="space-y-4">
-                                {filteredUpdates.length > 0 && selectedTab !== "notification" && (
+                                {(filteredUpdates.length > 0 || updatesLoading) && selectedTab !== "notification" && (
                                     <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 pt-2">
                                         <TrendingUp className="h-4 w-4" />
                                         Tracked Exams
@@ -559,7 +588,7 @@ export default function Trending() {
                                     />
                                 ))}
                             </div>
-                        ) : filteredUpdates.length === 0 ? (
+                        ) : (!updatesLoading && filteredUpdates.length === 0) ? (
                             <div className="text-center py-16">
                                 <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
                                     <TrendingUp className="h-10 w-10 text-muted-foreground" />

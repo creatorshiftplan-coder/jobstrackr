@@ -1,12 +1,19 @@
 import { useMemo } from "react";
 import { useJobs } from "@/hooks/useJobs";
-import { useProfile } from "@/hooks/useProfile";
-import { useExams } from "@/hooks/useExams";
+import { useProfile, Profile } from "@/hooks/useProfile";
+import { useExams, ExamAttempt } from "@/hooks/useExams";
 import { useAuth } from "@/hooks/useAuth";
 import { Job } from "@/types/job";
 import { hybridRecommend, qualificationToTag, HybridMatchedJob } from "@/lib/hybridScorer";
 import { matchAndSort, MatchPreferences } from "@/lib/jobMatcher";
 import { isJobActive } from "@/lib/jobUtils";
+
+interface UseRecommendationsOptions {
+  /** Pre-fetched profile to avoid a redundant Supabase call */
+  initialProfile?: Profile | null;
+  /** Pre-fetched user exams to avoid a redundant Supabase call */
+  initialUserExams?: ExamAttempt[];
+}
 
 /**
  * Combined hook for hybrid job recommendations on the Index page.
@@ -20,13 +27,29 @@ import { isJobActive } from "@/lib/jobUtils";
  *
  * This is a simpler path than the full Recommendations wizard.
  * It uses profile data directly (no 8-step wizard answers needed).
+ *
+ * Performance: When called from the homepage, pass initialJobs/initialProfile/initialUserExams
+ * to avoid 3 redundant Supabase queries.
  */
-export function useRecommendations(limit: number = 10, enabled: boolean = true, initialJobs?: Job[]) {
+export function useRecommendations(
+  limit: number = 10,
+  enabled: boolean = true,
+  initialJobs?: Job[],
+  options?: UseRecommendationsOptions,
+) {
   const { user, isGuestMode } = useAuth();
+
+  // Only fetch if not provided externally
+  const hasInitialProfile = options?.initialProfile !== undefined;
+  const hasInitialExams = options?.initialUserExams !== undefined;
+
   const { data: jobs, isLoading: jobsLoading } = useJobs({ enabled: enabled && !initialJobs });
   const resolvedJobs = initialJobs || jobs;
-  const { profile, isLoading: profileLoading } = useProfile({ enabled });
-  const { userExams } = useExams({ enabled, includeExamCatalog: false });
+  const { profile: fetchedProfile, isLoading: profileLoading } = useProfile({ enabled: enabled && !hasInitialProfile });
+  const { userExams: fetchedExams } = useExams({ enabled: enabled && !hasInitialExams, includeExamCatalog: false });
+
+  const profile = hasInitialProfile ? options!.initialProfile : fetchedProfile;
+  const userExams = hasInitialExams ? options!.initialUserExams! : fetchedExams;
 
   // Build lightweight preferences from profile data
   const preferences: MatchPreferences = useMemo(() => ({
@@ -83,10 +106,11 @@ export function useRecommendations(limit: number = 10, enabled: boolean = true, 
     /** Jobs recommended based on sectors, tags, recency — general recommendations */
     recommended,
     /** Whether data is still loading */
-    isLoading: enabled && ((!initialJobs && jobsLoading) || profileLoading),
+    isLoading: enabled && ((!initialJobs && jobsLoading) || (!hasInitialProfile && profileLoading)),
     /** Whether user has tracked exams */
     hasTrackedExams: enabled && userExams.length > 0,
     /** Whether user has set sector preferences */
     hasSectorPreferences: (profile?.preferred_sectors?.length ?? 0) > 0,
   };
 }
+

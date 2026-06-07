@@ -27,10 +27,18 @@ async function redisGet(key: string): Promise<string | null> {
 
 /** Low-level SET with EX (expiry in seconds) via Upstash REST API */
 async function redisSet(key: string, value: string, ttlSeconds: number): Promise<void> {
-  const res = await fetch(`${UPSTASH_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}?EX=${ttlSeconds}`, {
-    headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+  const res = await fetch(UPSTASH_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${UPSTASH_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(['SET', key, value, 'EX', ttlSeconds]),
   });
-  if (!res.ok) throw new Error(`Redis SET failed: ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Redis SET failed: ${res.status} - ${errText}`);
+  }
 }
 
 /**

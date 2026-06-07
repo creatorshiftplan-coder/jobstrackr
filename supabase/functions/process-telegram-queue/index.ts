@@ -126,7 +126,7 @@ async function enqueueJobNotifications(supabase: any, payload: any) {
     return 0;
   }
 
-  let queued = 0;
+  const itemsToInsert = [];
 
   for (const conn of connections) {
     const pref = conn.notification_preferences;
@@ -155,26 +155,28 @@ async function enqueueJobNotifications(supabase: any, payload: any) {
       `🔗 <b><a href="${jobUrl}">View Details on Website</a></b>`,
     ].join("\n");
 
-    // Duplicate check
-    const { data: existing } = await supabase
-      .from("telegram_notifications_queue")
-      .select("id")
-      .eq("telegram_chat_id", conn.telegram_chat_id)
-      .eq("job_id", job_id)
-      .maybeSingle();
-
-    if (!existing) {
-      await supabase.from("telegram_notifications_queue").insert({
-        user_id: conn.user_id,
-        telegram_chat_id: conn.telegram_chat_id,
-        job_id: job_id,
-        message_text: msg,
-      });
-      queued++;
-    }
+    itemsToInsert.push({
+      user_id: conn.user_id,
+      telegram_chat_id: conn.telegram_chat_id,
+      job_id: job_id,
+      message_text: msg,
+    });
   }
 
-  return queued;
+  if (itemsToInsert.length === 0) return 0;
+
+  // Batch upsert to eliminate N+1 queries. Ignore conflicts (duplicates).
+  const { data, error } = await supabase
+    .from("telegram_notifications_queue")
+    .upsert(itemsToInsert, { onConflict: "telegram_chat_id,job_id", ignoreDuplicates: true })
+    .select("id");
+
+  if (error) {
+    console.error("[process-telegram-queue] Batch insert error for jobs:", error.message);
+    return 0;
+  }
+
+  return data?.length || 0;
 }
 
 // Enqueue matching notifications for a new exam update
@@ -202,7 +204,7 @@ async function enqueueUpdateNotifications(supabase: any, payload: any) {
     return 0;
   }
 
-  let queued = 0;
+  const itemsToInsert = [];
 
   for (const conn of connections) {
     const pref = conn.notification_preferences;
@@ -230,26 +232,28 @@ async function enqueueUpdateNotifications(supabase: any, payload: any) {
       `🔗 <b><a href="${updateUrl}">View Details on Website</a></b>`,
     ].join("\n");
 
-    // Duplicate check
-    const { data: existing } = await supabase
-      .from("telegram_notifications_queue")
-      .select("id")
-      .eq("telegram_chat_id", conn.telegram_chat_id)
-      .eq("update_id", update_id)
-      .maybeSingle();
-
-    if (!existing) {
-      await supabase.from("telegram_notifications_queue").insert({
-        user_id: conn.user_id,
-        telegram_chat_id: conn.telegram_chat_id,
-        update_id: update_id,
-        message_text: msg,
-      });
-      queued++;
-    }
+    itemsToInsert.push({
+      user_id: conn.user_id,
+      telegram_chat_id: conn.telegram_chat_id,
+      update_id: update_id,
+      message_text: msg,
+    });
   }
 
-  return queued;
+  if (itemsToInsert.length === 0) return 0;
+
+  // Batch upsert to eliminate N+1 queries. Ignore conflicts (duplicates).
+  const { data, error } = await supabase
+    .from("telegram_notifications_queue")
+    .upsert(itemsToInsert, { onConflict: "telegram_chat_id,update_id", ignoreDuplicates: true })
+    .select("id");
+
+  if (error) {
+    console.error("[process-telegram-queue] Batch insert error for updates:", error.message);
+    return 0;
+  }
+
+  return data?.length || 0;
 }
 
 // Send queued pending notifications

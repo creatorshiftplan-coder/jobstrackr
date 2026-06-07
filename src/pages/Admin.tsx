@@ -727,6 +727,7 @@ export default function Admin() {
   const [discoverSavingUrl, setDiscoverSavingUrl] = useState<string | null>(null);
   const [discoverSavingAll, setDiscoverSavingAll] = useState(false);
   const [discoverSavedUrls, setDiscoverSavedUrls] = useState<Set<string>>(new Set());
+  const [discoverDuplicateUrls, setDiscoverDuplicateUrls] = useState<Set<string>>(new Set());
   const [discoverExpandedUrl, setDiscoverExpandedUrl] = useState<string | null>(null);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -3774,6 +3775,7 @@ ${hashtagsStr}`;
     setDiscoveredLinks([]);
     setDiscoverScrapedResults({});
     setDiscoverSavedUrls(new Set());
+    setDiscoverDuplicateUrls(new Set());
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -3826,9 +3828,9 @@ ${hashtagsStr}`;
     }
   };
 
-  const handleDiscoverSaveJob = async (url: string): Promise<boolean> => {
+  const handleDiscoverSaveJob = async (url: string): Promise<"saved" | "duplicate" | "error"> => {
     const r = discoverScrapedResults[url];
-    if (!r) return false;
+    if (!r) return "error";
     setDiscoverSavingUrl(url);
 
     try {
@@ -3934,9 +3936,10 @@ ${hashtagsStr}`;
           description: `Similar to: "${duplicateJobTitle}". Save blocked.`,
           variant: "destructive",
         });
+        setDiscoverDuplicateUrls(prev => new Set(prev).add(url));
         setDiscoverSavedUrls(prev => new Set(prev).add(url));
         setDiscoverSavingUrl(null);
-        return false;
+        return "duplicate";
       }
 
       // Check for duplicate by title before inserting
@@ -3952,9 +3955,10 @@ ${hashtagsStr}`;
           description: `"${existingJobs[0].title}" already exists in the database. Skipped.`,
           variant: "destructive",
         });
+        setDiscoverDuplicateUrls(prev => new Set(prev).add(url));
         setDiscoverSavedUrls(prev => new Set(prev).add(url));
         setDiscoverSavingUrl(null);
-        return false;
+        return "duplicate";
       }
 
       const { data: newJob, error } = await supabase.from("jobs").insert(sanitizeJobRecord(jobRecord)).select("id").single();
@@ -3964,10 +3968,10 @@ ${hashtagsStr}`;
       queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       toast({ title: "Saved!", description: `${jobRecord.title} added to database.` });
-      return true;
+      return "saved";
     } catch (error: any) {
       toast({ title: "Save failed", description: error.message, variant: "destructive" });
-      return false;
+      return "error";
     } finally {
       setDiscoverSavingUrl(null);
     }
@@ -7539,13 +7543,30 @@ ${hashtagsStr}`;
                           onClick={async () => {
                             setDiscoverSavingAll(true);
                             const unsaved = discoveredLinks.filter(l => discoverScrapedResults[l.url] && !discoverSavedUrls.has(l.url));
-                            let saved = 0;
+                            let savedCount = 0;
+                            let duplicateCount = 0;
+                            let errorCount = 0;
                             for (const link of unsaved) {
-                              const success = await handleDiscoverSaveJob(link.url);
-                              if (success) saved++;
+                              const result = await handleDiscoverSaveJob(link.url);
+                              if (result === "saved") savedCount++;
+                              else if (result === "duplicate") duplicateCount++;
+                              else if (result === "error") errorCount++;
                             }
                             setDiscoverSavingAll(false);
-                            toast({ title: "Save All complete", description: `${saved} job${saved !== 1 ? "s" : ""} saved.` });
+                            
+                            let description = `${savedCount} job${savedCount !== 1 ? "s" : ""} saved.`;
+                            if (duplicateCount > 0) {
+                              description += ` ${duplicateCount} duplicate${duplicateCount !== 1 ? "s" : ""} skipped.`;
+                            }
+                            if (errorCount > 0) {
+                              description += ` ${errorCount} error${errorCount !== 1 ? "s" : ""} failed.`;
+                            }
+                            
+                            toast({
+                              title: "Save All complete",
+                              description,
+                              variant: errorCount > 0 ? "destructive" : "default"
+                            });
                           }}
                         >
                           {discoverSavingAll ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
@@ -7570,7 +7591,9 @@ ${hashtagsStr}`;
                             {discoveredLinks.map((link, idx) => {
                               const isScraped = !!discoverScrapedResults[link.url];
                               const isScraping = discoverScrapingUrl === link.url;
-                              const isSaved = discoverSavedUrls.has(link.url);
+                              const isProcessed = discoverSavedUrls.has(link.url);
+                              const isDuplicate = discoverDuplicateUrls.has(link.url);
+                              const isSaved = isProcessed && !isDuplicate;
                               const isSaving = discoverSavingUrl === link.url;
                               const isExpanded = discoverExpandedUrl === link.url;
 
@@ -7592,6 +7615,8 @@ ${hashtagsStr}`;
                                     <TableCell>
                                       {isSaved ? (
                                         <Badge className="bg-green-100 text-green-700 border-0 text-[10px]"><CheckCircle className="h-3 w-3 mr-1" />Saved</Badge>
+                                      ) : isDuplicate ? (
+                                        <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px]"><AlertTriangle className="h-3 w-3 mr-1" />Duplicate</Badge>
                                       ) : isScraped ? (
                                         <Badge className="bg-blue-100 text-blue-700 border-0 text-[10px]"><Check className="h-3 w-3 mr-1" />Scraped</Badge>
                                       ) : isScraping ? (
@@ -7633,7 +7658,7 @@ ${hashtagsStr}`;
                                             >
                                               <RefreshCw className="h-3 w-3 mr-1" /> Re-scrape
                                             </Button>
-                                            {!isSaved && (
+                                            {!isProcessed && (
                                               <Button
                                                 size="sm"
                                                 className="h-7 text-xs whitespace-nowrap"

@@ -40,13 +40,27 @@ async function redisSetEx(key: string, value: string, ttlSeconds: number): Promi
   }
 }
 
-// Helper to generate cache key from request
-function getCacheKey(request: Request): string {
+// Helper to generate cache key from request (scoped by user auth token)
+async function getCacheKey(request: Request): Promise<string> {
   const url = new URL(request.url);
   // Use the path and query string after the /api/supabase/ prefix
   const path = url.pathname.replace(/^\/api\/supabase\//, '');
   const search = url.search;
-  return `cache:${path}${search}`;
+  const baseKey = `cache:${path}${search}`;
+
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.replace("Bearer ", "").trim();
+    if (token) {
+      // Use Web Crypto API to hash the token to keep cache key clean and secure
+      const msgBuffer = new TextEncoder().encode(token);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+      return `${baseKey}:user:${hashHex}`;
+    }
+  }
+  return baseKey;
 }
 
 export const config = {
@@ -60,7 +74,7 @@ export default async function handler(request: Request) {
     return proxyToSupabase(request);
   }
 
-  const cacheKey = getCacheKey(request);
+  const cacheKey = await getCacheKey(request);
 
   // Try to get from Redis cache
   const cached = await redisGet(cacheKey);

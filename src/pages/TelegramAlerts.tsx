@@ -284,7 +284,7 @@ export default function TelegramAlerts() {
               </div>
               <h1 className="font-display text-3xl font-bold tracking-tight text-foreground lg:text-4xl">Telegram Alerts</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground lg:text-base">
-                Connect your Telegram account and configure your categories, qualifications, and state preferences to receive personalized job notifications.
+                Get personalized notification updates directly on your Telegram account based on your preferred categories, qualifications, and states.
               </p>
             </div>
             <div className="rounded-2xl border border-border/70 bg-card/85 p-5 shadow-sm backdrop-blur-sm min-w-[240px]">
@@ -299,7 +299,7 @@ export default function TelegramAlerts() {
           </div>
         </div>
       </section>
-
+ 
       <main className="px-4 py-6 space-y-6 md:mx-auto md:max-w-6xl md:px-6 lg:px-8">
         {/* Telegram Bot Connection Card */}
         <Card className="border-0 shadow-card bg-white dark:bg-card overflow-hidden">
@@ -310,7 +310,7 @@ export default function TelegramAlerts() {
               </div>
               <div>
                 <CardTitle className="text-base font-semibold text-foreground">Telegram Alerts Channel</CardTitle>
-                <CardDescription className="text-xs">Receive instant updates directly on your Telegram account</CardDescription>
+                <CardDescription className="text-xs">Get personalized notification updates directly on your Telegram account</CardDescription>
               </div>
             </div>
           </CardHeader>

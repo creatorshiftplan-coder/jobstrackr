@@ -35,7 +35,7 @@ export interface ProviderResponse {
 export async function loadApiKeys(supabase: SupabaseClient): Promise<ApiKeyConfig[]> {
   try {
     const { data, error } = await supabase
-      .from("api_keys_config")
+      .from("decrypted_api_keys_config")
       .select("*")
       .eq("is_active", true)
       .order("priority", { ascending: true })

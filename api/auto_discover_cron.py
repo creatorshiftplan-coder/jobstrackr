@@ -33,6 +33,14 @@ def _json_response(handler, status_code: int, data: dict):
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
+        # 1. Enforce Authentication (Vercel Cron Secret)
+        cron_secret = os.environ.get("CRON_SECRET")
+        if cron_secret:
+            auth_header = self.headers.get("Authorization", "")
+            if not auth_header.startswith("Bearer ") or auth_header.split(" ")[1].strip() != cron_secret:
+                _json_response(self, 401, {"status": "error", "error": "Unauthorized access"})
+                return
+
         start_time = datetime.now(timezone.utc)
         try:
             supabase = get_supabase_client()

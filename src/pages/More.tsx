@@ -293,17 +293,17 @@ export default function More() {
             
             {/* Quick Actions/Navigation */}
             <div>
-              <h3 className="font-display font-semibold text-foreground text-lg mb-3">Quick Navigation</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <h3 className="font-display font-semibold text-foreground text-base mb-2.5">Quick Navigation</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
                 <Card
                   className="bg-white dark:bg-card border-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                   onClick={handleTrackExam}
                 >
-                  <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                    <div className="h-11 w-11 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
-                      <ClipboardList className="h-5.5 w-5.5 text-primary" />
+                  <CardContent className="p-3 flex flex-col items-center text-center gap-1.5">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                      <ClipboardList className="h-4.5 w-4.5 text-primary" />
                     </div>
-                    <span className="text-xs font-semibold text-foreground">Track an Exam</span>
+                    <span className="text-[11px] sm:text-xs font-semibold text-foreground">Track an Exam</span>
                   </CardContent>
                 </Card>
 
@@ -311,11 +311,11 @@ export default function More() {
                   className="bg-white dark:bg-card border-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => navigate("/search")}
                 >
-                  <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                    <div className="h-11 w-11 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
-                      <Search className="h-5.5 w-5.5 text-primary" />
+                  <CardContent className="p-3 flex flex-col items-center text-center gap-1.5">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                      <Search className="h-4.5 w-4.5 text-primary" />
                     </div>
-                    <span className="text-xs font-semibold text-foreground">Find an Exam</span>
+                    <span className="text-[11px] sm:text-xs font-semibold text-foreground">Find an Exam</span>
                   </CardContent>
                 </Card>
 
@@ -323,11 +323,11 @@ export default function More() {
                   className="bg-white dark:bg-card border-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => navigate("/trending")}
                 >
-                  <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                    <div className="h-11 w-11 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
-                      <Flame className="h-5.5 w-5.5 text-primary" />
+                  <CardContent className="p-3 flex flex-col items-center text-center gap-1.5">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                      <Flame className="h-4.5 w-4.5 text-primary" />
                     </div>
-                    <span className="text-xs font-semibold text-foreground">Trending Exams</span>
+                    <span className="text-[11px] sm:text-xs font-semibold text-foreground">Trending Exams</span>
                   </CardContent>
                 </Card>
 
@@ -335,19 +335,19 @@ export default function More() {
                   className="bg-white dark:bg-card border-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => navigate("/saved")}
                 >
-                  <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                    <div className="h-11 w-11 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
-                      <Bookmark className="h-5.5 w-5.5 text-primary" />
+                  <CardContent className="p-3 flex flex-col items-center text-center gap-1.5">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                      <Bookmark className="h-4.5 w-4.5 text-primary" />
                     </div>
-                    <span className="text-xs font-semibold text-foreground">Saved Jobs</span>
+                    <span className="text-[11px] sm:text-xs font-semibold text-foreground">Saved Jobs</span>
                   </CardContent>
                 </Card>
               </div>
             </div>
 
-            {/* AI & Smart Tools */}
+            {/* Smart Tools & Utilities */}
             <div>
-              <h3 className="font-display font-semibold text-foreground text-lg mb-3">AI & Smart Tools</h3>
+              <h3 className="font-display font-semibold text-foreground text-lg mb-3">Smart Tools & Utilities</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 
                 {/* Jobs For You */}
@@ -396,7 +396,7 @@ export default function More() {
                         </div>
                         <div>
                           <h4 className="font-semibold text-sm text-foreground">Upload Your Documents</h4>
-                          <p className="text-xs text-muted-foreground mt-0.5">AI auto-fills profile details from documents</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Automatically fill profile details from documents</p>
                         </div>
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -414,7 +414,7 @@ export default function More() {
                         </div>
                         <div>
                           <h4 className="font-semibold text-sm text-foreground">Syllabus Finder</h4>
-                          <p className="text-xs text-muted-foreground mt-0.5">Search and view exam syllabi powered by AI</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Search and view exam syllabi instantly</p>
                         </div>
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />

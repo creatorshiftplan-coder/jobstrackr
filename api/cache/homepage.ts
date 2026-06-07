@@ -64,12 +64,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         supabaseFetch('exams?select=*&is_active=eq.true&order=name'),
       ]);
 
+      // Clean jobs of heavy metadata fields not needed on the list view
+      const cleanAllJobs = (allJobs || []).map((job: any) => {
+        if (job.job_metadata) {
+          const {
+            eligibility_profile,
+            overview,
+            selection_process,
+            vacancies_detail,
+            important_dates,
+            ...rest
+          } = job.job_metadata;
+          job.job_metadata = rest;
+        }
+        return job;
+      });
+
       // Extract recent jobs from the already-fetched full list (first 50)
-      const recentJobs = (allJobs || []).slice(0, 50);
+      const recentJobs = cleanAllJobs.slice(0, 50);
 
       return {
         recentJobs,
-        allJobs: allJobs || [],
+        allJobs: cleanAllJobs,
         exams: exams || [],
       };
     });
