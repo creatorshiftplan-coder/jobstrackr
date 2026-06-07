@@ -250,9 +250,13 @@ export function useGovtJobScraper() {
 
     const scrapeLinks = useMutation({
         mutationFn: async ({ url, limit, pages = 1 }: { url: string; limit: number; pages?: number }) => {
+            const { data: { session } } = await supabase.auth.getSession();
             const resp = await fetch("/api/scrape-article-links", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${session?.access_token || ""}`
+                },
                 body: JSON.stringify({ url, limit, pages }),
             });
             if (!resp.ok) {
@@ -267,9 +271,13 @@ export function useGovtJobScraper() {
 
     const scrapeSingleArticle = useMutation({
         mutationFn: async ({ articleUrl, rephrase = false }: { articleUrl: string; rephrase?: boolean }) => {
+            const { data: { session } } = await supabase.auth.getSession();
             const resp = await fetch("/api/scrape-article", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${session?.access_token || ""}`
+                },
                 body: JSON.stringify({ url: articleUrl, rephrase }),
             });
             if (!resp.ok) {

@@ -3724,9 +3724,13 @@ ${hashtagsStr}`;
     setScraperRawExpanded(false);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch("/api/scrape", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || ""}`
+        },
         body: JSON.stringify({ url: scraperUrl.trim() }),
       });
 
@@ -3772,9 +3776,13 @@ ${hashtagsStr}`;
     setDiscoverSavedUrls(new Set());
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch("/api/discover", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || ""}`
+        },
         body: JSON.stringify({ url: discoverUrl.trim(), pages: discoverPages, follow_pages: false }),
       });
       const text = await resp.text();
@@ -3795,9 +3803,13 @@ ${hashtagsStr}`;
   const handleDiscoverScrapeOne = async (url: string) => {
     setDiscoverScrapingUrl(url);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch("/api/scrape", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || ""}`
+        },
         body: JSON.stringify({ url }),
       });
       const text = await resp.text();
