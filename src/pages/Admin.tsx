@@ -1221,7 +1221,8 @@ export default function Admin() {
 
   useEffect(() => {
     fetchTelegramLogs();
-  }, [fetchTelegramLogs]);
+    fetchQueueStats();
+  }, [fetchTelegramLogs, fetchQueueStats]);
 
   const [sectorSearchQuery, setSectorSearchQuery] = useState("");
 
@@ -1536,6 +1537,212 @@ export default function Admin() {
       return textToSearch.includes(sector);
     });
   }, [rawTelegramExamUpdates, selectedTelegramSector, selectedTelegramTag]);
+
+  // Telegram Queue Control and Diagnostics Panel States
+  const [queueStats, setQueueStats] = useState({ pending: 0, sent: 0, failed: 0, totalSubscribers: 0 });
+  const [loadingQueueStats, setLoadingQueueStats] = useState(false);
+  const [flushingQueue, setFlushingQueue] = useState(false);
+  const [cleaningQueue, setCleaningQueue] = useState(false);
+  const [runningMatcherId, setRunningMatcherId] = useState<string | null>(null);
+  const [runningBroadcastId, setRunningBroadcastId] = useState<string | null>(null);
+
+  const fetchQueueStats = useCallback(async () => {
+    setLoadingQueueStats(true);
+    try {
+      const { count: pending } = await supabase
+        .from("telegram_notifications_queue")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+
+      const { count: sent } = await supabase
+        .from("telegram_notifications_queue")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "sent");
+
+      const { count: failed } = await supabase
+        .from("telegram_notifications_queue")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "failed");
+
+      const { count: totalSubscribers } = await supabase
+        .from("telegram_connections")
+        .select("*", { count: "exact", head: true })
+        .eq("is_active", true);
+
+      setQueueStats({
+        pending: pending || 0,
+        sent: sent || 0,
+        failed: failed || 0,
+        totalSubscribers: totalSubscribers || 0
+      });
+    } catch (err) {
+      console.error("Failed to fetch queue stats:", err);
+    } finally {
+      setLoadingQueueStats(false);
+    }
+  }, []);
+
+  const handleFlushQueue = async () => {
+    setFlushingQueue(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-telegram-queue`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || ""}`,
+        },
+        body: JSON.stringify({}),
+      });
+
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.error || "Failed to flush queue");
+
+      toast({
+        title: "Queue Processed",
+        description: `Successfully processed: ${resData.sent || 0} sent, ${resData.failed || 0} failed.`,
+      });
+      fetchQueueStats();
+    } catch (err: any) {
+      toast({
+        title: "Flush Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setFlushingQueue(false);
+    }
+  };
+
+  const handleCleanQueue = async () => {
+    setCleaningQueue(true);
+    try {
+      const { error } = await supabase
+        .from("telegram_notifications_queue")
+        .delete()
+        .neq("status", "pending")
+        .lt("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+      toast({
+        title: "Queue Cleared",
+        description: "Sent and failed logs older than 7 days have been cleaned up.",
+      });
+      fetchQueueStats();
+    } catch (err: any) {
+      toast({
+        title: "Cleanup Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCleaningQueue(false);
+    }
+  };
+
+  const handleTriggerMatcher = async (type: "job" | "update", item: any) => {
+    setRunningMatcherId(item.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      let payload = {};
+      if (type === "job") {
+        payload = {
+          type: "job",
+          job_id: item.id,
+          title: item.title,
+          department: item.department,
+          location: item.location,
+          qualification: item.qualification,
+          vacancies_display: item.vacancies_display || (item.vacancies ? `${item.vacancies} Posts` : "Not Published"),
+          last_date_display: item.last_date_display || (item.last_date ? String(item.last_date) : "Check Website"),
+          slug: item.slug
+        };
+      } else {
+        payload = {
+          type: "exam_update",
+          update_id: item.id,
+          title: item.title,
+          category: item.category,
+          summary: item.summary
+        };
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-telegram-queue`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || ""}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.error || "Failed to trigger matcher");
+
+      toast({
+        title: "Matching Completed",
+        description: `Preferences matched. Queued new notifications: ${resData.sent || 0} sent/failed in this run.`,
+      });
+      fetchQueueStats();
+    } catch (err: any) {
+      toast({
+        title: "Matching Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setRunningMatcherId(null);
+    }
+  };
+
+  const handleTriggerBroadcast = async (type: "job" | "update", item: any) => {
+    setRunningBroadcastId(item.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const payload = type === "job" ? { job: item } : { exam_update: item };
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-auto-post`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || ""}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.error || "Failed to broadcast");
+
+      toast({
+        title: "Broadcast Complete",
+        description: `Successfully posted to ${resData.postedCount || 0}/${resData.totalCount || 0} channels.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Broadcast Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setRunningBroadcastId(null);
+    }
+  };
+
+  const recentJobs = useMemo(() => {
+    if (!jobs) return [];
+    return [...jobs]
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      .slice(0, 5);
+  }, [jobs]);
+
+  const recentUpdates = useMemo(() => {
+    if (!rawTelegramExamUpdates) return [];
+    return [...rawTelegramExamUpdates]
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      .slice(0, 5);
+  }, [rawTelegramExamUpdates]);
 
   const handlePostToTelegram = async () => {
     const channel = telegramChannels.find(c => c.id === selectedTelegramChannelId);
@@ -4651,9 +4858,10 @@ ${hashtagsStr}`;
           {/* Telegram Posting Tab */}
           <TabsContent value="telegram">
             <Tabs defaultValue="poster" className="space-y-4">
-              <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+              <TabsList className="grid w-full max-w-[600px] grid-cols-3">
                 <TabsTrigger value="poster">Manual Poster</TabsTrigger>
                 <TabsTrigger value="history" onClick={fetchTelegramLogs}>Posting History & Status</TabsTrigger>
+                <TabsTrigger value="controls" onClick={fetchQueueStats}>Queue & Diagnostics</TabsTrigger>
               </TabsList>
               
               <TabsContent value="poster" className="space-y-4">
@@ -5237,6 +5445,224 @@ ${hashtagsStr}`;
                     )}
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="controls" className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Stats Cards */}
+                  <Card className="bg-card">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pending Notifications</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-amber-500">{queueStats.pending}</div>
+                      <p className="text-[10px] text-muted-foreground mt-1">Waiting in send queue</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Delivered Notifications</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-green-500">{queueStats.sent}</div>
+                      <p className="text-[10px] text-muted-foreground mt-1">Sent to subscribers</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Failed Notifications</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-destructive">{queueStats.failed}</div>
+                      <p className="text-[10px] text-muted-foreground mt-1">Errored out / retrying</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Subscribers</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-primary">{queueStats.totalSubscribers}</div>
+                      <p className="text-[10px] text-muted-foreground mt-1">Users with Telegram notifications active</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Queue Actions / Flush Controls */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card className="md:col-span-1">
+                    <CardHeader>
+                      <CardTitle className="text-md font-semibold">Queue Actions</CardTitle>
+                      <CardDescription>Manually trigger queue processing or cleaning</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Button
+                        className="w-full gap-2"
+                        onClick={handleFlushQueue}
+                        disabled={flushingQueue || queueStats.pending === 0}
+                      >
+                        {flushingQueue ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Processing Queue...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4" />
+                            Flush Queue Now
+                          </>
+                        )}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                        onClick={handleCleanQueue}
+                        disabled={cleaningQueue || (queueStats.sent === 0 && queueStats.failed === 0)}
+                      >
+                        {cleaningQueue ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Cleaning...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4" />
+                            Clear Logs (> 7 days)
+                          </>
+                        )}
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs text-muted-foreground"
+                        onClick={fetchQueueStats}
+                        disabled={loadingQueueStats}
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loadingQueueStats ? "animate-spin" : ""}`} />
+                        Refresh Statistics
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Manual Broadcast / Matching triggering */}
+                  <Card className="md:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="text-md font-semibold">Recent Job Operations</CardTitle>
+                      <CardDescription>Manually trigger matching notifications or public channel broadcasts</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {recentJobs.length === 0 ? (
+                        <div className="text-center py-6 text-sm text-muted-foreground italic">
+                          No jobs available.
+                        </div>
+                      ) : (
+                        <div className="divide-y border-t border-b">
+                          {recentJobs.map(job => (
+                            <div key={job.id} className="p-3 text-xs flex items-center justify-between gap-4">
+                              <div className="min-w-0 flex-1">
+                                <div className="font-semibold text-foreground line-clamp-1">{job.title}</div>
+                                <div className="text-muted-foreground text-[10px] truncate">{job.department}</div>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-[11px] gap-1 px-2.5"
+                                  disabled={runningMatcherId !== null}
+                                  onClick={() => handleTriggerMatcher("job", job)}
+                                >
+                                  {runningMatcherId === job.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="h-3 w-3 text-primary" />
+                                  )}
+                                  Queue Matcher
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-[11px] gap-1 px-2.5"
+                                  disabled={runningBroadcastId !== null}
+                                  onClick={() => handleTriggerBroadcast("job", job)}
+                                >
+                                  {runningBroadcastId === job.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Send className="h-3 w-3 text-emerald-500" />
+                                  )}
+                                  Broadcast
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Recent Updates Controls */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card className="md:col-span-3">
+                    <CardHeader>
+                      <CardTitle className="text-md font-semibold">Recent Update Operations</CardTitle>
+                      <CardDescription>Manually trigger subscriber preference matching or public channel broadcasts for updates</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {recentUpdates.length === 0 ? (
+                        <div className="text-center py-6 text-sm text-muted-foreground italic">
+                          No recent updates found.
+                        </div>
+                      ) : (
+                        <div className="divide-y border-t border-b">
+                          {recentUpdates.map(update => (
+                            <div key={update.id} className="p-3 text-xs flex items-center justify-between gap-4">
+                              <div className="min-w-0 flex-1">
+                                <div className="font-semibold text-foreground line-clamp-1">{update.title}</div>
+                                <div className="text-muted-foreground text-[10px] capitalize">Category: {update.category?.replace("_", " ")} | Status: {update.status || "N/A"}</div>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-[11px] gap-1 px-2.5"
+                                  disabled={runningMatcherId !== null}
+                                  onClick={() => handleTriggerMatcher("update", update)}
+                                >
+                                  {runningMatcherId === update.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="h-3 w-3 text-primary" />
+                                  )}
+                                  Queue Matcher
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-[11px] gap-1 px-2.5"
+                                  disabled={runningBroadcastId !== null}
+                                  onClick={() => handleTriggerBroadcast("update", update)}
+                                >
+                                  {runningBroadcastId === update.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Send className="h-3 w-3 text-emerald-500" />
+                                  )}
+                                  Broadcast
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
             </Tabs>
           </TabsContent>
