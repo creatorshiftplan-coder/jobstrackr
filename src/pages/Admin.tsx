@@ -7,7 +7,7 @@ import { useAdminStats } from "@/hooks/useAdminStats";
 import { useAnalyticsData } from "@/hooks/useAnalyticsData";
 import { useAutoDiscover } from "@/hooks/useAutoDiscover";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square, ChevronLeft, ChevronRight, Send, Terminal, Facebook } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square, ChevronLeft, ChevronRight, Send, Terminal, Facebook, MessageSquare } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAllExamUpdates } from "@/hooks/useExamUpdates";
 import { inferCategory } from "@/lib/jobUtils";
@@ -670,6 +670,51 @@ export default function Admin() {
   const { unreviewedCount, logs: autoDiscoverLogs, logsLoading: autoDiscoverLoading, markAsReviewed, discoverByCategory, scrapeUrl, addDiscoveredJobs, updateDiscoveredJobs } = useAutoDiscover();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Suggestions & Grievance Feedback Hub State
+  const [feedbackFilter, setFeedbackFilter] = useState<"all" | "pending" | "resolved">("all");
+  const [feedbackSearch, setFeedbackSearch] = useState("");
+
+  const { data: feedbackItems = [], isLoading: feedbackLoading } = useQuery({
+    queryKey: ["admin-feedback"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("suggestions_grievances")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && isAdmin,
+  });
+
+  const unreadFeedbackCount = useMemo(() => {
+    return feedbackItems.filter((item: any) => item.status === "pending").length;
+  }, [feedbackItems]);
+
+  const resolveFeedbackMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("suggestions_grievances")
+        .update({ status: "resolved" })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Status Updated",
+        description: "The feedback has been marked as resolved.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["admin-feedback"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error updating status",
+        description: error.message || "Failed to resolve feedback.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Govt Job Scraper (Updates tab)
   const govtScraper = useGovtJobScraper();
@@ -4451,6 +4496,15 @@ ${hashtagsStr}`;
                   <span className="hidden sm:inline">AI Keys</span>
                 </TabsTrigger>
               )}
+              <TabsTrigger value="feedback" className="gap-1 min-w-[44px] h-10 relative">
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">Feedback</span>
+                {unreadFeedbackCount > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]">
+                    {unreadFeedbackCount > 99 ? '99+' : unreadFeedbackCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -8995,6 +9049,179 @@ ${hashtagsStr}`;
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="feedback">
+            <Card className="border-0 shadow-card">
+              <CardHeader className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-primary" />
+                      Suggestions & Grievances
+                    </CardTitle>
+                    <CardDescription>
+                      View and resolve feedback submitted by users and guest visitors
+                    </CardDescription>
+                  </div>
+                </div>
+
+                {/* Filter and Search Controls */}
+                <div className="flex flex-col md:flex-row gap-3">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by email or message content..."
+                      value={feedbackSearch}
+                      onChange={(e) => setFeedbackSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant={feedbackFilter === "all" ? "default" : "outline"}
+                      onClick={() => setFeedbackFilter("all")}
+                      size="sm"
+                      className="rounded-lg"
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={feedbackFilter === "pending" ? "default" : "outline"}
+                      onClick={() => setFeedbackFilter("pending")}
+                      size="sm"
+                      className="rounded-lg relative"
+                    >
+                      Pending
+                      {unreadFeedbackCount > 0 && (
+                        <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                          {unreadFeedbackCount}
+                        </span>
+                      )}
+                    </Button>
+                    <Button
+                      variant={feedbackFilter === "resolved" ? "default" : "outline"}
+                      onClick={() => setFeedbackFilter("resolved")}
+                      size="sm"
+                      className="rounded-lg"
+                    >
+                      Resolved
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                {feedbackLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm">Loading feedback items...</p>
+                  </div>
+                ) : (() => {
+                  const filteredFeedback = feedbackItems.filter((item: any) => {
+                    const matchesStatus =
+                      feedbackFilter === "all" || item.status === feedbackFilter;
+                    const cleanSearch = feedbackSearch.toLowerCase().trim();
+                    const matchesSearch =
+                      !cleanSearch ||
+                      (item.user_email || "anonymous").toLowerCase().includes(cleanSearch) ||
+                      item.message?.toLowerCase().includes(cleanSearch);
+                    return matchesStatus && matchesSearch;
+                  });
+
+                  if (filteredFeedback.length === 0) {
+                    return (
+                      <div className="text-center py-12 border border-dashed rounded-xl bg-muted/20">
+                        <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground/60 mb-2" />
+                        <h4 className="font-semibold text-sm text-foreground">No submissions found</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          No feedback matching the current filters has been received.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {filteredFeedback.map((item: any) => (
+                        <Card
+                          key={item.id}
+                          className={`border-border/60 shadow-sm transition-all hover:shadow-md ${
+                            item.status === "pending"
+                              ? "border-l-4 border-l-orange-500"
+                              : "border-l-4 border-l-green-500 bg-secondary/10"
+                          }`}
+                        >
+                          <CardContent className="p-4 space-y-3">
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-foreground truncate" title={item.user_email || "Anonymous Submitter"}>
+                                  {item.user_email || <span className="text-muted-foreground italic font-normal">Anonymous Submitter</span>}
+                                </p>
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  {item.created_at
+                                    ? format(new Date(item.created_at), "dd MMM yyyy, hh:mm a")
+                                    : "N/A"}
+                                </span>
+                              </div>
+                              <div className="flex gap-1.5 flex-shrink-0">
+                                <Badge
+                                  className={`text-[10px] capitalize px-2 py-0.5 rounded-full ${
+                                    item.type === "grievance"
+                                      ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                                      : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
+                                  }`}
+                                >
+                                  {item.type === "grievance" ? "⚠️ Grievance" : "💡 Suggestion"}
+                                </Badge>
+                                <Badge
+                                  variant={item.status === "pending" ? "outline" : "default"}
+                                  className={`text-[10px] capitalize px-2 py-0.5 rounded-full ${
+                                    item.status === "pending"
+                                      ? "border-orange-200 text-orange-700 bg-orange-50/50 dark:border-orange-900/30 dark:text-orange-400 dark:bg-orange-950/10"
+                                      : "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300"
+                                  }`}
+                                >
+                                  {item.status}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-foreground leading-relaxed bg-secondary/20 dark:bg-secondary/40 p-3 rounded-xl whitespace-pre-wrap select-all font-sans border border-border/40">
+                              {item.message}
+                            </p>
+
+                            {item.status === "pending" && (
+                              <div className="flex justify-end pt-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={resolveFeedbackMutation.isPending}
+                                  onClick={() => resolveFeedbackMutation.mutate(item.id)}
+                                  className="h-8 text-xs font-semibold hover:bg-green-50 hover:text-green-600 hover:border-green-300 dark:hover:bg-green-950/20 dark:hover:text-green-400 dark:hover:border-green-900 transition-colors"
+                                >
+                                  {resolveFeedbackMutation.isPending ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                      Resolving...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Check className="h-3.5 w-3.5 mr-1 text-green-600" />
+                                      Mark Resolved
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
