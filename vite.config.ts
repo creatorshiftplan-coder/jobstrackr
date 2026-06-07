@@ -324,12 +324,19 @@ function localCachePlugin(env: Record<string, string>) {
       const supabaseFetch = async (path: string) => {
         const url = env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
         const key = env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        if (!url || !key) {
+          throw new Error("Supabase URL or Key is missing from environment variables");
+        }
         const response = await fetch(`${url}/rest/v1/${path}`, {
           headers: {
-            apikey: key!,
+            apikey: key,
             Authorization: `Bearer ${key}`,
           },
         });
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Supabase API error: ${response.status} ${response.statusText} - ${errText}`);
+        }
         return response.json();
       };
 

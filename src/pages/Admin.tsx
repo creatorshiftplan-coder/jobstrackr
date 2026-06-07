@@ -998,7 +998,7 @@ export default function Admin() {
   const [checkingVacancies, setCheckingVacancies] = useState(false);
 
   const handleCheckVacancies = useCallback(() => {
-    if (!jobs || jobs.length === 0) {
+    if (!Array.isArray(jobs) || jobs.length === 0) {
       toast({
         title: "No jobs loaded",
         description: "Please wait for jobs to finish loading or check your connection.",
@@ -1453,7 +1453,7 @@ export default function Admin() {
   };
 
   const activeJobsForTelegram = useMemo(() => {
-    if (!jobs) return [];
+    if (!Array.isArray(jobs)) return [];
     
     const filtered = jobs.filter(job => {
       const lastDate = getJobDeadlineDate(job);
@@ -1507,7 +1507,7 @@ export default function Admin() {
   const { data: rawTelegramExamUpdates, isLoading: telegramUpdatesLoading } = useAllExamUpdates();
 
   const telegramExamUpdates = useMemo(() => {
-    if (!rawTelegramExamUpdates) return [];
+    if (!Array.isArray(rawTelegramExamUpdates)) return [];
     
     return rawTelegramExamUpdates.filter(update => {
       if (selectedTelegramTag !== "All Jobs") {
@@ -1816,7 +1816,7 @@ export default function Admin() {
   };
 
   const recentJobs = useMemo(() => {
-    if (!jobs) return [];
+    if (!Array.isArray(jobs)) return [];
     let list = [...jobs];
     if (selectedDiagDate) {
       list = list.filter(job => {
@@ -1832,7 +1832,7 @@ export default function Admin() {
   }, [jobs, selectedDiagDate]);
 
   const recentUpdates = useMemo(() => {
-    if (!rawTelegramExamUpdates) return [];
+    if (!Array.isArray(rawTelegramExamUpdates)) return [];
     let list = [...rawTelegramExamUpdates];
     if (selectedDiagDate) {
       list = list.filter(update => {
@@ -2605,7 +2605,7 @@ ${hashtagsStr}`;
   };
 
   const activeJobsForFacebook = useMemo(() => {
-    if (!jobs) return [];
+    if (!Array.isArray(jobs)) return [];
     
     const filtered = jobs.filter(job => {
       const lastDate = getJobDeadlineDate(job);
@@ -2657,7 +2657,7 @@ ${hashtagsStr}`;
   }, [jobs, selectedFacebookSector, selectedFacebookTag, facebookSortField, facebookSortDirection]);
 
   const facebookExamUpdates = useMemo(() => {
-    if (!rawTelegramExamUpdates) return [];
+    if (!Array.isArray(rawTelegramExamUpdates)) return [];
     
     return rawTelegramExamUpdates.filter(update => {
       if (selectedFacebookTag !== "All Jobs") {
@@ -3162,7 +3162,7 @@ ${hashtagsStr}`;
 
   // Get all unique years of expired jobs dynamically
   const expiredYears = useMemo(() => {
-    if (!jobs) return [];
+    if (!Array.isArray(jobs)) return [];
     const years = new Set<number>();
     jobs.forEach(job => {
       const lastDate = getJobDeadlineDate(job);
@@ -3962,7 +3962,7 @@ ${hashtagsStr}`;
   };
 
   const handleBackfillEligibilityProfiles = async () => {
-    if (!jobs || jobs.length === 0) {
+    if (!Array.isArray(jobs) || jobs.length === 0) {
       toast({ title: "No jobs found", description: "There are no jobs available to backfill." });
       return;
     }
