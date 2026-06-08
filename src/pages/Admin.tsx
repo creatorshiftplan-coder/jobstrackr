@@ -1158,6 +1158,11 @@ export default function Admin() {
   const [telegramSortDirection, setTelegramSortDirection] = useState<"asc" | "desc">("desc");
   const [telegramConsoleLogs, setTelegramConsoleLogs] = useState<string[]>([]);
   const consoleBottomRef = useRef<HTMLDivElement>(null);
+  const [allowTelegramDuplicate, setAllowTelegramDuplicate] = useState<boolean>(false);
+  const [showClearLogsConfirm, setShowClearLogsConfirm] = useState<boolean>(false);
+  const [showOnlyUnsuccessfulLogs, setShowOnlyUnsuccessfulLogs] = useState<boolean>(false);
+  const [selectedFailedLogIds, setSelectedFailedLogIds] = useState<string[]>([]);
+  const [resendingLogs, setResendingLogs] = useState<boolean>(false);
 
   // Auto-scroll the Telegram console to the bottom when new logs are added
   useEffect(() => {
@@ -1191,6 +1196,13 @@ export default function Admin() {
   const [telegramLogs, setTelegramLogs] = useState<TelegramSentJobLog[]>([]);
   const [loadingTelegramLogs, setLoadingTelegramLogs] = useState(false);
   const [channelStats, setChannelStats] = useState<Record<string, { total: number; lastSent: string | null; lastTitle: string | null; lastStatus: string | null }>>({});
+
+  const filteredLogs = useMemo(() => {
+    if (showOnlyUnsuccessfulLogs) {
+      return telegramLogs.filter(log => log.status !== "success");
+    }
+    return telegramLogs;
+  }, [telegramLogs, showOnlyUnsuccessfulLogs]);
 
   const fetchChannelStats = useCallback(async () => {
     try {
@@ -1238,7 +1250,7 @@ export default function Admin() {
   const fetchTelegramLogs = useCallback(async () => {
     setLoadingTelegramLogs(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("telegram_sent_jobs")
         .select(`
           id,
@@ -1255,6 +1267,12 @@ export default function Admin() {
         .order("sent_at", { ascending: false })
         .limit(100);
 
+      if (showOnlyUnsuccessfulLogs) {
+        query = query.neq("status", "success");
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
       setTelegramLogs((data as any) || []);
       await fetchChannelStats();
@@ -1263,7 +1281,310 @@ export default function Admin() {
     } finally {
       setLoadingTelegramLogs(false);
     }
-  }, [fetchChannelStats]);
+  }, [fetchChannelStats, showOnlyUnsuccessfulLogs]);
+
+  const handleDeleteTelegramLog = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("telegram_sent_jobs")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      toast({
+        title: "Log Deleted",
+        description: "The broadcast history record has been removed. You can now re-send this item.",
+      });
+      fetchTelegramLogs();
+    } catch (err: any) {
+      toast({
+        title: "Delete Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
+  };
+  const handleClearTelegramLogs = async () => {
+    try {
+      setLoadingTelegramLogs(true);
+      const { error } = await supabase
+        .from("telegram_sent_jobs")
+        .delete()
+        .neq("status", "non_existent");
+
+      if (error) throw error;
+      
+      toast({
+        title: "History Cleared",
+        description: "All Telegram broadcast history has been successfully cleared.",
+      });
+      fetchTelegramLogs();
+    } catch (err: any) {
+      toast({
+        title: "Clear Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setShowClearLogsConfirm(false);
+      setLoadingTelegramLogs(false);
+    }
+  };
+
+  const handleResendSelectedLogs = async () => {
+    if (selectedFailedLogIds.length === 0) return;
+    
+    setResendingLogs(true);
+    let successCount = 0;
+    
+    try {
+      for (let i = 0; i < selectedFailedLogIds.length; i++) {
+        const logId = selectedFailedLogIds[i];
+        const log = telegramLogs.find(l => l.id === logId);
+        if (!log) continue;
+        
+        const channel = telegramChannels.find(c => c.id === log.channel_id);
+        if (!channel) {
+          console.error("Channel not found for log:", log.id);
+          continue;
+        }
+        
+        let itemTitle = "";
+        let messageText = "";
+        
+        if (log.job_id) {
+          const job = jobs?.find(j => j.id === log.job_id);
+          if (!job) {
+            console.error("Job not found in active list for log:", log.id);
+            continue;
+          }
+          itemTitle = job.title;
+          
+          const jobLink = `${getWebappBaseUrl()}/jobs/${job.slug || job.id}`;
+          const hashtags = ["#GovernmentJobs", "#SarkariNaukri"];
+          const titleLower = job.title.toLowerCase();
+          const deptLower = job.department.toLowerCase();
+          if (titleLower.includes("ssc") || deptLower.includes("ssc")) hashtags.unshift("#SSC");
+          else if (titleLower.includes("upsc") || deptLower.includes("upsc")) hashtags.unshift("#UPSC");
+          else if (titleLower.includes("rrb") || titleLower.includes("railway") || deptLower.includes("railway")) hashtags.unshift("#Railway");
+          else if (titleLower.includes("bank") || deptLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
+          else if (titleLower.includes("police") || deptLower.includes("police")) hashtags.unshift("#Police");
+          else if (titleLower.includes("defence") || titleLower.includes("army") || titleLower.includes("navy") || titleLower.includes("air force")) hashtags.unshift("#Defence");
+          else if (titleLower.includes("teacher") || titleLower.includes("teaching")) hashtags.unshift("#TeachingJobs");
+          else if (titleLower.includes("court") || titleLower.includes("judic")) hashtags.unshift("#Judiciary");
+          else if (titleLower.includes("steno")) hashtags.unshift("#Stenographer");
+          const hashtagsStr = hashtags.join(" ");
+
+          messageText = `
+<b>🚨 NEW RECRUITMENT ALERT</b>
+
+<b>📌 ${escapeHtml(job.title)}</b>
+
+🏢 Organization: ${escapeHtml(job.department)}
+👥 Vacancies: ${escapeHtml(job.vacancies_display || job.vacancies || "TBD")}
+📅 Last Date: ${(() => {
+            const d = getJobDeadlineDate(job);
+            return d ? format(d, "dd MMM yyyy") : escapeHtml(job.last_date_display || job.last_date);
+          })()}
+
+✅ Apply Online
+
+🔗 <b><a href="${jobLink}">View Full Notification on Website</a></b>
+
+${hashtagsStr}
+          `.trim();
+        } else if (log.update_id) {
+          const update = telegramExamUpdates?.find(u => u.id === log.update_id);
+          if (!update) {
+            console.error("Update not found in active list for log:", log.id);
+            continue;
+          }
+          itemTitle = update.title;
+          
+          const updateLink = `${getWebappBaseUrl()}/exam-update/${update.id}`;
+          const categoryLower = update.category.toLowerCase();
+          const titleLower = update.title.toLowerCase();
+
+          let tagCategory = "#ExamUpdate";
+          let templateType: "admit_card" | "result" | "answer_key" | "recruitment" = "recruitment";
+          
+          if (categoryLower.includes("admit") || titleLower.includes("admit") || categoryLower.includes("city") || titleLower.includes("city") || categoryLower.includes("hall") || categoryLower.includes("call") || categoryLower.includes("syllabus")) {
+            templateType = "admit_card";
+            tagCategory = "#AdmitCard";
+          } else if (categoryLower.includes("result") || titleLower.includes("result") || categoryLower.includes("cutoff") || titleLower.includes("cutoff") || categoryLower.includes("scorecard") || categoryLower.includes("merit")) {
+            templateType = "result";
+            tagCategory = "#Result";
+          } else if (categoryLower.includes("answer") || titleLower.includes("answer") || categoryLower.includes("key") || titleLower.includes("key") || categoryLower.includes("sheet")) {
+            templateType = "answer_key";
+            tagCategory = "#AnswerKey";
+          }
+
+          const hashtags = [tagCategory];
+          if (templateType === "result" || templateType === "recruitment") {
+            hashtags.push("#GovernmentJobs");
+          } else {
+            hashtags.push("#ExamUpdate");
+          }
+          
+          if (titleLower.includes("ssc")) hashtags.unshift("#SSC");
+          else if (titleLower.includes("upsc")) hashtags.unshift("#UPSC");
+          else if (titleLower.includes("rrb") || titleLower.includes("railway")) hashtags.unshift("#Railway");
+          else if (titleLower.includes("bank") || titleLower.includes("sbi") || titleLower.includes("ibps")) hashtags.unshift("#Banking");
+          else if (titleLower.includes("police")) hashtags.unshift("#Police");
+          else if (titleLower.includes("defence")) hashtags.unshift("#Defence");
+          const hashtagsStr = hashtags.join(" ");
+
+          if (templateType === "admit_card") {
+            const statusText = update.status || (titleLower.includes("city") ? "Exam City Slip Released" : "Admit Card Released");
+            const examDate = (() => {
+              if (update.important_dates && Array.isArray(update.important_dates)) {
+                const match = update.important_dates.find((d: any) => 
+                  /exam|test|written|cbt|date/i.test(d.event) && !/admit|result|apply|registration/i.test(d.event)
+                );
+                if (match) return match.date;
+              }
+              return "Check Details";
+            })();
+
+            messageText = `
+<b>🔔 IMPORTANT UPDATE</b>
+
+<b>📌 ${escapeHtml(update.title)}</b>
+
+📍 ${escapeHtml(statusText)}
+📅 Exam Date: ${escapeHtml(examDate)}
+
+✅ Download Now
+
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
+
+${hashtagsStr}
+            `.trim();
+          } else if (templateType === "result") {
+            messageText = `
+<b>🔔 IMPORTANT UPDATE</b>
+
+<b>📌 ${escapeHtml(update.title)}</b>
+
+📢 Result Released Successfully
+
+✅ Check Your Result
+
+🔗 <b><a href="${updateLink}">View Result on Website</a></b>
+
+${hashtagsStr}
+            `.trim();
+          } else if (templateType === "answer_key") {
+            messageText = `
+<b>🔔 IMPORTANT UPDATE</b>
+
+<b>📌 ${escapeHtml(update.title)}</b>
+
+📢 Official Answer Key Available
+
+✅ Check Response Sheet & Answer Key
+
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
+
+${hashtagsStr}
+            `.trim();
+          } else {
+            const orgText = (() => {
+              if (titleLower.includes("ssc")) return "SSC";
+              if (titleLower.includes("upsc")) return "UPSC";
+              if (titleLower.includes("rrb") || titleLower.includes("railway")) return "RRB / Railways";
+              if (titleLower.includes("sbi")) return "SBI";
+              if (titleLower.includes("ibps")) return "IBPS";
+              const match = update.title.match(/^(.*?)\s+(recruitment|exam|vacancy|admit|result)/i);
+              if (match && match[1]) return match[1].trim();
+              return "Government Agency";
+            })();
+
+            messageText = `
+<b>🔔 IMPORTANT UPDATE</b>
+
+<b>📌 ${escapeHtml(update.title)}</b>
+
+🏢 Organization: ${escapeHtml(orgText)}
+📢 Notification Details Available
+
+✅ View Notification & Apply
+
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
+
+${hashtagsStr}
+            `.trim();
+          }
+        }
+        
+        let rawChannelId = (channel.channel_id || "").replace(/[^a-zA-Z0-9_@-]/g, "").trim();
+        let formattedChannelId = rawChannelId;
+        if (/^\d+$/.test(rawChannelId)) {
+          formattedChannelId = `-100${rawChannelId}`;
+        } else if (/^-\d+$/.test(rawChannelId) && !rawChannelId.startsWith("-100")) {
+          formattedChannelId = `-100${rawChannelId.substring(1)}`;
+        } else if (/^[a-zA-Z][a-zA-Z0-9_]*$/.test(rawChannelId)) {
+          formattedChannelId = `@${rawChannelId}`;
+        }
+
+        const cleanedBotToken = (channel.bot_token || "").replace(/[^a-zA-Z0-9_:-]/g, "").trim();
+
+        const response = await fetch(`https://api.telegram.org/bot${cleanedBotToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: formattedChannelId,
+            text: messageText,
+            parse_mode: "HTML",
+            disable_web_page_preview: true,
+            link_preview_options: { is_disabled: true }
+          })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.ok) {
+          successCount++;
+          await supabase
+            .from("telegram_sent_jobs")
+            .update({
+              status: "success",
+              error_message: null,
+              sent_at: new Date().toISOString()
+            })
+            .eq("id", log.id);
+        } else {
+          await supabase
+            .from("telegram_sent_jobs")
+            .update({
+              status: "failed",
+              error_message: data.description || "Unknown Telegram API error",
+              sent_at: new Date().toISOString()
+            })
+            .eq("id", log.id);
+        }
+
+        if (i < selectedFailedLogIds.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+
+      toast({
+        title: "Resend Complete",
+        description: `Successfully resent ${successCount} out of ${selectedFailedLogIds.length} failed posts.`,
+      });
+      
+      setSelectedFailedLogIds([]);
+      fetchTelegramLogs();
+    } catch (err: any) {
+      toast({
+        title: "Resend Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setResendingLogs(false);
+    }
+  };
 
 
 
@@ -1898,6 +2219,14 @@ export default function Admin() {
     fetchQueueStats();
   }, [fetchTelegramLogs, fetchQueueStats]);
 
+  const escapeHtml = (text: any): string => {
+    if (text === null || text === undefined) return "";
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  };
+
   const handlePostToTelegram = async () => {
     const channel = telegramChannels.find(c => c.id === selectedTelegramChannelId);
     if (!channel) {
@@ -1966,21 +2295,20 @@ export default function Admin() {
           const hashtagsStr = hashtags.join(" ");
 
           messageText = `
-*🚨 NEW RECRUITMENT ALERT*
+<b>🚨 NEW RECRUITMENT ALERT</b>
 
-*📌 ${job.title}*
+<b>📌 ${escapeHtml(job.title)}</b>
 
-🏢 Organization: ${job.department}
-👥 Vacancies: ${job.vacancies_display || job.vacancies || "TBD"}
+🏢 Organization: ${escapeHtml(job.department)}
+👥 Vacancies: ${escapeHtml(job.vacancies_display || job.vacancies || "TBD")}
 📅 Last Date: ${(() => {
             const d = getJobDeadlineDate(job);
-            return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date;
+            return d ? format(d, "dd MMM yyyy") : escapeHtml(job.last_date_display || job.last_date);
           })()}
 
 ✅ Apply Online
 
-🔗 View Full Notification:
-${jobLink}
+🔗 <b><a href="${jobLink}">View Full Notification on Website</a></b>
 
 ${hashtagsStr}
           `.trim();
@@ -1988,7 +2316,7 @@ ${hashtagsStr}
           const update = telegramExamUpdates?.find(u => u.id === id);
           if (!update) continue;
           itemTitle = update.title;
-          const updateLink = `${getWebappBaseUrl()}/updates/${update.update_slug || update.id}`;
+          const updateLink = `${getWebappBaseUrl()}/exam-update/${update.id}`;
           
           const categoryLower = update.category.toLowerCase();
           const titleLower = update.title.toLowerCase();
@@ -2036,47 +2364,44 @@ ${hashtagsStr}
             })();
 
             messageText = `
-*🔔 IMPORTANT UPDATE*
+<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${update.title}*
+<b>📌 ${escapeHtml(update.title)}</b>
 
-📍 ${statusText}
-📅 Exam Date: ${examDate}
+📍 ${escapeHtml(statusText)}
+📅 Exam Date: ${escapeHtml(examDate)}
 
 ✅ Download Now
 
-🔗 View Details:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
 
 ${hashtagsStr}
             `.trim();
           } else if (templateType === "result") {
             messageText = `
-*🔔 IMPORTANT UPDATE*
+<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${update.title}*
+<b>📌 ${escapeHtml(update.title)}</b>
 
 📢 Result Released Successfully
 
 ✅ Check Your Result
 
-🔗 View Result:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Result on Website</a></b>
 
 ${hashtagsStr}
             `.trim();
           } else if (templateType === "answer_key") {
             messageText = `
-*🔔 IMPORTANT UPDATE*
+<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${update.title}*
+<b>📌 ${escapeHtml(update.title)}</b>
 
 📢 Official Answer Key Available
 
 ✅ Check Response Sheet & Answer Key
 
-🔗 View Details:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
 
 ${hashtagsStr}
             `.trim();
@@ -2094,17 +2419,16 @@ ${hashtagsStr}
             })();
 
             messageText = `
-*🔔 IMPORTANT UPDATE*
+<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${update.title}*
+<b>📌 ${escapeHtml(update.title)}</b>
 
-🏢 Organization: ${orgText}
+🏢 Organization: ${escapeHtml(orgText)}
 📢 Notification Details Available
 
 ✅ View Notification & Apply
 
-🔗 View Details:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
 
 ${hashtagsStr}
             `.trim();
@@ -2117,7 +2441,7 @@ ${hashtagsStr}
         ]);
 
         // Prevent duplicate sending
-        if (sentIds.has(id)) {
+        if (sentIds.has(id) && !allowTelegramDuplicate) {
           setTelegramConsoleLogs(prev => [
             ...prev,
             `[${format(new Date(), "HH:mm:ss")}] ⚠️ Skipped duplicate: "${itemTitle}" already successfully sent to this channel.`
@@ -2144,7 +2468,7 @@ ${hashtagsStr}
           body: JSON.stringify({
             chat_id: formattedChannelId,
             text: messageText,
-            parse_mode: "Markdown",
+            parse_mode: "HTML",
             disable_web_page_preview: true,
             link_preview_options: { is_disabled: true }
           })
@@ -2252,27 +2576,26 @@ ${hashtagsStr}
       else if (titleLower.includes("defence") || titleLower.includes("army") || titleLower.includes("navy") || titleLower.includes("air force")) hashtags.unshift("#Defence");
       const hashtagsStr = hashtags.join(" ");
 
-      return `${prefix}*🚨 NEW RECRUITMENT ALERT*
+      return `${prefix}<b>🚨 NEW RECRUITMENT ALERT</b>
 
-*📌 ${job.title}*
+<b>📌 ${escapeHtml(job.title)}</b>
 
-🏢 Organization: ${job.department}
-👥 Vacancies: ${job.vacancies_display || job.vacancies || "TBD"}
+🏢 Organization: ${escapeHtml(job.department)}
+👥 Vacancies: ${escapeHtml(job.vacancies_display || job.vacancies || "TBD")}
 📅 Last Date: ${(() => {
         const d = getJobDeadlineDate(job);
-        return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date;
+        return d ? format(d, "dd MMM yyyy") : escapeHtml(job.last_date_display || job.last_date);
       })()}
 
 ✅ Apply Online
 
-🔗 View Full Notification:
-${jobLink}
+🔗 <b><a href="${jobLink}">View Full Notification on Website</a></b>
 
 ${hashtagsStr}`;
     } else {
       const update = telegramExamUpdates?.find(u => u.id === firstId);
       if (!update) return "Select an update to see the live preview...";
-      const updateLink = `${getWebappBaseUrl()}/updates/${update.update_slug || update.id}`;
+      const updateLink = `${getWebappBaseUrl()}/exam-update/${update.id}`;
       const prefix = ids.length > 1 ? `[Previewing 1 of ${ids.length} selected updates]\n\n` : "";
 
       const categoryLower = update.category.toLowerCase();
@@ -2319,43 +2642,40 @@ ${hashtagsStr}`;
           return "Check Details";
         })();
 
-        return `${prefix}*🔔 IMPORTANT UPDATE*
+        return `${prefix}<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${update.title}*
+<b>📌 ${escapeHtml(update.title)}</b>
 
-📍 ${statusText}
-📅 Exam Date: ${examDate}
+📍 ${escapeHtml(statusText)}
+📅 Exam Date: ${escapeHtml(examDate)}
 
 ✅ Download Now
 
-🔗 View Details:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
 
 ${hashtagsStr}`;
       } else if (templateType === "result") {
-        return `${prefix}*🔔 IMPORTANT UPDATE*
+        return `${prefix}<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${update.title}*
+<b>📌 ${escapeHtml(update.title)}</b>
 
 📢 Result Released Successfully
 
 ✅ Check Your Result
 
-🔗 View Result:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Result on Website</a></b>
 
 ${hashtagsStr}`;
       } else if (templateType === "answer_key") {
-        return `${prefix}*🔔 IMPORTANT UPDATE*
+        return `${prefix}<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${update.title}*
+<b>📌 ${escapeHtml(update.title)}</b>
 
 📢 Official Answer Key Available
 
 ✅ Check Response Sheet & Answer Key
 
-🔗 View Details:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
 
 ${hashtagsStr}`;
       } else {
@@ -2370,17 +2690,16 @@ ${hashtagsStr}`;
           return "Government Agency";
         })();
 
-        return `${prefix}*🔔 IMPORTANT UPDATE*
+        return `${prefix}<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${update.title}*
+<b>📌 ${escapeHtml(update.title)}</b>
 
-🏢 Organization: ${orgText}
+🏢 Organization: ${escapeHtml(orgText)}
 📢 Notification Details Available
 
 ✅ View Notification & Apply
 
-🔗 View Details:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
 
 ${hashtagsStr}`;
       }
@@ -2778,7 +3097,7 @@ ${hashtagsStr}`;
     } else {
       const update = facebookExamUpdates?.find(u => u.id === firstId);
       if (!update) return "Select an update to see the live preview...";
-      const updateLink = `${getWebappBaseUrl()}/updates/${update.update_slug || update.id}`;
+      const updateLink = `${getWebappBaseUrl()}/exam-update/${update.id}`;
       const prefix = ids.length > 1 ? `[Previewing 1 of ${ids.length} selected updates]\n\n` : "";
 
       const categoryLower = update.category.toLowerCase();
@@ -2984,7 +3303,7 @@ ${hashtagsStr}`;
           const update = facebookExamUpdates?.find(u => u.id === id);
           if (!update) continue;
           itemTitle = update.title;
-          const updateLink = `${getWebappBaseUrl()}/updates/${update.update_slug || update.id}`;
+          const updateLink = `${getWebappBaseUrl()}/exam-update/${update.id}`;
           
           const categoryLower = update.category.toLowerCase();
           const titleLower = update.title.toLowerCase();
@@ -5404,6 +5723,21 @@ ${hashtagsStr}`;
                               Please select or configure a Telegram channel first.
                             </div>
                           )}
+
+                          <div className="flex items-center space-x-2 py-1 select-none">
+                            <Checkbox
+                              id="allow-duplicate-telegram"
+                              checked={allowTelegramDuplicate}
+                              onCheckedChange={(checked) => setAllowTelegramDuplicate(!!checked)}
+                            />
+                            <label
+                              htmlFor="allow-duplicate-telegram"
+                              className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-amber-600 dark:text-amber-500 cursor-pointer flex items-center gap-1.5"
+                            >
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              Allow duplicate posts (bypass history check)
+                            </label>
+                          </div>
                           
                           <Button
                             className="w-full gap-2 h-11"
@@ -5518,7 +5852,7 @@ ${hashtagsStr}`;
 
                 {/* History Logs Table */}
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
+                  <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <CardTitle className="text-md flex items-center gap-2">
                         <Clock className="h-4 w-4 text-primary" />
@@ -5528,31 +5862,101 @@ ${hashtagsStr}`;
                         Real-time duplicate-checking and dispatch log of the last 100 posts
                       </CardDescription>
                     </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={fetchTelegramLogs}
-                      disabled={loadingTelegramLogs}
-                      className="gap-1.5"
-                    >
-                      {loadingTelegramLogs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                      Refresh logs
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center space-x-2 select-none border rounded-md px-3 py-1.5 bg-muted/20">
+                        <Checkbox
+                          id="show-only-unsuccessful"
+                          checked={showOnlyUnsuccessfulLogs}
+                          disabled={resendingLogs}
+                          onCheckedChange={(checked) => {
+                            setShowOnlyUnsuccessfulLogs(!!checked);
+                            setSelectedFailedLogIds([]);
+                          }}
+                        />
+                        <label
+                          htmlFor="show-only-unsuccessful"
+                          className="text-xs font-medium cursor-pointer text-muted-foreground hover:text-foreground"
+                        >
+                          Show failed only
+                        </label>
+                      </div>
+                      <div className="flex gap-2">
+                        {selectedFailedLogIds.length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={handleResendSelectedLogs}
+                            disabled={resendingLogs}
+                            className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                          >
+                            {resendingLogs ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Send className="h-3.5 w-3.5" />
+                            )}
+                            Resend Selected ({selectedFailedLogIds.length})
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={fetchTelegramLogs}
+                          disabled={loadingTelegramLogs || resendingLogs}
+                          className="gap-1.5"
+                        >
+                          {loadingTelegramLogs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                          Refresh logs
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive" 
+                          onClick={() => setShowClearLogsConfirm(true)}
+                          disabled={loadingTelegramLogs || telegramLogs.length === 0 || resendingLogs}
+                          className="gap-1.5"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Clear history
+                        </Button>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {loadingTelegramLogs ? (
                       <div className="flex items-center justify-center py-12">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       </div>
-                    ) : telegramLogs.length === 0 ? (
+                    ) : filteredLogs.length === 0 ? (
                       <div className="text-center py-12 text-muted-foreground text-sm">
-                        No posting logs found. Successful and failed Telegram broadcasts will be logged here.
+                        {showOnlyUnsuccessfulLogs 
+                          ? "No unsuccessful logs found." 
+                          : "No posting logs found. Successful and failed Telegram broadcasts will be logged here."
+                        }
                       </div>
                     ) : (
                       <div className="border rounded-md overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>
+                              <TableHead className="w-[40px]">
+                                <Checkbox
+                                  disabled={resendingLogs}
+                                  checked={
+                                    filteredLogs.length > 0 &&
+                                    filteredLogs.every(log => log.status !== "success" ? selectedFailedLogIds.includes(log.id) : true) &&
+                                    filteredLogs.some(log => log.status !== "success")
+                                  }
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      const failedIds = filteredLogs
+                                        .filter(log => log.status !== "success")
+                                        .map(log => log.id);
+                                      setSelectedFailedLogIds(failedIds);
+                                    } else {
+                                      setSelectedFailedLogIds([]);
+                                    }
+                                  }}
+                                />
+                              </TableHead>
                               <TableHead>Broadcast Date</TableHead>
                               <TableHead>Channel Name</TableHead>
                               <TableHead>Sector</TableHead>
@@ -5560,14 +5964,34 @@ ${hashtagsStr}`;
                               <TableHead className="min-w-[200px]">Item Title</TableHead>
                               <TableHead>Status</TableHead>
                               <TableHead className="max-w-[180px]">Details/Errors</TableHead>
+                              <TableHead className="w-[80px] text-right">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody className="text-xs">
-                            {telegramLogs.map((log) => {
+                            {filteredLogs.map((log) => {
                               const title = log.jobs?.title || log.exam_updates?.title || "Unknown Title";
                               const subtitle = log.jobs?.department || "";
+                              const isSelected = selectedFailedLogIds.includes(log.id);
+                              
                               return (
-                                <TableRow key={log.id}>
+                                <TableRow key={log.id} className={isSelected ? "bg-amber-500/5 hover:bg-amber-500/10 transition-colors" : ""}>
+                                  <TableCell className="w-[40px]">
+                                    {log.status !== "success" ? (
+                                      <Checkbox
+                                        disabled={resendingLogs}
+                                        checked={isSelected}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) {
+                                            setSelectedFailedLogIds(prev => [...prev, log.id]);
+                                          } else {
+                                            setSelectedFailedLogIds(prev => prev.filter(id => id !== log.id));
+                                          }
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="w-4 h-4" />
+                                    )}
+                                  </TableCell>
                                   <TableCell className="font-mono text-[10px] text-muted-foreground">
                                     {format(new Date(log.sent_at), "dd MMM yyyy, HH:mm")}
                                   </TableCell>
@@ -5611,6 +6035,18 @@ ${hashtagsStr}`;
                                     ) : (
                                       log.error_message || "Unknown error"
                                     )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      disabled={resendingLogs}
+                                      className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      onClick={() => handleDeleteTelegramLog(log.id)}
+                                      title="Delete history entry"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
                                   </TableCell>
                                 </TableRow>
                               );
@@ -9881,6 +10317,28 @@ ${hashtagsStr}`;
             >
               {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear Telegram Logs Confirmation AlertDialog */}
+      <AlertDialog open={showClearLogsConfirm} onOpenChange={(open) => !open && setShowClearLogsConfirm(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Telegram Broadcast History?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all records of sent telegram posts. Duplicate checks will be reset, meaning you can resend any previously sent jobs or updates without duplicate blocks.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loadingTelegramLogs}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              disabled={loadingTelegramLogs}
+              onClick={handleClearTelegramLogs}
+            >
+              Clear All
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

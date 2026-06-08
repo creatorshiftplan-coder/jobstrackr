@@ -11,6 +11,14 @@ if (!BOT_TOKEN) {
 }
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
+function escapeHtml(text: any): string {
+  if (text === null || text === undefined) return "";
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 async function sendTelegramMessage(chatId: string | number, text: string, replyMarkup?: object) {
   try {
     const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
@@ -19,7 +27,7 @@ async function sendTelegramMessage(chatId: string | number, text: string, replyM
       body: JSON.stringify({
         chat_id: chatId,
         text: text,
-        parse_mode: "Markdown",
+        parse_mode: "HTML",
         disable_web_page_preview: true,
         reply_markup: replyMarkup,
       }),
@@ -129,19 +137,19 @@ Deno.serve(async (req) => {
           console.error("[telegram-bot] DB Upsert error:", error);
           await sendTelegramMessage(
             chatId,
-            "❌ *Connection Error*\n\nFailed to link your account. Please try again from the website."
+            "❌ <b>Connection Error</b>\n\nFailed to link your account. Please try again from the website."
           );
         } else {
           // Success Response
           const successMessage = `
-Welcome *${userName}*! You are subscribed to the latest job notification and updates personalised just for you.
+Welcome <b>${escapeHtml(userName)}</b>! You are subscribed to the latest job notification and updates personalised just for you.
           `.trim();
           await sendTelegramMessage(chatId, successMessage);
         }
       } else {
         // start without userId
         const welcomeMessage = `
-👋 *Welcome to JobsTrackr Bot!*
+👋 <b>Welcome to JobsTrackr Bot!</b>
 
 To receive personalized job notifications, you need to link your Telegram account from the JobsTrackr website.
 
@@ -149,16 +157,16 @@ To receive personalized job notifications, you need to link your Telegram accoun
 2️⃣ Tap "Connect Telegram" under Notifications.
 3️⃣ You will be redirected back here to link your account.
 
-Link page: https://www.jobstrackr.in/settings/notifications
+Link page: https://jobstrackr.in/settings/notifications
         `.trim();
         await sendTelegramMessage(chatId, welcomeMessage);
       }
     } else if (text === "/help") {
       const helpMessage = `
-🤖 *JobsTrackr Bot Commands*
+🤖 <b>JobsTrackr Bot Commands</b>
 
 Here is how you can manage your notifications:
-• /start <id> - Connect your Telegram account
+• /start &lt;id&gt; - Connect your Telegram account
 • /preferences - Link to manage your job preferences
 • /stop - Temporarily pause job notifications
 • /resume - Resume job notifications
@@ -169,7 +177,7 @@ Manage all your detailed job interests (SSC, UPSC, Banking, etc.) directly on th
       await sendTelegramMessage(chatId, helpMessage);
     } else if (text === "/preferences") {
       const prefMessage = `
-⚙️ *Notification Preferences*
+⚙️ <b>Notification Preferences</b>
 
 You can manage your categories, qualifications, and state filters directly inside your JobsTrackr account.
       `.trim();
@@ -178,7 +186,7 @@ You can manage your categories, qualifications, and state filters directly insid
           [
             {
               text: "Manage Preferences",
-              url: "https://www.jobstrackr.in/settings/notifications",
+              url: "https://jobstrackr.in/settings/notifications",
             },
           ],
         ],
@@ -200,7 +208,7 @@ You can manage your categories, qualifications, and state filters directly insid
         );
       } else {
         const stopMessage = `
-🔕 *Notifications Paused*
+🔕 <b>Notifications Paused</b>
 
 You will no longer receive job alerts on Telegram. 
 Type /resume at any time to start receiving notifications again.
@@ -224,7 +232,7 @@ Type /resume at any time to start receiving notifications again.
         );
       } else {
         const resumeMessage = `
-🔔 *Notifications Resumed*
+🔔 <b>Notifications Resumed</b>
 
 Welcome back! You will now receive personalized job alerts on Telegram based on your preferences.
         `.trim();
@@ -234,7 +242,7 @@ Welcome back! You will now receive personalized job alerts on Telegram based on 
       // Unrecognized commands
       await sendTelegramMessage(
         chatId,
-        "❓ *Unrecognized Command*\n\nType /help to see all available bot commands."
+        "❓ <b>Unrecognized Command</b>\n\nType /help to see all available bot commands."
       );
     }
 

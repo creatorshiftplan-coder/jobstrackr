@@ -5,6 +5,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function escapeHtml(text: any): string {
+  if (text === null || text === undefined) return "";
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function getMatchedSectors(job: { title: string; department: string; qualification?: string; description?: string }): string[] {
   const text = `${job.title} ${job.department} ${job.qualification || ""} ${job.description || ""}`.toLowerCase();
   const matched: string[] = [];
@@ -197,7 +205,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           chat_id: formattedChannelId,
           text: message,
-          parse_mode: "Markdown",
+          parse_mode: "HTML",
           disable_web_page_preview: true,
           link_preview_options: { is_disabled: true }
         })
@@ -253,7 +261,7 @@ Deno.serve(async (req) => {
 
       console.log(`Sending update to ${channelsToPost.length} channel(s)...`);
 
-      const updateLink = `https://jobstrackr.in/updates/${exam_update.update_slug || exam_update.id}`;
+      const updateLink = `https://jobstrackr.in/exam-update/${exam_update.id}`;
       const categoryLower = exam_update.category.toLowerCase();
       const titleLower = exam_update.title.toLowerCase();
 
@@ -300,47 +308,44 @@ Deno.serve(async (req) => {
         })();
 
         messageText = `
-*🔔 IMPORTANT UPDATE*
+<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${exam_update.title}*
+<b>📌 ${escapeHtml(exam_update.title)}</b>
 
-📍 ${statusText}
-📅 Exam Date: ${examDate}
+📍 ${escapeHtml(statusText)}
+📅 Exam Date: ${escapeHtml(examDate)}
 
 ✅ Download Now
 
-🔗 View Details:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
 
 ${hashtagsStr}
         `.trim();
       } else if (templateType === "result") {
         messageText = `
-*🔔 IMPORTANT UPDATE*
+<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${exam_update.title}*
+<b>📌 ${escapeHtml(exam_update.title)}</b>
 
 📢 Result Released Successfully
 
 ✅ Check Your Result
 
-🔗 View Result:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Result on Website</a></b>
 
 ${hashtagsStr}
         `.trim();
       } else if (templateType === "answer_key") {
         messageText = `
-*🔔 IMPORTANT UPDATE*
+<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${exam_update.title}*
+<b>📌 ${escapeHtml(exam_update.title)}</b>
 
 📢 Official Answer Key Available
 
 ✅ Check Response Sheet & Answer Key
 
-🔗 View Details:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
 
 ${hashtagsStr}
         `.trim();
@@ -357,17 +362,16 @@ ${hashtagsStr}
         })();
 
         messageText = `
-*🔔 IMPORTANT UPDATE*
+<b>🔔 IMPORTANT UPDATE</b>
 
-*📌 ${exam_update.title}*
+<b>📌 ${escapeHtml(exam_update.title)}</b>
 
-🏢 Organization: ${orgText}
+🏢 Organization: ${escapeHtml(orgText)}
 📢 Notification Details Available
 
 ✅ View Notification & Apply
 
-🔗 View Details:
-${updateLink}
+🔗 <b><a href="${updateLink}">View Details on Website</a></b>
 
 ${hashtagsStr}
         `.trim();
@@ -400,7 +404,7 @@ ${hashtagsStr}
             body: JSON.stringify({
               chat_id: formattedChannelId,
               text: messageText,
-              parse_mode: "Markdown",
+              parse_mode: "HTML",
               disable_web_page_preview: true,
               link_preview_options: { is_disabled: true }
             })
@@ -508,18 +512,17 @@ ${hashtagsStr}
       const lastDate = job.last_date_display || job.last_date || "Check Details";
 
       const messageText = `
-*🚨 NEW RECRUITMENT ALERT*
+<b>🚨 NEW RECRUITMENT ALERT</b>
 
-*📌 ${job.title}*
+<b>📌 ${escapeHtml(job.title)}</b>
 
-🏢 Organization: ${job.department}
-👥 Vacancies: ${vacancies}
-📅 Last Date: ${lastDate}
+🏢 Organization: ${escapeHtml(job.department)}
+👥 Vacancies: ${escapeHtml(vacancies)}
+📅 Last Date: ${escapeHtml(lastDate)}
 
 ✅ Apply Online
 
-🔗 View Full Notification:
-${jobLink}
+🔗 <b><a href="${jobLink}">View Full Notification on Website</a></b>
 
 ${hashtagsStr}
       `.trim();
@@ -552,7 +555,7 @@ ${hashtagsStr}
             body: JSON.stringify({
               chat_id: formattedChannelId,
               text: messageText,
-              parse_mode: "Markdown",
+              parse_mode: "HTML",
               disable_web_page_preview: true,
               link_preview_options: { is_disabled: true }
             })

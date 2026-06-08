@@ -30,8 +30,9 @@ const INDIAN_STATES = [
   "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
-function escapeHtml(text: string): string {
-  return text
+function escapeHtml(text: any): string {
+  if (text === null || text === undefined) return "";
+  return String(text)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
@@ -113,7 +114,7 @@ async function enqueueJobNotifications(supabase: any, payload: any) {
 
   const val = `${title || ""} ${department || ""}`.toLowerCase();
   const jobLevel = getQualificationLevel(qualification);
-  const jobUrl = `https://www.jobstrackr.in/job/${slug || job_id}`;
+  const jobUrl = `https://jobstrackr.in/jobs/${slug || job_id}`;
 
   // Fetch all active telegram connections with preferences
   const { data: connections, error: connError } = await supabase
@@ -191,7 +192,7 @@ async function enqueueUpdateNotifications(supabase: any, payload: any) {
   else return 0; // Skip other categories
 
   const val = `${title || ""} ${summary || ""}`.toLowerCase();
-  const updateUrl = `https://www.jobstrackr.in/exam-update/${update_id}`;
+  const updateUrl = `https://jobstrackr.in/exam-update/${update_id}`;
 
   // Fetch all active connections with preferences
   const { data: connections, error: connError } = await supabase
@@ -443,6 +444,13 @@ Deno.serve(async (req) => {
       console.log(`[process-telegram-queue] Enqueuing notifications for update: ${body.title}`);
       const queued = await enqueueUpdateNotifications(supabase, body);
       console.log(`[process-telegram-queue] Queued ${queued} update notifications`);
+    }
+
+    // Phase 1.5: Clean up any stuck processing notifications (self-healing recovery)
+    try {
+      await supabase.rpc("cleanup_stuck_telegram_notifications");
+    } catch (err) {
+      console.error("[process-telegram-queue] Stuck queue cleanup failed:", err);
     }
 
     // Phase 2: Process the queue (send pending messages)
