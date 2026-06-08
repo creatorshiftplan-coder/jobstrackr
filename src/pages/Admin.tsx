@@ -3956,7 +3956,7 @@ ${hashtagsStr}`;
         job_metadata: Object.keys(metadata).length > 0 ? metadata : null,
       };
 
-      // Check for duplicates locally first using checkJobSimilarity
+      // Check for duplicates locally first using checkJobSimilarity (exact matches only)
       let isDuplicate = false;
       let duplicateJobTitle = "";
       if (jobs) {
@@ -3967,7 +3967,7 @@ ${hashtagsStr}`;
             department: jobRecord.department,
             location: jobRecord.location,
           }, existingJob);
-          if (similarity.isSimilar) {
+          if (similarity.isSimilar && similarity.matchType === "exact") {
             isDuplicate = true;
             duplicateJobTitle = existingJob.title;
             break;
@@ -3982,7 +3982,6 @@ ${hashtagsStr}`;
           variant: "destructive",
         });
         setDiscoverDuplicateUrls(prev => new Set(prev).add(url));
-        setDiscoverSavedUrls(prev => new Set(prev).add(url));
         setDiscoverSavingUrl(null);
         return "duplicate";
       }
@@ -4001,7 +4000,6 @@ ${hashtagsStr}`;
           variant: "destructive",
         });
         setDiscoverDuplicateUrls(prev => new Set(prev).add(url));
-        setDiscoverSavedUrls(prev => new Set(prev).add(url));
         setDiscoverSavingUrl(null);
         return "duplicate";
       }
@@ -4156,7 +4154,7 @@ ${hashtagsStr}`;
         job_metadata: Object.keys(metadata).length > 0 ? metadata : null,
       };
 
-      // Check for duplicates
+      // Check for duplicates (exact matches only)
       let isDuplicate = false;
       let duplicateJobTitle = "";
       if (jobs) {
@@ -4167,7 +4165,7 @@ ${hashtagsStr}`;
             department: jobRecord.department,
             location: jobRecord.location,
           }, existingJob);
-          if (similarity.isSimilar) {
+          if (similarity.isSimilar && similarity.matchType === "exact") {
             isDuplicate = true;
             duplicateJobTitle = existingJob.title;
             break;
@@ -7593,10 +7591,10 @@ ${hashtagsStr}`;
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={discoverSavingAll || discoverScrapingUrl !== null || Object.keys(discoverScrapedResults).filter(url => !discoverSavedUrls.has(url)).length === 0}
+                          disabled={discoverSavingAll || discoverScrapingUrl !== null || Object.keys(discoverScrapedResults).filter(url => !discoverSavedUrls.has(url) && !discoverDuplicateUrls.has(url)).length === 0}
                           onClick={async () => {
                             setDiscoverSavingAll(true);
-                            const unsaved = discoveredLinks.filter(l => discoverScrapedResults[l.url] && !discoverSavedUrls.has(l.url));
+                            const unsaved = discoveredLinks.filter(l => discoverScrapedResults[l.url] && !discoverSavedUrls.has(l.url) && !discoverDuplicateUrls.has(l.url));
                             let savedCount = 0;
                             let duplicateCount = 0;
                             let errorCount = 0;
@@ -7645,9 +7643,9 @@ ${hashtagsStr}`;
                             {discoveredLinks.map((link, idx) => {
                               const isScraped = !!discoverScrapedResults[link.url];
                               const isScraping = discoverScrapingUrl === link.url;
-                              const isProcessed = discoverSavedUrls.has(link.url);
+                              const isSaved = discoverSavedUrls.has(link.url);
                               const isDuplicate = discoverDuplicateUrls.has(link.url);
-                              const isSaved = isProcessed && !isDuplicate;
+                              const isProcessed = isSaved || isDuplicate;
                               const isSaving = discoverSavingUrl === link.url;
                               const isExpanded = discoverExpandedUrl === link.url;
 
