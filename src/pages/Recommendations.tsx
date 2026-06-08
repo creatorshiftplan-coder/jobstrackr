@@ -23,6 +23,8 @@ import { hybridRecommend, qualificationToTag, HybridMatchedJob } from "@/lib/hyb
 import { cn } from "@/lib/utils";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { toast } from "sonner";
+import { buildUserEmbeddingText } from "@/lib/userEmbedding";
+import { triggerProfileEmbeddingUpdate, useAiRecommendations } from "@/hooks/useAiRecommendations";
 
 // ── Wizard Step Definitions ─────────────────────────────────────────────
 
@@ -302,6 +304,7 @@ export default function Recommendations() {
   const { profile, isLoading: profileLoading, upsertProfile } = useProfile();
   const { education, isLoading: educationLoading, addEducation } = useEducation();
   const { data: jobs, isLoading: jobsLoading } = useJobs();
+  const { userExams } = useExams();
 
   // Collected answers — try to load from localStorage first
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -400,6 +403,14 @@ export default function Recommendations() {
         });
       }
 
+      // Trigger background profile embedding update
+      const embeddingText = buildUserEmbeddingText(
+        { ...profile, preferred_sectors: (answers.sectors as string[]) || profile?.preferred_sectors || [] } as any,
+        education.length > 0 ? education : [{ qualification_type: answers.qualification as string } as any],
+        userExams || []
+      );
+      triggerProfileEmbeddingUpdate(user.id, embeddingText);
+
       setEditMode(false);
       setWizardComplete(true);
       toast.success("Preferences saved successfully!");
@@ -443,10 +454,18 @@ export default function Recommendations() {
           qualification_type: answers.qualification,
         });
       }
+
+      // Trigger background profile embedding update
+      const embeddingText = buildUserEmbeddingText(
+        { ...profile, preferred_sectors: (answers.sectors as string[]) || profile?.preferred_sectors || [] } as any,
+        education.length > 0 ? education : [{ qualification_type: answers.qualification as string } as any],
+        userExams || []
+      );
+      triggerProfileEmbeddingUpdate(user.id, embeddingText);
     } catch {
       // Non-critical
     }
-  }, [answers, user, education, upsertProfile, addEducation]);
+  }, [answers, user, education, upsertProfile, addEducation, profile, userExams]);
 
   // Advance to next step or complete
   const advanceStep = useCallback(() => {
@@ -579,19 +598,56 @@ export default function Recommendations() {
     return matchAndSort(jobs, preferences);
   }, [jobs, preferences]);
 
-  // Hybrid scoring: re-rank eligible jobs using exam intent + tag overlap
-  const { userExams } = useExams();
+  // Fetch server-side AI Recommendations from Groq
+  const { data: aiRecommendations } = useAiRecommendations(
+    preferences.skills,
+    !!user?.id && wizardComplete
+  );
+
+  const aiMatchedJobsMap = useMemo(() => {
+    if (!aiRecommendations || aiRecommendations.length === 0) return null;
+    const map = new Map<string, { match_score: number; reasons: string[] }>();
+    for (const rec of aiRecommendations) {
+      map.set(rec.job.id, { match_score: rec.match_score, reasons: rec.reasons });
+    }
+    return map;
+  }, [aiRecommendations]);
+
+  // Hybrid scoring: re-rank eligible jobs using exam intent + tag overlap + AI match score
   const hybridMatchedJobs: HybridMatchedJob[] = useMemo(() => {
     const eligible = matchedJobs.filter((m) => m.eligibility.eligible);
     const qualTag = qualificationToTag(preferences.qualificationType);
-    return hybridRecommend(
+    const localRecommend = hybridRecommend(
       eligible,
       (answers.sectors as string[]) || profile?.preferred_sectors || [],
       userExams,
       qualTag,
       eligible.length // don't limit — Recommendations shows all
     );
-  }, [matchedJobs, preferences, answers.sectors, profile?.preferred_sectors, userExams]);
+
+    if (!aiMatchedJobsMap) return localRecommend;
+
+    return localRecommend
+      .map((matched) => {
+        const aiInfo = aiMatchedJobsMap.get(matched.job.id);
+        if (aiInfo) {
+          return {
+            ...matched,
+            aiScore: aiInfo.match_score,
+            aiReasons: aiInfo.reasons,
+            priorityScore: aiInfo.match_score, // Override score with LLM score
+          };
+        }
+        return matched;
+      })
+      .filter((m) => (m as any).aiScore === undefined || (m as any).aiScore > 0)
+      .sort((a, b) => {
+        const scoreA = (a as any).aiScore ?? -1;
+        const scoreB = (b as any).aiScore ?? -1;
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        return (b.job.vacancies || 0) - (a.job.vacancies || 0);
+      });
+  }, [matchedJobs, preferences, answers.sectors, profile?.preferred_sectors, userExams, aiMatchedJobsMap]);
 
   // Set of job IDs that match tracked exams (for badge display)
   const examMatchedIds = useMemo(() => {
@@ -657,7 +713,31 @@ export default function Recommendations() {
     return skillsNeededJobs.filter(({ job }) => !matchesSelectedLocation(job));
   }, [hasPreferredLocations, matchesSelectedLocation, skillsNeededJobs]);
 
-  const notEligibleJobs = useMemo(() => matchedJobs.filter((m) => !m.eligibility.eligible), [matchedJobs]);
+  const notEligibleJobs = useMemo(() => {
+    const locallyNotEligible = matchedJobs.filter((m) => !m.eligibility.eligible);
+    
+    if (!aiMatchedJobsMap) return locallyNotEligible;
+
+    const aiNotEligible = matchedJobs
+      .filter((m) => m.eligibility.eligible)
+      .filter((m) => {
+        const aiInfo = aiMatchedJobsMap.get(m.job.id);
+        return aiInfo !== undefined && aiInfo.match_score === 0;
+      })
+      .map((m) => {
+        const aiInfo = aiMatchedJobsMap.get(m.job.id)!;
+        return {
+          ...m,
+          eligibility: {
+            ...m.eligibility,
+            eligible: false,
+            reasons: aiInfo.reasons.length > 0 ? aiInfo.reasons : ["Does not match profile requirements (AI evaluation)"],
+          }
+        };
+      });
+
+    return [...locallyNotEligible, ...aiNotEligible];
+  }, [matchedJobs, aiMatchedJobsMap]);
   const [showSkillsNeeded, setShowSkillsNeeded] = useState(false);
   const visibleEditSteps = useMemo(() => getVisibleSteps(profile, education, answers, true), [profile, education, answers]);
   const filteredSectorSuggestions = useMemo(
@@ -668,6 +748,28 @@ export default function Recommendations() {
     () => INDIAN_STATES.filter((state) => state.toLowerCase().includes(locationQuery.toLowerCase())),
     [locationQuery]
   );
+
+  const renderAiReasons = (jobId: string) => {
+    const aiInfo = aiMatchedJobsMap?.get(jobId);
+    if (!aiInfo) return null;
+    return (
+      <div className="mt-2 mb-3 px-4 py-2.5 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-xl border border-emerald-500/15 text-xs text-muted-foreground flex flex-col gap-1.5 animate-fadeIn">
+        <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5 mb-1">
+          <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            {aiInfo.match_score}% Profile Match
+          </span>
+          <span className="text-[10px] text-muted-foreground/80 font-medium">AI Match Analysis</span>
+        </div>
+        {aiInfo.reasons.map((r, i) => (
+          <span key={i} className="flex items-start gap-1.5 text-foreground/85 leading-normal">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
+            {r}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
   const isLoading = authLoading || profileLoading || educationLoading || jobsLoading || !preferencesHydrated;
 
@@ -1254,6 +1356,7 @@ export default function Recommendations() {
                   </Badge>
                 )}
                 <JobCard job={job} />
+                {renderAiReasons(job.id)}
               </div>
             ))}
           </div>
@@ -1280,6 +1383,7 @@ export default function Recommendations() {
                   ))}
                 </div>
                 <JobCard job={job} />
+                {renderAiReasons(job.id)}
               </div>
             ))}
           </div>
@@ -1299,6 +1403,7 @@ export default function Recommendations() {
             {allIndiaJobs.map(({ job }, index) => (
               <div key={job.id} className="animate-fadeIn" style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}>
                 <JobCard job={job} />
+                {renderAiReasons(job.id)}
               </div>
             ))}
           </div>
@@ -1318,6 +1423,7 @@ export default function Recommendations() {
             {otherStateJobs.map(({ job }, index) => (
               <div key={job.id} className="animate-fadeIn" style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}>
                 <JobCard job={job} />
+                {renderAiReasons(job.id)}
               </div>
             ))}
           </div>
@@ -1364,6 +1470,7 @@ export default function Recommendations() {
                       ))}
                     </div>
                     <JobCard job={job} />
+                    {renderAiReasons(job.id)}
                   </div>
                 ))}
               </div>
@@ -1397,6 +1504,7 @@ export default function Recommendations() {
                       ))}
                     </div>
                     <JobCard job={job} />
+                    {renderAiReasons(job.id)}
                   </div>
                 ))}
               </div>

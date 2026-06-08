@@ -1,16 +1,21 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useExamUpdateById } from "@/hooks/useExamUpdates";
+import { useJob } from "@/hooks/useJobs";
+import { useJobForExam } from "@/hooks/useJobForExam";
+import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
+import { OrganizationLogo } from "@/components/OrganizationLogo";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import {
     ArrowLeft, Calendar, ExternalLink, Download, Newspaper,
-    FileText, Award, BarChart3, Key, Sparkles, ChevronDown, AlertCircle, Tag
+    FileText, Award, BarChart3, Key, Sparkles, ChevronDown, AlertCircle, Tag, Share2
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
+import { toast } from "sonner";
 
 // ── Category config (same as card) ───────────────────────────────────
 function getCategoryConfig(category: string) {
@@ -40,11 +45,33 @@ export default function ExamUpdateDetail() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { data: update, isLoading, error } = useExamUpdateById(id);
+    const { data: job } = useJob(update?.job_id || "");
+    const { data: fuzzyJob } = useJobForExam(update?.title || "");
+    const activeJob = job || fuzzyJob;
+    const { getLogoByName } = useConductingBodyLogos();
+    const logoUrl = getLogoByName(activeJob?.department || "");
+
     const [expandedSection, setExpandedSection] = useState<number | null>(null);
+
+    const handleShare = async () => {
+        const shareUrl = `${window.location.origin}/exam-update/${id}`;
+        const shareText = update ? `${update.title} — Check latest updates on JobsTrackr` : 'Check latest updates on JobsTrackr';
+        const shareData = { title: update?.title || 'Update', text: shareText, url: shareUrl };
+        if (navigator.share && navigator.canShare?.(shareData)) {
+            try { await navigator.share(shareData); } catch { }
+        } else {
+            try {
+                await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+                toast.success("Link copied to clipboard!");
+            } catch {
+                toast.error("Failed to copy link");
+            }
+        }
+    };
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
             </div>
         );
@@ -52,7 +79,7 @@ export default function ExamUpdateDetail() {
 
     if (error || !update) {
         return (
-            <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="min-h-screen flex items-center justify-center bg-background p-4">
                 <div className="text-center space-y-4">
                     <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
                     <h2 className="text-xl font-bold">Update Not Found</h2>
@@ -76,79 +103,111 @@ export default function ExamUpdateDetail() {
 
     return (
         <div className="min-h-screen bg-background pb-20">
-            <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
+            {/* Sticky Header */}
+            <header className="sticky top-0 z-40 bg-card/85 backdrop-blur-md border-b border-border/50 shadow-sm transition-all duration-200">
+                <div className="flex items-center justify-between px-4 py-3 gap-3 max-w-2xl mx-auto">
+                    <button
+                        onClick={() => navigate("/trending")}
+                        className="p-2 -ml-2 rounded-full hover:bg-secondary active:scale-95 transition-all flex-shrink-0"
+                        aria-label="Go back"
+                    >
+                        <ArrowLeft className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+                    </button>
+                    <h1 className="flex-1 font-semibold text-sm text-foreground truncate">{update.title}</h1>
+                    <button
+                        onClick={handleShare}
+                        className="p-2 -mr-2 rounded-full hover:bg-secondary active:scale-95 transition-all flex-shrink-0"
+                        title="Share"
+                    >
+                        <Share2 className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+                    </button>
+                </div>
+            </header>
 
-                {/* Back */}
-                <button
-                    onClick={() => navigate("/trending")}
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                    <ArrowLeft className="h-4 w-4" /> Back to Trending
-                </button>
+            <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
 
                 {/* ── Header ───────────────────────────────────── */}
                 <Section>
-                    <Card className={cn("overflow-hidden border-l-4")} style={{ borderLeftColor: catConfig.accent }}>
+                    <Card className={cn("overflow-hidden border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl border-l-4")} style={{ borderLeftColor: catConfig.accent }}>
                         <div className={cn("h-1 bg-gradient-to-r", catConfig.gradient)} />
-                        <div className="p-4 space-y-2">
-                            <div className="flex items-start gap-3">
-                                <div className={cn("flex-shrink-0 rounded-lg p-2 mt-0.5", catConfig.bg)}>
-                                    <CatIcon className={cn("h-5 w-5", catConfig.text)} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                                        <Badge variant="outline" className={cn("text-[10px] font-semibold capitalize", catConfig.text, catConfig.border)}>
-                                            {catConfig.label}
-                                        </Badge>
-                                        {update.status && (
-                                            <Badge variant="secondary" className="text-[10px]">{update.status}</Badge>
-                                        )}
-                                        {isNew && (
-                                            <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">
-                                                <Sparkles className="h-3 w-3 mr-1" />New
-                                            </Badge>
-                                        )}
-                                        {timeAgo && <span className="text-[11px] text-muted-foreground">{timeAgo}</span>}
-                                    </div>
-                                    <h1 className="text-base sm:text-lg font-bold text-foreground leading-snug">
-                                        {update.title}
-                                    </h1>
-                                    {update.published_date && (
-                                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                                            Published: {update.published_date}
-                                        </p>
+                        <div className="p-4 flex items-start gap-4">
+                            <OrganizationLogo
+                                logoUrl={logoUrl}
+                                name={activeJob?.department || update.title}
+                                containerClassName="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden"
+                                imageClassName="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                                iconClassName="h-6 w-6 sm:h-7 sm:w-7 text-primary"
+                            />
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                                    <Badge variant="outline" className={cn("text-[10px] font-semibold capitalize", catConfig.text, catConfig.border)}>
+                                        {catConfig.label}
+                                    </Badge>
+                                    {update.status && (
+                                        <Badge variant="secondary" className="text-[10px]">{update.status}</Badge>
                                     )}
+                                    {isNew && (
+                                        <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">
+                                            <Sparkles className="h-3 w-3 mr-1" />New
+                                        </Badge>
+                                    )}
+                                    {timeAgo && <span className="text-[11px] text-muted-foreground">{timeAgo}</span>}
                                 </div>
+                                <h1 className="text-base sm:text-lg font-bold text-foreground leading-snug">
+                                    {update.title}
+                                </h1>
+                                {activeJob?.department && (
+                                    <p className="text-xs text-muted-foreground font-semibold mt-1">
+                                        {activeJob.department}
+                                    </p>
+                                )}
+                                {update.published_date && (
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        Published: {update.published_date}
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </Card>
                 </Section>
 
+                {/* ── Connected Job Details Banner ──────────────── */}
+                {activeJob && (
+                    <Section delay={0.03}>
+                        <Link 
+                            to={`/jobs/${activeJob.slug || activeJob.id}`}
+                            className="block"
+                        >
+                            <Card className="p-4 border border-blue-500/20 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 dark:from-blue-950/10 dark:to-indigo-950/10 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                                <div className="space-y-1">
+                                    <p className="text-xs text-muted-foreground/80 font-medium">Recruitment Details</p>
+                                    <h3 className="text-sm font-bold text-foreground line-clamp-1">{activeJob.title}</h3>
+                                    {activeJob.vacancies_display && (
+                                        <p className="text-[11px] text-primary font-semibold">{activeJob.vacancies_display} Vacancies</p>
+                                    )}
+                                </div>
+                                <div className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm">
+                                    View Job Details <ExternalLink className="h-3.5 w-3.5" />
+                                </div>
+                            </Card>
+                        </Link>
+                    </Section>
+                )}
+
                 {/* ── Summary ──────────────────────────────────── */}
                 {update.summary && (
                     <Section delay={0.05}>
-                        <Card className="p-4">
-                            <p className="text-sm text-muted-foreground leading-relaxed">{update.summary}</p>
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5">
+                            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{update.summary}</p>
                         </Card>
                     </Section>
                 )}
 
-                {/* ── Tags ─────────────────────────────────────── */}
-                {update.tags && update.tags.length > 0 && (
-                    <Section delay={0.07}>
-                        <div className="flex flex-wrap gap-1.5 items-center">
-                            <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-                            {update.tags.map((tag, i) => (
-                                <Badge key={i} variant="secondary" className="text-[10px]">{tag}</Badge>
-                            ))}
-                        </div>
-                    </Section>
-                )}
 
                 {/* ── Important Dates ───────────────────────────── */}
                 {update.important_dates && update.important_dates.length > 0 && (
                     <Section delay={0.1}>
-                        <Card className="p-4 space-y-3">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-red-500" /> Important Dates
                             </h2>
@@ -172,7 +231,7 @@ export default function ExamUpdateDetail() {
                 {/* ── Overview ─────────────────────────────────── */}
                 {update.overview && update.overview.length > 0 && (
                     <Section delay={0.12}>
-                        <Card className="p-4 space-y-3">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-sm font-bold text-foreground">Overview</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                 {update.overview.map((item, i) => (
@@ -189,7 +248,7 @@ export default function ExamUpdateDetail() {
                 {/* ── Download Links ────────────────────────────── */}
                 {update.download_links && update.download_links.length > 0 && (
                     <Section delay={0.14}>
-                        <Card className="p-4 space-y-3">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                                 <Download className="h-4 w-4 text-blue-500" /> Quick Links
                             </h2>
@@ -215,7 +274,7 @@ export default function ExamUpdateDetail() {
                 {/* ── Sections accordion ────────────────────────── */}
                 {update.sections && update.sections.length > 0 && (
                     <Section delay={0.16}>
-                        <Card className="p-4 space-y-2">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-sm font-bold text-foreground">Details</h2>
                             <div className="space-y-1.5">
                                 {update.sections.map((s, i) => (
@@ -244,7 +303,7 @@ export default function ExamUpdateDetail() {
                 {/* ── Related Articles ─────────────────────────── */}
                 {update.related_articles && update.related_articles.length > 0 && (
                     <Section delay={0.18}>
-                        <Card className="p-4 space-y-3">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-sm font-bold text-foreground">Related Articles</h2>
                             <div className="space-y-1.5">
                                 {update.related_articles.map((ra, i) => (
@@ -262,6 +321,18 @@ export default function ExamUpdateDetail() {
                                 ))}
                             </div>
                         </Card>
+                    </Section>
+                )}
+
+                {/* ── Tags ─────────────────────────────────────── */}
+                {update.tags && update.tags.length > 0 && (
+                    <Section delay={0.2}>
+                        <div className="flex flex-wrap gap-1.5 items-center pt-2">
+                            <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                            {update.tags.map((tag, i) => (
+                                <Badge key={i} variant="secondary" className="text-[10px]">{tag}</Badge>
+                            ))}
+                        </div>
                     </Section>
                 )}
 

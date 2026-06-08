@@ -269,21 +269,21 @@ export default function JobDetails() {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border">
-        <div className="flex items-center justify-between px-4 py-3 gap-3">
+      <header className="sticky top-0 z-40 bg-card/85 backdrop-blur-md border-b border-border/50 shadow-sm transition-all duration-200">
+        <div className="flex items-center justify-between px-4 py-3 gap-3 max-w-2xl mx-auto">
           <button
             onClick={handleBack}
-            className="p-2 -ml-2 rounded-full hover:bg-secondary transition-colors flex-shrink-0"
+            className="p-2 -ml-2 rounded-full hover:bg-secondary active:scale-95 transition-all flex-shrink-0"
             aria-label="Go back"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5 text-muted-foreground hover:text-foreground" />
           </button>
           <h1 className="flex-1 font-semibold text-sm text-foreground truncate">{job.title}</h1>
           <SaveJobButton jobId={job.id} />
         </div>
       </header>
 
-      <main className="px-4 py-4 space-y-4">
+      <main className="max-w-2xl mx-auto px-4 py-4 space-y-4">
         {/* Title Section */}
         <div className="animate-slide-up">
           <div className="flex gap-2 mb-2">
@@ -373,7 +373,7 @@ export default function JobDetails() {
 
         {/* Quick Info Cards */}
         <div className="grid grid-cols-2 gap-3 animate-slide-up" style={{ animationDelay: "0.1s" }}>
-          <Card className="border-0 shadow-md">
+          <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl hover:scale-[1.02] transition-transform duration-300">
             <CardContent className="p-3 flex items-center gap-2 overflow-hidden">
               <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <MapPin className="h-4 w-4 text-primary" />
@@ -384,7 +384,7 @@ export default function JobDetails() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-md">
+          <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl hover:scale-[1.02] transition-transform duration-300">
             <CardContent className="p-3 flex items-center gap-2 overflow-hidden">
               <div className="h-9 w-9 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
                 <IndianRupee className="h-4 w-4 text-success" />
@@ -395,7 +395,7 @@ export default function JobDetails() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-md">
+          <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl hover:scale-[1.02] transition-transform duration-300">
             <CardContent className="p-3 flex items-center gap-2 overflow-hidden">
               <div className="h-9 w-9 rounded-full bg-warning/10 flex items-center justify-center flex-shrink-0">
                 <Calendar className="h-4 w-4 text-warning" />
@@ -408,7 +408,7 @@ export default function JobDetails() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-md">
+          <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl hover:scale-[1.02] transition-transform duration-300">
             <CardContent className="p-3 flex items-center gap-2 overflow-hidden">
               <div className="h-9 w-9 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0">
                 <Users className="h-4 w-4 text-info" />
@@ -433,7 +433,7 @@ export default function JobDetails() {
         </div>
 
         {/* Details Section */}
-        <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.2s" }}>
+        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.2s" }}>
           <CardContent className="p-4 space-y-4">
             <div className="flex items-start gap-3">
               <GraduationCap className="h-5 w-5 text-primary mt-0.5" />
@@ -486,7 +486,7 @@ export default function JobDetails() {
         </Card>
 
         {/* About this Job - Description + Unique Info */}
-        <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.3s" }}>
+        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.3s" }}>
           <CardContent className="p-4 space-y-4">
             <h3 className="font-display font-semibold text-foreground mb-2">About this Job</h3>
 
@@ -511,7 +511,7 @@ export default function JobDetails() {
 
         {/* Eligibility */}
         {job.eligibility && (
-          <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.4s" }}>
+          <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.4s" }}>
             <CardContent className="p-4">
               <h3 className="font-display font-semibold text-foreground mb-2">Eligibility Criteria</h3>
               <p className="text-sm text-muted-foreground whitespace-pre-line">{job.eligibility}</p>
@@ -526,7 +526,7 @@ export default function JobDetails() {
             <>
               {/* Salary Details */}
               {meta.salary_text && (
-                <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.45s" }}>
+                <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.45s" }}>
                   <CardContent className="p-4">
                     <h3 className="font-display font-semibold text-foreground mb-2">💰 Salary Details</h3>
                     <p className="text-sm text-muted-foreground whitespace-pre-line">{meta.salary_text}</p>
@@ -536,7 +536,7 @@ export default function JobDetails() {
 
               {/* Age Limit Details */}
               {meta.age_limit_text && (
-                <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.5s" }}>
+                <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.5s" }}>
                   <CardContent className="p-4">
                     <h3 className="font-display font-semibold text-foreground mb-2">👤 Age Limit Details</h3>
                     <p className="text-sm text-muted-foreground whitespace-pre-line">{meta.age_limit_text}</p>
@@ -546,7 +546,7 @@ export default function JobDetails() {
 
               {/* Vacancy Breakdown */}
               {vacancyRows.length > 0 && (
-                <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.55s" }}>
+                <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.55s" }}>
                   <CardContent className="p-4">
                     <h3 className="font-display font-semibold text-foreground mb-3 flex items-center gap-2">
                       <Users className="h-4 w-4" />
@@ -578,7 +578,7 @@ export default function JobDetails() {
 
               {/* Application Fees */}
               {meta.application_fees && Array.isArray(meta.application_fees) && meta.application_fees.length > 0 && (
-                <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.6s" }}>
+                <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.6s" }}>
                   <CardContent className="p-4">
                     <h3 className="font-display font-semibold text-foreground mb-3">💰 Application Fees</h3>
                     <div className="space-y-2">
@@ -595,7 +595,7 @@ export default function JobDetails() {
 
               {/* Selection Process */}
               {meta.selection_process && Array.isArray(meta.selection_process) && meta.selection_process.length > 0 && (
-                <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.65s" }}>
+                <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.65s" }}>
                   <CardContent className="p-4">
                     <h3 className="font-display font-semibold text-foreground mb-3">📋 Selection Process</h3>
                     <ol className="space-y-2 pl-1">
@@ -614,7 +614,7 @@ export default function JobDetails() {
 
               {/* Important Dates */}
               {meta.important_dates && Object.values(meta.important_dates).some((v: any) => v) && (
-                <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.7s" }}>
+                <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.7s" }}>
                   <CardContent className="p-4">
                     <h3 className="font-display font-semibold text-foreground mb-3 flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
@@ -636,7 +636,7 @@ export default function JobDetails() {
 
               {/* Overview */}
               {meta.overview && typeof meta.overview === 'object' && Object.keys(meta.overview).length > 0 && (
-                <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.75s" }}>
+                <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.75s" }}>
                   <CardContent className="p-4">
                     <h3 className="font-display font-semibold text-foreground mb-3">ℹ️ Overview</h3>
                     <div className="space-y-2">
@@ -653,7 +653,7 @@ export default function JobDetails() {
 
               {/* Notification PDF & Links */}
               {meta.notification_pdf && !isFreeJobAlertUrl(meta.notification_pdf) && (
-                <Card className="border-0 shadow-md animate-slide-up" style={{ animationDelay: "0.8s" }}>
+                <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.8s" }}>
                   <CardContent className="p-4">
                     <h3 className="font-display font-semibold text-foreground mb-3">📄 Documents</h3>
                     <a href={meta.notification_pdf} target="_blank" rel="noopener noreferrer">
@@ -718,7 +718,7 @@ export default function JobDetails() {
           width: isMobile ? '100%' : (state === 'expanded' ? 'calc(100% - 16rem)' : 'calc(100% - 3rem)')
         }}
       >
-        <div className="flex justify-center gap-3">
+        <div className="max-w-2xl mx-auto flex justify-center gap-3">
           {!btnDisabled && btnHref ? (
             <a href={btnHref} target="_blank" rel="noopener noreferrer" className="flex-1">
               <Button 
@@ -854,14 +854,11 @@ function ExamUpdatesSection({ updates }: { updates: ExamUpdateItem[] }) {
       <div className="flex items-center gap-2 pt-2">
         <div className="h-1 w-1 rounded-full bg-primary" />
         <h3 className="font-display font-semibold text-foreground">Exam Updates</h3>
-        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
-          Auto-scraped
-        </Badge>
       </div>
 
       {/* Update Summaries */}
       {summaries.length > 0 && (
-        <Card className="border-0 shadow-md">
+        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl">
           <CardContent className="p-4 space-y-3">
             <h4 className="font-medium text-sm text-foreground flex items-center gap-2">
               <Calendar className="h-4 w-4 text-primary" />
@@ -884,7 +881,7 @@ function ExamUpdatesSection({ updates }: { updates: ExamUpdateItem[] }) {
 
       {/* Important Dates from scraped articles */}
       {allDates.length > 0 && (
-        <Card className="border-0 shadow-md">
+        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl">
           <CardContent className="p-4">
             <h4 className="font-medium text-sm text-foreground mb-3 flex items-center gap-2">
               <Calendar className="h-4 w-4 text-primary" />
@@ -922,7 +919,7 @@ function ExamUpdatesSection({ updates }: { updates: ExamUpdateItem[] }) {
 
       {/* Download Links from scraped articles */}
       {allDownloads.length > 0 && (
-        <Card className="border-0 shadow-md">
+        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl">
           <CardContent className="p-4">
             <h4 className="font-medium text-sm text-foreground mb-3 flex items-center gap-2">
               <ExternalLink className="h-4 w-4 text-primary" />

@@ -14,6 +14,8 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { BottomNav } from "@/components/BottomNav";
 import { isFreeJobAlertUrl } from "@/lib/urlUtils";
+import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
+import { OrganizationLogo } from "@/components/OrganizationLogo";
 
 // ── Milestone timeline config ─────────────────────────────────────
 const MILESTONES = [
@@ -48,6 +50,7 @@ export default function UpdateDetails() {
     const { slug } = useParams<{ slug: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
+    const { getLogoByName } = useConductingBodyLogos();
     const { data: exam, isLoading, error } = useUpdateBySlug(slug || "");
     const { data: matchingJob } = useJobForExam(exam?.name);
     const { data: relatedUpdates } = useRelatedUpdates(
@@ -80,14 +83,14 @@ export default function UpdateDetails() {
     // ── Loading / Error states ────────────────────────────────────
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
             </div>
         );
     }
     if (error || !exam) {
         return (
-            <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="min-h-screen flex items-center justify-center bg-background p-4">
                 <div className="text-center space-y-4">
                     <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
                     <h2 className="text-xl font-bold">Update Not Found</h2>
@@ -109,32 +112,52 @@ export default function UpdateDetails() {
         ? formatDistanceToNow(new Date(exam.ai_last_updated_at), { addSuffix: true })
         : null;
 
-    return (
-        <div className="min-h-screen bg-background">
-            <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+    const logoUrl = getLogoByName(exam.conducting_body || "");
 
-                {/* ── Back ─────────────────────────────────────────── */}
-                <button onClick={() => navigate('/trending')} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    <ArrowLeft className="h-4 w-4" /> Back to Trending
-                </button>
+    return (
+        <div className="min-h-screen bg-background pb-20">
+            {/* Sticky Header */}
+            <header className="sticky top-0 z-40 bg-card/85 backdrop-blur-md border-b border-border/50 shadow-sm transition-all duration-200">
+                <div className="flex items-center justify-between px-4 py-3 gap-3 max-w-2xl mx-auto">
+                    <button
+                        onClick={() => navigate('/trending')}
+                        className="p-2 -ml-2 rounded-full hover:bg-secondary active:scale-95 transition-all flex-shrink-0"
+                        aria-label="Go back"
+                    >
+                        <ArrowLeft className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+                    </button>
+                    <h1 className="flex-1 font-semibold text-sm text-foreground truncate">{exam.name}</h1>
+                    <button
+                        onClick={handleShare}
+                        className="p-2 -mr-2 rounded-full hover:bg-secondary active:scale-95 transition-all flex-shrink-0"
+                        title="Share"
+                    >
+                        <Share2 className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+                    </button>
+                </div>
+            </header>
+
+            <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
                 {/* ── Header Card ───────────────────────────────────── */}
                 <Section>
-                    <Card className="p-5 border-l-4" style={{ borderLeftColor: badge.color }}>
-                        <div className="flex items-start justify-between gap-2">
-                            <div className="space-y-2 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="px-3 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: badge.color }}>
-                                        {badge.label}
-                                    </span>
-                                    {exam.conducting_body && <span className="text-xs text-muted-foreground">{exam.conducting_body}</span>}
-                                    {timeAgo && <span className="text-xs text-muted-foreground">• Updated {timeAgo}</span>}
-                                </div>
-                                <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-tight">{exam.name}</h1>
+                    <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl overflow-hidden p-5 flex items-start gap-4 border-l-4" style={{ borderLeftColor: badge.color }}>
+                        <OrganizationLogo
+                            logoUrl={logoUrl}
+                            name={exam.conducting_body || exam.name}
+                            containerClassName="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden"
+                            imageClassName="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                            iconClassName="h-6 w-6 sm:h-7 sm:w-7 text-primary"
+                        />
+                        <div className="space-y-2 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="px-3 py-0.5 rounded-full text-[10px] font-semibold text-white capitalize shadow-sm" style={{ backgroundColor: badge.color }}>
+                                    {badge.label}
+                                </span>
+                                {exam.conducting_body && <span className="text-xs text-muted-foreground font-semibold">{exam.conducting_body}</span>}
+                                {timeAgo && <span className="text-[11px] text-muted-foreground/80">• Updated {timeAgo}</span>}
                             </div>
-                            <button onClick={handleShare} className="p-2 rounded-full bg-secondary/50 hover:bg-secondary transition-colors flex-shrink-0" title="Share">
-                                <Share2 className="h-5 w-5" />
-                            </button>
+                            <h2 className="text-lg sm:text-xl font-bold text-foreground leading-tight">{exam.name}</h2>
                         </div>
                     </Card>
                 </Section>
@@ -143,41 +166,46 @@ export default function UpdateDetails() {
                    SECTION 1: MILESTONE TIMELINE (SEO BOOST)
                    ══════════════════════════════════════════════════ */}
                 <Section delay={0.05}>
-                    <Card className="p-5 space-y-4">
+                    <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                         <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-                            <Clock className="h-5 w-5 text-indigo-500" /> Recruitment Progress
+                            <Clock className="h-5 w-5 text-indigo-500 animate-pulse" /> Recruitment Progress
                         </h2>
-                        <div className="relative">
+                        <div className="relative pl-1 pt-1">
                             {MILESTONES.map((ms, i) => {
                                 const Icon = ms.icon;
                                 const reached = i < milestoneProgress;
                                 const isCurrent = i === milestoneProgress - 1;
                                 return (
-                                    <div key={ms.key} className="flex items-start gap-3 relative">
+                                    <div key={ms.key} className="flex items-start gap-4 relative">
                                         {/* Vertical line */}
                                         {i < MILESTONES.length - 1 && (
                                             <div
-                                                className="absolute left-[15px] top-[32px] w-0.5 h-[calc(100%-8px)]"
-                                                style={{ backgroundColor: reached ? ms.color : 'var(--border)' }}
+                                                className="absolute left-[15px] top-[32px] w-[2px] h-[calc(100%-8px)] rounded-full transition-all duration-300"
+                                                style={{
+                                                    background: reached
+                                                        ? `linear-gradient(to bottom, ${ms.color}, ${MILESTONES[i+1]?.color || ms.color})`
+                                                        : 'hsl(var(--border) / 0.5)'
+                                                }}
                                             />
                                         )}
                                         {/* Icon circle */}
                                         <div
-                                            className="relative z-10 flex items-center justify-center w-[30px] h-[30px] rounded-full flex-shrink-0"
+                                            className="relative z-10 flex items-center justify-center w-[32px] h-[32px] rounded-full flex-shrink-0 transition-all duration-300 shadow-sm"
                                             style={{
                                                 backgroundColor: reached ? ms.color : 'transparent',
-                                                border: reached ? 'none' : '2px solid var(--border)',
+                                                border: reached ? 'none' : '2px solid hsl(var(--border) / 0.8)',
+                                                boxShadow: isCurrent ? `0 0 14px 4px ${ms.color}40` : undefined,
                                             }}
                                         >
-                                            <Icon className="h-4 w-4" style={{ color: reached ? 'white' : 'var(--muted-foreground)' }} />
+                                            <Icon className="h-4 w-4 transition-colors" style={{ color: reached ? 'white' : 'var(--muted-foreground)' }} />
                                         </div>
                                         {/* Label */}
-                                        <div className="pb-5 pt-1">
-                                            <p className={`text-sm font-medium ${reached ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                        <div className="pb-6 pt-1 flex-1 min-w-0">
+                                            <p className={`text-sm transition-colors ${reached ? 'text-foreground font-bold' : 'text-muted-foreground/60'}`}>
                                                 {ms.label}
                                                 {isCurrent && (
-                                                    <span className="ml-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full text-white" style={{ backgroundColor: ms.color }}>
-                                                        Current
+                                                    <span className="ml-2.5 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded-full text-white shadow-sm inline-block align-middle" style={{ backgroundColor: ms.color }}>
+                                                        Current Status
                                                     </span>
                                                 )}
                                             </p>
@@ -194,7 +222,7 @@ export default function UpdateDetails() {
                    ══════════════════════════════════════════════════ */}
                 {aiData.summary && (
                     <Section delay={0.1}>
-                        <Card className="p-5 space-y-3">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-3">
                             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
                                 <BookOpen className="h-5 w-5 text-blue-500" /> Latest News
                             </h2>
@@ -208,7 +236,7 @@ export default function UpdateDetails() {
                    ══════════════════════════════════════════════════ */}
                 {aiData.latest_updates && aiData.latest_updates.length > 0 && (
                     <Section delay={0.15}>
-                        <Card className="p-5 space-y-4">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
                                 <Clock className="h-5 w-5 text-purple-500" /> Updates Timeline
                             </h2>
@@ -235,7 +263,7 @@ export default function UpdateDetails() {
                    ══════════════════════════════════════════════════ */}
                 {aiData.predicted_events && aiData.predicted_events.length > 0 && (
                     <Section delay={0.2}>
-                        <Card className="p-5 space-y-4">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
                                 <ClipboardCheck className="h-5 w-5 text-orange-500" /> Phase Details
                             </h2>
@@ -285,7 +313,7 @@ export default function UpdateDetails() {
                    ══════════════════════════════════════════════════ */}
                 {(aiData.exam_dates || aiData.last_date_to_apply) && (
                     <Section delay={0.25}>
-                        <Card className="p-5 space-y-3">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-3">
                             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
                                 <Calendar className="h-5 w-5 text-red-500" /> Important Dates
                             </h2>
@@ -311,7 +339,7 @@ export default function UpdateDetails() {
                    ══════════════════════════════════════════════════ */}
                 {aiData.recommendations && aiData.recommendations.length > 0 && (
                     <Section delay={0.3}>
-                        <Card className="p-5 space-y-3">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-3">
                             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
                                 <Lightbulb className="h-5 w-5 text-amber-500" /> Recommendations for Candidates
                             </h2>
@@ -334,111 +362,113 @@ export default function UpdateDetails() {
                    ══════════════════════════════════════════════════ */}
                 {matchingJob && (
                     <Section delay={0.35}>
-                        <Card className="p-5 space-y-4 bg-gradient-to-br from-blue-50/60 to-indigo-50/40 dark:from-blue-950/20 dark:to-indigo-950/10 border-blue-200 dark:border-blue-900/40">
-                            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-                                <Briefcase className="h-5 w-5 text-blue-600" /> Recruitment Details – {matchingJob.title || exam.name}
-                            </h2>
+                        <Link to={`/jobs/${matchingJob.slug}`} className="block">
+                            <Card className="p-5 space-y-4 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 dark:from-blue-950/25 dark:to-indigo-950/15 border border-blue-500/30 dark:border-blue-900/40 shadow-card rounded-2xl cursor-pointer hover:shadow-md transition-shadow">
+                                <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                                    <Briefcase className="h-5 w-5 text-blue-600" /> Recruitment Details – {matchingJob.title || exam.name}
+                                </h2>
 
-                            {/* Stats grid */}
-                            <div className="grid grid-cols-2 gap-3">
-                                {/* Vacancies */}
-                                <div className="bg-white dark:bg-card rounded-xl p-3 border">
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                        <Users className="h-3.5 w-3.5 text-blue-500" />
-                                        <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Vacancies</span>
-                                    </div>
-                                    <p className="font-bold text-foreground text-lg">
-                                        {matchingJob.vacancies_display || matchingJob.vacancies || 'Check notification'}
-                                    </p>
-                                </div>
-
-                                {/* Salary */}
-                                <div className="bg-white dark:bg-card rounded-xl p-3 border">
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                        <IndianRupee className="h-3.5 w-3.5 text-green-500" />
-                                        <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Salary</span>
-                                    </div>
-                                    <p className="font-bold text-foreground text-lg">
-                                        {matchingJob.salary_min && matchingJob.salary_max
-                                            ? `₹${matchingJob.salary_min.toLocaleString('en-IN')} – ₹${matchingJob.salary_max.toLocaleString('en-IN')}`
-                                            : matchingJob.salary_min
-                                                ? `₹${matchingJob.salary_min.toLocaleString('en-IN')}+`
-                                                : 'Not disclosed'}
-                                    </p>
-                                </div>
-
-                                {/* Age Limit */}
-                                {(matchingJob.age_min || matchingJob.age_max) && (
+                                {/* Stats grid */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    {/* Vacancies */}
                                     <div className="bg-white dark:bg-card rounded-xl p-3 border">
                                         <div className="flex items-center gap-1.5 mb-1">
-                                            <Award className="h-3.5 w-3.5 text-orange-500" />
-                                            <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Age Limit</span>
+                                            <Users className="h-3.5 w-3.5 text-blue-500" />
+                                            <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Vacancies</span>
                                         </div>
                                         <p className="font-bold text-foreground text-lg">
-                                            {matchingJob.age_min && matchingJob.age_max
-                                                ? `${matchingJob.age_min} – ${matchingJob.age_max} years`
-                                                : matchingJob.age_min ? `${matchingJob.age_min}+ years` : `Up to ${matchingJob.age_max} years`}
+                                            {matchingJob.vacancies_display || matchingJob.vacancies || 'Check notification'}
+                                        </p>
+                                    </div>
+
+                                    {/* Salary */}
+                                    <div className="bg-white dark:bg-card rounded-xl p-3 border">
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <IndianRupee className="h-3.5 w-3.5 text-green-500" />
+                                            <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Salary</span>
+                                        </div>
+                                        <p className="font-bold text-foreground text-lg">
+                                            {matchingJob.salary_min && matchingJob.salary_max
+                                                ? `₹${matchingJob.salary_min.toLocaleString('en-IN')} – ₹${matchingJob.salary_max.toLocaleString('en-IN')}`
+                                                : matchingJob.salary_min
+                                                    ? `₹${matchingJob.salary_min.toLocaleString('en-IN')}+`
+                                                    : 'Not disclosed'}
+                                        </p>
+                                    </div>
+
+                                    {/* Age Limit */}
+                                    {(matchingJob.age_min || matchingJob.age_max) && (
+                                        <div className="bg-white dark:bg-card rounded-xl p-3 border">
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <Award className="h-3.5 w-3.5 text-orange-500" />
+                                                <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Age Limit</span>
+                                            </div>
+                                            <p className="font-bold text-foreground text-lg">
+                                                {matchingJob.age_min && matchingJob.age_max
+                                                    ? `${matchingJob.age_min} – ${matchingJob.age_max} years`
+                                                    : matchingJob.age_min ? `${matchingJob.age_min}+ years` : `Up to ${matchingJob.age_max} years`}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Qualification */}
+                                    {matchingJob.qualification && (
+                                        <div className="bg-white dark:bg-card rounded-xl p-3 border">
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <GraduationCap className="h-3.5 w-3.5 text-purple-500" />
+                                                <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Qualification</span>
+                                            </div>
+                                            <p className="font-semibold text-foreground text-sm">{matchingJob.qualification}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Eligibility */}
+                                {(matchingJob.eligibility || aiData.eligibility) && (
+                                    <div className="bg-white dark:bg-card rounded-xl p-4 border space-y-1">
+                                        <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                            <Award className="h-4 w-4 text-green-500" /> Eligibility Criteria
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground leading-relaxed">
+                                            {matchingJob.eligibility || aiData.eligibility}
                                         </p>
                                     </div>
                                 )}
 
-                                {/* Qualification */}
-                                {matchingJob.qualification && (
-                                    <div className="bg-white dark:bg-card rounded-xl p-3 border">
-                                        <div className="flex items-center gap-1.5 mb-1">
-                                            <GraduationCap className="h-3.5 w-3.5 text-purple-500" />
-                                            <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Qualification</span>
-                                        </div>
-                                        <p className="font-semibold text-foreground text-sm">{matchingJob.qualification}</p>
+                                {/* Selection Process */}
+                                {matchingJob.description && (
+                                    <div className="bg-white dark:bg-card rounded-xl p-4 border space-y-1">
+                                        <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                            <ClipboardCheck className="h-4 w-4 text-indigo-500" /> Selection Process
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">{matchingJob.description}</p>
                                     </div>
                                 )}
-                            </div>
 
-                            {/* Eligibility */}
-                            {(matchingJob.eligibility || aiData.eligibility) && (
-                                <div className="bg-white dark:bg-card rounded-xl p-4 border space-y-1">
-                                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                                        <Award className="h-4 w-4 text-green-500" /> Eligibility Criteria
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground leading-relaxed">
-                                        {matchingJob.eligibility || aiData.eligibility}
-                                    </p>
+                                {/* CTA */}
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                    {matchingJob.slug && (
+                                        <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-full text-sm font-medium hover:bg-blue-700 transition-colors">
+                                            View Full Job Details <ExternalLink className="h-3.5 w-3.5" />
+                                        </div>
+                                    )}
+                                    {matchingJob.apply_link && !isFreeJobAlertUrl(matchingJob.apply_link) && (
+                                        <a href={matchingJob.apply_link} target="_blank" rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-full text-sm font-medium hover:bg-green-700 transition-colors">
+                                            Apply Now <ExternalLink className="h-3.5 w-3.5" />
+                                        </a>
+                                    )}
                                 </div>
-                            )}
-
-                            {/* Selection Process */}
-                            {matchingJob.description && (
-                                <div className="bg-white dark:bg-card rounded-xl p-4 border space-y-1">
-                                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                                        <ClipboardCheck className="h-4 w-4 text-indigo-500" /> Selection Process
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">{matchingJob.description}</p>
-                                </div>
-                            )}
-
-                            {/* CTA */}
-                            <div className="flex flex-wrap gap-2 pt-1">
-                                {matchingJob.slug && (
-                                    <Link to={`/jobs/${matchingJob.slug}`}
-                                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-full text-sm font-medium hover:bg-blue-700 transition-colors">
-                                        View Full Job Details <ExternalLink className="h-3.5 w-3.5" />
-                                    </Link>
-                                )}
-                                {matchingJob.apply_link && !isFreeJobAlertUrl(matchingJob.apply_link) && (
-                                    <a href={matchingJob.apply_link} target="_blank" rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-full text-sm font-medium hover:bg-green-700 transition-colors">
-                                        Apply Now <ExternalLink className="h-3.5 w-3.5" />
-                                    </a>
-                                )}
-                            </div>
-                        </Card>
+                            </Card>
+                        </Link>
                     </Section>
                 )}
 
                 {/* Eligibility fallback if no matching job but AI has it */}
                 {!matchingJob && aiData.eligibility && (
                     <Section delay={0.35}>
-                        <Card className="p-5 space-y-2">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-2">
                             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
                                 <Award className="h-5 w-5 text-green-500" /> Eligibility
                             </h2>
@@ -452,7 +482,7 @@ export default function UpdateDetails() {
                    ══════════════════════════════════════════════════ */}
                 {relatedUpdates && relatedUpdates.length > 0 && (
                     <Section delay={0.4}>
-                        <Card className="p-5 space-y-3">
+                        <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-3">
                             <h2 className="text-base font-bold text-foreground">Related Updates</h2>
                             <div className="space-y-2">
                                 {relatedUpdates.map((re) => {

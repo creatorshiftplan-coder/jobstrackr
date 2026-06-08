@@ -252,9 +252,11 @@ function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCard
         }
     };
 
-    const handleViewDetails = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
+    const handleViewDetails = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         navigate(`/updates/${exam.update_slug || exam.id}`);
     };
 
@@ -264,7 +266,10 @@ function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCard
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: Math.min(index * 0.1, 0.5) }}
         >
-            <Card className="overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group">
+            <Card 
+                onClick={handleViewDetails}
+                className="overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group cursor-pointer"
+            >
                 {/* Hero Image with Gradient Overlay */}
                 <div
                     className="relative h-48 sm:h-56 bg-cover bg-center"
@@ -395,7 +400,11 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
         }
     }, [initialExpanded]);
 
-    const handleViewDetails = () => {
+    const handleViewDetails = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         navigate(`/updates/${exam.update_slug || exam.id}`);
     };
 
@@ -405,11 +414,17 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: Math.min(index * 0.1, 0.5) }}
         >
-            <Card className="overflow-hidden border shadow-lg hover:shadow-xl transition-all duration-300">
+            <Card 
+                onClick={handleViewDetails}
+                className="overflow-hidden border shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+            >
                 {/* Header - Clickable to expand */}
                 <div
                     className="p-4 border-b border-border/50 cursor-pointer hover:bg-secondary/30 transition-colors"
-                    onClick={() => setIsExpanded(!isExpanded)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsExpanded(!isExpanded);
+                    }}
                 >
                     <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -590,6 +605,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="block rounded-lg border border-border/60 bg-secondary/25 p-3 hover:bg-secondary/45 transition-colors"
+                                            onClick={(e) => e.stopPropagation()}
                                         >
                                             <div className="flex items-center gap-2 mb-1">
                                                 <Badge variant="outline" className="text-[10px] capitalize">
@@ -648,7 +664,10 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
                 {/* Footer */}
                 <div className="px-4 pb-4 pt-2 border-t border-border flex items-center justify-between">
                     <button
-                        onClick={() => setIsExpanded(!isExpanded)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsExpanded(!isExpanded);
+                        }}
                         className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                     >
                         {isExpanded ? "Hide Updates" : "Read Updates"}
@@ -656,7 +675,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
                     </button>
 
                     <button
-                        onClick={handleViewDetails}
+                        onClick={(e) => handleViewDetails(e)}
                         className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
                     >
                         View Full Details
