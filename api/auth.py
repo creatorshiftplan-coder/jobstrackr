@@ -25,15 +25,18 @@ def is_request_authorized(auth_header: str) -> bool:
     if not token:
         return False
 
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    supabase_url = os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL")
+    
+    # Check for service role key first, then fallback to publishable key
+    service_role_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    supabase_key = service_role_key or os.environ.get("VITE_SUPABASE_PUBLISHABLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
     
     if not supabase_url or not supabase_key:
-        print("[auth] Error: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing from environment variables.")
+        print("[auth] Error: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY/VITE_SUPABASE_PUBLISHABLE_KEY is missing from environment variables.")
         return False
 
     # 1. Trusted trigger/cron check
-    if token == supabase_key:
+    if service_role_key and token == service_role_key:
         return True
 
     # 2. Frontend JWT validation via Supabase Auth API
@@ -56,10 +59,11 @@ def is_request_authorized(auth_header: str) -> bool:
             return False
 
         # 3. Role check via database RPC has_any_admin_role
+        # Pass user's own token (auth_header) for execution context to authorize RPC check properly
         rpc_response = requests.post(
             f"{supabase_url}/rest/v1/rpc/has_any_admin_role",
             headers={
-                "Authorization": f"Bearer {supabase_key}",
+                "Authorization": auth_header,
                 "apikey": supabase_key,
                 "Content-Type": "application/json"
             },
