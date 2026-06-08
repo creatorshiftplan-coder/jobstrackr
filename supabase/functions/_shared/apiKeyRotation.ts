@@ -49,8 +49,8 @@ export async function loadApiKeys(supabase: SupabaseClient): Promise<ApiKeyConfi
     console.warn("Could not load API keys from DB, falling back to env vars:", e);
   }
 
-  // Fallback: build key configs from GEMINI_API_KEY env vars
-  const envKeys = [
+  // Fallback: build key configs from GEMINI_API_KEY and GROQ_API_KEY env vars
+  const geminiEnvKeys = [
     Deno.env.get("GEMINI_API_KEY"),
     Deno.env.get("GEMINI_API_KEY_2"),
     Deno.env.get("GEMINI_API_KEY_3"),
@@ -60,19 +60,46 @@ export async function loadApiKeys(supabase: SupabaseClient): Promise<ApiKeyConfi
     Deno.env.get("GEMINI_API_KEY_7"),
   ].filter(Boolean) as string[];
 
-  return envKeys.map((key, i) => ({
-    id: `env-${i}`,
+  const geminiConfigs = geminiEnvKeys.map((key, i) => ({
+    id: `env-gemini-${i}`,
     provider: "gemini",
     model_name: "gemini-2.5-flash",
     api_key: key,
     is_active: true,
     priority: i,
-    label: `Env Key ${i + 1}`,
+    label: `Env Gemini Key ${i + 1}`,
     last_used_at: null,
     last_error: null,
     total_calls: 0,
     total_errors: 0,
   }));
+
+  const groqEnvKeys = [
+    Deno.env.get("GROQ_API_KEY"),
+    Deno.env.get("GROQ_API_KEY_2"),
+    Deno.env.get("GROQ_API_KEY_3"),
+    Deno.env.get("GROQ_API_KEY_4"),
+    Deno.env.get("GROQ_API_KEY_5"),
+    Deno.env.get("GROQ_API_KEY_6"),
+    Deno.env.get("GROQ_API_KEY_7"),
+    Deno.env.get("GROQ_API_KEY_8"),
+  ].filter(Boolean) as string[];
+
+  const groqConfigs = groqEnvKeys.map((key, i) => ({
+    id: `env-groq-${i}`,
+    provider: "groq",
+    model_name: "llama-3.3-70b-versatile",
+    api_key: key,
+    is_active: true,
+    priority: i,
+    label: `Env Groq Key ${i + 1}`,
+    last_used_at: null,
+    last_error: null,
+    total_calls: 0,
+    total_errors: 0,
+  }));
+
+  return [...geminiConfigs, ...groqConfigs];
 }
 
 /**

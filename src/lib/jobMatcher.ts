@@ -179,105 +179,114 @@ export function getSkillLabel(skill: string): string {
 function parseJobQualRequirement(qualification: string): QualProfile {
   const text = qualification.toLowerCase();
 
-  // ── Detect specialization requirements ───────────────────────
-
-  // Engineering (B.Tech / B.E)
+  // 1. Engineering (M.Tech / ME)
+  if (/\b(m\.?tech|m\.?e)\b/i.test(text)) {
+    return { level: 5, stream: "engineering" };
+  }
+  // 2. Engineering (B.Tech / B.E)
   if (
-    text.includes("b.tech") || text.includes("btech") ||
-    text.includes("b.e.") || text.includes("b.e ") || text.includes("b.e,") ||
-    (text.includes("engineering") && (text.includes("graduate") || text.includes("degree")))
+    /\b(b\.?tech|b\.?e)\b/i.test(text) ||
+    (/\bengineering\b/i.test(text) && /\b(graduate|degree|bachelor)\b/i.test(text))
   ) {
     return { level: 4, stream: "engineering" };
   }
 
-  // M.Tech / ME (post-grad engineering)
-  if (text.includes("m.tech") || text.includes("mtech") || text.includes("m.e.") || text.includes("m.e ")) {
-    return { level: 5, stream: "engineering" };
+  // 3. Medical / MBBS / Veterinary (M.D. / M.S. / M.V.Sc)
+  if (/\b(m\.?d\.?|m\.?s\.?|m\.?v\.?sc|mvsc)\b/i.test(text) && /\b(medical|surgery|veterinary|animal)\b/i.test(text)) {
+    return { level: 5, stream: "medical" };
   }
-
-  // Medical / MBBS
-  if (text.includes("mbbs") || text.includes("medical degree") || text.includes("bds")) {
+  // 4. Medical / MBBS / Veterinary (B.B.S. / B.D.S / B.V.Sc)
+  if (
+    /\b(mbbs|bds|bvsc|b\.?v\.?sc|animal husbandry)\b/i.test(text) ||
+    (/\b(medical|veterinary)\b/i.test(text) && /\b(degree|graduate|bachelor)\b/i.test(text))
+  ) {
     return { level: 4, stream: "medical" };
   }
 
-  // Nursing
-  if (text.includes("nursing") || text.includes("b.sc nursing") || text.includes("gnm")) {
+  // 5. Nursing (M.Sc Nursing)
+  if (/\bm\.?sc\s+nursing\b/i.test(text)) {
+    return { level: 5, stream: "nursing" };
+  }
+  // 6. Nursing (B.Sc Nursing / GNM)
+  if (/\b(nursing|gnm|anm|b\.?sc\s+nursing)\b/i.test(text)) {
     return { level: 4, stream: "nursing" };
   }
 
-  // Pharmacy
-  if (text.includes("pharmacy") || text.includes("b.pharm") || text.includes("d.pharm")) {
-    return { level: text.includes("d.pharm") ? 3.5 : 4, stream: "pharmacy" };
+  // 7. Pharmacy (M.Pharm)
+  if (/\bm\.?pharm\b/i.test(text)) {
+    return { level: 5, stream: "pharmacy" };
+  }
+  // 8. Pharmacy (B.Pharm / D.Pharm)
+  if (/\b(pharmacy|pharmacist|b\.?pharm|d\.?pharm)\b/i.test(text)) {
+    return { level: /\bd\.?pharm\b/i.test(text) ? 3.5 : 4, stream: "pharmacy" };
   }
 
-  // Teaching (B.Ed / TET)
-  if (text.includes("b.ed") || text.includes("bed") || text.includes("tet") || text.includes("ctet")) {
+  // 9. Teaching (M.Ed)
+  if (/\bm\.?ed\b/i.test(text)) {
+    return { level: 5, stream: "teaching" };
+  }
+  // 10. Teaching (B.Ed / TET)
+  if (/\b(b\.?ed|bed|tet|ctet|d\.el\.ed|d\.ed)\b/i.test(text)) {
     return { level: 4, stream: "teaching" };
   }
 
-  // Law
-  if (text.includes("llb") || text.includes("l.l.b") || text.includes("law degree") || text.includes("advocate")) {
+  // 11. Law (LLM)
+  if (/\b(llm|l\.l\.m)\b/i.test(text)) {
+    return { level: 5, stream: "law" };
+  }
+  // 12. Law (LLB)
+  if (/\b(laws?|ll\.?b\.?|law degree|advocate)\b/i.test(text)) {
     return { level: 4, stream: "law" };
   }
 
-  // ── General level detection (no specific stream) ─────────────
+  // ── General levels ──────────────────────────────────────────
 
   // PhD
-  if (text.includes("phd") || text.includes("doctorate")) {
+  if (/\b(ph\.?\s*d\.?|doctorate)\b/i.test(text)) {
     return { level: 6, stream: "general" };
   }
 
   // Post Graduate (general — MA/MSc/MCom/MBA)
   if (
-    text.includes("post") || text.includes("master") ||
-    text.includes("m.sc") || text.includes("m.a") || text.includes("m.com") || text.includes("mba") ||
-    text.includes("mca")
+    /\b(post[\s-]?graduat(?:e|ion)|master'?s?|m\.?sc|m\.?a\b|m\.?com|mba|mca)\b/i.test(text) ||
+    /\b(msc|ma|mcom)\b/i.test(text)
   ) {
     return { level: 5, stream: "general" };
   }
 
   // Graduate (general — BA/BSc/BCom etc)
   if (
-    text.includes("graduate") || text.includes("graduation") ||
-    text.includes("bachelor") || text.includes("degree") ||
-    text.includes("b.sc") || text.includes("b.a") || text.includes("b.com") ||
-    text.includes("bca") || text.includes("bba")
+    /\b(graduat(?:e|ion)|bachelor'?s?|degree|b\.?sc|b\.?a\b|b\.?com|bca|bba)\b/i.test(text) ||
+    /\b(bsc|ba|bcom)\b/i.test(text)
   ) {
     return { level: 4, stream: "general" };
   }
 
   // Diploma
-  if (text.includes("diploma")) {
+  if (/\bdiploma\b/i.test(text)) {
     return { level: 3.5, stream: "general" };
   }
 
   // ITI
-  if (text.includes("iti")) {
+  if (/\biti\b/i.test(text)) {
     return { level: 3, stream: "general" };
   }
 
-  // 12th / Higher Secondary
-  if (
-    text.includes("12th") || text.includes("class xii") ||
-    text.includes("intermediate") || text.includes("higher secondary") || text.includes("+2")
-  ) {
+  // 12th
+  if (/\b(12th|class xii|intermediate|higher secondary|\+2)\b/i.test(text)) {
     return { level: 3, stream: "general" };
   }
 
-  // 10th / Matriculation
-  if (
-    text.includes("10th") || text.includes("class x") ||
-    text.includes("matriculation") || text.includes("ssc pass") || text.includes("10 pass")
-  ) {
+  // 10th
+  if (/\b(10th|class x|matriculation|ssc pass|10 pass)\b/i.test(text)) {
     return { level: 2, stream: "general" };
   }
 
   // 8th
-  if (text.includes("8th") || text.includes("class viii") || text.includes("middle")) {
+  if (/\b(8th|class viii|middle)\b/i.test(text)) {
     return { level: 1, stream: "general" };
   }
 
-  // Fallback: any qualification
   return { level: 0, stream: "general" };
 }
 
@@ -497,6 +506,10 @@ function evaluateStructuredQualification(
       continue;
     }
 
+    if (alternative.required_subjects && alternative.required_subjects.length > 0 && !userMatchesSpecialization(userQualificationName, alternative.required_subjects)) {
+      continue;
+    }
+
     for (const registration of [...profile.global_rules.required_registrations, ...alternative.required_registrations]) {
       addUniqueLabel(requirementLabels, registration.label);
     }
@@ -587,11 +600,13 @@ const SPECIALIZED_QUAL_PATTERNS: RegExp[] = [
   // "Diploma in Surveyorship", "Diploma in Civil Engineering", etc.
   /\b(diploma)\s+(?:in|of)\s+([a-z][a-z\s&/,]+?)(?:\s+(?:from|issued|recognized|by|with|or|and\s+(?:its|any)|under)\b|[.;,]|$)/gi,
   // "Degree in Agriculture", "Bachelor's Degree in Fisheries"
-  /\b(degree|bachelor'?s?\s*degree|master'?s?\s*degree)\s+(?:in|of)\s+([a-z][a-z\s&/,]+?)(?:\s+(?:from|issued|recognized|by|with|or|and\s+(?:its|any)|under)\b|[.;,]|$)/gi,
+  /\b(degree|bachelor'?s?\s*degree|master'?s?\s*degree|graduate|graduation)\s+(?:in|of)\s+([a-z][a-z\s&/,]+?)(?:\s+(?:from|issued|recognized|by|with|or|and\s+(?:its|any)|under)\b|[.;,]|$)/gi,
   // "B.Sc in Agriculture", "M.Sc in Fisheries", "B.E. in Civil Engineering"
   /\b(b\.?\s*(?:sc|tech|e|a|com|pharm|ed)|m\.?\s*(?:sc|tech|e|a|com|pharm|ed)|b\.?\s*(?:arch|lib))\s*\.?\s+(?:in|of)\s+([a-z][a-z\s&/,]+?)(?:\s+(?:from|issued|recognized|by|with|or|and\s+(?:its|any)|under)\b|[.;,]|$)/gi,
   // "Certificate in X", "Post Graduate Certificate in X"
   /\b(certificate|certification)\s+(?:in|of)\s+([a-z][a-z\s&/,]+?)(?:\s+(?:from|issued|recognized|by|with|or|and\s+(?:its|any)|under)\b|[.;,]|$)/gi,
+  // Parenthesized specialization requirements like "B.Sc (Physics)", "Diploma (Electrical Engineering)"
+  /\b(diploma|degree|b\.?\s*(?:sc|tech|e|a|com|pharm|ed)|m\.?\s*(?:sc|tech|e|a|com|pharm|ed)|b\.?\s*(?:arch|lib)|graduate|graduation|certificate|certification)\s*\(\s*([a-z][a-z\s&/,]+?)\s*\)/gi,
 ];
 
 function detectSpecializedRequirements(
@@ -608,7 +623,7 @@ function detectSpecializedRequirements(
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(jobText)) !== null) {
       const qualType = match[1].trim();
-      const specialization = match[2].trim().replace(/\s+/g, " ");
+      const specialization = match[2].trim().replace(/[()]/g, "").replace(/\s+/g, " ");
 
       // Skip generic/empty specializations
       if (!specialization || specialization.length < 3) continue;
@@ -816,10 +831,14 @@ export function checkEligibility(
   }
 
   if (!profile.quality_flags.includes("review_needed") && !profile.quality_flags.includes("manual_review")) {
-    const specializedMissing = detectSpecializedRequirements(jobText, userQualificationName);
-    for (const label of specializedMissing) {
-      if (!skillsMissing.includes(label)) {
-        skillsMissing.push(label);
+    // Only check specialized requirements as missing skills if the user has NOT successfully matched the hard qualifications check.
+    // If qualOk is true, they matched at least one path, so they don't have qualification-level skills missing.
+    if (qualOk !== true) {
+      const specializedMissing = detectSpecializedRequirements(jobText, userQualificationName);
+      for (const label of specializedMissing) {
+        if (!skillsMissing.includes(label)) {
+          skillsMissing.push(label);
+        }
       }
     }
   } else {

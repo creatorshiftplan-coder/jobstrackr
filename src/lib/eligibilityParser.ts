@@ -18,12 +18,12 @@ import {
   Job,
 } from "@/types/job";
 
-const PROFILE_VERSION = 1;
+const PROFILE_VERSION = 4;
 
 const qualificationLevelPatterns: Array<{ level: EligibilityQualificationLevel; pattern: RegExp }> = [
-  { level: "phd", pattern: /\b(ph\.?d\.?|doctorate)\b/i },
-  { level: "post_graduation", pattern: /\b(post[\s-]?graduat(?:e|ion)|master'?s?|m\.?sc\.?|m\.?a\.?|m\.?com\.?|mba|mca|m\.?tech\.?|md|ms|dnb)\b/i },
-  { level: "graduation", pattern: /\b(graduat(?:e|ion)|bachelor'?s?|degree|b\.?sc\.?|b\.?a\.?|b\.?com\.?|bca|bba|b\.?tech\.?|b\.?e\.?|llb|mbbs|bds|b\.?pharm\.?|b\.?ed\.?)\b/i },
+  { level: "phd", pattern: /\b(ph\.?\s*d\.?|doctorate)\b/i },
+  { level: "post_graduation", pattern: /\b(post[\s-]?graduat(?:e|ion)|master'?s?|m\.?sc\.?|m\.?a\.?|m\.?com\.?|mba|mca|m\.?tech\.?|md|ms|dnb|mvsc|m\.?v\.?sc\.?)\b/i },
+  { level: "graduation", pattern: /\b(graduat(?:e|ion)|bachelor'?s?|degree|b\.?sc\.?|b\.?a\.?|b\.?com\.?|bca|bba|b\.?tech\.?|b\.?e\.?|llb|mbbs|bds|b\.?pharm\.?|b\.?ed\.?|bvsc|b\.?v\.?sc\.?)\b/i },
   { level: "diploma", pattern: /\b(diploma|polytechnic|d\.?pharm\.?|gnm|anm|jbt|d\.el\.ed\.?|d\.ed\.?|mlt|dmlt)\b/i },
   { level: "iti", pattern: /\b(iti|ncvt|scvt|craft apprentice|trade apprentice)\b/i },
   { level: "12th", pattern: /\b(12th|10\+2|intermediate|higher secondary|senior secondary|\+2)\b/i },
@@ -33,10 +33,10 @@ const qualificationLevelPatterns: Array<{ level: EligibilityQualificationLevel; 
 
 const streamPatterns: Array<{ stream: EligibilityQualificationStream; pattern: RegExp }> = [
   { stream: "engineering", pattern: /\b(engineering|b\.?tech\.?|m\.?tech\.?|b\.?e\.?|m\.?e\.?|civil engineering|mechanical engineering|electronics|computer science|dialysis technology|critical care technology)\b/i },
-  { stream: "medical", pattern: /\b(mbbs|medicine|medical|bds|radiography|radiology|imaging|dental|operation theatre|ot technician|emergency medicine|orthopaedics|paediatrics|anesthesiology|echocardiography)\b/i },
+  { stream: "medical", pattern: /\b(mbbs|medicine|medical|bds|radiography|radiology|imaging|dental|operation theatre|ot technician|emergency medicine|orthopaedics|paediatrics|anesthesiology|echocardiography|veterinary|bvsc|mvsc|b\.?v\.?sc|m\.?v\.?sc|animal husbandry)\b/i },
   { stream: "nursing", pattern: /\b(nursing|gnm|anm|nurse|midwife)\b/i },
   { stream: "pharmacy", pattern: /\b(pharmacy|pharmacist|b\.?pharm\.?|d\.?pharm\.?)\b/i },
-  { stream: "law", pattern: /\b(law|llb|advocate|bar council|legal practitioner)\b/i },
+  { stream: "law", pattern: /\b(laws?|ll\.?b\.?|advocate|bar council|legal practitioner)\b/i },
   { stream: "teaching", pattern: /\b(b\.?ed\.?|d\.el\.ed\.?|d\.?ed\.?|jbt|tet|ctet|jtet|teacher eligibility|elementary education|special education)\b/i },
 ];
 
@@ -114,10 +114,18 @@ const subjectPatterns: Array<{ subject: string; pattern: RegExp }> = [
   { subject: "hindi", pattern: /\bhindi\b/i },
   { subject: "english", pattern: /\benglish\b/i },
   { subject: "library_science", pattern: /\blibrary science|library & information\b/i },
+  { subject: "agriculture", pattern: /\b(agriculture|agri|agricultural)\b/i },
+  { subject: "horticulture", pattern: /\bhorticulture\b/i },
+  { subject: "forestry", pattern: /\bforestry\b/i },
+  { subject: "fisheries", pattern: /\bfisheries\b/i },
+  { subject: "veterinary", pattern: /\b(veterinary|animal husbandry)\b/i },
+  { subject: "electrical", pattern: /\b(electrical|electronics)\b/i },
+  { subject: "mechanical", pattern: /\bmechanical\b/i },
+  { subject: "civil", pattern: /\bcivil\b/i },
 ];
 
 const specializationPatterns: Array<{ pattern: RegExp; fallback: string }> = [
-  { pattern: /\b(?:degree|diploma|certificate|graduate degree|b\.?tech\.?|b\.?e\.?|b\.?sc\.?|m\.?sc\.?|mba|llb|mbbs|md|ms|dnb)\s*(?:in|of)?\s+([a-z][a-z0-9&()/,\s-]+?)(?:\s+(?:with|from|plus|and|or|having|required|recognized|minimum|valid)\b|[.;,]|$)/gi, fallback: "" },
+  { pattern: /\b(?:degree|diploma|certificate|graduate degree|b\.?tech\.?|b\.?e\.?|b\.?sc\.?|m\.?sc\.?|mba|llb|mbbs|md|ms|dnb)\s*(?:in|of)?\s*\(?\s*([a-z][a-z0-9&/,\s-]+?)\s*\)?(?:\s+(?:with|from|plus|and|or|having|required|recognized|minimum|valid)\b|[.;,]|$)/gi, fallback: "" },
   { pattern: /\b(?:critical care technology|dialysis technology|general nursing(?:\s*&\s*midwifery)?|computer application|data entry operator|translation|library science|elementary education|special education|medical imaging technology|radiography|operation theatre technology|dental technician|fisheries science|nautical science|civil engineering|mechanical engineering|biotechnology|molecular biology|life science|microbiology|virology|echocardiography)\b/gi, fallback: "" },
 ];
 
@@ -388,7 +396,9 @@ function normalizeSpecialization(raw: string): string {
     .replace(/^in\s+/i, "")
     .replace(/^(?:the\s+)?(?:concerned|relevant|same)\s+/i, "")
     .replace(/\bfield\b$/i, "")
-    .replace(/\s+/g, " ");
+    .replace(/[()]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function extractSpecializations(text: string): string[] {
@@ -514,7 +524,7 @@ function splitAlternatives(baseText: string, qualityFlags: string[]): string[] {
   }
 
   const alternatives = baseText
-    .split(/\s+OR\s+/i)
+    .split(/\s+OR\s+/)
     .map((part) => normalizeWhitespace(part))
     .filter(Boolean);
 
@@ -661,7 +671,7 @@ export function parseEligibilityProfileFromText(
 export function getEligibilityProfile(job: Job): EligibilityProfile {
   const existingProfile = job.job_metadata?.eligibility_profile;
   const currentRawText = normalizeEligibilityText([job.qualification, job.eligibility]);
-  if (existingProfile?.version && existingProfile.raw_text === currentRawText) {
+  if (existingProfile?.version && existingProfile.version === PROFILE_VERSION && existingProfile.raw_text === currentRawText) {
     return existingProfile;
   }
 

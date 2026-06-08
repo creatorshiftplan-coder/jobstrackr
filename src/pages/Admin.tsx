@@ -1155,7 +1155,7 @@ export default function Admin() {
   const [postingToTelegram, setPostingToTelegram] = useState<boolean>(false);
   const [showTelegramAddChannelDialog, setShowTelegramAddChannelDialog] = useState<boolean>(false);
   const [telegramSortField, setTelegramSortField] = useState<"vacancies" | "last_date" | "created_at" | null>("created_at");
-  const [telegramSortDirection, setTelegramSortDirection] = useState<"asc" | "desc">("desc");
+  const [telegramSortDirection, setTelegramSortDirection] = useState<"asc" | "desc">("asc");
   const [telegramConsoleLogs, setTelegramConsoleLogs] = useState<string[]>([]);
   const consoleBottomRef = useRef<HTMLDivElement>(null);
   const [allowTelegramDuplicate, setAllowTelegramDuplicate] = useState<boolean>(false);
@@ -1876,7 +1876,7 @@ ${hashtagsStr}
   const telegramExamUpdates = useMemo(() => {
     if (!Array.isArray(rawTelegramExamUpdates)) return [];
     
-    return rawTelegramExamUpdates.filter(update => {
+    const filtered = rawTelegramExamUpdates.filter(update => {
       if (selectedTelegramTag !== "All Jobs") {
         return matchTagFilter(update.title, selectedTelegramTag);
       }
@@ -1900,6 +1900,8 @@ ${hashtagsStr}
       
       return textToSearch.includes(sector);
     });
+
+    return [...filtered].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   }, [rawTelegramExamUpdates, selectedTelegramSector, selectedTelegramTag]);
 
   // Telegram Queue Control and Diagnostics Panel States
@@ -2716,7 +2718,7 @@ ${hashtagsStr}`;
   const [postingToFacebook, setPostingToFacebook] = useState<boolean>(false);
   const [showFacebookAddPageDialog, setShowFacebookAddPageDialog] = useState<boolean>(false);
   const [facebookSortField, setFacebookSortField] = useState<"vacancies" | "last_date" | "created_at" | null>("created_at");
-  const [facebookSortDirection, setFacebookSortDirection] = useState<"asc" | "desc">("desc");
+  const [facebookSortDirection, setFacebookSortDirection] = useState<"asc" | "desc">("asc");
   const [facebookConsoleLogs, setFacebookConsoleLogs] = useState<string[]>([]);
   const facebookConsoleBottomRef = useRef<HTMLDivElement>(null);
 
@@ -3024,7 +3026,7 @@ ${hashtagsStr}`;
   const facebookExamUpdates = useMemo(() => {
     if (!Array.isArray(rawTelegramExamUpdates)) return [];
     
-    return rawTelegramExamUpdates.filter(update => {
+    const filtered = rawTelegramExamUpdates.filter(update => {
       if (selectedFacebookTag !== "All Jobs") {
         return matchTagFilter(update.title, selectedFacebookTag);
       }
@@ -3048,6 +3050,8 @@ ${hashtagsStr}`;
       
       return textToSearch.includes(sector);
     });
+
+    return [...filtered].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   }, [rawTelegramExamUpdates, selectedFacebookSector, selectedFacebookTag]);
 
   const getFacebookPreviewMessage = () => {
@@ -5570,9 +5574,9 @@ ${hashtagsStr}`;
                                   <SelectValue placeholder="Sort by" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="created_at">Date Added (Newest)</SelectItem>
+                                  <SelectItem value="created_at">Date Added</SelectItem>
                                   <SelectItem value="last_date">Deadline Date</SelectItem>
-                                  <SelectItem value="vacancies">Vacancies (Highest)</SelectItem>
+                                  <SelectItem value="vacancies">Vacancies</SelectItem>
                                 </SelectContent>
                               </Select>
                               
@@ -6606,9 +6610,9 @@ ${hashtagsStr}`;
                                   <SelectValue placeholder="Sort by" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="created_at">Date Added (Newest)</SelectItem>
+                                  <SelectItem value="created_at">Date Added</SelectItem>
                                   <SelectItem value="last_date">Deadline Date</SelectItem>
-                                  <SelectItem value="vacancies">Vacancies (Highest)</SelectItem>
+                                  <SelectItem value="vacancies">Vacancies</SelectItem>
                                 </SelectContent>
                               </Select>
                               
