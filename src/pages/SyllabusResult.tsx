@@ -1,12 +1,11 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { BottomNav } from "@/components/BottomNav";
-import { ArrowLeft, Bookmark, ChevronDown, ChevronUp, ExternalLink, FileText, Clock, BarChart3, Download, Share2, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, Bookmark, ChevronDown, ChevronUp, FileText, Clock, BarChart3, Download, Share2, Check, Loader2 } from "lucide-react";
 import { Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import logoWhite from "@/assets/logo-white.png";
 import logoColor from "@/assets/logo-color.png";
-import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -75,7 +74,7 @@ export default function SyllabusResult() {
                 const normalized = examParam.replace(/\s*\d{4}\s*/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
 
                 // Exact match
-                let { data } = await (supabase as any)
+                let { data } = await supabase
                     .from("syllabus_cache")
                     .select("syllabus_data, source_urls, year")
                     .eq("exam_name", normalized)
@@ -87,7 +86,7 @@ export default function SyllabusResult() {
                 if (!data) {
                     const words = normalized.split(" ").filter((w: string) => w.length > 2);
                     const pattern = words.length >= 2 ? `%${words[0]}%${words[1]}%` : `${normalized}%`;
-                    const { data: fallback } = await (supabase as any)
+                    const { data: fallback } = await supabase
                         .from("syllabus_cache")
                         .select("syllabus_data, source_urls, year")
                         .ilike("exam_name", pattern)
@@ -272,8 +271,9 @@ export default function SyllabusResult() {
                 toast({ title: "Link copied!", description: "Shareable syllabus link copied to clipboard." });
                 setTimeout(() => setShared(false), 2000);
             }
-        } catch (e: any) {
-            if (e?.name !== "AbortError") {
+        } catch (e: unknown) {
+            const err = e as { name?: string };
+            if (err?.name !== "AbortError") {
                 await navigator.clipboard.writeText(shareUrl);
                 setShared(true);
                 toast({ title: "Link copied!", description: "Shareable syllabus link copied to clipboard." });
@@ -281,6 +281,39 @@ export default function SyllabusResult() {
             }
         }
     }, [syllabusData, toast]);
+
+    // ─── Compute stages ────────────────────────────────────────────────
+
+    const stages = useMemo(() => {
+        if (!syllabusData) return [];
+        if (syllabusData.stages?.length) {
+            return syllabusData.stages.map((s) => ({
+                name: s.stage_name || "General",
+                exam_type: s.exam_type,
+                total_marks: s.total_marks,
+                duration_mins: s.duration_mins,
+                sections: s.sections || [],
+            }));
+        }
+        const stageMap = new Map<string, { items: SyllabusItem[]; exam_type?: string; total_marks?: number; duration_mins?: number }>();
+        for (const item of syllabusData.syllabus || []) {
+            const name = item.stage_name || "General";
+            if (!stageMap.has(name)) stageMap.set(name, { items: [], exam_type: item.exam_type, total_marks: item.total_marks, duration_mins: item.duration_mins });
+            stageMap.get(name)!.items.push(item);
+        }
+        return Array.from(stageMap.entries()).map(([name, d]) => ({ name, exam_type: d.exam_type, total_marks: d.total_marks, duration_mins: d.duration_mins, sections: d.items }));
+    }, [syllabusData]);
+
+    const activeStage = stages.length > 0 ? stages[activeStageIndex] || stages[0] : null;
+
+    const activeSections = useMemo(() => {
+        if (!syllabusData) return [];
+        return activeStage?.sections || syllabusData.syllabus || [];
+    }, [activeStage, syllabusData]);
+
+    const totalMarks = useMemo(() => activeSections.reduce((s, i) => s + (i.marks || 0), 0), [activeSections]);
+
+    const toggleSection = (index: number) => setExpandedSections((prev) => ({ ...prev, [index]: !prev[index] }));
 
     // Loading state (when opened via shared link)
     if (loading) {
@@ -306,33 +339,6 @@ export default function SyllabusResult() {
             </div>
         );
     }
-
-    // ─── Compute stages ────────────────────────────────────────────────
-
-    const stages = useMemo(() => {
-        if (syllabusData.stages?.length) {
-            return syllabusData.stages.map((s) => ({
-                name: s.stage_name || "General",
-                exam_type: s.exam_type,
-                total_marks: s.total_marks,
-                duration_mins: s.duration_mins,
-                sections: s.sections || [],
-            }));
-        }
-        const stageMap = new Map<string, { items: SyllabusItem[]; exam_type?: string; total_marks?: number; duration_mins?: number }>();
-        for (const item of syllabusData.syllabus || []) {
-            const name = item.stage_name || "General";
-            if (!stageMap.has(name)) stageMap.set(name, { items: [], exam_type: item.exam_type, total_marks: item.total_marks, duration_mins: item.duration_mins });
-            stageMap.get(name)!.items.push(item);
-        }
-        return Array.from(stageMap.entries()).map(([name, d]) => ({ name, exam_type: d.exam_type, total_marks: d.total_marks, duration_mins: d.duration_mins, sections: d.items }));
-    }, [syllabusData]);
-
-    const activeStage = stages.length > 0 ? stages[activeStageIndex] || stages[0] : null;
-    const activeSections = activeStage?.sections || syllabusData.syllabus || [];
-    const totalMarks = useMemo(() => activeSections.reduce((s, i) => s + (i.marks || 0), 0), [activeSections]);
-
-    const toggleSection = (index: number) => setExpandedSections((prev) => ({ ...prev, [index]: !prev[index] }));
 
     // ─── Render ────────────────────────────────────────────────────────
 
@@ -518,28 +524,7 @@ export default function SyllabusResult() {
                     </div>
                 </div>
 
-                {/* Sources */}
-                {syllabusData.grounding_sources && syllabusData.grounding_sources.length > 0 && (
-                    <div className="border-t border-border pt-4">
-                        <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                            <ExternalLink className="h-4 w-4" /> Sources
-                        </h4>
-                        <div className="space-y-2">
-                            {syllabusData.grounding_sources.filter((url) => !isFreeJobAlertUrl(url)).slice(0, 3).map((url, i) => (
-                                <a
-                                    key={i}
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 bg-primary/5 text-primary text-sm px-3 py-2.5 rounded-lg hover:bg-primary/10 transition-colors"
-                                >
-                                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="truncate">{url.replace(/https?:\/\/(www\.)?/, "").split("/")[0]}</span>
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-                )}
+
             </main>
 
             <BottomNav />

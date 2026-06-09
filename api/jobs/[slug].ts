@@ -482,7 +482,7 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
   <!-- React SPA Mount Point -->
   <div id="root"></div>
   <!-- PROD_BODY_ASSETS_START -->
-  <script type="module" crossorigin src="/assets/index-Z3bYo5n7.js"></script>
+  <script type="module" crossorigin src="/assets/index-BBscb9yv.js"></script>
   <!-- PROD_BODY_ASSETS_END -->
   <script>
     // Mark body when SPA mounts to hide SSR content
