@@ -542,16 +542,6 @@ function localCachePlugin(env: Record<string, string>) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
-    define: {
-      "process.env.GROQ_API_KEY": JSON.stringify(env.GROQ_API_KEY),
-      "process.env.GROQ_API_KEY_2": JSON.stringify(env.GROQ_API_KEY_2),
-      "process.env.GROQ_API_KEY_3": JSON.stringify(env.GROQ_API_KEY_3),
-      "process.env.GROQ_API_KEY_4": JSON.stringify(env.GROQ_API_KEY_4),
-      "process.env.GROQ_API_KEY_5": JSON.stringify(env.GROQ_API_KEY_5),
-      "process.env.GROQ_API_KEY_6": JSON.stringify(env.GROQ_API_KEY_6),
-      "process.env.GROQ_API_KEY_7": JSON.stringify(env.GROQ_API_KEY_7),
-      "process.env.GROQ_API_KEY_8": JSON.stringify(env.GROQ_API_KEY_8),
-    },
     server: {
       host: "::",
       port: 8080,
