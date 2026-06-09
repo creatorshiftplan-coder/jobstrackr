@@ -48,35 +48,6 @@ export default function Search() {
     setSearchParams(nextParams, { replace: true });
   };
 
-  // Scroll detection for hiding/showing search bar
-  const [isSearchBarVisible, setIsSearchBarVisible] = useState(true);
-  const lastScrollY = useRef(0);
-  const [visibleJobsCount, setVisibleJobsCount] = useState(20);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      const scrollThreshold = 50; // Minimum scroll distance to trigger
-
-      if (Math.abs(currentScrollY - lastScrollY.current) < scrollThreshold) {
-        return; // Ignore small scroll movements
-      }
-
-      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
-        // Scrolling down & past initial header
-        setIsSearchBarVisible(false);
-      } else {
-        // Scrolling up
-        setIsSearchBarVisible(true);
-      }
-
-      lastScrollY.current = currentScrollY;
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
     let filtered = jobs;
@@ -134,6 +105,142 @@ export default function Search() {
 
   const deferredFilteredJobs = useDeferredValue(filteredJobs);
 
+  // ── Mobile sticky header: directional-reveal (Facebook / Instagram style) ──
+  // Two-state machine: "shown" | "hidden". CSS handles the animation.
+  //
+  // Uses a position-anchor instead of a direction+accumulator so that mobile
+  // momentum jitter (tiny backward events between real scroll events) cannot
+  // reset the counter and break the reveal.
+  //
+  // Rules:
+  //   • scrollY ≤ TOP_PIN_PX   → always shown (top of page / pull-to-refresh)
+  //   • shown  + scrolled DOWN ≥ HIDE_THRESHOLD from anchorY → hidden
+  //   • hidden + scrolled UP   ≥ REVEAL_THRESHOLD from anchorY → shown
+  //   • While hidden and scrolling further down, anchorY advances with the
+  //     scroll so the reveal threshold is always measured from the most
+  //     recent bottom, not from where the bar first disappeared.
+  const TOP_PIN_PX          = 10;
+  const HIDE_THRESHOLD_PX   = 30;
+  const REVEAL_THRESHOLD_PX = 30;
+
+  const mobileHeaderRef = useRef<HTMLElement>(null);
+  const [visibleJobsCount, setVisibleJobsCount] = useState(20);
+  const observerTargetRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const header = mobileHeaderRef.current;
+    if (!header) return;
+
+    type HeaderState = "shown" | "hidden";
+    let state: HeaderState = "shown";
+    let lastY   = window.scrollY;
+    // anchorY is the reference point for threshold measurements.
+    //   • shown  → set when we became shown; hide fires at anchorY + HIDE_THRESHOLD
+    //   • hidden → tracks the furthest-down position reached; reveal fires when
+    //              we've come back up REVEAL_THRESHOLD from anchorY
+    let anchorY = window.scrollY;
+    let rafId: number | null = null;
+
+    const setHeaderState = (next: HeaderState, y: number) => {
+      if (next === state) return;
+      state  = next;
+      anchorY = y;
+      const h = header.offsetHeight || 1;
+      header.style.transform = next === "hidden"
+        ? `translate3d(0, ${-h}px, 0)`
+        : "translate3d(0, 0, 0)";
+    };
+
+    const apply = () => {
+      rafId = null;
+      const y  = window.scrollY;
+      const dy = y - lastY;
+      lastY = y;
+      if (dy === 0) return;
+
+      const h = header.offsetHeight || 1;
+
+      if (y <= TOP_PIN_PX) {
+        // Always visible at the very top (handles pull-to-refresh / overscroll)
+        setHeaderState("shown", y);
+      } else if (state === "shown") {
+        // Hide once we've scrolled down HIDE_THRESHOLD from where we last showed
+        if (y > h && y > anchorY + HIDE_THRESHOLD_PX) {
+          setHeaderState("hidden", y);
+        }
+      } else {
+        // state === "hidden"
+        // Keep anchorY at the furthest-down position reached while hidden, so
+        // the reveal always measures from the most recent bottom. Tiny jitter
+        // (a few-px forward bump during momentum scroll) just nudges anchorY
+        // down slightly — it does NOT reset a separate counter to 0.
+        if (dy > 0 && y > anchorY) anchorY = y;
+        // Reveal once the user has scrolled up REVEAL_THRESHOLD from anchorY
+        if (y < anchorY - REVEAL_THRESHOLD_PX) {
+          setHeaderState("shown", y);
+        }
+      }
+    };
+
+    const onScroll = () => {
+      if (rafId === null) rafId = requestAnimationFrame(apply);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      header.style.transform = "";
+    };
+  }, []);
+
+  // Scroll-triggered infinite scroll via IntersectionObserver
+  useEffect(() => {
+    const target = observerTargetRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && deferredFilteredJobs.length > visibleJobsCount) {
+          setVisibleJobsCount((prev) => Math.min(prev + 20, deferredFilteredJobs.length));
+        }
+      },
+      {
+        root: document.getElementById("main-scroll") || null,
+        rootMargin: "300px",
+      }
+    );
+
+    observer.observe(target);
+    return () => {
+      observer.unobserve(target);
+    };
+  }, [deferredFilteredJobs, visibleJobsCount]);
+
+  // Background loader to gradually render more jobs after initial paint / filter reset
+  useEffect(() => {
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+
+    const loadMoreBackground = () => {
+      setVisibleJobsCount((prev) => {
+        if (prev < deferredFilteredJobs.length) {
+          timerId = setTimeout(loadMoreBackground, 300);
+          return Math.min(prev + 20, deferredFilteredJobs.length);
+        }
+        return prev;
+      });
+    };
+
+    // Delay start slightly to let the initial 20 items paint first
+    timerId = setTimeout(loadMoreBackground, 500);
+
+    return () => {
+      if (timerId) {
+        clearTimeout(timerId);
+      }
+    };
+  }, [deferredFilteredJobs]);
+
   useEffect(() => {
     setVisibleJobsCount(20);
   }, [debouncedQuery, selectedLocations, selectedSectors, selectedQualifications]);
@@ -181,7 +288,11 @@ export default function Search() {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-8">
-      <header className="sticky top-0 z-40 bg-primary dark:bg-card backdrop-blur-xl border-b border-primary-foreground/10 dark:border-border md:hidden">
+      <header
+        ref={mobileHeaderRef}
+        className="sticky top-0 z-40 bg-primary dark:bg-card backdrop-blur-xl border-b border-primary-foreground/10 dark:border-border md:hidden will-change-transform"
+        style={{ transition: "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)" }}
+      >
         <div className="flex items-center gap-3 px-4 h-14">
           <Link to="/more">
             <div className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-primary-foreground/10 dark:hover:bg-secondary/80 transition-colors">
@@ -199,7 +310,7 @@ export default function Search() {
             </div>
           </Link>
         </div>
-        <div className={`flex gap-2 px-4 transition-all duration-300 ease-in-out overflow-hidden ${isSearchBarVisible ? 'max-h-16 opacity-100 py-2' : 'max-h-0 opacity-0 py-0'}`}>
+        <div className="flex gap-2 px-4 py-2">
           <div className="relative flex-1">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -403,14 +514,8 @@ export default function Search() {
             </div>
 
             {hasMoreJobs && (
-              <div className="flex justify-center pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setVisibleJobsCount((count) => count + 20)}
-                  className="min-w-40 rounded-xl"
-                >
-                  Load 20 more
-                </Button>
+              <div ref={observerTargetRef} className="flex justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
             )}
 
