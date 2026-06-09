@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 220 20% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 14%;
+    --primary: 214 84% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 220 20% 14%;
+    --muted: 210 16% 93%;
+    --muted-foreground: 215 14% 50%;
+    --accent: 214 84% 56%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 214 84% 56%;
+    --radius: 0.75rem;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 14% 40%;
+    --sidebar-primary: 214 84% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 214 84% 96%;
+    --sidebar-accent-foreground: 214 84% 46%;
+    --sidebar-border: 214 20% 93%;
+    --sidebar-ring: 214 84% 56%;
+    --success: 142 64% 42%;
+    --warning: 38 92% 50%;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  .dark {
+    --background: 222 20% 8%;
+    --foreground: 210 20% 94%;
+    --card: 222 18% 12%;
+    --card-foreground: 210 20% 94%;
+    --popover: 222 18% 12%;
+    --popover-foreground: 210 20% 94%;
+    --primary: 214 84% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 16% 16%;
+    --secondary-foreground: 210 20% 94%;
+    --muted: 222 14% 18%;
+    --muted-foreground: 215 14% 60%;
+    --accent: 222 16% 16%;
+    --accent-foreground: 210 20% 94%;
+    --destructive: 0 62% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222 14% 20%;
+    --input: 222 14% 20%;
+    --ring: 214 84% 56%;
+    --sidebar-background: 222 18% 10%;
+    --sidebar-foreground: 210 14% 70%;
+    --sidebar-primary: 214 84% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 16% 16%;
+    --sidebar-accent-foreground: 210 14% 80%;
+    --sidebar-border: 222 14% 18%;
+    --sidebar-ring: 214 84% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .job-card-gradient {
+    background: linear-gradient(135deg, hsl(214 84% 56%), hsl(200 80% 52%));
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

@@ -1,0 +1,704 @@
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { TrendingExam, CATEGORY_GRADIENTS } from "@/hooks/useTrendingExams";
+import { formatDistanceToNow, differenceInDays, parseISO, isValid } from "date-fns";
+import { cn } from "@/lib/utils";
+import { getExamStatusType, getBadgeConfig as getStatusBadgeConfig, ExamStatusType } from "@/lib/examStatus";
+import { TrendingUp, Users, Clock, Calendar, Lightbulb, ChevronDown, ChevronRight, Bookmark, ExternalLink, Share2, FileText, Award, BarChart3, Newspaper } from "lucide-react";
+import type { ExamUpdateItem } from "@/hooks/useExamUpdates";
+
+import { motion } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
+import { useSaveJob, useUnsaveJob, useIsJobSaved } from "@/hooks/useSavedJobs";
+import { useAuth } from "@/hooks/useAuth";
+import { useJobForExam } from "@/hooks/useJobForExam";
+import { useExamUpdatesForExam } from "@/hooks/useExamUpdates";
+import { isWhatsAppUrl, isWhatsAppContent } from "@/lib/urlUtils";
+
+interface TrendingExamCardProps {
+    exam: TrendingExam;
+    index: number;
+    initialExpanded?: boolean;
+}
+
+// Sector-specific images
+const SECTOR_IMAGES: Record<string, string> = {
+    Banking: "https://images.unsplash.com/photo-1541354329998-f4d9a9f9297f?w=800&q=80",
+    SSC: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&q=80",
+    Railways: "https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=800&q=80",
+    Defence: "https://images.unsplash.com/photo-1579912437766-7896df6d3cd3?w=800&q=80",
+    UPSC: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&q=80",
+    Teaching: "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800&q=80",
+    State: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80",
+    default: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&q=80",
+};
+
+// Animated counter hook
+function useAnimatedCounter(target: number, duration: number = 1000) {
+    const [count, setCount] = useState(0);
+
+    useEffect(() => {
+        if (target === 0) return;
+
+        const steps = 30;
+        const increment = target / steps;
+        const stepDuration = duration / steps;
+        let current = 0;
+
+        const timer = setInterval(() => {
+            current += increment;
+            if (current >= target) {
+                setCount(target);
+                clearInterval(timer);
+            } else {
+                setCount(Math.floor(current));
+            }
+        }, stepDuration);
+
+        return () => clearInterval(timer);
+    }, [target, duration]);
+
+    return count;
+}
+
+// Format large numbers (1234 -> 1.2k)
+function formatCount(num: number): string {
+    if (num >= 1000) {
+        return (num / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+    }
+    return num.toString();
+}
+
+// Get time ago string
+function getTimeAgo(dateStr?: string | null): string {
+    if (!dateStr) return "";
+    try {
+        return formatDistanceToNow(new Date(dateStr), { addSuffix: false }) + " ago";
+    } catch {
+        return "";
+    }
+}
+
+// Get color config for update category
+function getUpdateCategoryConfig(category: string): { bg: string; text: string; border: string; label: string; icon: typeof FileText } {
+    const cat = category?.toLowerCase().replace(/[_\s]+/g, "") || "";
+    if (cat.includes("result") || cat.includes("merit") || cat.includes("score"))
+        return { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", border: "border-green-500/30", label: "Result Out", icon: Award };
+    if (cat.includes("admit") || cat.includes("hall") || cat.includes("ticket"))
+        return { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", border: "border-blue-500/30", label: "Admit Card", icon: FileText };
+    if (cat.includes("cutoff") || cat.includes("cut"))
+        return { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400", border: "border-orange-500/30", label: "Cutoff", icon: BarChart3 };
+    if (cat.includes("answer") || cat.includes("key"))
+        return { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400", border: "border-purple-500/30", label: "Answer Key", icon: FileText };
+    if (cat.includes("syllabus") || cat.includes("pattern"))
+        return { bg: "bg-indigo-500/10", text: "text-indigo-600 dark:text-indigo-400", border: "border-indigo-500/30", label: "Syllabus", icon: FileText };
+    return { bg: "bg-gray-500/10", text: "text-gray-600 dark:text-gray-400", border: "border-gray-500/30", label: "News", icon: Newspaper };
+}
+
+// Inline updates strip - shared between card types
+function InlineUpdatesStrip({ updates, variant = "light" }: { updates: ExamUpdateItem[]; variant?: "light" | "dark" }) {
+    // Filter out WhatsApp-related updates
+    const filtered = updates.filter((u) => !isWhatsAppUrl(u.url) && !isWhatsAppContent(u.title));
+    if (filtered.length === 0) return null;
+    const topUpdates = filtered.slice(0, 3);
+    const isDark = variant === "dark";
+
+    return (
+        <div className={cn("space-y-2", isDark ? "pt-3" : "")}>
+            {topUpdates.map((update) => {
+                const catConfig = getUpdateCategoryConfig(update.category);
+                const CatIcon = catConfig.icon;
+                return (
+                    <a
+                        key={update.id}
+                        href={update.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn(
+                            "flex items-start gap-2.5 rounded-lg px-3 py-2 transition-colors",
+                            isDark
+                                ? "bg-white/10 hover:bg-white/15"
+                                : "bg-secondary/30 hover:bg-secondary/50 border border-border/40"
+                        )}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className={cn("mt-0.5 flex-shrink-0 rounded-md p-1", catConfig.bg)}>
+                            <CatIcon className={cn("h-3.5 w-3.5", catConfig.text)} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className={cn(
+                                    "text-[10px] font-semibold uppercase tracking-wider",
+                                    isDark ? "text-white/70" : catConfig.text
+                                )}>
+                                    {catConfig.label}
+                                </span>
+                                {update.download_links?.length > 0 && (
+                                    <span className={cn(
+                                        "text-[10px]",
+                                        isDark ? "text-white/50" : "text-primary"
+                                    )}>
+                                        {update.download_links.length} link{update.download_links.length !== 1 ? "s" : ""}
+                                    </span>
+                                )}
+                            </div>
+                            <p className={cn(
+                                "text-sm font-medium line-clamp-1",
+                                isDark ? "text-white" : "text-foreground"
+                            )}>
+                                {update.title}
+                            </p>
+                            {update.summary && (
+                                <p className={cn(
+                                    "text-xs line-clamp-1 mt-0.5",
+                                    isDark ? "text-white/60" : "text-muted-foreground"
+                                )}>
+                                    {update.summary}
+                                </p>
+                            )}
+                        </div>
+                        <ExternalLink className={cn(
+                            "h-3.5 w-3.5 flex-shrink-0 mt-1",
+                            isDark ? "text-white/40" : "text-muted-foreground"
+                        )} />
+                    </a>
+                );
+            })}
+        </div>
+    );
+}
+
+// Calculate countdown
+function getCountdown(dateStr?: string): { days: number; label: string } | null {
+    if (!dateStr) return null;
+
+    try {
+        const date = parseISO(dateStr);
+        if (!isValid(date)) return null;
+
+        const days = differenceInDays(date, new Date());
+        if (days < 0) return null;
+
+        return { days, label: days === 1 ? "day" : "days" };
+    } catch {
+        return null;
+    }
+}
+
+// Featured Card - for Notification/Upcoming badges (with hero image)
+function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCardProps) {
+    const navigate = useNavigate();
+    const { toast } = useToast();
+    const statusType = getExamStatusType(exam.ai_cached_response);
+    const badge = getStatusBadgeConfig(statusType);
+    const timeAgo = getTimeAgo(exam.ai_last_updated_at);
+    const summary = exam.ai_cached_response?.summary || "Tap to view the latest updates for this exam.";
+    const sectorImage = SECTOR_IMAGES[exam.category || "default"] || SECTOR_IMAGES.default;
+
+    // Find matching job and exam updates for this exam
+    const { data: matchingJob, isLoading: isLoadingJob } = useJobForExam(exam.name);
+    const jobId = matchingJob?.id;
+    const { data: examUpdates } = useExamUpdatesForExam(exam.id, exam.name);
+    const latestScrapedUpdates = (examUpdates || []).filter((update) => !isWhatsAppUrl(update.url) && !isWhatsAppContent(update.title) && (update.summary || update.status || update.download_links?.length)).slice(0, 3);
+
+    // Save job functionality - use matching job ID if found
+    const { mutate: saveJob, isPending: isSaving } = useSaveJob();
+    const { mutate: unsaveJob, isPending: isUnsaving } = useUnsaveJob();
+    const isSaved = useIsJobSaved(jobId || "");
+    const { user } = useAuth();
+
+    const handleSaveToggle = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!user) {
+            toast({ title: "Please login to save jobs" });
+            return;
+        }
+        if (!jobId) {
+            toast({ title: "No matching job found to save" });
+            return;
+        }
+        if (isSaved) {
+            unsaveJob(jobId);
+        } else {
+            saveJob(jobId);
+        }
+    };
+
+    const handleShare = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const shareUrl = `${window.location.origin}/trending?exam=${exam.id}`;
+        const shareText = `${badge.label} for "${exam.name}" - View all the news and updates`;
+        const shareData = { title: exam.name, text: shareText, url: shareUrl };
+
+        if (navigator.share && navigator.canShare?.(shareData)) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                if ((err as Error).name !== 'AbortError') {
+                    console.error('Share failed:', err);
+                }
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+                toast({ title: "Link copied to clipboard!" });
+            } catch {
+                toast({ title: "Failed to copy link", variant: "destructive" });
+            }
+        }
+    };
+
+    const handleViewDetails = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        navigate(`/updates/${exam.update_slug || exam.id}`);
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: Math.min(index * 0.1, 0.5) }}
+        >
+            <Card 
+                onClick={handleViewDetails}
+                className="overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group cursor-pointer"
+            >
+                {/* Hero Image with Gradient Overlay */}
+                <div
+                    className="relative h-48 sm:h-56 bg-cover bg-center"
+                    style={{ backgroundImage: `url(${sectorImage})` }}
+                >
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent" />
+
+                    {/* Content over image */}
+                    <div className="absolute inset-0 p-4 sm:p-5 flex flex-col justify-end">
+                        {/* Badge Row */}
+                        <div className="flex items-center gap-2 mb-2">
+                            <span
+                                className="px-2.5 py-1 rounded-full text-xs font-semibold text-white"
+                                style={{ backgroundColor: badge.color }}
+                            >
+                                {badge.label}
+                            </span>
+                            {timeAgo && (
+                                <div className="flex items-center gap-1.5 text-white/70 text-xs">
+                                    <span className="w-1 h-1 rounded-full bg-white/50" />
+                                    {timeAgo}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Title */}
+                        <h3 className="text-lg sm:text-xl font-bold text-white leading-tight mb-2 line-clamp-2">
+                            {exam.name}
+                        </h3>
+
+                        {/* Description */}
+                        <p className="text-sm text-white/80 line-clamp-2 mb-3">
+                            {summary}
+                        </p>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleViewDetails}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-gray-900 rounded-full text-sm font-medium hover:bg-gray-100 transition-colors"
+                            >
+                                View Details
+                                <ExternalLink className="h-4 w-4" />
+                            </button>
+                            <button
+                                onClick={handleSaveToggle}
+                                disabled={isSaving || isUnsaving}
+                                className={cn(
+                                    "p-2 rounded-full backdrop-blur-sm transition-colors",
+                                    isSaved
+                                        ? "bg-primary text-white hover:bg-primary/90"
+                                        : "bg-white/20 hover:bg-white/30"
+                                )}
+                            >
+                                <Bookmark className={cn("h-5 w-5", isSaved ? "fill-current" : "text-white")} />
+                            </button>
+                            <button
+                                onClick={handleShare}
+                                className="p-2 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm transition-colors"
+                                title="Share"
+                            >
+                                <Share2 className="h-5 w-5 text-white" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Inline Exam Updates Strip */}
+                {latestScrapedUpdates.length > 0 && (
+                    <div className="px-4 py-3 border-t border-border/30 bg-card">
+                        <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Latest Updates</h4>
+                        <InlineUpdatesStrip updates={latestScrapedUpdates} variant="light" />
+                    </div>
+                )}
+
+                {/* Job Details from matched job */}
+                {matchingJob && (
+                    <div className="px-4 py-3 border-t border-border/30 bg-card">
+                        <div className="flex flex-wrap gap-3 text-xs">
+                            {matchingJob.vacancies && (
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                    <Users className="h-3.5 w-3.5 text-primary" />
+                                    <span className="font-medium text-foreground">{matchingJob.vacancies_display || `${matchingJob.vacancies} Posts`}</span>
+                                </div>
+                            )}
+                            {matchingJob.last_date && (
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                    <Calendar className="h-3.5 w-3.5 text-red-500" />
+                                    <span className="font-medium text-foreground">{matchingJob.last_date_display || matchingJob.last_date}</span>
+                                </div>
+                            )}
+                            {matchingJob.qualification && (
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                    <FileText className="h-3.5 w-3.5 text-emerald-500" />
+                                    <span className="font-medium text-foreground line-clamp-1 max-w-[150px]">{matchingJob.qualification}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </Card>
+        </motion.div>
+    );
+}
+
+
+// Simple Card - for other status types (clean white card)
+function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardProps) {
+    const [isExpanded, setIsExpanded] = useState(initialExpanded);
+    const navigate = useNavigate();
+    const statusType = getExamStatusType(exam.ai_cached_response);
+    const badge = getStatusBadgeConfig(statusType);
+    const timeAgo = getTimeAgo(exam.ai_last_updated_at);
+    const summary = exam.ai_cached_response?.summary || "Tap to view updates.";
+    const statusData = exam.ai_cached_response;
+    const countdown = getCountdown(statusData?.last_date_to_apply || statusData?.exam_dates);
+
+    // Find matching job for this exam
+    const { data: matchingJob } = useJobForExam(exam.name);
+    const jobId = matchingJob?.id;
+    const { data: examUpdates } = useExamUpdatesForExam(exam.id, exam.name);
+    const latestScrapedUpdates = (examUpdates || []).filter((update) => !isWhatsAppUrl(update.url) && !isWhatsAppContent(update.title) && (update.summary || update.status || update.download_links?.length)).slice(0, 3);
+
+    // Sync expanded state when initialExpanded changes (e.g., from URL param)
+    useEffect(() => {
+        if (initialExpanded) {
+            setIsExpanded(true);
+        }
+    }, [initialExpanded]);
+
+    const handleViewDetails = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        navigate(`/updates/${exam.update_slug || exam.id}`);
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: Math.min(index * 0.1, 0.5) }}
+        >
+            <Card 
+                onClick={handleViewDetails}
+                className="overflow-hidden border shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+            >
+                {/* Header - Clickable to expand */}
+                <div
+                    className="p-4 border-b border-border/50 cursor-pointer hover:bg-secondary/30 transition-colors"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsExpanded(!isExpanded);
+                    }}
+                >
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                            {/* Badge Row */}
+                            <div className="flex items-center gap-2 mb-2">
+                                <span
+                                    className="px-2 py-0.5 rounded-full text-xs font-medium border"
+                                    style={{
+                                        backgroundColor: `${badge.color}15`,
+                                        borderColor: `${badge.color}30`,
+                                        color: badge.color
+                                    }}
+                                >
+                                    {badge.label}
+                                </span>
+                                {timeAgo && (
+                                    <span className="text-xs text-muted-foreground">{timeAgo}</span>
+                                )}
+                            </div>
+
+                            {/* Title */}
+                            <h3 className="font-semibold text-foreground leading-tight line-clamp-1">
+                                {exam.name}
+                            </h3>
+                        </div>
+
+                        <div className="p-1">
+                            <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform", isExpanded && "rotate-180")} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Content - only show when collapsed */}
+                {!isExpanded && (
+                    <div className="p-4 space-y-4">
+                        {/* Summary */}
+                        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+                            {summary}
+                        </p>
+
+                        {/* Countdown Stats */}
+                        {countdown && (
+                            <div className="flex flex-wrap gap-2">
+                                <div className="flex-1 min-w-[80px] max-w-[120px] bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-900/30 rounded-xl p-3 text-center">
+                                    <Calendar className="h-4 w-4 text-red-500 mx-auto mb-1" />
+                                    <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                                        {countdown.days}
+                                    </p>
+                                    <p className="text-xs text-red-600/80 dark:text-red-400/80 uppercase tracking-wide font-medium">
+                                        {countdown.label} left
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Inline Exam Updates Strip (always visible) */}
+                        {latestScrapedUpdates.length > 0 && (
+                            <div>
+                                <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Latest Updates</h4>
+                                <InlineUpdatesStrip updates={latestScrapedUpdates} variant="light" />
+                            </div>
+                        )}
+
+                        {/* Job Details from matched job */}
+                        {matchingJob && (
+                            <div className="flex flex-wrap gap-3 text-xs pt-2 border-t border-border/30">
+                                {matchingJob.vacancies && (
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                        <Users className="h-3.5 w-3.5 text-primary" />
+                                        <span className="font-medium text-foreground">{matchingJob.vacancies_display || `${matchingJob.vacancies} Posts`}</span>
+                                    </div>
+                                )}
+                                {matchingJob.last_date && (
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                        <Calendar className="h-3.5 w-3.5 text-red-500" />
+                                        <span className="font-medium text-foreground">{matchingJob.last_date_display || matchingJob.last_date}</span>
+                                    </div>
+                                )}
+                                {matchingJob.qualification && (
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                        <FileText className="h-3.5 w-3.5 text-emerald-500" />
+                                        <span className="font-medium text-foreground line-clamp-1 max-w-[150px]">{matchingJob.qualification}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Expanded Content */}
+                {isExpanded && statusData && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="px-4 pb-4 space-y-4 border-t border-border relative"
+                    >
+                        {/* Share Button */}
+                        <button
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                const shareUrl = `${window.location.origin}/trending?exam=${exam.id}`;
+                                const shareText = `${badge.label} for "${exam.name}" - View all the news and updates`;
+                                const shareData = {
+                                    title: exam.name,
+                                    text: shareText,
+                                    url: shareUrl,
+                                };
+
+                                if (navigator.share && navigator.canShare?.(shareData)) {
+                                    try {
+                                        await navigator.share(shareData);
+                                    } catch (err) {
+                                        if ((err as Error).name !== 'AbortError') {
+                                            console.error('Share failed:', err);
+                                        }
+                                    }
+                                } else {
+                                    // Fallback: copy to clipboard
+                                    try {
+                                        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+                                        // Use document.createElement for toast-like notification
+                                        const toast = document.createElement('div');
+                                        toast.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 bg-foreground text-background px-4 py-2 rounded-lg text-sm z-50';
+                                        toast.textContent = 'Link copied to clipboard!';
+                                        document.body.appendChild(toast);
+                                        setTimeout(() => toast.remove(), 2000);
+                                    } catch (err) {
+                                        // Fallback for browsers without clipboard API
+                                        const textArea = document.createElement("textarea");
+                                        textArea.value = `${shareText}\n${shareUrl}`;
+                                        textArea.style.position = "fixed";
+                                        textArea.style.left = "-999999px";
+                                        document.body.appendChild(textArea);
+                                        textArea.select();
+                                        document.execCommand("copy");
+                                        document.body.removeChild(textArea);
+                                    }
+                                }
+                            }}
+                            className="absolute top-2 right-4 p-2.5 rounded-full bg-secondary/30 hover:bg-secondary/60 transition-colors"
+                            title="Share this update"
+                        >
+                            <Share2 className="h-5 w-5 text-foreground" />
+                        </button>
+
+                        {/* Full Summary / News */}
+                        {statusData.summary && (
+                            <div className="space-y-2 pt-3 pr-10">
+                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Latest News</h4>
+                                <p className="text-sm text-foreground leading-relaxed">
+                                    {statusData.summary}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Latest Updates */}
+                        {statusData.latest_updates && statusData.latest_updates.length > 0 && (
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Updates</h4>
+                                <ul className="space-y-2">
+                                    {statusData.latest_updates.map((update, i) => (
+                                        <li key={i} className="text-sm text-foreground">
+                                            • {typeof update === 'string' ? update : (update as any).description || (update as any).title}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {latestScrapedUpdates.length > 0 && (
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Related News</h4>
+                                <div className="space-y-2">
+                                    {latestScrapedUpdates.map((update) => (
+                                        <a
+                                            key={update.id}
+                                            href={update.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block rounded-lg border border-border/60 bg-secondary/25 p-3 hover:bg-secondary/45 transition-colors"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Badge variant="outline" className="text-[10px] capitalize">
+                                                    {update.category?.replace(/_/g, " ") || "Update"}
+                                                </Badge>
+                                                {update.status && (
+                                                    <span className="text-[10px] text-muted-foreground line-clamp-1">{update.status}</span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm font-medium text-foreground line-clamp-1">{update.title}</p>
+                                            {update.summary && (
+                                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{update.summary}</p>
+                                            )}
+                                            {update.download_links?.length > 0 && (
+                                                <p className="text-xs text-primary mt-1">{update.download_links.length} quick link{update.download_links.length !== 1 ? "s" : ""} available</p>
+                                            )}
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Recommendations */}
+                        {statusData.recommendations && statusData.recommendations.length > 0 && (
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recommendations</h4>
+                                <ul className="space-y-2">
+                                    {statusData.recommendations.map((rec, i) => (
+                                        <li key={i} className="flex items-start gap-2 text-sm">
+                                            <Lightbulb className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                            <span className="text-foreground">{rec}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Important Dates */}
+                        {statusData.exam_dates && (
+                            <div className="space-y-1">
+                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Important Dates</h4>
+                                <p className="text-sm text-foreground">{statusData.exam_dates}</p>
+                            </div>
+                        )}
+
+                        {/* Eligibility */}
+                        {statusData.eligibility && (
+                            <div className="space-y-1">
+                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Eligibility</h4>
+                                <p className="text-sm text-foreground">{statusData.eligibility}</p>
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+
+                {/* Footer */}
+                <div className="px-4 pb-4 pt-2 border-t border-border flex items-center justify-between">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsExpanded(!isExpanded);
+                        }}
+                        className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                    >
+                        {isExpanded ? "Hide Updates" : "Read Updates"}
+                        <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
+                    </button>
+
+                    <button
+                        onClick={(e) => handleViewDetails(e)}
+                        className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                    >
+                        View Full Details
+                        <ExternalLink className="h-4 w-4" />
+                    </button>
+                </div>
+            </Card>
+        </motion.div>
+    );
+}
+
+// Main exported component - chooses card type based on badge
+export function TrendingExamCard({ exam, index, initialExpanded }: TrendingExamCardProps) {
+    const statusType = getExamStatusType(exam.ai_cached_response);
+
+    // Use FeaturedCard for Notification and Upcoming badges
+    const useFeaturedStyle = statusType === 'notification' || statusType === 'upcoming';
+
+    if (useFeaturedStyle) {
+        return <FeaturedCard exam={exam} index={index} initialExpanded={initialExpanded} />;
+    }
+
+    return <SimpleCard exam={exam} index={index} initialExpanded={initialExpanded} />;
+}
+
+export default TrendingExamCard;

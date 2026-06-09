@@ -1,0 +1,160 @@
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+if (!REDIS_URL || !REDIS_TOKEN) {
+  console.warn('Upstash Redis credentials not configured');
+}
+
+// Helper: Redis GET via Upstash REST API (URL-path format)
+async function redisGet(key: string): Promise<string | null> {
+  if (!REDIS_URL || !REDIS_TOKEN) return null;
+  try {
+    const response = await fetch(`${REDIS_URL}/get/${encodeURIComponent(key)}`, {
+      headers: { 'Authorization': `Bearer ${REDIS_TOKEN}` },
+    });
+    if (!response.ok) {
+      console.error(`Redis GET failed: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    const data = await response.json();
+    return data.result;
+  } catch (error) {
+    console.error('Redis GET error:', error);
+    return null;
+  }
+}
+
+// Helper: Redis SET with EX via Upstash REST API (URL-path format)
+async function redisSetEx(key: string, value: string, ttlSeconds: number): Promise<void> {
+  if (!REDIS_URL || !REDIS_TOKEN) return;
+  try {
+    const response = await fetch(
+      `${REDIS_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}?EX=${ttlSeconds}`,
+      { headers: { 'Authorization': `Bearer ${REDIS_TOKEN}` } },
+    );
+    if (!response.ok) {
+      console.error(`Redis SET failed: ${response.status} ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Redis SET error:', error);
+  }
+}
+
+// Helper to generate cache key from request (scoped by user auth token)
+async function getCacheKey(request: Request): Promise<string> {
+  const url = new URL(request.url);
+  // Use the path and query string after the /api/supabase/ prefix
+  const path = url.pathname.replace(/^\/api\/supabase\//, '');
+  const search = url.search;
+  const baseKey = `cache:${path}${search}`;
+
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.replace("Bearer ", "").trim();
+    if (token) {
+      // Use Web Crypto API to hash the token to keep cache key clean and secure
+      const msgBuffer = new TextEncoder().encode(token);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+      return `${baseKey}:user:${hashHex}`;
+    }
+  }
+  return baseKey;
+}
+
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(request: Request) {
+  // Only cache GET requests
+  if (request.method !== 'GET') {
+    // Proxy directly to Supabase without caching
+    return proxyToSupabase(request);
+  }
+
+  const cacheKey = await getCacheKey(request);
+
+  // Try to get from Redis cache
+  const cached = await redisGet(cacheKey);
+  if (cached !== null && cached !== '') {
+    // cached is a stringified JSON object we stored: {body: string}
+    try {
+      const cachedData = JSON.parse(cached);
+      return new Response(cachedData.body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Cache': 'HIT',
+        },
+      });
+    } catch (e) {
+      // If parsing fails, fallback to proxy
+      console.error('Failed to parse cached value:', e);
+    }
+  }
+
+  // Fetch from Supabase
+  const response = await proxyToSupabase(request);
+
+  // If successful, cache the response body
+  if (response.ok) {
+    const body = await response.text();
+    try {
+      await redisSetEx(cacheKey, JSON.stringify({ body }), 300);
+    } catch (e) {
+      console.error('Failed to cache response:', e);
+    }
+
+    // Return the response with a cache miss header
+    return new Response(body, {
+      status: response.status,
+      headers: {
+        ...response.headers,
+        'X-Cache': 'MISS',
+      },
+    });
+  }
+
+  // For non-ok responses, return as-is (don't cache)
+  return response;
+}
+
+// Proxy function to forward request to Supabase
+async function proxyToSupabase(request: Request): Promise<Response> {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    return new Response('Supabase configuration missing', { status: 500 });
+  }
+
+  // Build the target URL: replace /api/supabase/ with the Supabase REST URL
+  const url = new URL(request.url);
+  let path = url.pathname; // e.g., /api/supabase/rest/v1/jobs
+  // Remove the /api/supabase prefix
+  path = path.replace(/^\/api\/supabase\//, '');
+  const targetUrl = `${supabaseUrl}/rest/v1/${path}${url.search}`;
+
+  // Copy headers from the original request, but replace host and possibly others
+  const headers = new Headers(request.headers);
+  headers.set('host', new URL(supabaseUrl).host);
+  // Ensure apikey and authorization headers are present (they should be from the original request)
+  // If not, we can add them from the anon key
+  if (!headers.has('apikey')) {
+    headers.set('apikey', supabaseKey);
+  }
+  if (!headers.has('authorization')) {
+    headers.set('authorization', `Bearer ${supabaseKey}`);
+  }
+
+  // Note: The request might have a body (for POST, etc.)
+  const response = await fetch(targetUrl, {
+    method: request.method,
+    headers: headers,
+    body: request.body,
+  });
+
+  return response;
+}

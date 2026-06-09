@@ -1,0 +1,141 @@
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/cache/jobs",
+      "destination": "/api/cache/jobs"
+    },
+    {
+      "source": "/api/cache/trending-exams",
+      "destination": "/api/cache/trending-exams"
+    },
+    {
+      "source": "/api/cache/homepage",
+      "destination": "/api/cache/homepage"
+    },
+    {
+      "source": "/api/cache/logos",
+      "destination": "/api/cache/logos"
+    },
+    {
+      "source": "/api/cache/exam-updates",
+      "destination": "/api/cache/exam-updates"
+    },
+    {
+      "source": "/api/scrape",
+      "destination": "/api/scrape"
+    },
+    {
+      "source": "/api/discover",
+      "destination": "/api/discover"
+    },
+    {
+      "source": "/api/scrape-article",
+      "destination": "/api/scrape_article"
+    },
+    {
+      "source": "/api/scrape-article-links",
+      "destination": "/api/scrape_article_links"
+    },
+    {
+      "source": "/jobs/:slug",
+      "destination": "/api/jobs/:slug"
+    },
+    {
+      "source": "/updates/:slug",
+      "destination": "/api/updates/:slug"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap.xml"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/robots.txt"
+    },
+    {
+      "source": "/site.webmanifest",
+      "destination": "/site.webmanifest"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/favicon.ico"
+    },
+    {
+      "source": "/favicon-16x16.png",
+      "destination": "/favicon-16x16.png"
+    },
+    {
+      "source": "/favicon-32x32.png",
+      "destination": "/favicon-32x32.png"
+    },
+    {
+      "source": "/icon-192x192.png",
+      "destination": "/icon-192x192.png"
+    },
+    {
+      "source": "/icon-512x512.png",
+      "destination": "/icon-512x512.png"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self' https://*.supabase.co https://*.googleapis.com https://api.telegram.org https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.supabase.co; frame-ancestors 'none';"
+        }
+      ]
+    },
+    {
+      "source": "/og-image.png",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/logo.png",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}
