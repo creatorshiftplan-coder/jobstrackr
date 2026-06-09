@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square, ChevronLeft, ChevronRight, Send, Terminal, Facebook, MessageSquare } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAllExamUpdates } from "@/hooks/useExamUpdates";
-import { inferCategory } from "@/lib/jobUtils";
+import { inferCategory, isJobActive } from "@/lib/jobUtils";
 import { useEffect } from "react";
 import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
@@ -661,6 +661,10 @@ const matchTagFilter = (title: string, tag: string): boolean => {
   }
 };
 
+interface CustomJob extends Job {
+  embedding?: number[] | null;
+}
+
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, isFullAdmin, isLoading: roleLoading } = useAdminRole();
@@ -670,6 +674,255 @@ export default function Admin() {
   const { unreviewedCount, logs: autoDiscoverLogs, logsLoading: autoDiscoverLoading, markAsReviewed, discoverByCategory, scrapeUrl, addDiscoveredJobs, updateDiscoveredJobs } = useAutoDiscover();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Job Embeddings & Summaries State
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isEmbedding, setIsEmbedding] = useState(false);
+  const [processProgress, setProcessProgress] = useState({ current: 0, total: 0, errors: 0 });
+  const [modelLoading, setModelLoading] = useState(false);
+  const [processingSearch, setProcessingSearch] = useState("");
+  const extractorRef = useRef<any>(null);
+
+  const { data: activeJobs = [], isLoading: activeJobsLoading } = useQuery({
+    queryKey: ["admin-active-jobs-embeddings"],
+    queryFn: async (): Promise<CustomJob[]> => {
+      const today = new Date().toISOString().split("T")[0];
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("id, slug, title, department, location, last_date, last_date_display, qualification, eligibility, experience, tags, eligibility_summary, embedding")
+        .gte("last_date", today)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return (data || []) as CustomJob[];
+    },
+    refetchOnWindowFocus: false,
+  });
+
+  const stats = useMemo(() => {
+    const total = activeJobs.length;
+    const summarized = activeJobs.filter(j => j.eligibility_summary).length;
+    const embedded = activeJobs.filter(j => j.embedding).length;
+    return { total, summarized, embedded };
+  }, [activeJobs]);
+
+  const getExtractor = async () => {
+    if (extractorRef.current) return extractorRef.current;
+    setModelLoading(true);
+    try {
+      const { env, pipeline } = await import("@xenova/transformers");
+      env.allowLocalModels = false;
+      const extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+      extractorRef.current = extractor;
+      return extractor;
+    } catch (e) {
+      console.error("Failed to load local embedding model:", e);
+      toast({
+        title: "Model Load Error",
+        description: "Failed to download/load the local embedding model.",
+        variant: "destructive"
+      });
+      throw e;
+    } finally {
+      setModelLoading(false);
+    }
+  };
+
+  const handleBatchSummarize = async () => {
+    setIsSummarizing(true);
+    setProcessProgress({ current: 0, total: 0, errors: 0 });
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const { data: targetJobs, error } = await supabase
+        .from("jobs")
+        .select("*")
+        .gte("last_date", today)
+        .is("eligibility_summary", null)
+        .limit(50);
+
+      if (error) {
+        toast({
+          title: "Database Error",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!targetJobs || targetJobs.length === 0) {
+        toast({
+          title: "Summarization Complete",
+          description: "No active jobs found that need Groq summarization.",
+        });
+        return;
+      }
+
+      setProcessProgress({ current: 0, total: targetJobs.length, errors: 0 });
+
+      const { summariseEligibility } = await import("@/lib/eligibilitySummariser");
+
+      for (const job of targetJobs) {
+        try {
+          const rawText = job.eligibility || job.qualification;
+          const result = await summariseEligibility(rawText);
+          if (result && result.summary) {
+            await supabase
+              .from("jobs")
+              .update({
+                eligibility_summary: result.summary,
+                required_skills: result.required_skills
+              })
+              .eq("id", job.id);
+          } else {
+            throw new Error("No summary returned");
+          }
+          setProcessProgress(p => ({ ...p, current: p.current + 1 }));
+        } catch (err) {
+          console.error(`Error summarizing job ${job.title}:`, err);
+          setProcessProgress(p => ({ ...p, current: p.current + 1, errors: p.errors + 1 }));
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
+      toast({
+        title: "Summarization Batch Completed",
+        description: `Processed ${targetJobs.length} jobs.`,
+      });
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  const handleBatchEmbed = async () => {
+    setIsEmbedding(true);
+    setProcessProgress({ current: 0, total: 0, errors: 0 });
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const { data: targetJobs, error } = await supabase
+        .from("jobs")
+        .select("*")
+        .gte("last_date", today)
+        .not("eligibility_summary", "is", null)
+        .is("embedding", null)
+        .limit(50);
+
+      if (error) {
+        toast({
+          title: "Database Error",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!targetJobs || targetJobs.length === 0) {
+        toast({
+          title: "Embedding Complete",
+          description: "No active jobs found that need embedding generation.",
+        });
+        return;
+      }
+
+      const extractor = await getExtractor();
+      setProcessProgress({ current: 0, total: targetJobs.length, errors: 0 });
+
+      for (const job of targetJobs) {
+        try {
+          const text = [job.eligibility_summary, job.tags?.join(" ")].filter(Boolean).join(" ");
+          const output = await extractor(text, { pooling: "mean", normalize: true });
+          const embedding = Array.from(output.data);
+
+          await supabase
+            .from("jobs")
+            .update({ embedding })
+            .eq("id", job.id);
+
+          setProcessProgress(p => ({ ...p, current: p.current + 1 }));
+        } catch (err) {
+          console.error(`Error embedding job ${job.title}:`, err);
+          setProcessProgress(p => ({ ...p, current: p.current + 1, errors: p.errors + 1 }));
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
+      toast({
+        title: "Embedding Batch Completed",
+        description: `Processed ${targetJobs.length} jobs.`,
+      });
+    } finally {
+      setIsEmbedding(false);
+    }
+  };
+
+  const handleSingleSummarize = async (job: CustomJob) => {
+    try {
+      const { summariseEligibility } = await import("@/lib/eligibilitySummariser");
+      const rawText = job.eligibility || job.qualification;
+      const result = await summariseEligibility(rawText);
+      if (result && result.summary) {
+        await supabase
+          .from("jobs")
+          .update({
+            eligibility_summary: result.summary,
+            required_skills: result.required_skills
+          })
+          .eq("id", job.id);
+        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
+        toast({
+          title: "Job Summarized",
+          description: `Successfully summarized eligibility for: ${job.title}`,
+        });
+      } else {
+        throw new Error("No summary returned");
+      }
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast({
+        title: "Summarization Failed",
+        description: error.message || "Failed to generate summary.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSingleEmbed = async (job: CustomJob) => {
+    try {
+      if (!job.eligibility_summary) {
+        toast({
+          title: "Summary Required",
+          description: "Please generate the Groq eligibility summary first.",
+          variant: "destructive"
+        });
+        return;
+      }
+      const extractor = await getExtractor();
+      const text = [job.eligibility_summary, job.tags?.join(" ")].filter(Boolean).join(" ");
+      const output = await extractor(text, { pooling: "mean", normalize: true });
+      const embedding = Array.from(output.data);
+
+      await supabase
+        .from("jobs")
+        .update({ embedding })
+        .eq("id", job.id);
+
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
+      toast({
+        title: "Job Embedded",
+        description: `Successfully generated embedding for: ${job.title}`,
+      });
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast({
+        title: "Embedding Failed",
+        description: error.message || "Failed to generate embedding.",
+        variant: "destructive"
+      });
+    }
+  };
 
   // Suggestions & Grievance Feedback Hub State
   const [feedbackFilter, setFeedbackFilter] = useState<"all" | "pending" | "resolved">("all");
@@ -4825,6 +5078,10 @@ ${hashtagsStr}`;
                     {unreadFeedbackCount > 99 ? '99+' : unreadFeedbackCount}
                   </Badge>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="job-processing" className="gap-1 min-w-[44px] h-10">
+                <Terminal className="h-4 w-4" />
+                <span className="hidden sm:inline">Embeddings</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -9658,6 +9915,288 @@ ${hashtagsStr}`;
                     </div>
                   );
                 })()}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="job-processing">
+            <Card className="border-0 shadow-card">
+              <CardHeader className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                      <Terminal className="h-5 w-5 text-primary" />
+                      Active Job Processing (Embeddings & Summaries)
+                    </CardTitle>
+                    <CardDescription>
+                      Generate Groq-powered eligibility summaries and local vector embeddings for active jobs.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-6">
+                {/* Stats Overview */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="bg-secondary/10 border-border/40">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-3 bg-primary/10 rounded-xl text-primary">
+                        <Briefcase className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium">Total Active Jobs</p>
+                        <h4 className="text-2xl font-bold text-foreground">
+                          {activeJobsLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : stats.total}
+                        </h4>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-secondary/10 border-border/40">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-3 bg-green-500/10 rounded-xl text-green-500">
+                        <Sparkles className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium">Summarized (Groq)</p>
+                        <h4 className="text-2xl font-bold text-foreground">
+                          {activeJobsLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : `${stats.summarized} / ${stats.total}`}
+                        </h4>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-secondary/10 border-border/40">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
+                        <Activity className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium">Embedded (WASM)</p>
+                        <h4 className="text-2xl font-bold text-foreground">
+                          {activeJobsLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : `${stats.embedded} / ${stats.total}`}
+                        </h4>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Model State Display */}
+                <Card className="border-border/40 bg-secondary/5">
+                  <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`h-2.5 w-2.5 rounded-full ${modelLoading ? 'bg-amber-500 animate-pulse' : extractorRef.current ? 'bg-green-500' : 'bg-muted'}`} />
+                      <span className="text-sm font-semibold text-foreground">Local WASM Embedding Model</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {modelLoading ? (
+                        <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Downloading/Loading model from CDN (~80MB)...</span>
+                        </div>
+                      ) : extractorRef.current ? (
+                        <span className="text-green-600 dark:text-green-400 font-medium">Ready (all-MiniLM-L6-v2)</span>
+                      ) : (
+                        <span>Will load automatically when starting embedding process.</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Action Buttons & Progress */}
+                <div className="space-y-4 p-4 border border-dashed rounded-xl bg-secondary/10">
+                  <h4 className="text-sm font-semibold text-foreground">Batch Operations (50 Jobs at a time)</h4>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      disabled={isSummarizing || isEmbedding || activeJobsLoading}
+                      onClick={handleBatchSummarize}
+                      className="gap-2"
+                    >
+                      {isSummarizing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Summarizing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Summarize Next 50 (Groq)
+                        </>
+                      )}
+                    </Button>
+
+                    <Button
+                      disabled={isSummarizing || isEmbedding || modelLoading || activeJobsLoading}
+                      onClick={handleBatchEmbed}
+                      className="gap-2"
+                      variant="secondary"
+                    >
+                      {isEmbedding ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Embedding...
+                        </>
+                      ) : (
+                        <>
+                          <Activity className="h-4 w-4" />
+                          Embed Next 50 (Local WASM)
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Progress Indicator */}
+                  {(isSummarizing || isEmbedding) && (
+                    <div className="space-y-2 pt-2 border-t border-border/40">
+                      <div className="flex justify-between text-xs font-semibold text-muted-foreground">
+                        <span>
+                          {isSummarizing ? "Groq Summarization Progress" : "WASM Embedding Progress"}
+                        </span>
+                        <span>
+                          {processProgress.current} / {processProgress.total} completed 
+                          {processProgress.errors > 0 && ` (${processProgress.errors} errors)`}
+                        </span>
+                      </div>
+                      <div className="w-full bg-secondary h-2.5 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-primary h-full transition-all duration-300"
+                          style={{ width: `${processProgress.total > 0 ? (processProgress.current / processProgress.total) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Search and Table */}
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search active jobs by title, department, or location..."
+                      value={processingSearch}
+                      onChange={(e) => setProcessingSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+
+                  {activeJobsLoading ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <p className="text-sm">Loading active jobs list...</p>
+                    </div>
+                  ) : (() => {
+                    const filtered = activeJobs.filter(job => {
+                      const cleanSearch = processingSearch.toLowerCase().trim();
+                      if (!cleanSearch) return true;
+                      return (
+                        job.title?.toLowerCase().includes(cleanSearch) ||
+                        job.department?.toLowerCase().includes(cleanSearch) ||
+                        job.location?.toLowerCase().includes(cleanSearch)
+                      );
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="text-center py-12 border border-dashed rounded-xl bg-muted/20">
+                          <Briefcase className="h-10 w-10 mx-auto text-muted-foreground/60 mb-2" />
+                          <h4 className="font-semibold text-sm text-foreground">No active jobs found</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            No active jobs match the search criteria.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="border border-border/40 rounded-xl overflow-hidden shadow-sm">
+                        <ScrollArea className="w-full max-h-[600px]">
+                          <Table>
+                            <TableHeader className="bg-secondary/35">
+                              <TableRow>
+                                <TableHead className="font-semibold text-xs text-foreground/80">Title & Agency</TableHead>
+                                <TableHead className="font-semibold text-xs text-foreground/80 w-[120px]">Last Date</TableHead>
+                                <TableHead className="font-semibold text-xs text-foreground/80 w-[130px]">Groq Summary</TableHead>
+                                <TableHead className="font-semibold text-xs text-foreground/80 w-[130px]">Embedding</TableHead>
+                                <TableHead className="font-semibold text-xs text-foreground/80 text-right w-[180px]">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {filtered.map(job => {
+                                const hasSummary = !!job.eligibility_summary;
+                                const hasEmbedding = !!job.embedding;
+
+                                return (
+                                  <TableRow key={job.id} className="hover:bg-secondary/5 transition-colors">
+                                    <TableCell className="py-3">
+                                      <div className="font-semibold text-xs text-foreground leading-tight">{job.title}</div>
+                                      <div className="text-[10px] text-muted-foreground mt-0.5 flex flex-wrap gap-x-2 items-center">
+                                        <span>{job.department}</span>
+                                        {job.location && (
+                                          <>
+                                            <span className="text-muted-foreground/40">•</span>
+                                            <span>📍 {job.location}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-3 text-[11px] font-mono text-muted-foreground">
+                                      {job.last_date_display || job.last_date}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {hasSummary ? (
+                                        <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/10 border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
+                                          Summarized
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="secondary" className="bg-secondary text-muted-foreground hover:bg-secondary border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
+                                          Pending
+                                        </Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {hasEmbedding ? (
+                                        <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10 border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
+                                          Embedded
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="secondary" className="bg-secondary text-muted-foreground hover:bg-secondary border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
+                                          Pending
+                                        </Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-3 text-right">
+                                      <div className="flex justify-end gap-1.5">
+                                        <Button
+                                          size="sm"
+                                          variant={hasSummary ? "outline" : "default"}
+                                          disabled={isSummarizing || isEmbedding}
+                                          onClick={() => handleSingleSummarize(job)}
+                                          className="h-7 px-2 text-[10px] font-semibold"
+                                        >
+                                          {hasSummary ? "Regen Groq" : "Summarize"}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant={hasEmbedding ? "outline" : "default"}
+                                          disabled={isSummarizing || isEmbedding || !hasSummary || modelLoading}
+                                          onClick={() => handleSingleEmbed(job)}
+                                          className="h-7 px-2 text-[10px] font-semibold"
+                                        >
+                                          {hasEmbedding ? "Regen WASM" : "Embed"}
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                          <ScrollBar orientation="horizontal" />
+                        </ScrollArea>
+                      </div>
+                    );
+                  })()}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
