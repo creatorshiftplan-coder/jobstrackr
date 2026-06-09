@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import logoWhite from "@/assets/logo-white.png";
 import logoColor from "@/assets/logo-color.png";
+import { useSmartBack } from "@/hooks/useSmartBack";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ export default function SyllabusResult() {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const { toast } = useToast();
+    const handleBack = useSmartBack("/syllabus");
 
     const [syllabusData, setSyllabusData] = useState<SyllabusData | null>(
         (location.state?.syllabusData as SyllabusData) || null
@@ -332,7 +334,7 @@ export default function SyllabusResult() {
         return (
             <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 pb-20">
                 <p className="text-muted-foreground">{examParam ? `No cached syllabus found for "${examParam}".` : "No syllabus data found."}</p>
-                <button onClick={() => navigate("/syllabus")} className="text-primary text-sm font-medium hover:underline">
+                <button onClick={handleBack} className="text-primary text-sm font-medium hover:underline">
                     ← Back to Syllabus Finder
                 </button>
                 <BottomNav />
@@ -348,7 +350,7 @@ export default function SyllabusResult() {
             <header className="sticky top-0 z-40 bg-primary dark:bg-card px-4 py-2">
                 <div className="flex items-center justify-between">
                     <button
-                        onClick={() => navigate("/syllabus")}
+                        onClick={handleBack}
                         className="h-8 w-8 rounded-full bg-primary-foreground/20 flex items-center justify-center hover:bg-primary-foreground/30 transition-colors"
                     >
                         <ArrowLeft className="h-4 w-4 text-primary-foreground dark:text-foreground" />
