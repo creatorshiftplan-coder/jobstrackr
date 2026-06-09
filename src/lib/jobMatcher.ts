@@ -414,13 +414,7 @@ export interface MatchPreferences {
 }
 
 // ── Age Relaxation by Category ──────────────────────────────────────────
-function getAgeRelaxation(category: string | null): number {
-  switch (category?.toUpperCase()) {
-    case "OBC": return 3;
-    case "SC": case "ST": return 5;
-    default: return 0;
-  }
-}
+
 
 function qualLevelToNumber(level: string): number {
   return QUAL_LEVELS[level as keyof typeof QUAL_LEVELS] ?? 0;
@@ -765,7 +759,23 @@ export function checkEligibility(
     const hasProfileAgeReq = (profileAgeRule?.min && profileAgeRule.min >= 10) || (profileAgeRule?.max && profileAgeRule.max >= 10);
     const hasAgeReq = hasProfileAgeReq || (job.age_min && job.age_min >= 10) || (job.age_max && job.age_max >= 10);
     if (hasAgeReq) {
-      const relaxation = getAgeRelaxation(category);
+      let relaxation = 0;
+      if (category) {
+        const userCatLower = category.toLowerCase();
+        const customRelaxations = profileAgeRule?.relaxations || [];
+        const matchedRule = customRelaxations.find((r) => {
+          const ruleCatLower = r.category.toLowerCase();
+          return ruleCatLower.includes(userCatLower) || userCatLower.includes(ruleCatLower) ||
+                 (userCatLower === "st" && ruleCatLower.includes("st")) ||
+                 (userCatLower === "sc" && ruleCatLower.includes("sc"));
+        });
+        if (matchedRule && typeof matchedRule.years === "number") {
+          relaxation = matchedRule.years;
+        } else {
+          relaxation = 0;
+        }
+      }
+
       const min = (profileAgeRule?.min && profileAgeRule.min >= 10)
         ? profileAgeRule.min
         : (job.age_min && job.age_min >= 10) ? job.age_min : 0;

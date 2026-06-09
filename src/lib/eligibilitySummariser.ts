@@ -39,20 +39,23 @@ Return ONLY the JSON object. Do not include markdown wraps or backticks outside 
  * - Contains at least one age number.
  * - Does not start with preamble words like 'I' or 'Here'.
  */
-function validateSummary(summary: string): boolean {
+function validateSummary(summary: string, rawText?: string | null): boolean {
   if (!summary) return false;
   
   const words = summary.trim().split(/\s+/).filter(Boolean);
-  if (words.length < 80 || words.length > 150) {
+  if (words.length < 5 || words.length > 250) {
     console.warn(`[Summariser Validation] Failed word count: ${words.length}`);
     return false;
   }
 
-  // Check if it contains an age number (e.g. "18", "27", "35", "45", "Age 21")
-  const hasAgeNumber = /\b(age\s+)?\d{2}\b/i.test(summary);
-  if (!hasAgeNumber) {
-    console.warn(`[Summariser Validation] Failed age number check: no two-digit age found.`);
-    return false;
+  // Check if it contains an age number, but ONLY if the raw eligibility text had any two-digit numbers.
+  const rawHasTwoDigitNumber = rawText ? /\b\d{2}\b/.test(rawText) : false;
+  if (rawHasTwoDigitNumber) {
+    const hasAgeNumber = /\b\d{2}\b/i.test(summary);
+    if (!hasAgeNumber) {
+      console.warn(`[Summariser Validation] Failed age number check: raw text has double digits, but summary does not.`);
+      return false;
+    }
   }
 
   // Check for preambles
@@ -106,7 +109,7 @@ export async function summariseEligibility(
         const skillsList = parsed.required_skills || [];
 
         // Validate summary text quality
-        if (validateSummary(summaryText)) {
+        if (validateSummary(summaryText, rawEligibilityText)) {
           return {
             summary: summaryText,
             required_skills: skillsList as SkillObject[]

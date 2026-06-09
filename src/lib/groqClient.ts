@@ -1,116 +1,54 @@
-// Groq API Client with 8-Key Round-Robin Rotation & Quota/Rate-Limit Tracking
+// Groq API Client with Automated Key Rotation & Error Recovery
 // Exposes a call API to make Llama model chat completion calls.
 
-export type KeyStatus = "ACTIVE" | "RATE_LIMITED" | "EXHAUSTED";
-
-interface KeyState {
-  index: number;
-  status: KeyStatus;
-  rateLimitedAt: number;
-  exhaustedDate: string;
-  failures: number;
-  lastFailureReset: number;
-}
-
-// Module-level persistent state for keys
 const KEY_COUNT = 8;
-let currentKeyIndex = 0;
-
-const keyStates: KeyState[] = Array.from({ length: KEY_COUNT }, (_, i) => ({
-  index: i + 1,
-  status: "ACTIVE",
-  rateLimitedAt: 0,
-  exhaustedDate: "",
-  failures: 0,
-  lastFailureReset: Date.now(),
-}));
+const keysOrder = [1, 2, 3, 4, 5, 6, 7, 8];
 
 /**
  * Helper to fetch a key from various environments (process.env, Deno.env, import.meta.env)
  */
 function getGroqKey(index: number): string | undefined {
-  const keyName = `GROQ_KEY_${index}`;
-  const viteKeyName = `VITE_GROQ_KEY_${index}`;
-
-  // 1. Try process.env (Node.js & Vercel serverless)
-  if (typeof process !== "undefined" && process.env) {
-    if (process.env[keyName]) return process.env[keyName];
-    if (process.env[viteKeyName]) return process.env[viteKeyName];
+  // 1. Try process.env variables (Vite statically replaces these in the frontend)
+  try {
+    let val: string | undefined;
+    switch (index) {
+      case 1: val = process.env.GROQ_API_KEY; break;
+      case 2: val = process.env.GROQ_API_KEY_2; break;
+      case 3: val = process.env.GROQ_API_KEY_3; break;
+      case 4: val = process.env.GROQ_API_KEY_4; break;
+      case 5: val = process.env.GROQ_API_KEY_5; break;
+      case 6: val = process.env.GROQ_API_KEY_6; break;
+      case 7: val = process.env.GROQ_API_KEY_7; break;
+      case 8: val = process.env.GROQ_API_KEY_8; break;
+    }
+    if (val && !val.startsWith("process.env.")) return val;
+  } catch (e) {
+    // process is not defined, ignore and proceed to fallbacks
   }
 
-  // 2. Try Deno.env (Deno Edge Functions)
-  // @ts-ignore
-  if (typeof Deno !== "undefined" && Deno.env) {
+  // 2. Try Deno.env
+  try {
     // @ts-ignore
-    const k = Deno.env.get(keyName) || Deno.env.get(viteKeyName);
-    if (k) return k;
-  }
+    if (typeof Deno !== "undefined" && Deno.env) {
+      const name = index === 1 ? "GROQ_API_KEY" : `GROQ_API_KEY_${index}`;
+      // @ts-ignore
+      const val = Deno.env.get(name);
+      if (val) return val;
+    }
+  } catch (e) {}
 
-  // 3. Try import.meta.env (Vite frontend client)
-  // @ts-ignore
-  if (typeof import.meta !== "undefined" && import.meta.env) {
+  // 3. Try import.meta.env
+  try {
     // @ts-ignore
-    const k = import.meta.env[viteKeyName] || import.meta.env[keyName];
-    if (k) return k;
-  }
+    if (typeof import.meta !== "undefined" && import.meta.env) {
+      const name = index === 1 ? "GROQ_API_KEY" : `GROQ_API_KEY_${index}`;
+      // @ts-ignore
+      const val = import.meta.env[name];
+      if (val) return val;
+    }
+  } catch (e) {}
 
   return undefined;
-}
-
-/**
- * Gets the current date string in Indian Standard Time (IST / UTC + 5:30)
- */
-function getTodayISTString(): string {
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const date = new Date(Date.now() + istOffset);
-  return date.toISOString().split("T")[0];
-}
-
-/**
- * Updates a key state, resetting rate-limits, failure counts, and daily quotas if their timers expired.
- */
-function refreshKeyState(state: KeyState) {
-  const now = Date.now();
-
-  // Reset rate limits after 60 seconds (free tier usually resets per minute)
-  if (state.status === "RATE_LIMITED" && now - state.rateLimitedAt >= 60000) {
-    state.status = "ACTIVE";
-  }
-
-  // Reset daily exhaust at midnight IST
-  if (state.status === "EXHAUSTED" && state.exhaustedDate !== getTodayISTString()) {
-    state.status = "ACTIVE";
-    state.exhaustedDate = "";
-  }
-
-  // Reset failure counts every hour
-  if (now - state.lastFailureReset >= 3600000) {
-    state.failures = 0;
-    state.lastFailureReset = now;
-  }
-}
-
-/**
- * Returns the next available active key, or null if all keys are exhausted/limited.
- */
-function getNextAvailableKeyIndex(): number | null {
-  const todayIST = getTodayISTString();
-
-  for (let i = 0; i < KEY_COUNT; i++) {
-    const checkIndex = (currentKeyIndex + i) % KEY_COUNT;
-    const state = keyStates[checkIndex];
-    
-    refreshKeyState(state);
-
-    const hasKeyVal = !!getGroqKey(state.index);
-
-    if (hasKeyVal && state.status === "ACTIVE" && state.failures < 3) {
-      currentKeyIndex = checkIndex;
-      return currentKeyIndex;
-    }
-  }
-
-  return null;
 }
 
 export interface GroqCompletionRequest {
@@ -126,17 +64,20 @@ export interface GroqCompletionRequest {
 export async function groqChatCompletion(
   request: GroqCompletionRequest
 ): Promise<any> {
-  const maxAttempts = KEY_COUNT;
+  let lastError = "All Groq API keys failed";
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const keyIdx = getNextAvailableKeyIndex();
-    if (keyIdx === null) {
-      console.warn("[Groq Rotation] All available Groq keys are exhausted or rate-limited.");
-      return null;
+  for (let attempt = 0; attempt < KEY_COUNT; attempt++) {
+    // Always fetch the first key from the current queue order
+    const keyNum = keysOrder[0];
+    const apiKey = getGroqKey(keyNum);
+
+    if (!apiKey) {
+      // If the key is not configured, shift it to the end of the queue immediately
+      keysOrder.push(keysOrder.shift()!);
+      continue;
     }
 
-    const state = keyStates[keyIdx];
-    const apiKey = getGroqKey(state.index)!;
+    console.log(`Trying Groq Key ${keyNum}/${KEY_COUNT} (Attempt ${attempt + 1})`);
 
     try {
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -149,36 +90,34 @@ export async function groqChatCompletion(
       });
 
       if (response.ok) {
-        // Success: reset key failures
-        state.failures = 0;
+        // Success: keep the working key at the front of the queue
         return await response.json();
       }
 
-      // Handle specific API error codes
-      if (response.status === 429) {
-        // Rate limit exceeded
-        console.warn(`[Groq Rotation] Key ${state.index} rate-limited (429). Rotating key.`);
-        state.status = "RATE_LIMITED";
-        state.rateLimitedAt = Date.now();
-      } else if (response.status === 413 || response.status === 402) {
-        // Payload too large, or payment/quota exhaustion
-        console.warn(`[Groq Rotation] Key ${state.index} exhausted/quota hit (${response.status}). Rotating key.`);
-        state.status = "EXHAUSTED";
-        state.exhaustedDate = getTodayISTString();
-      } else {
-        // General error (like 500 or other bad request)
-        state.failures++;
-        console.error(`[Groq Rotation] Key ${state.index} failed with status ${response.status}. Consecutive failures: ${state.failures}`);
-      }
+      const statusCode = response.status;
+      const errorText = await response.text().catch(() => "");
+      console.warn(`[Groq Rotation] Key ${keyNum} failed with status ${statusCode}: ${errorText.slice(0, 100)}`);
+      lastError = `Key ${keyNum} failed: ${statusCode} - ${errorText.slice(0, 50)}`;
+
+      // Move the failed key to the end of the queue
+      keysOrder.push(keysOrder.shift()!);
+
+      // Cooldown wait before trying the next key
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      continue;
 
     } catch (err: any) {
-      state.failures++;
-      console.error(`[Groq Rotation] Network error on Key ${state.index}. Consecutive failures: ${state.failures}`, err);
-    }
+      console.error(`[Groq Rotation] Network error on Key ${keyNum}:`, err);
+      lastError = `Network error on Key ${keyNum}: ${err.message || err}`;
 
-    // Advance to next key pointer for subsequent retry/call
-    currentKeyIndex = (currentKeyIndex + 1) % KEY_COUNT;
+      // Move the failed key to the end of the queue
+      keysOrder.push(keysOrder.shift()!);
+
+      // Cooldown wait before trying the next key
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      continue;
+    }
   }
 
-  throw new Error("All Groq API keys failed or were exhausted.");
+  throw new Error(`All Groq API keys failed. Last error: ${lastError}`);
 }

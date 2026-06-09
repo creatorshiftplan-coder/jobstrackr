@@ -668,7 +668,7 @@ interface CustomJob extends Job {
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, isFullAdmin, isLoading: roleLoading } = useAdminRole();
-  const { data: jobs, isLoading: jobsLoading } = useJobs();
+  const { data: jobs, isLoading: jobsLoading } = useJobs({ bypassCache: true });
   const { userStats, apiStats, isLoading: statsLoading } = useAdminStats();
   const analyticsData = useAnalyticsData();
   const { unreviewedCount, logs: autoDiscoverLogs, logsLoading: autoDiscoverLoading, markAsReviewed, discoverByCategory, scrapeUrl, addDiscoveredJobs, updateDiscoveredJobs } = useAutoDiscover();
@@ -681,40 +681,38 @@ export default function Admin() {
   const [processProgress, setProcessProgress] = useState({ current: 0, total: 0, errors: 0 });
   const [modelLoading, setModelLoading] = useState(false);
   const [processingSearch, setProcessingSearch] = useState("");
+  const [processingPage, setProcessingPage] = useState(1);
+  const [selectedPreviewJob, setSelectedPreviewJob] = useState<CustomJob | null>(null);
   const extractorRef = useRef<any>(null);
 
-  const { data: activeJobs = [], isLoading: activeJobsLoading } = useQuery({
-    queryKey: ["admin-active-jobs-embeddings"],
-    queryFn: async (): Promise<CustomJob[]> => {
-      // Step 1: Fetch all job IDs and dates (lightweight)
-      const { data: allJobs, error: allError } = await supabase
+  const { data: embeddedJobIds = new Set<string>(), isLoading: embeddedJobsLoading } = useQuery({
+    queryKey: ["admin-embedded-job-ids"],
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await supabase
         .from("jobs")
-        .select("id, last_date, last_date_display");
+        .select("id")
+        .not("embedding", "is", null);
 
-      if (allError) throw allError;
-
-      // Step 2: Filter active jobs client-side using the identical deadline rules
-      const activeIds = (allJobs || [])
-        .filter(job => {
-          const lastDate = getJobDeadlineDate(job);
-          return !lastDate || lastDate >= new Date();
-        })
-        .map(job => job.id);
-
-      if (activeIds.length === 0) return [];
-
-      // Step 3: Fetch details for the unexpired active jobs
-      const { data: activeJobsData, error: activeError } = await supabase
-        .from("jobs")
-        .select("id, slug, title, department, location, last_date, last_date_display, qualification, eligibility, experience, tags, eligibility_summary, embedding")
-        .in("id", activeIds)
-        .order("created_at", { ascending: false });
-
-      if (activeError) throw activeError;
-      return (activeJobsData || []) as CustomJob[];
+      if (error) throw error;
+      return new Set((data || []).map((j: any) => j.id));
     },
     refetchOnWindowFocus: false,
   });
+
+  const activeJobs = useMemo((): CustomJob[] => {
+    if (!Array.isArray(jobs)) return [];
+    return jobs
+      .filter(job => {
+        const lastDate = getJobDeadlineDate(job);
+        return !lastDate || lastDate >= new Date();
+      })
+      .map(job => ({
+        ...job,
+        embedding: embeddedJobIds.has(job.id) ? [1] : null
+      })) as CustomJob[];
+  }, [jobs, embeddedJobIds]);
+
+  const activeJobsLoading = jobsLoading || embeddedJobsLoading;
 
   const stats = useMemo(() => {
     const total = activeJobs.length;
@@ -764,11 +762,39 @@ export default function Admin() {
 
       setProcessProgress({ current: 0, total: targetJobs.length, errors: 0 });
 
+      // Fetch descriptions for the target jobs on-demand
+      const targetIds = targetJobs.map(j => j.id);
+      const { data: fullJobs } = await supabase
+        .from("jobs")
+        .select("id, description")
+        .in("id", targetIds);
+      const descriptionMap = new Map((fullJobs || []).map(j => [j.id, j.description]));
+
       const { summariseEligibility } = await import("@/lib/eligibilitySummariser");
 
       for (const job of targetJobs) {
         try {
-          const rawText = job.eligibility || job.qualification;
+          const ageDetails: string[] = [];
+          if (job.job_metadata?.age_limit_text) {
+            ageDetails.push(`Age Limit: ${job.job_metadata.age_limit_text}`);
+          } else if (job.age_min || job.age_max) {
+            const minText = job.age_min ? `Minimum ${job.age_min} years` : "";
+            const maxText = job.age_max ? `Maximum ${job.age_max} years` : "";
+            ageDetails.push(`Age Limit: ${minText} ${maxText}`.trim());
+          } else {
+            const description = descriptionMap.get(job.id);
+            if (description) {
+              const descSnippet = description.split(/\s+/).slice(0, 250).join(" ");
+              ageDetails.push(`Job Details: ${descSnippet}`);
+            }
+          }
+
+          const rawText = [
+            job.eligibility,
+            job.qualification,
+            ...ageDetails
+          ].filter(Boolean).join("\n");
+
           const result = await summariseEligibility(rawText);
           if (result && result.summary) {
             await supabase
@@ -782,6 +808,8 @@ export default function Admin() {
             throw new Error("No summary returned");
           }
           setProcessProgress(p => ({ ...p, current: p.current + 1 }));
+          // Pace requests to avoid triggering API rate limits
+          await new Promise((resolve) => setTimeout(resolve, 1500));
         } catch (err) {
           console.error(`Error summarizing job ${job.title}:`, err);
           setProcessProgress(p => ({ ...p, current: p.current + 1, errors: p.errors + 1 }));
@@ -789,7 +817,7 @@ export default function Admin() {
       }
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-embedded-job-ids"] });
       toast({
         title: "Summarization Batch Completed",
         description: `Processed ${targetJobs.length} jobs.`,
@@ -838,7 +866,7 @@ export default function Admin() {
       }
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-embedded-job-ids"] });
       toast({
         title: "Embedding Batch Completed",
         description: `Processed ${targetJobs.length} jobs.`,
@@ -851,7 +879,33 @@ export default function Admin() {
   const handleSingleSummarize = async (job: CustomJob) => {
     try {
       const { summariseEligibility } = await import("@/lib/eligibilitySummariser");
-      const rawText = job.eligibility || job.qualification;
+      
+      // Fetch full job description on-demand
+      const { data: fullJob } = await supabase
+        .from("jobs")
+        .select("description")
+        .eq("id", job.id)
+        .single();
+      const description = fullJob?.description;
+
+      const ageDetails: string[] = [];
+      if (job.job_metadata?.age_limit_text) {
+        ageDetails.push(`Age Limit: ${job.job_metadata.age_limit_text}`);
+      } else if (job.age_min || job.age_max) {
+        const minText = job.age_min ? `Minimum ${job.age_min} years` : "";
+        const maxText = job.age_max ? `Maximum ${job.age_max} years` : "";
+        ageDetails.push(`Age Limit: ${minText} ${maxText}`.trim());
+      } else if (description) {
+        const descSnippet = description.split(/\s+/).slice(0, 250).join(" ");
+        ageDetails.push(`Job Details: ${descSnippet}`);
+      }
+
+      const rawText = [
+        job.eligibility,
+        job.qualification,
+        ...ageDetails
+      ].filter(Boolean).join("\n");
+
       const result = await summariseEligibility(rawText);
       if (result && result.summary) {
         await supabase
@@ -862,7 +916,7 @@ export default function Admin() {
           })
           .eq("id", job.id);
         queryClient.invalidateQueries({ queryKey: ["jobs"] });
-        queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-embedded-job-ids"] });
         toast({
           title: "Job Summarized",
           description: `Successfully summarized eligibility for: ${job.title}`,
@@ -901,7 +955,7 @@ export default function Admin() {
         .eq("id", job.id);
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-embedded-job-ids"] });
       toast({
         title: "Job Embedded",
         description: `Successfully generated embedding for: ${job.title}`,
@@ -2160,6 +2214,56 @@ ${hashtagsStr}
   const [runningBatchBroadcast, setRunningBatchBroadcast] = useState<"job" | "update" | null>(null);
   const [selectedDiagDate, setSelectedDiagDate] = useState<string>("");
 
+  // Fetch jobs for selected diagnostic date
+  const { data: diagDateJobs, isLoading: diagJobsLoading } = useQuery({
+    queryKey: ["admin-diag-jobs", selectedDiagDate],
+    queryFn: async () => {
+      if (!selectedDiagDate) return null;
+      
+      const start = new Date(`${selectedDiagDate}T00:00:00`).toISOString();
+      const end = new Date(`${selectedDiagDate}T23:59:59.999`).toISOString();
+      
+      const { data, error } = await supabase
+        .from("jobs")
+        .select(`
+          id, slug, title, department, location, last_date, last_date_display, 
+          vacancies, vacancies_display, qualification, eligibility, experience, 
+          salary_min, salary_max, age_min, age_max, application_fee, job_metadata, 
+          is_featured, admin_refreshed_at, created_at, tags, eligibility_summary, 
+          required_skills
+        `)
+        .gte("created_at", start)
+        .lte("created_at", end)
+        .order("created_at", { ascending: false });
+        
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedDiagDate,
+  });
+
+  // Fetch exam updates for selected diagnostic date
+  const { data: diagDateUpdates, isLoading: diagUpdatesLoading } = useQuery({
+    queryKey: ["admin-diag-updates", selectedDiagDate],
+    queryFn: async () => {
+      if (!selectedDiagDate) return null;
+      
+      const start = new Date(`${selectedDiagDate}T00:00:00`).toISOString();
+      const end = new Date(`${selectedDiagDate}T23:59:59.999`).toISOString();
+      
+      const { data, error } = await supabase
+        .from("exam_updates")
+        .select("*")
+        .gte("created_at", start)
+        .lte("created_at", end)
+        .order("created_at", { ascending: false });
+        
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedDiagDate,
+  });
+
   const fetchQueueStats = useCallback(async () => {
     setLoadingQueueStats(true);
     try {
@@ -2430,36 +2534,22 @@ ${hashtagsStr}
   };
 
   const recentJobs = useMemo(() => {
-    if (!Array.isArray(jobs)) return [];
-    let list = [...jobs];
     if (selectedDiagDate) {
-      list = list.filter(job => {
-        try {
-          return format(new Date(job.created_at), "yyyy-MM-dd") === selectedDiagDate;
-        } catch {
-          return false;
-        }
-      });
+      return diagDateJobs || [];
     }
-    const sorted = list.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    return selectedDiagDate ? sorted : sorted.slice(0, 5);
-  }, [jobs, selectedDiagDate]);
+    if (!Array.isArray(jobs)) return [];
+    const sorted = [...jobs].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    return sorted.slice(0, 5);
+  }, [jobs, selectedDiagDate, diagDateJobs]);
 
   const recentUpdates = useMemo(() => {
-    if (!Array.isArray(rawTelegramExamUpdates)) return [];
-    let list = [...rawTelegramExamUpdates];
     if (selectedDiagDate) {
-      list = list.filter(update => {
-        try {
-          return format(new Date(update.created_at), "yyyy-MM-dd") === selectedDiagDate;
-        } catch {
-          return false;
-        }
-      });
+      return diagDateUpdates || [];
     }
-    const sorted = list.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    return selectedDiagDate ? sorted : sorted.slice(0, 5);
-  }, [rawTelegramExamUpdates, selectedDiagDate]);
+    if (!Array.isArray(rawTelegramExamUpdates)) return [];
+    const sorted = [...rawTelegramExamUpdates].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    return sorted.slice(0, 5);
+  }, [rawTelegramExamUpdates, selectedDiagDate, diagDateUpdates]);
 
   useEffect(() => {
     fetchTelegramLogs();
@@ -6492,7 +6582,11 @@ ${hashtagsStr}`;
                       </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                      {recentJobs.length === 0 ? (
+                      {diagJobsLoading ? (
+                        <div className="flex justify-center items-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      ) : recentJobs.length === 0 ? (
                         <div className="text-center py-6 text-sm text-muted-foreground italic">
                           No jobs available.
                         </div>
@@ -6587,7 +6681,11 @@ ${hashtagsStr}`;
                       </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                      {recentUpdates.length === 0 ? (
+                      {diagUpdatesLoading ? (
+                        <div className="flex justify-center items-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      ) : recentUpdates.length === 0 ? (
                         <div className="text-center py-6 text-sm text-muted-foreground italic">
                           No recent updates found.
                         </div>
@@ -10066,7 +10164,10 @@ ${hashtagsStr}`;
                     <Input
                       placeholder="Search active jobs by title, department, or location..."
                       value={processingSearch}
-                      onChange={(e) => setProcessingSearch(e.target.value)}
+                      onChange={(e) => {
+                        setProcessingSearch(e.target.value);
+                        setProcessingPage(1);
+                      }}
                       className="pl-9"
                     />
                   </div>
@@ -10099,98 +10200,248 @@ ${hashtagsStr}`;
                       );
                     }
 
-                    return (
-                      <div className="border border-border/40 rounded-xl overflow-hidden shadow-sm">
-                        <ScrollArea className="w-full max-h-[600px]">
-                          <Table>
-                            <TableHeader className="bg-secondary/35">
-                              <TableRow>
-                                <TableHead className="font-semibold text-xs text-foreground/80">Title & Agency</TableHead>
-                                <TableHead className="font-semibold text-xs text-foreground/80 w-[120px]">Last Date</TableHead>
-                                <TableHead className="font-semibold text-xs text-foreground/80 w-[130px]">Groq Summary</TableHead>
-                                <TableHead className="font-semibold text-xs text-foreground/80 w-[130px]">Embedding</TableHead>
-                                <TableHead className="font-semibold text-xs text-foreground/80 text-right w-[180px]">Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filtered.map(job => {
-                                const hasSummary = !!job.eligibility_summary;
-                                const hasEmbedding = !!job.embedding;
+                    const itemsPerPage = 50;
+                    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+                    const effectivePage = Math.min(processingPage, totalPages || 1);
+                    const startIndex = (effectivePage - 1) * itemsPerPage;
+                    const paginatedJobs = filtered.slice(startIndex, startIndex + itemsPerPage);
 
-                                return (
-                                  <TableRow key={job.id} className="hover:bg-secondary/5 transition-colors">
-                                    <TableCell className="py-3">
-                                      <div className="font-semibold text-xs text-foreground leading-tight">{job.title}</div>
-                                      <div className="text-[10px] text-muted-foreground mt-0.5 flex flex-wrap gap-x-2 items-center">
-                                        <span>{job.department}</span>
-                                        {job.location && (
-                                          <>
-                                            <span className="text-muted-foreground/40">•</span>
-                                            <span>📍 {job.location}</span>
-                                          </>
+                    return (
+                      <div className="space-y-4">
+                        <div className="border border-border/40 rounded-xl overflow-hidden shadow-sm">
+                          <ScrollArea className="h-[500px] w-full">
+                            <Table>
+                              <TableHeader className="bg-secondary/35">
+                                <TableRow>
+                                  <TableHead className="font-semibold text-xs text-foreground/80">Title & Agency</TableHead>
+                                  <TableHead className="font-semibold text-xs text-foreground/80 w-[120px]">Last Date</TableHead>
+                                  <TableHead className="font-semibold text-xs text-foreground/80 w-[130px]">Groq Summary</TableHead>
+                                  <TableHead className="font-semibold text-xs text-foreground/80 w-[130px]">Embedding</TableHead>
+                                  <TableHead className="font-semibold text-xs text-foreground/80 text-right w-[180px]">Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {paginatedJobs.map(job => {
+                                  const hasSummary = !!job.eligibility_summary;
+                                  const hasEmbedding = !!job.embedding;
+
+                                  return (
+                                    <TableRow key={job.id} className="hover:bg-secondary/5 transition-colors">
+                                      <TableCell className="py-3">
+                                        <div 
+                                          className="font-semibold text-xs text-foreground leading-tight hover:underline cursor-pointer flex items-center gap-1.5"
+                                          onClick={() => setSelectedPreviewJob(job)}
+                                        >
+                                          {job.title}
+                                          <Eye className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+                                        </div>
+                                        <div className="text-[10px] text-muted-foreground mt-0.5 flex flex-wrap gap-x-2 items-center">
+                                          <span>{job.department}</span>
+                                          {job.location && (
+                                            <>
+                                              <span className="text-muted-foreground/40">•</span>
+                                              <span>📍 {job.location}</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="py-3 text-[11px] font-mono text-muted-foreground">
+                                        {job.last_date_display || job.last_date}
+                                      </TableCell>
+                                      <TableCell className="py-3">
+                                        {hasSummary ? (
+                                          <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/10 border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
+                                            Summarized
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="secondary" className="bg-secondary text-muted-foreground hover:bg-secondary border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
+                                            Pending
+                                          </Badge>
                                         )}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="py-3 text-[11px] font-mono text-muted-foreground">
-                                      {job.last_date_display || job.last_date}
-                                    </TableCell>
-                                    <TableCell className="py-3">
-                                      {hasSummary ? (
-                                        <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/10 border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
-                                          Summarized
-                                        </Badge>
-                                      ) : (
-                                        <Badge variant="secondary" className="bg-secondary text-muted-foreground hover:bg-secondary border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
-                                          Pending
-                                        </Badge>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="py-3">
-                                      {hasEmbedding ? (
-                                        <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10 border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
-                                          Embedded
-                                        </Badge>
-                                      ) : (
-                                        <Badge variant="secondary" className="bg-secondary text-muted-foreground hover:bg-secondary border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
-                                          Pending
-                                        </Badge>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="py-3 text-right">
-                                      <div className="flex justify-end gap-1.5">
-                                        <Button
-                                          size="sm"
-                                          variant={hasSummary ? "outline" : "default"}
-                                          disabled={isSummarizing || isEmbedding}
-                                          onClick={() => handleSingleSummarize(job)}
-                                          className="h-7 px-2 text-[10px] font-semibold"
-                                        >
-                                          {hasSummary ? "Regen Groq" : "Summarize"}
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant={hasEmbedding ? "outline" : "default"}
-                                          disabled={isSummarizing || isEmbedding || !hasSummary || modelLoading}
-                                          onClick={() => handleSingleEmbed(job)}
-                                          className="h-7 px-2 text-[10px] font-semibold"
-                                        >
-                                          {hasEmbedding ? "Regen WASM" : "Embed"}
-                                        </Button>
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                          <ScrollBar orientation="horizontal" />
-                        </ScrollArea>
+                                      </TableCell>
+                                      <TableCell className="py-3">
+                                        {hasEmbedding ? (
+                                          <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10 border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
+                                            Embedded
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="secondary" className="bg-secondary text-muted-foreground hover:bg-secondary border-0 text-[10px] font-semibold rounded-full px-2 py-0.5">
+                                            Pending
+                                          </Badge>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="py-3 text-right">
+                                        <div className="flex justify-end gap-1.5">
+                                          <Button
+                                            size="sm"
+                                            variant={hasSummary ? "outline" : "default"}
+                                            disabled={isSummarizing || isEmbedding}
+                                            onClick={() => handleSingleSummarize(job)}
+                                            className="h-7 px-2 text-[10px] font-semibold"
+                                          >
+                                            {hasSummary ? "Regen Groq" : "Summarize"}
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant={hasEmbedding ? "outline" : "default"}
+                                            disabled={isSummarizing || isEmbedding || !hasSummary || modelLoading}
+                                            onClick={() => handleSingleEmbed(job)}
+                                            className="h-7 px-2 text-[10px] font-semibold"
+                                          >
+                                            {hasEmbedding ? "Regen WASM" : "Embed"}
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                            <ScrollBar orientation="horizontal" />
+                          </ScrollArea>
+                        </div>
+
+                        {/* Pagination Footer */}
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between border border-border/40 rounded-xl bg-secondary/5 px-4 py-3 sm:px-6">
+                            <div className="flex flex-1 justify-between sm:hidden">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={effectivePage === 1}
+                                onClick={() => setProcessingPage(prev => Math.max(1, prev - 1))}
+                              >
+                                Previous
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={effectivePage === totalPages}
+                                onClick={() => setProcessingPage(prev => Math.min(totalPages, prev + 1))}
+                              >
+                                Next
+                              </Button>
+                            </div>
+                            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                              <div>
+                                <p className="text-xs text-muted-foreground">
+                                  Showing <span className="font-semibold">{startIndex + 1}</span> to{" "}
+                                  <span className="font-semibold">
+                                    {Math.min(effectivePage * itemsPerPage, filtered.length)}
+                                  </span>{" "}
+                                  of <span className="font-semibold">{filtered.length}</span> active jobs
+                                </p>
+                              </div>
+                              <div>
+                                <nav className="isolate inline-flex -space-x-px rounded-md shadow-xs" aria-label="Pagination">
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="rounded-l-md h-8 w-8"
+                                    disabled={effectivePage === 1}
+                                    onClick={() => setProcessingPage(prev => Math.max(1, prev - 1))}
+                                  >
+                                    <ChevronLeft className="h-4 w-4" />
+                                  </Button>
+                                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter((p) => {
+                                      return (
+                                        p === 1 ||
+                                        p === totalPages ||
+                                        Math.abs(p - effectivePage) <= 2
+                                      );
+                                    })
+                                    .map((p, index, arr) => {
+                                      const showEllipsisBefore = index > 0 && p - arr[index - 1] > 1;
+                                      return (
+                                        <div key={p} className="flex items-center">
+                                          {showEllipsisBefore && (
+                                            <span className="inline-flex items-center px-2 text-xs font-semibold text-muted-foreground">
+                                              ...
+                                            </span>
+                                          )}
+                                          <Button
+                                            variant={effectivePage === p ? "default" : "outline"}
+                                            className="h-8 w-8 p-0 text-xs"
+                                            onClick={() => setProcessingPage(p)}
+                                          >
+                                            {p}
+                                          </Button>
+                                        </div>
+                                      );
+                                    })}
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="rounded-r-md h-8 w-8"
+                                    disabled={effectivePage === totalPages}
+                                    onClick={() => setProcessingPage(prev => Math.min(totalPages, prev + 1))}
+                                  >
+                                    <ChevronRight className="h-4 w-4" />
+                                  </Button>
+                                </nav>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
                 </div>
               </CardContent>
             </Card>
+
+            <Dialog open={!!selectedPreviewJob} onOpenChange={(open) => { if (!open) setSelectedPreviewJob(null); }}>
+              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-base font-bold flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    Verify Eligibility Summary & Skills
+                  </DialogTitle>
+                  <DialogDescription className="text-xs">
+                    Review raw eligibility text and the Groq-generated summary and parsed skills for:
+                    <span className="font-semibold block text-foreground mt-1">{selectedPreviewJob?.title}</span>
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-3 text-xs">
+                  {/* Raw Eligibility */}
+                  <div className="space-y-1.5">
+                    <h4 className="font-semibold text-foreground">Raw Eligibility / Qualification Text</h4>
+                    <div className="p-3 bg-secondary/20 rounded-lg max-h-[150px] overflow-y-auto border border-border/30 whitespace-pre-wrap text-muted-foreground font-mono">
+                      {selectedPreviewJob?.eligibility || selectedPreviewJob?.qualification || "No eligibility text found."}
+                    </div>
+                  </div>
+
+                  {/* Generated Summary */}
+                  <div className="space-y-1.5">
+                    <h4 className="font-semibold text-foreground flex items-center gap-1.5">
+                      Groq Eligibility Summary
+                      {selectedPreviewJob?.eligibility_summary && (
+                        <Badge variant="outline" className="text-[9px] bg-green-500/5 text-green-600 border-green-500/20">
+                          Active
+                        </Badge>
+                      )}
+                    </h4>
+                    <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 text-foreground font-medium leading-relaxed">
+                      {selectedPreviewJob?.eligibility_summary || "Pending Groq summarization."}
+                    </div>
+                  </div>
+
+                  {/* Extracted Skills */}
+                  <div className="space-y-1.5">
+                    <h4 className="font-semibold text-foreground">Extracted Skills Schema</h4>
+                    <div className="p-3 bg-secondary/15 rounded-lg border border-border/30 font-mono text-[10px] max-h-[180px] overflow-y-auto">
+                      {selectedPreviewJob?.required_skills && selectedPreviewJob.required_skills.length > 0 ? (
+                        <pre className="text-foreground">{JSON.stringify(selectedPreviewJob.required_skills, null, 2)}</pre>
+                      ) : (
+                        <span className="text-muted-foreground">No structured skills extracted.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </main>

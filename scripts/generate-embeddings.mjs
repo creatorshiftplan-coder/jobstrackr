@@ -195,7 +195,24 @@ async function buildEmbeddingText(job) {
   }
 
   // Generate summary now if missing
-  const textToSummarise = job.eligibility || job.qualification;
+  const ageDetails = [];
+  if (job.job_metadata?.age_limit_text) {
+    ageDetails.push(`Age Limit: ${job.job_metadata.age_limit_text}`);
+  } else if (job.age_min || job.age_max) {
+    const minText = job.age_min ? `Minimum ${job.age_min} years` : "";
+    const maxText = job.age_max ? `Maximum ${job.age_max} years` : "";
+    ageDetails.push(`Age Limit: ${minText} ${maxText}`.trim());
+  } else if (job.description) {
+    const descSnippet = job.description.split(/\s+/).slice(0, 250).join(" ");
+    ageDetails.push(`Job Details: ${descSnippet}`);
+  }
+
+  const textToSummarise = [
+    job.eligibility,
+    job.qualification,
+    ...ageDetails
+  ].filter(Boolean).join("\n");
+
   const result = await summariseEligibility(textToSummarise);
 
   if (result && result.summary) {
@@ -223,7 +240,7 @@ async function run() {
   while (true) {
     const { data: jobs, error } = await supabase
       .from('jobs')
-      .select('id, title, department, description, qualification, eligibility, tags, eligibility_summary')
+      .select('id, title, department, description, qualification, eligibility, tags, eligibility_summary, job_metadata, age_min, age_max')
       .is('embedding', null)
       .limit(BATCH_SIZE);
 

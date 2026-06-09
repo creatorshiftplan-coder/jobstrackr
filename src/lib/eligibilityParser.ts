@@ -307,12 +307,30 @@ function extractAgeRule(text: string): EligibilityGlobalRules["age_rule"] {
   const minOnlyMatch = text.match(/minimum age[:\s]*(\d{1,2})/i);
   const maxOnlyMatch = text.match(/(?:maximum|upper) age(?:\s*limit)?[:\s]*(\d{1,2})/i);
 
-  const relaxations = Array.from(text.matchAll(/\b(SC\/?ST|SC|ST|OBC(?:-NCL)?|EWS|PwBD|PwD|Ex[\s-]?Servicemen?)\b[^\d]*(\d{1,2})\s*years?/gi)).map((match) => ({
+  const standardRelaxations = Array.from(
+    text.matchAll(/\b(SC\/?ST|SC|ST|OBC(?:-NCL)?|EWS|PwBD|PwD|ExSM|Ex[\s-]?Servicemen?)\b[^\d]*(\d{1,2})\s*years?/gi)
+  ).map((match) => ({
     category: normalizeWhitespace(match[1]),
     years: Number(match[2]),
     source_text: text,
     confidence: 0.9,
   }));
+
+  const denseRelaxations = Array.from(
+    text.matchAll(/\b(SC\/?ST|SC|ST|OBC(?:-NCL)?|EWS|PwBD|PwD|ExSM|Ex[\s-]?Servicemen?)\b\s*\+\s*(\d{1,2})\b/gi)
+  ).map((match) => ({
+    category: normalizeWhitespace(match[1]),
+    years: Number(match[2]),
+    source_text: text,
+    confidence: 0.9,
+  }));
+
+  const relaxations = [...standardRelaxations];
+  for (const dr of denseRelaxations) {
+    if (!relaxations.some(r => r.category.toLowerCase() === dr.category.toLowerCase())) {
+      relaxations.push(dr);
+    }
+  }
 
   if (!minMaxMatch && !minOnlyMatch && !maxOnlyMatch && relaxations.length === 0) return null;
 
@@ -635,6 +653,7 @@ export function parseEligibilityProfileFromText(
   qualification: string | null | undefined,
   eligibility: string | null | undefined,
   title?: string | null,
+  eligibilitySummary?: string | null,
 ): EligibilityProfile {
   const rawText = normalizeEligibilityText([qualification, eligibility]);
   const segmentsText = splitSegments(rawText);
@@ -646,6 +665,32 @@ export function parseEligibilityProfileFromText(
 
   const qualityFlags = detectQualityFlags(rawText, sourceSegments);
   const globalRules = buildGlobalRules(sourceSegments, rawText);
+
+  // If eligibilitySummary is provided, parse and merge its age rule
+  if (eligibilitySummary) {
+    const summaryAgeRule = extractAgeRule(eligibilitySummary);
+    if (summaryAgeRule) {
+      if (!globalRules.age_rule) {
+        globalRules.age_rule = summaryAgeRule;
+      } else {
+        // Merge the age rules
+        globalRules.age_rule = {
+          min: summaryAgeRule.min ?? globalRules.age_rule.min,
+          max: summaryAgeRule.max ?? globalRules.age_rule.max,
+          reference_date_text: globalRules.age_rule.reference_date_text ?? summaryAgeRule.reference_date_text,
+          relaxations: [...(globalRules.age_rule.relaxations || [])],
+          source_text: `${globalRules.age_rule.source_text} | ${summaryAgeRule.source_text}`,
+          confidence: Math.max(globalRules.age_rule.confidence, summaryAgeRule.confidence),
+        };
+        // Combine and deduplicate relaxations by category
+        for (const r of (summaryAgeRule.relaxations || [])) {
+          if (!globalRules.age_rule.relaxations.some(mr => mr.category.toLowerCase() === r.category.toLowerCase())) {
+            globalRules.age_rule.relaxations.push(r);
+          }
+        }
+      }
+    }
+  }
 
   const alternativeSource = normalizeWhitespace(
     sourceSegments
@@ -659,7 +704,7 @@ export function parseEligibilityProfileFromText(
 
   return {
     version: PROFILE_VERSION,
-    raw_text: rawText || normalizeWhitespace(title || ""),
+    raw_text: normalizeEligibilityText([qualification, eligibility, eligibilitySummary]) || normalizeWhitespace(title || ""),
     source_segments: sourceSegments,
     global_rules: globalRules,
     alternatives,
@@ -670,16 +715,16 @@ export function parseEligibilityProfileFromText(
 
 export function getEligibilityProfile(job: Job): EligibilityProfile {
   const existingProfile = job.job_metadata?.eligibility_profile;
-  const currentRawText = normalizeEligibilityText([job.qualification, job.eligibility]);
+  const currentRawText = normalizeEligibilityText([job.qualification, job.eligibility, job.eligibility_summary]);
   if (existingProfile?.version && existingProfile.version === PROFILE_VERSION && existingProfile.raw_text === currentRawText) {
     return existingProfile;
   }
 
-  const cacheKey = `${job.id}:${job.qualification}:${job.eligibility ?? ""}`;
+  const cacheKey = `${job.id}:${job.qualification}:${job.eligibility ?? ""}:${job.eligibility_summary ?? ""}`;
   const cached = profileCache.get(cacheKey);
   if (cached) return cached;
 
-  const profile = parseEligibilityProfileFromText(job.qualification, job.eligibility, job.title);
+  const profile = parseEligibilityProfileFromText(job.qualification, job.eligibility, job.title, job.eligibility_summary);
   profileCache.set(cacheKey, profile);
   return profile;
 }
