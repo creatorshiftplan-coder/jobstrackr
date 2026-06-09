@@ -2,7 +2,10 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-createRoot(document.getElementById("root")!).render(<App />);
+const container = document.getElementById("root")!;
+const root = createRoot(container);
+root.render(<App />);
+document.body.classList.add("spa-mounted");
 
 // Register Service Worker for PWA support
 if (typeof window !== "undefined" && "serviceWorker" in navigator) {

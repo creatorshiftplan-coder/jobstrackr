@@ -885,7 +885,7 @@ function ExamUpdatesSection({ updates }: { updates: ExamUpdateItem[] }) {
           <CardContent className="p-4">
             <h4 className="font-medium text-sm text-foreground mb-3 flex items-center gap-2">
               <Calendar className="h-4 w-4 text-primary" />
-              Scraped Important Dates
+              Important Dates
             </h4>
             <div className="space-y-2">
               {allDates.slice(0, 15).map((d, i) => (

@@ -160,11 +160,16 @@ export function useForYouJobs(
     };
   }, [answers, profile, highestEducation, inferredStream]);
 
-  const forYouJobs = useMemo((): Job[] => {
-    if (!enabled || !hasWizardAnswers || !resolvedJobs || resolvedJobs.length === 0) return [];
+  const matchedJobs = useMemo(() => {
+    if (!resolvedJobs || resolvedJobs.length === 0) return [];
+    return matchAndSort(resolvedJobs, preferences);
+  }, [resolvedJobs, preferences]);
 
-    const matched = matchAndSort(resolvedJobs, preferences);
-    const eligible = matched.filter((m) => m.eligibility.eligible && m.eligibility.skillsMissing.length === 0);
+  const forYouJobs = useMemo((): Job[] => {
+    if (!enabled || !hasWizardAnswers || matchedJobs.length === 0) return [];
+
+    // Filter to jobs where they pass all hard filters AND have no missing skills
+    const eligible = matchedJobs.filter((m) => m.eligibility.eligible && m.eligibility.skillsMissing.length === 0);
     const qualTag = qualificationToTag(preferences.qualificationType);
 
     const hybrid = hybridRecommend(
@@ -176,10 +181,12 @@ export function useForYouJobs(
     );
 
     return hybrid.map((h) => h.job);
-  }, [enabled, hasWizardAnswers, resolvedJobs, preferences, answers.sectors, profile?.preferred_sectors, userExams, limit]);
+  }, [enabled, hasWizardAnswers, matchedJobs, preferences, answers.sectors, profile?.preferred_sectors, userExams, limit]);
 
   return {
     forYouJobs,
+    matchedJobs,
+    preferences,
     hasWizardAnswers,
     isLoading: enabled && (((!initialJobs && jobsLoading) || (!hasInitialProfile && profileLoading) || (!hasInitialEducation && educationLoading))),
   };

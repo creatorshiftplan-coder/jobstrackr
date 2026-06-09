@@ -371,11 +371,20 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
     [data-ssr-content] .update-footer { margin-top: 32px; padding: 16px; background: #f1f5f9; border-radius: 8px; font-size: 0.85rem; color: #475569; }
     ${ssrShellStyles()}
   </style>
+  <!-- PROD_HEAD_ASSETS_START -->
+  <link rel="modulepreload" crossorigin href="/assets/vendor-react-odAJResg.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-query-BBQmO3Ti.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-ui-DpFJXXGU.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-icons-DXUmfovX.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-supabase-BvsnE-zR.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-lottie-8Z6zZkhm.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-B5pyd0nL.css">
+  <!-- PROD_HEAD_ASSETS_END -->
 </head>
 <body>
   ${ssrNavbar()}
   <!-- SEO Content (visible to crawlers and pre-render) -->
-  <article data-ssr-content itemscope itemtype="https://schema.org/JobPosting">
+  <article data-ssr-content itemprop="item" itemscope itemtype="https://schema.org/JobPosting">
     <meta itemprop="datePosted" content="${job.created_at?.split('T')[0] || ''}">
     <meta itemprop="validThrough" content="${job.last_date || ''}">
 
@@ -472,7 +481,9 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
   ${ssrBottomNav()}
   <!-- React SPA Mount Point -->
   <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
+  <!-- PROD_BODY_ASSETS_START -->
+  <script type="module" crossorigin src="/assets/index-p0-KmA-K.js"></script>
+  <!-- PROD_BODY_ASSETS_END -->
   <script>
     // Mark body when SPA mounts to hide SSR content
     const observer = new MutationObserver(() => {

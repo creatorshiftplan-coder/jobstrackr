@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { SectionHeader } from "@/components/SectionHeader";
 import { FeaturedJobCard } from "@/components/FeaturedJobCard";
 import { RecommendedJobCard } from "@/components/RecommendedJobCard";
-import { RecommendedJobRow } from "@/components/RecommendedJobRow";
+import { FeedShelf } from "@/components/FeedShelf";
 import { ActiveExamCard } from "@/components/ActiveExamCard";
 import { BottomNav } from "@/components/BottomNav";
 import { SectorPreferenceCard } from "@/components/SectorPreferenceCard";
@@ -14,9 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useExams } from "@/hooks/useExams";
 import { useProfile } from "@/hooks/useProfile";
 import { useEducation } from "@/hooks/useEducation";
-import { useRecommendations } from "@/hooks/useRecommendations";
-import { useSimilarJobs } from "@/hooks/useSimilarJobs";
-import { useForYouJobs } from "@/hooks/useForYouJobs";
+import { useFeed } from "@/hooks/useFeed";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -56,14 +54,8 @@ const Index = () => {
 
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [activeExamIndex, setActiveExamIndex] = useState(0);
-  const [activeForYouIndex, setActiveForYouIndex] = useState(0);
-  const [activeRecommendedIndex, setActiveRecommendedIndex] = useState(0);
-  const [activeSimilarIndex, setActiveSimilarIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const examsScrollRef = useRef<HTMLDivElement>(null);
-  const forYouScrollRef = useRef<HTMLDivElement>(null);
-  const recommendedScrollRef = useRef<HTMLDivElement>(null);
-  const similarJobsScrollRef = useRef<HTMLDivElement>(null);
   const [sectorCardSkipped, setSectorCardSkipped] = useState(false);
   const [preferencesSaved, setPreferencesSaved] = useState(false);
 
@@ -82,23 +74,17 @@ const Index = () => {
   // ── Core data: single bundled API call ──
   const { data: homepageData, isLoading: homepageLoading, error: homepageError } = useHomepageData();
   const jobs = homepageData?.allJobs;
-  const isLoading = homepageLoading;
-  const error = homepageError;
-
-  // ── Shared user data: fetched once, passed to all personalization hooks ──
-  const { userExams } = useExams({ includeExamCatalog: false });
-  const { profile, isLoading: profileLoading } = useProfile();
-  const { education } = useEducation();
   const queryClient = useQueryClient();
 
-  // ── Personalization hooks: use shared data to avoid redundant fetches ──
-  const sharedOptions = { initialProfile: profile, initialUserExams: userExams };
-  const { recommended: hybridRecommended, examMatched, hasTrackedExams } = useRecommendations(
-    10, true, jobs, sharedOptions,
-  );
-  const { forYouJobs, hasWizardAnswers } = useForYouJobs(
-    5, true, jobs, { ...sharedOptions, initialEducation: education },
-  );
+  // ── Netflix rows feed ──
+  const { shelves, isLoading: feedLoading } = useFeed();
+
+  const isLoading = homepageLoading || feedLoading;
+  const error = homepageError;
+
+  // ── Shared user data: fetched once ──
+  const { userExams } = useExams({ includeExamCatalog: false });
+  const { profile, isLoading: profileLoading } = useProfile();
 
   // Prefetch explore page data when idle (P7: cross-page prefetching)
   useEffect(() => {
@@ -147,20 +133,6 @@ const Index = () => {
       .filter((job) => isJobActive(job.last_date))
       .slice(0, 7);
   }, [homepageData?.recentJobs, filteredJobs]);
-
-  // Hybrid recommended jobs (from useRecommendations hook)
-  const recommendedJobs = useMemo(() => {
-    return hybridRecommended.map((r) => r.job).slice(0, 5);
-  }, [hybridRecommended]);
-
-  // Similar jobs based on top recommendation or newest job (deferred to idle)
-  const seedJobId = recommendedJobs[0]?.id || newJobs[0]?.id;
-  const { data: similarJobs = [] } = useSimilarJobs(seedJobId, 5, similarJobsReady);
-
-  // Jobs matching user's tracked exams
-  const examMatchedJobs = useMemo(() => {
-    return examMatched.map((r) => r.job);
-  }, [examMatched]);
 
   // Show sector card if user is logged in, hasn't set preferences, hasn't skipped, and hasn't saved this session
   const showSectorCard = user && !profileLoading &&
@@ -324,213 +296,14 @@ const Index = () => {
               </section>
             )}
 
-            {/* Based on Your Exams Section - Jobs matching tracked exams */}
-            {examMatchedJobs.length > 0 && (
-              <section className="mb-8 md:mb-0 md:animate-fade-in-up">
-                <SectionHeader title="Based on Your Exams" variant="dark" />
-                <div className="flex flex-col gap-4 px-5 md:px-0">
-                  {examMatchedJobs.map((job) => (
-                    <div key={job.id} className="relative">
-                      <Badge
-                        className="absolute -top-2 right-3 z-10 bg-amber-500/90 text-white text-[10px] px-2 py-0.5 shadow-sm"
-                      >
-                        <Target className="h-3 w-3 mr-1" />
-                        Tracked Exam
-                      </Badge>
-                      <RecommendedJobCard job={job} />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+            {/* Netflix Rows Feed */}
+            {!isLoading && shelves.slice(0, 3).map((shelf) => (
+              <FeedShelf key={shelf.key} shelf={shelf} />
+            ))}
 
-            {/* Jobs For You Section - from /for-you wizard preferences */}
-            {forYouJobs.length > 0 && (
-              <section className="mb-8 md:mb-0 md:animate-fade-in-up">
-                <SectionHeader title="Jobs For You" linkTo="/for-you" linkText="Show All" variant="dark" />
-                <div className="relative">
-                  <button
-                    onClick={() => scrollLeft(forYouScrollRef, 276)}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-full shadow-sm border border-border/30 opacity-60 hover:opacity-100 transition-opacity md:hidden"
-                    aria-label="Scroll left"
-                  >
-                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <div
-                    ref={forYouScrollRef}
-                    className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide md:grid md:grid-cols-3 md:overflow-visible md:px-0"
-                    onScroll={(e) => {
-                      const cardWidth = 260 + 16;
-                      const index = Math.round(e.currentTarget.scrollLeft / cardWidth);
-                      setActiveForYouIndex(Math.min(index, forYouJobs.length - 1));
-                    }}
-                  >
-                    {forYouJobs.map((job) => (
-                      <div key={job.id} className="w-[260px] sm:w-[300px] flex-shrink-0 md:w-auto">
-                        <RecommendedJobCard job={job} />
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => scrollRight(forYouScrollRef, 276)}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-full shadow-sm border border-border/30 opacity-60 hover:opacity-100 transition-opacity md:hidden"
-                    aria-label="Scroll right"
-                  >
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </div>
-                <div className="flex justify-center gap-2 mt-4 px-5 md:hidden">
-                  {forYouJobs.map((_, index) => (
-                    <div
-                      key={index}
-                      className={cn(
-                        "h-2 w-2 rounded-full transition-all",
-                        index === activeForYouIndex ? "bg-primary" : "bg-primary/30"
-                      )}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Recommended Jobs Section - Horizontal scroll on mobile, rows on desktop */}
-            {recommendedJobs.length > 0 && (
-              <section className="mb-8 md:mb-0 md:animate-fade-in-up" style={{ animationDelay: "240ms" }}>
-                <SectionHeader title="Recommended Jobs" linkTo="/recommendations" linkText="Show All" variant="dark" />
-                {/* Mobile: horizontal scroll */}
-                <div className="relative md:hidden">
-                  <button
-                    onClick={() => scrollLeft(recommendedScrollRef, 276)}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-full shadow-sm border border-border/30 opacity-60 hover:opacity-100 transition-opacity"
-                    aria-label="Scroll left"
-                  >
-                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <div
-                    ref={recommendedScrollRef}
-                    className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide"
-                    onScroll={(e) => {
-                      const cardWidth = 260 + 16;
-                      const index = Math.round(e.currentTarget.scrollLeft / cardWidth);
-                      setActiveRecommendedIndex(Math.min(index, recommendedJobs.length - 1));
-                    }}
-                  >
-                    {recommendedJobs.map((job) => (
-                      <div key={job.id} className="w-[260px] sm:w-[300px] flex-shrink-0">
-                        <RecommendedJobCard job={job} />
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => scrollRight(recommendedScrollRef, 276)}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-full shadow-sm border border-border/30 opacity-60 hover:opacity-100 transition-opacity"
-                    aria-label="Scroll right"
-                  >
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </div>
-                <div className="flex justify-center gap-2 mt-4 px-5 md:hidden">
-                  {recommendedJobs.map((_, index) => (
-                    <div
-                      key={index}
-                      className={cn(
-                        "h-2 w-2 rounded-full transition-all",
-                        index === activeRecommendedIndex ? "bg-primary" : "bg-primary/30"
-                      )}
-                    />
-                  ))}
-                </div>
-                {/* Desktop: row list */}
-                <div className="hidden md:flex md:flex-col md:gap-3">
-                  {recommendedJobs.map((job) => (
-                    <RecommendedJobRow key={job.id} job={job} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Similar Jobs Section - Horizontal scroll on mobile, grid on desktop */}
-            {similarJobs.length > 0 && (
-              <section className="mb-8 md:mb-0 md:animate-fade-in-up">
-                <SectionHeader title="Similar Jobs" variant="dark" />
-                <div className="relative md:hidden">
-                  <button
-                    onClick={() => scrollLeft(similarJobsScrollRef, 236)}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-full shadow-sm border border-border/30 opacity-60 hover:opacity-100 transition-opacity"
-                    aria-label="Scroll left"
-                  >
-                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <div
-                    ref={similarJobsScrollRef}
-                    className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide"
-                    onScroll={(e) => {
-                      const cardWidth = 220 + 16;
-                      const index = Math.round(e.currentTarget.scrollLeft / cardWidth);
-                      setActiveSimilarIndex(Math.min(index, similarJobs.length - 1));
-                    }}
-                  >
-                    {similarJobs.map((sj) => (
-                      <Link key={sj.id} to={`/jobs/${sj.slug || sj.id}`} className="block">
-                        <div className="w-[220px] sm:w-[260px] flex-shrink-0 p-4 rounded-2xl bg-white dark:bg-card shadow-md border border-border/50 hover:shadow-lg transition-all">
-                          <h3 className="font-bold text-foreground text-sm leading-tight line-clamp-2 mb-1">{sj.title}</h3>
-                          <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{sj.department}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <MapPin className="h-3 w-3 flex-shrink-0" />
-                            <span className="line-clamp-1">{sj.location || 'India'}</span>
-                          </div>
-                          {sj.qualification && (
-                            <p className="text-[10px] text-muted-foreground/70 mt-2 line-clamp-1">{sj.qualification}</p>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => scrollRight(similarJobsScrollRef, 236)}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-full shadow-sm border border-border/30 opacity-60 hover:opacity-100 transition-opacity"
-                    aria-label="Scroll right"
-                  >
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </div>
-                <div className="flex justify-center gap-2 mt-4 px-5 md:hidden">
-                  {similarJobs.map((_, index) => (
-                    <div
-                      key={index}
-                      className={cn(
-                        "h-2 w-2 rounded-full transition-all",
-                        index === activeSimilarIndex ? "bg-primary" : "bg-primary/30"
-                      )}
-                    />
-                  ))}
-                </div>
-                {/* Desktop: grid */}
-                <div className="hidden md:grid md:grid-cols-3 md:gap-4">
-                  {similarJobs.map((sj) => (
-                    <Link key={sj.id} to={`/jobs/${sj.slug || sj.id}`} className="block">
-                      <div className="p-4 rounded-xl border border-border bg-card shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                            <Briefcase className="h-4 w-4 text-primary" />
-                          </div>
-                          <h3 className="font-bold text-foreground text-sm leading-tight line-clamp-2">{sj.title}</h3>
-                        </div>
-                        <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{sj.department}</p>
-                        <div className="flex items-center gap-2 text-xs text-primary/70">
-                          <MapPin className="h-3 w-3 flex-shrink-0" />
-                          <span className="line-clamp-1">{sj.location || 'India'}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Show all jobs if no featured/recommended split */}
+            {/* Show all jobs if no featured/feed rows split */}
             {newJobs.length === 0 &&
-              recommendedJobs.length === 0 &&
+              shelves.length === 0 &&
               filteredJobs.length > 0 && (
                 <section>
                   <SectionHeader title="All Jobs" variant="dark" />

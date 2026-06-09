@@ -34,6 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'salary_min', 'salary_max', 'age_min', 'age_max',
         'application_fee', 'job_metadata', 'is_featured',
         'admin_refreshed_at', 'created_at', 'tags',
+        'eligibility_summary', 'required_skills',
       ].join(',');
 
       const url = `${SUPABASE_URL}/rest/v1/jobs?select=${columns}&order=created_at.desc&limit=10000`;

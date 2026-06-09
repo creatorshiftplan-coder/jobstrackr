@@ -292,6 +292,8 @@ export type Database = {
           updated_at: string
           vacancies: number | null
           vacancies_display: string | null
+          eligibility_summary: string | null
+          required_skills: Json | null
         }
         Insert: {
           age_max?: number | null
@@ -316,6 +318,8 @@ export type Database = {
           updated_at?: string
           vacancies?: number | null
           vacancies_display?: string | null
+          eligibility_summary?: string | null
+          required_skills?: Json | null
         }
         Update: {
           age_max?: number | null
@@ -340,6 +344,8 @@ export type Database = {
           updated_at?: string
           vacancies?: number | null
           vacancies_display?: string | null
+          eligibility_summary?: string | null
+          required_skills?: Json | null
         }
         Relationships: []
       }

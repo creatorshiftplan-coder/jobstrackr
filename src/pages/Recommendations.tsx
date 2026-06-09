@@ -25,6 +25,8 @@ import { useSmartBack } from "@/hooks/useSmartBack";
 import { toast } from "sonner";
 import { buildUserEmbeddingText } from "@/lib/userEmbedding";
 import { triggerProfileEmbeddingUpdate, useAiRecommendations } from "@/hooks/useAiRecommendations";
+import { useFeed } from "@/hooks/useFeed";
+import { FeedShelf } from "@/components/FeedShelf";
 
 // ── Wizard Step Definitions ─────────────────────────────────────────────
 
@@ -305,11 +307,12 @@ export default function Recommendations() {
   const { education, isLoading: educationLoading, addEducation } = useEducation();
   const { data: jobs, isLoading: jobsLoading } = useJobs();
   const { userExams } = useExams();
-
   // Collected answers — try to load from localStorage first
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [wizardComplete, setWizardComplete] = useState(false);
   const [preferencesHydrated, setPreferencesHydrated] = useState(false);
+
+  const { shelves, isLoading: feedLoading } = useFeed(wizardComplete);
   const [showPartial, setShowPartial] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [showDateInput, setShowDateInput] = useState(false);
@@ -1326,111 +1329,25 @@ export default function Recommendations() {
         )}
 
         {/* ── Loading skeletons ── */}
-        {jobsLoading && (
-          <div className="space-y-4">
+        {(jobsLoading || feedLoading) && (
+          <div className="space-y-4 px-4 sm:px-6">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-[200px] w-full rounded-2xl" />
             ))}
           </div>
         )}
 
-        {/* ── Your Location — Can Apply ── */}
-        {!jobsLoading && preferredLocationJobs.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <span className="font-display font-semibold text-sm text-foreground">
-                {hasPreferredLocations ? "Your Location" : "Can Apply"}
-              </span>
-              <span className="text-xs text-muted-foreground font-medium">({preferredLocationJobs.length})</span>
-              <div className="flex-1 h-px bg-border/60" />
-            </div>
-            {preferredLocationJobs.map(({ job }, index) => (
-              <div key={job.id} className="animate-fadeIn relative" style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}>
-                {examMatchedIds.has(job.id) && (
-                  <Badge className="absolute -top-2 right-3 z-10 bg-amber-500/90 text-white text-[10px] px-2 py-0.5 shadow-sm">
-                    <Target className="h-3 w-3 mr-1" />
-                    Tracked Exam
-                  </Badge>
-                )}
-                <JobCard job={job} />
-                {renderAiReasons(job.id)}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Your Location + Skills Needed ── */}
-        {!jobsLoading && hasPreferredLocations && preferredLocationSkillsNeededJobs.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-lg bg-amber-500/15 flex items-center justify-center">
-                <Wrench className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
-              <span className="font-display font-semibold text-sm text-foreground">Your Location · Skills Gap</span>
-              <span className="text-xs text-muted-foreground font-medium">({preferredLocationSkillsNeededJobs.length})</span>
-              <div className="flex-1 h-px bg-border/60" />
-            </div>
-            {preferredLocationSkillsNeededJobs.map(({ job, eligibility }, index) => (
-              <div key={job.id} className="space-y-1.5 animate-fadeIn" style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}>
-                <div className="flex flex-wrap gap-1.5 px-1">
-                  {eligibility.skillsMissing.map((skill, i) => (
-                    <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium inline-flex items-center gap-1">
-                      <Wrench className="h-3 w-3" />{skill}
-                    </span>
-                  ))}
-                </div>
-                <JobCard job={job} />
-                {renderAiReasons(job.id)}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── All India ── */}
-        {!jobsLoading && allIndiaJobs.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-lg bg-sky-500/15 flex items-center justify-center">
-                <Globe className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-              </div>
-              <span className="font-display font-semibold text-sm text-foreground">All India</span>
-              <span className="text-xs text-muted-foreground font-medium">({allIndiaJobs.length})</span>
-              <div className="flex-1 h-px bg-border/60" />
-            </div>
-            {allIndiaJobs.map(({ job }, index) => (
-              <div key={job.id} className="animate-fadeIn" style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}>
-                <JobCard job={job} />
-                {renderAiReasons(job.id)}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Other States ── */}
-        {!jobsLoading && otherStateJobs.length > 0 && (
-          <div className="space-y-3 opacity-90">
-            <div className="flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-lg bg-blue-500/15 flex items-center justify-center">
-                <Globe className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              </div>
-              <span className="font-display font-semibold text-sm text-foreground">Other States</span>
-              <span className="text-xs text-muted-foreground font-medium">({otherStateJobs.length})</span>
-              <div className="flex-1 h-px bg-border/60" />
-            </div>
-            {otherStateJobs.map(({ job }, index) => (
-              <div key={job.id} className="animate-fadeIn" style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}>
-                <JobCard job={job} />
-                {renderAiReasons(job.id)}
-              </div>
+        {/* ── Netflix Rows Feed ── */}
+        {!(jobsLoading || feedLoading) && shelves.length > 0 && (
+          <div className="space-y-2">
+            {shelves.map((shelf) => (
+              <FeedShelf key={shelf.key} shelf={shelf} />
             ))}
           </div>
         )}
 
         {/* ── Empty state ── */}
-        {!jobsLoading && canApplyJobs.length === 0 && skillsNeededJobs.length === 0 && (
+        {!(jobsLoading || feedLoading) && shelves.length === 0 && (
           <div className="text-center py-16 px-5">
             <div className="mx-auto h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 to-info/20 flex items-center justify-center mb-5">
               <Target className="h-10 w-10 text-primary/60" />
@@ -1444,43 +1361,9 @@ export default function Recommendations() {
           </div>
         )}
 
-        {/* ── Extra Skills Required (collapsible) ── */}
-        {!jobsLoading && remainingSkillsNeededJobs.length > 0 && (
-          <div className="space-y-3">
-            <button
-              onClick={() => setShowSkillsNeeded(!showSkillsNeeded)}
-              className="flex items-center gap-2.5 w-full text-left px-3 py-3 rounded-xl bg-amber-500/5 border border-amber-500/15 hover:bg-amber-500/10 transition-colors"
-            >
-              <div className="h-7 w-7 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
-                <Wrench className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
-              <span className="text-sm font-semibold text-foreground flex-1">Extra Skills Required</span>
-              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{remainingSkillsNeededJobs.length} jobs</span>
-              <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", showSkillsNeeded && "rotate-180")} />
-            </button>
-            {showSkillsNeeded && (
-              <div className="space-y-3">
-                {remainingSkillsNeededJobs.map(({ job, eligibility }, index) => (
-                  <div key={job.id} className="space-y-1.5 opacity-85 animate-fadeIn" style={{ animationDelay: `${index * 40}ms`, animationFillMode: "both" }}>
-                    <div className="flex flex-wrap gap-1.5 px-1">
-                      {eligibility.skillsMissing.map((skill, i) => (
-                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium inline-flex items-center gap-1">
-                          <Wrench className="h-3 w-3" />{skill}
-                        </span>
-                      ))}
-                    </div>
-                    <JobCard job={job} />
-                    {renderAiReasons(job.id)}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── Not Eligible (collapsible) ── */}
-        {!jobsLoading && notEligibleJobs.length > 0 && (
-          <div className="space-y-3">
+        {!(jobsLoading || feedLoading) && notEligibleJobs.length > 0 && (
+          <div className="space-y-3 px-4 sm:px-6">
             <button
               onClick={() => setShowPartial(!showPartial)}
               className="flex items-center gap-2.5 w-full text-left px-3 py-3 rounded-xl bg-red-500/5 border border-red-500/15 hover:bg-red-500/10 transition-colors"

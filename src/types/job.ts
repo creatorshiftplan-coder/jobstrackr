@@ -181,6 +181,90 @@ export interface JobMetadata {
   eligibility_profile?: EligibilityProfile;
 }
 
+export type SkillObjectType =
+  | "typing"
+  | "stenography"
+  | "computer"
+  | "iti"
+  | "driving"
+  | "law"
+  | "ncc"
+  | "experience"
+  | "physical"
+  | "custom";
+
+export interface BaseSkillObject {
+  type: SkillObjectType;
+  required: boolean;
+}
+
+export interface TypingSkillObject extends BaseSkillObject {
+  type: "typing";
+  language: string;
+  min_wpm: number | null;
+}
+
+export interface StenographySkillObject extends BaseSkillObject {
+  type: "stenography";
+  language: string;
+  min_wpm: number | null;
+}
+
+export interface ComputerSkillObject extends BaseSkillObject {
+  type: "computer";
+  min_level: number | null;
+  accepted: string[];
+}
+
+export interface ItiSkillObject extends BaseSkillObject {
+  type: "iti";
+  trades: string[];
+  any_trade: boolean;
+}
+
+export interface DrivingSkillObject extends BaseSkillObject {
+  type: "driving";
+  license_types: string[];
+}
+
+export interface LawSkillObject extends BaseSkillObject {
+  type: "law";
+  accepted: string[];
+}
+
+export interface NccSkillObject extends BaseSkillObject {
+  type: "ncc";
+  min_certificate: "A" | "B" | "C";
+}
+
+export interface ExperienceSkillObject extends BaseSkillObject {
+  type: "experience";
+  domain: string;
+  min_years: number;
+}
+
+export interface PhysicalSkillObject extends BaseSkillObject {
+  type: "physical";
+  height_cm: { male: number; female: number } | null;
+}
+
+export interface CustomSkillObject extends BaseSkillObject {
+  type: "custom";
+  label: string;
+}
+
+export type SkillObject =
+  | TypingSkillObject
+  | StenographySkillObject
+  | ComputerSkillObject
+  | ItiSkillObject
+  | DrivingSkillObject
+  | LawSkillObject
+  | NccSkillObject
+  | ExperienceSkillObject
+  | PhysicalSkillObject
+  | CustomSkillObject;
+
 export interface Job {
   id: string;
   slug: string | null;
@@ -214,5 +298,8 @@ export interface Job {
    * Location inferred from title/department if explicit location is generic (e.g. 'India', 'All India')
    */
   inferred_location?: string | null;
+  eligibility_summary: string | null;
+  required_skills: SkillObject[] | null;
 }
+
 

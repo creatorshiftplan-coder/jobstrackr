@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -53,6 +53,7 @@ const SyllabusResult = lazy(() => import("./pages/SyllabusResult"));
 const UpdateDetails = lazy(() => import("./pages/UpdateDetails"));
 const ExamUpdateDetail = lazy(() => import("./pages/ExamUpdateDetail"));
 const Recommendations = lazy(() => import("./pages/Recommendations"));
+const ShelfDetails = lazy(() => import("./pages/ShelfDetails"));
 
 // Page loader component
 const PageLoader = () => (
@@ -74,6 +75,10 @@ const queryClient = new QueryClient({
 const App = () => {
   const [showSplash, setShowSplash] = useState(() => shouldShowSplash());
 
+  useEffect(() => {
+    document.body.classList.add("spa-mounted");
+  }, []);
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
@@ -94,7 +99,7 @@ const App = () => {
                       <DesktopSidebar />
                       <div className="flex flex-1 flex-col min-w-0">
                         <TopBar />
-                        <main className="flex-1 overflow-y-auto">
+                        <main id="main-scroll" className="flex-1 overflow-y-auto">
                           <Suspense fallback={<PageLoader />}>
                             <Routes>
                       <Route path="/" element={<Index />} />
@@ -124,6 +129,7 @@ const App = () => {
                       <Route path="/syllabus/result" element={<SyllabusResult />} />
                       <Route path="/edit-sector-preferences" element={<EditSectorPreferences />} />
                       <Route path="/for-you" element={<Recommendations />} />
+                      <Route path="/for-you/shelf/:shelfKey" element={<ShelfDetails />} />
                       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                       <Route path="/refund-policy" element={<RefundPolicy />} />
                       <Route path="/terms-of-service" element={<TermsOfService />} />

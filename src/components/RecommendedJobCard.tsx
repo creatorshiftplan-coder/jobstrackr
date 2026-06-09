@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
 import { Users, Calendar, GraduationCap, Tag } from "lucide-react";
@@ -8,9 +8,12 @@ import { SaveJobButton } from "@/components/SaveJobButton";
 import { Badge } from "@/components/ui/badge";
 import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification } from "@/lib/jobUtils";
 import { OrganizationLogo } from "@/components/OrganizationLogo";
+import { cn } from "@/lib/utils";
 
 interface RecommendedJobCardProps {
   job: Job;
+  matchBadge?: ReactNode;
+  gapChips?: ReactNode;
 }
 
 const formatVacancy = (vacancies: number | null, vacanciesDisplay: string | null) => {
@@ -19,7 +22,11 @@ const formatVacancy = (vacancies: number | null, vacanciesDisplay: string | null
   return "TBD";
 };
 
-export const RecommendedJobCard = memo(function RecommendedJobCard({ job }: RecommendedJobCardProps) {
+export const RecommendedJobCard = memo(function RecommendedJobCard({
+  job,
+  matchBadge,
+  gapChips
+}: RecommendedJobCardProps) {
   const { getLogoByName } = useConductingBodyLogos();
   const logoUrl = getLogoByName(job.department);
 
@@ -50,7 +57,12 @@ export const RecommendedJobCard = memo(function RecommendedJobCard({ job }: Reco
 
   return (
     <Link to={`/jobs/${job.slug || job.id}`} className="block w-full">
-      <div className="relative p-4 sm:p-5 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg border border-border/50 min-h-[180px] sm:min-h-[200px] flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.01] hover:shadow-xl">
+      <div className={cn(
+        "relative p-4 sm:p-5 rounded-2xl bg-white dark:bg-card backdrop-blur-md shadow-lg flex flex-col transition-all hover:bg-gray-50 dark:hover:bg-card/90 hover:scale-[1.01] hover:shadow-xl",
+        gapChips 
+          ? "border border-amber-500/50 dark:border-amber-500/30 shadow-amber-500/5 bg-amber-500/[0.01]" 
+          : "border border-border/50"
+      )}>
         {/* Save Button - Top Right */}
         <div className="absolute top-2 right-2">
           <SaveJobButton jobId={job.id} />
@@ -77,7 +89,7 @@ export const RecommendedJobCard = memo(function RecommendedJobCard({ job }: Reco
         </div>
 
         {/* Category & Qualification Tags */}
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-wrap gap-2 mb-3 items-center">
           <Badge variant="secondary" className="bg-primary/10 text-primary border-0 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1">
             <Tag className="h-3 w-3" />
             {category}
@@ -86,7 +98,15 @@ export const RecommendedJobCard = memo(function RecommendedJobCard({ job }: Reco
             <GraduationCap className="h-3 w-3" />
             {shortQualification}
           </Badge>
+          {matchBadge}
         </div>
+
+        {/* Gap Chips */}
+        {gapChips && (
+          <div className="flex flex-wrap gap-1.5 mb-3" onClick={(e) => e.stopPropagation()}>
+            {gapChips}
+          </div>
+        )}
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -106,4 +126,5 @@ export const RecommendedJobCard = memo(function RecommendedJobCard({ job }: Reco
     </Link>
   );
 });
+
 
