@@ -683,14 +683,14 @@ export default function Admin() {
   const [processingSearch, setProcessingSearch] = useState("");
   const extractorRef = useRef<any>(null);
 
-  const { data: activeJobs = [], isLoading: activeJobsLoading } = useQuery({
+  const { data: rawActiveJobs = [], isLoading: activeJobsLoading } = useQuery({
     queryKey: ["admin-active-jobs-embeddings"],
     queryFn: async (): Promise<CustomJob[]> => {
       const today = new Date().toISOString().split("T")[0];
       const { data, error } = await supabase
         .from("jobs")
         .select("id, slug, title, department, location, last_date, last_date_display, qualification, eligibility, experience, tags, eligibility_summary, embedding")
-        .gte("last_date", today)
+        .or(`last_date.gte.${today},last_date.is.null`)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -698,6 +698,10 @@ export default function Admin() {
     },
     refetchOnWindowFocus: false,
   });
+
+  const activeJobs = useMemo(() => {
+    return rawActiveJobs.filter(job => isJobActive(job.last_date));
+  }, [rawActiveJobs]);
 
   const stats = useMemo(() => {
     const total = activeJobs.length;
@@ -736,7 +740,7 @@ export default function Admin() {
       const { data: targetJobs, error } = await supabase
         .from("jobs")
         .select("*")
-        .gte("last_date", today)
+        .or(`last_date.gte.${today},last_date.is.null`)
         .is("eligibility_summary", null)
         .limit(50);
 
@@ -749,7 +753,9 @@ export default function Admin() {
         return;
       }
 
-      if (!targetJobs || targetJobs.length === 0) {
+      const filteredJobs = (targetJobs || []).filter(job => isJobActive(job.last_date));
+
+      if (filteredJobs.length === 0) {
         toast({
           title: "Summarization Complete",
           description: "No active jobs found that need Groq summarization.",
@@ -757,11 +763,11 @@ export default function Admin() {
         return;
       }
 
-      setProcessProgress({ current: 0, total: targetJobs.length, errors: 0 });
+      setProcessProgress({ current: 0, total: filteredJobs.length, errors: 0 });
 
       const { summariseEligibility } = await import("@/lib/eligibilitySummariser");
 
-      for (const job of targetJobs) {
+      for (const job of filteredJobs) {
         try {
           const rawText = job.eligibility || job.qualification;
           const result = await summariseEligibility(rawText);
@@ -787,7 +793,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
       toast({
         title: "Summarization Batch Completed",
-        description: `Processed ${targetJobs.length} jobs.`,
+        description: `Processed ${filteredJobs.length} jobs.`,
       });
     } finally {
       setIsSummarizing(false);
@@ -802,7 +808,7 @@ export default function Admin() {
       const { data: targetJobs, error } = await supabase
         .from("jobs")
         .select("*")
-        .gte("last_date", today)
+        .or(`last_date.gte.${today},last_date.is.null`)
         .not("eligibility_summary", "is", null)
         .is("embedding", null)
         .limit(50);
@@ -816,7 +822,9 @@ export default function Admin() {
         return;
       }
 
-      if (!targetJobs || targetJobs.length === 0) {
+      const filteredJobs = (targetJobs || []).filter(job => isJobActive(job.last_date));
+
+      if (filteredJobs.length === 0) {
         toast({
           title: "Embedding Complete",
           description: "No active jobs found that need embedding generation.",
@@ -825,9 +833,9 @@ export default function Admin() {
       }
 
       const extractor = await getExtractor();
-      setProcessProgress({ current: 0, total: targetJobs.length, errors: 0 });
+      setProcessProgress({ current: 0, total: filteredJobs.length, errors: 0 });
 
-      for (const job of targetJobs) {
+      for (const job of filteredJobs) {
         try {
           const text = [job.eligibility_summary, job.tags?.join(" ")].filter(Boolean).join(" ");
           const output = await extractor(text, { pooling: "mean", normalize: true });
@@ -849,7 +857,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
       toast({
         title: "Embedding Batch Completed",
-        description: `Processed ${targetJobs.length} jobs.`,
+        description: `Processed ${filteredJobs.length} jobs.`,
       });
     } finally {
       setIsEmbedding(false);
