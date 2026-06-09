@@ -683,25 +683,38 @@ export default function Admin() {
   const [processingSearch, setProcessingSearch] = useState("");
   const extractorRef = useRef<any>(null);
 
-  const { data: rawActiveJobs = [], isLoading: activeJobsLoading } = useQuery({
+  const { data: activeJobs = [], isLoading: activeJobsLoading } = useQuery({
     queryKey: ["admin-active-jobs-embeddings"],
     queryFn: async (): Promise<CustomJob[]> => {
-      const today = new Date().toISOString().split("T")[0];
-      const { data, error } = await supabase
+      // Step 1: Fetch all job IDs and dates (lightweight)
+      const { data: allJobs, error: allError } = await supabase
+        .from("jobs")
+        .select("id, last_date, last_date_display");
+
+      if (allError) throw allError;
+
+      // Step 2: Filter active jobs client-side using the identical deadline rules
+      const activeIds = (allJobs || [])
+        .filter(job => {
+          const lastDate = getJobDeadlineDate(job);
+          return !lastDate || lastDate >= new Date();
+        })
+        .map(job => job.id);
+
+      if (activeIds.length === 0) return [];
+
+      // Step 3: Fetch details for the unexpired active jobs
+      const { data: activeJobsData, error: activeError } = await supabase
         .from("jobs")
         .select("id, slug, title, department, location, last_date, last_date_display, qualification, eligibility, experience, tags, eligibility_summary, embedding")
-        .or(`last_date.gte.${today},last_date.is.null`)
+        .in("id", activeIds)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      return (data || []) as CustomJob[];
+      if (activeError) throw activeError;
+      return (activeJobsData || []) as CustomJob[];
     },
     refetchOnWindowFocus: false,
   });
-
-  const activeJobs = useMemo(() => {
-    return rawActiveJobs.filter(job => isJobActive(job.last_date));
-  }, [rawActiveJobs]);
 
   const stats = useMemo(() => {
     const total = activeJobs.length;
@@ -736,26 +749,12 @@ export default function Admin() {
     setIsSummarizing(true);
     setProcessProgress({ current: 0, total: 0, errors: 0 });
     try {
-      const today = new Date().toISOString().split("T")[0];
-      const { data: targetJobs, error } = await supabase
-        .from("jobs")
-        .select("*")
-        .or(`last_date.gte.${today},last_date.is.null`)
-        .is("eligibility_summary", null)
-        .limit(50);
+      // Find jobs in-memory that need summarization
+      const targetJobs = activeJobs
+        .filter(job => !job.eligibility_summary)
+        .slice(0, 50);
 
-      if (error) {
-        toast({
-          title: "Database Error",
-          description: error.message,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const filteredJobs = (targetJobs || []).filter(job => isJobActive(job.last_date));
-
-      if (filteredJobs.length === 0) {
+      if (targetJobs.length === 0) {
         toast({
           title: "Summarization Complete",
           description: "No active jobs found that need Groq summarization.",
@@ -763,11 +762,11 @@ export default function Admin() {
         return;
       }
 
-      setProcessProgress({ current: 0, total: filteredJobs.length, errors: 0 });
+      setProcessProgress({ current: 0, total: targetJobs.length, errors: 0 });
 
       const { summariseEligibility } = await import("@/lib/eligibilitySummariser");
 
-      for (const job of filteredJobs) {
+      for (const job of targetJobs) {
         try {
           const rawText = job.eligibility || job.qualification;
           const result = await summariseEligibility(rawText);
@@ -793,7 +792,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
       toast({
         title: "Summarization Batch Completed",
-        description: `Processed ${filteredJobs.length} jobs.`,
+        description: `Processed ${targetJobs.length} jobs.`,
       });
     } finally {
       setIsSummarizing(false);
@@ -804,27 +803,12 @@ export default function Admin() {
     setIsEmbedding(true);
     setProcessProgress({ current: 0, total: 0, errors: 0 });
     try {
-      const today = new Date().toISOString().split("T")[0];
-      const { data: targetJobs, error } = await supabase
-        .from("jobs")
-        .select("*")
-        .or(`last_date.gte.${today},last_date.is.null`)
-        .not("eligibility_summary", "is", null)
-        .is("embedding", null)
-        .limit(50);
+      // Find jobs in-memory that need embedding
+      const targetJobs = activeJobs
+        .filter(job => job.eligibility_summary && !job.embedding)
+        .slice(0, 50);
 
-      if (error) {
-        toast({
-          title: "Database Error",
-          description: error.message,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const filteredJobs = (targetJobs || []).filter(job => isJobActive(job.last_date));
-
-      if (filteredJobs.length === 0) {
+      if (targetJobs.length === 0) {
         toast({
           title: "Embedding Complete",
           description: "No active jobs found that need embedding generation.",
@@ -833,9 +817,9 @@ export default function Admin() {
       }
 
       const extractor = await getExtractor();
-      setProcessProgress({ current: 0, total: filteredJobs.length, errors: 0 });
+      setProcessProgress({ current: 0, total: targetJobs.length, errors: 0 });
 
-      for (const job of filteredJobs) {
+      for (const job of targetJobs) {
         try {
           const text = [job.eligibility_summary, job.tags?.join(" ")].filter(Boolean).join(" ");
           const output = await extractor(text, { pooling: "mean", normalize: true });
@@ -857,7 +841,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["admin-active-jobs-embeddings"] });
       toast({
         title: "Embedding Batch Completed",
-        description: `Processed ${filteredJobs.length} jobs.`,
+        description: `Processed ${targetJobs.length} jobs.`,
       });
     } finally {
       setIsEmbedding(false);
