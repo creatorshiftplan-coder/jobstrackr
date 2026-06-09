@@ -38,12 +38,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ].join(',');
 
       const url = `${SUPABASE_URL}/rest/v1/jobs?select=${columns}&order=created_at.desc&limit=10000`;
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         headers: {
           'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${SUPABASE_KEY}`,
         },
       });
+
+      if (!response.ok) {
+        console.warn('[api/cache/jobs] Failed fetching with eligibility fields, retrying without them');
+        const fallbackColumns = [
+          'id', 'slug', 'title', 'department', 'location',
+          'last_date', 'last_date_display', 'vacancies', 'vacancies_display',
+          'qualification', 'eligibility', 'experience',
+          'salary_min', 'salary_max', 'age_min', 'age_max',
+          'application_fee', 'job_metadata', 'is_featured',
+          'admin_refreshed_at', 'created_at', 'tags',
+        ].join(',');
+        const fallbackUrl = `${SUPABASE_URL}/rest/v1/jobs?select=${fallbackColumns}&order=created_at.desc&limit=10000`;
+        response = await fetch(fallbackUrl, {
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+          },
+        });
+      }
+
+      if (!response.ok) {
+        throw new Error(`Supabase query failed with status ${response.status}`);
+      }
 
       const rawJobs = await response.json();
       return (rawJobs || []).map((job: any) => {

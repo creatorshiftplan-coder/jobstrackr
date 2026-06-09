@@ -350,8 +350,23 @@ function localCachePlugin(env: Record<string, string>) {
             "salary_min", "salary_max", "age_min", "age_max",
             "application_fee", "job_metadata", "is_featured",
             "admin_refreshed_at", "created_at", "tags",
+            "eligibility_summary", "required_skills",
           ].join(",");
-          const data = await supabaseFetch(`jobs?select=${columns}&order=created_at.desc&limit=10000`);
+          let data;
+          try {
+            data = await supabaseFetch(`jobs?select=${columns}&order=created_at.desc&limit=10000`);
+          } catch (err) {
+            console.warn("[localCachePlugin] Failed fetching with eligibility fields, retrying without them:", err);
+            const fallbackColumns = [
+              "id", "slug", "title", "department", "location",
+              "last_date", "last_date_display", "vacancies", "vacancies_display",
+              "qualification", "eligibility", "experience",
+              "salary_min", "salary_max", "age_min", "age_max",
+              "application_fee", "job_metadata", "is_featured",
+              "admin_refreshed_at", "created_at", "tags",
+            ].join(",");
+            data = await supabaseFetch(`jobs?select=${fallbackColumns}&order=created_at.desc&limit=10000`);
+          }
           res.writeHead(200, { "Content-Type": "application/json", "X-Cache-Hit": "0" });
           res.end(JSON.stringify(data));
         } catch (err: any) {
@@ -430,9 +445,24 @@ function localCachePlugin(env: Record<string, string>) {
             "salary_min", "salary_max", "age_min", "age_max",
             "application_fee", "job_metadata", "is_featured",
             "admin_refreshed_at", "created_at", "tags",
+            "eligibility_summary", "required_skills",
           ].join(",");
-          const [allJobs, exams] = await Promise.all([
-            supabaseFetch(`jobs?select=${columns}&order=created_at.desc&limit=10000`),
+          let allJobs;
+          try {
+            allJobs = await supabaseFetch(`jobs?select=${columns}&order=created_at.desc&limit=10000`);
+          } catch (err) {
+            console.warn("[localCachePlugin] Failed fetching with eligibility fields, retrying without them:", err);
+            const fallbackColumns = [
+              "id", "slug", "title", "department", "location",
+              "last_date", "last_date_display", "vacancies", "vacancies_display",
+              "qualification", "eligibility", "experience",
+              "salary_min", "salary_max", "age_min", "age_max",
+              "application_fee", "job_metadata", "is_featured",
+              "admin_refreshed_at", "created_at", "tags",
+            ].join(",");
+            allJobs = await supabaseFetch(`jobs?select=${fallbackColumns}&order=created_at.desc&limit=10000`);
+          }
+          const [exams] = await Promise.all([
             supabaseFetch("exams?select=*&is_active=eq.true&order=name"),
           ]);
           const recentJobs = (allJobs || []).slice(0, 50);

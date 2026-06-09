@@ -58,9 +58,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'eligibility_summary', 'required_skills',
       ].join(',');
 
+      const allJobsPromise = supabaseFetch(`jobs?select=${jobColumns}&order=created_at.desc&limit=10000`)
+        .catch((err) => {
+          console.warn('[api/cache/homepage] Failed fetching with eligibility fields, retrying without them:', err);
+          const fallbackColumns = [
+            'id', 'slug', 'title', 'department', 'location',
+            'last_date', 'last_date_display', 'vacancies', 'vacancies_display',
+            'qualification', 'eligibility', 'experience',
+            'salary_min', 'salary_max', 'age_min', 'age_max',
+            'application_fee', 'job_metadata', 'is_featured',
+            'admin_refreshed_at', 'created_at', 'tags',
+          ].join(',');
+          return supabaseFetch(`jobs?select=${fallbackColumns}&order=created_at.desc&limit=10000`);
+        });
+
       const [allJobs, exams] = await Promise.all([
-        // All jobs for recommendations (full column set, ordered by created_at)
-        supabaseFetch(`jobs?select=${jobColumns}&order=created_at.desc&limit=10000`),
+        allJobsPromise,
         // Active exams catalog
         supabaseFetch('exams?select=*&is_active=eq.true&order=name'),
       ]);

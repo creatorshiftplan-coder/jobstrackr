@@ -33,29 +33,47 @@ export function useHomepageData(enabled: boolean = true) {
 
 /** Fallback: direct Supabase fetch if cache endpoint is unavailable */
 async function fallbackFetch(): Promise<HomepageBundle> {
-  const columns = [
+  const columnsWithEligibility = [
     "id", "slug", "title", "department", "location",
     "last_date", "last_date_display", "vacancies", "vacancies_display",
     "qualification", "eligibility", "experience",
     "salary_min", "salary_max", "age_min", "age_max",
     "application_fee", "job_metadata", "is_featured",
     "admin_refreshed_at", "created_at", "tags",
+    "eligibility_summary", "required_skills",
   ].join(",");
 
-  const [{ data: allJobs }, { data: exams }] = await Promise.all([
-    supabase
-      .from("jobs")
-      .select(columns)
-      .order("created_at", { ascending: false })
-      .range(0, 9999),
-    supabase
-      .from("exams")
-      .select("*")
-      .eq("is_active", true)
-      .order("name"),
-  ]);
+  let jobsResult = await supabase
+    .from("jobs")
+    .select(columnsWithEligibility)
+    .order("created_at", { ascending: false })
+    .range(0, 9999);
 
-  const jobsList = (allJobs || []) as any;
+  if (jobsResult.error) {
+    console.warn("[useHomepageData] Failed fetching with eligibility fields, retrying without them:", jobsResult.error);
+    const columnsWithoutEligibility = [
+      "id", "slug", "title", "department", "location",
+      "last_date", "last_date_display", "vacancies", "vacancies_display",
+      "qualification", "eligibility", "experience",
+      "salary_min", "salary_max", "age_min", "age_max",
+      "application_fee", "job_metadata", "is_featured",
+      "admin_refreshed_at", "created_at", "tags",
+    ].join(",");
+
+    jobsResult = await supabase
+      .from("jobs")
+      .select(columnsWithoutEligibility)
+      .order("created_at", { ascending: false })
+      .range(0, 9999);
+  }
+
+  const { data: exams } = await supabase
+    .from("exams")
+    .select("*")
+    .eq("is_active", true)
+    .order("name");
+
+  const jobsList = (jobsResult.data || []) as any;
   return {
     recentJobs: jobsList.slice(0, 50),
     allJobs: jobsList,

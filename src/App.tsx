@@ -2,7 +2,9 @@ import { Suspense, lazy, useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { persister, shouldDehydrateQuery, PERSIST_BUSTER } from "@/lib/queryPersister";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
@@ -66,7 +68,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 30,   // 30 minutes
+      gcTime: 1000 * 60 * 60 * 24, // 24h — persister needs gcTime >= maxAge to keep entries hydrated
       refetchOnWindowFocus: false,
     },
   },
@@ -81,7 +83,17 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{
+          persister,
+          maxAge: 1000 * 60 * 60 * 24, // 24h
+          buster: PERSIST_BUSTER,
+          dehydrateOptions: {
+            shouldDehydrateQuery: (q) => shouldDehydrateQuery(q.queryKey),
+          },
+        }}
+      >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
           <AuthProvider>
@@ -146,7 +158,7 @@ const App = () => {
           </TooltipProvider>
         </AuthProvider>
       </ThemeProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   </ErrorBoundary>
   );
 };

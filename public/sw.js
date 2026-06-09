@@ -50,7 +50,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-First for API cache endpoints to support offline listings, recommendations, and tracking
+  // Stale-While-Revalidate for API cache endpoints: serve cached data instantly,
+  // refresh in the background so the next open sees fresh data.
   if (
     requestUrl.origin === self.location.origin &&
     (
@@ -61,19 +62,19 @@ self.addEventListener('fetch', (event) => {
     )
   ) {
     event.respondWith(
-      fetch(event.request)
-        .then((networkResponse) => {
-          if (networkResponse.status === 200) {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return networkResponse;
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cachedResponse) => {
+          const networkPromise = fetch(event.request)
+            .then((networkResponse) => {
+              if (networkResponse.status === 200) {
+                cache.put(event.request, networkResponse.clone());
+              }
+              return networkResponse;
+            })
+            .catch(() => cachedResponse);
+          return cachedResponse || networkPromise;
         })
-        .catch(() => {
-          return caches.match(event.request);
-        })
+      )
     );
     return;
   }

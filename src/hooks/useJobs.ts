@@ -15,13 +15,24 @@ export function useJobs(options: UseJobsOptions = {}) {
       const res = await fetch("/api/cache/jobs");
       if (!res.ok) {
         // Fallback to direct Supabase if cache endpoint fails
-        const { data, error } = await supabase
-          .from("jobs")
-          .select("id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, eligibility, experience, salary_min, salary_max, age_min, age_max, application_fee, job_metadata, is_featured, admin_refreshed_at, created_at, tags, eligibility_summary, required_skills")
-          .order("created_at", { ascending: false })
-          .range(0, 9999);
-        if (error) throw error;
-        return (data || []) as any;
+        try {
+          const { data, error } = await supabase
+            .from("jobs")
+            .select("id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, eligibility, experience, salary_min, salary_max, age_min, age_max, application_fee, job_metadata, is_featured, admin_refreshed_at, created_at, tags, eligibility_summary, required_skills")
+            .order("created_at", { ascending: false })
+            .range(0, 9999);
+          if (error) throw error;
+          return (data || []) as any;
+        } catch (err) {
+          console.warn("[useJobs] Failed fetching with eligibility fields, retrying without them:", err);
+          const { data, error } = await supabase
+            .from("jobs")
+            .select("id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, eligibility, experience, salary_min, salary_max, age_min, age_max, application_fee, job_metadata, is_featured, admin_refreshed_at, created_at, tags")
+            .order("created_at", { ascending: false })
+            .range(0, 9999);
+          if (error) throw error;
+          return (data || []) as any;
+        }
       }
       return res.json();
     },
