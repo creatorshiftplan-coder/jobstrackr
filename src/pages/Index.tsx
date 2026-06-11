@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { SectionHeader } from "@/components/SectionHeader";
 import { FeaturedJobCard } from "@/components/FeaturedJobCard";
@@ -9,20 +9,17 @@ import { ActiveExamCard } from "@/components/ActiveExamCard";
 import { BottomNav } from "@/components/BottomNav";
 import { SectorPreferenceCard } from "@/components/SectorPreferenceCard";
 import { QuickActions } from "@/components/QuickActions";
+import { LazySection } from "@/components/LazySection";
 import { useHomepageData } from "@/hooks/useHomepageData";
 import { useAuth } from "@/hooks/useAuth";
 import { useExams } from "@/hooks/useExams";
 import { useProfile } from "@/hooks/useProfile";
-import { useEducation } from "@/hooks/useEducation";
 import { useFeed } from "@/hooks/useFeed";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Briefcase, ChevronLeft, ChevronRight, MapPin, Target } from "lucide-react";
+import { Briefcase, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isJobActive } from "@/lib/jobUtils";
-
-const colorVariants = ["pink", "blue", "green", "orange"] as const;
 
 const Index = () => {
   const navigate = useNavigate();
@@ -34,23 +31,6 @@ const Index = () => {
       navigate("/welcome", { replace: true });
     }
   }, [user, authLoading, isGuestMode, navigate]);
-
-  // Defer similar_jobs RPC to after idle — it's an enhancement, not critical
-  const [similarJobsReady, setSimilarJobsReady] = useState(false);
-  useEffect(() => {
-    let idleId: number | undefined;
-    let timeoutId: number | undefined;
-    const enable = () => setSimilarJobsReady(true);
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(enable, { timeout: 1500 });
-    } else {
-      timeoutId = window.setTimeout(enable, 800);
-    }
-    return () => {
-      if (idleId !== undefined && "cancelIdleCallback" in window) window.cancelIdleCallback(idleId);
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-    };
-  }, []);
 
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [activeExamIndex, setActiveExamIndex] = useState(0);
@@ -77,7 +57,10 @@ const Index = () => {
   const queryClient = useQueryClient();
 
   // ── Netflix rows feed ──
-  const { shelves, isLoading: feedLoading } = useFeed();
+  // Reuses the bundle's allJobs so the multi-MB jobs list is downloaded once.
+  // While the bundle is in flight the feed's own jobs fetch stays disabled;
+  // if the bundle errors, the feed falls back to fetching jobs itself.
+  const { shelves, isLoading: feedLoading } = useFeed(true, jobs, homepageLoading);
 
   // Homepage shelves: drop "Almost There - 1 Skill Away" and surface the
   // highest-vacancy jobs from the user's recommendations alongside the
@@ -95,11 +78,19 @@ const Index = () => {
       .slice(0, 3);
   }, [shelves]);
 
-  const isLoading = homepageLoading || feedLoading;
-  const error = homepageError;
+  // Jobs-scoped readiness — sections render independently, no global gate
+  const jobsReady = !homepageLoading && !homepageError;
+
+  // Seed the shared ["jobs"] cache from the bundle so other pages
+  // (ShelfDetails, Recommendations, Search) don't re-download the jobs list
+  useEffect(() => {
+    if (homepageData?.allJobs && !queryClient.getQueryData(["jobs"])) {
+      queryClient.setQueryData(["jobs"], homepageData.allJobs);
+    }
+  }, [homepageData, queryClient]);
 
   // ── Shared user data: fetched once ──
-  const { userExams } = useExams({ includeExamCatalog: false });
+  const { userExams, isLoading: examsLoading } = useExams({ includeExamCatalog: false });
   const { profile, isLoading: profileLoading } = useProfile();
 
   // Prefetch explore page data when idle (P7: cross-page prefetching)
@@ -167,27 +158,15 @@ const Index = () => {
     setActiveCardIndex(Math.min(index, newJobs.length - 1));
   };
 
-  const showNoResults = !isLoading && filteredJobs.length === 0;
+  const showNoResults = jobsReady && filteredJobs.length === 0;
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-8">
+      {/* Page shell renders immediately — header, nav, layout never wait on data */}
       <PageHeader variant="dark" />
 
       <main className="md:mx-auto md:max-w-[960px] md:space-y-8 md:p-6 lg:p-8">
-        {isLoading ? (
-          <div className="px-5 space-y-6">
-            <Skeleton className="h-48 w-full rounded-3xl" />
-            <div className="grid grid-cols-2 gap-4">
-              <Skeleton className="h-40 rounded-2xl" />
-              <Skeleton className="h-40 rounded-2xl" />
-            </div>
-          </div>
-        ) : error ? (
-          <div className="text-center py-12 px-5">
-            <p className="text-destructive">Failed to load jobs</p>
-          </div>
-        ) : (
-          <>
+        <>
             {/* Sector Preference Card for first-time users */}
             {showSectorCard && (
               <div className="px-5 mb-6 md:px-0">
@@ -216,8 +195,27 @@ const Index = () => {
               </div>
             )}
 
+            {/* New Government Jobs Section - skeleton while its data is in flight */}
+            {homepageLoading && (
+              <section className="mb-8 md:mb-0">
+                <SectionHeader title="New Government Jobs" variant="dark" />
+                <div className="flex gap-4 overflow-x-hidden px-5 pb-2 md:px-0">
+                  {[0, 1, 2].map((i) => (
+                    <Skeleton key={i} className="h-48 w-[300px] flex-shrink-0 rounded-3xl" />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Jobs error is scoped to this section — exams and feed still render */}
+            {!homepageLoading && homepageError && (
+              <div className="text-center py-12 px-5">
+                <p className="text-destructive">Failed to load jobs</p>
+              </div>
+            )}
+
             {/* New Government Jobs Section - Latest uploaded jobs */}
-            {newJobs.length > 0 && (
+            {jobsReady && newJobs.length > 0 && (
               <section className="mb-8 md:mb-0 md:animate-fade-in-up" style={{ animationDelay: "80ms" }}>
                 <SectionHeader title="New Government Jobs" variant="dark" />
                 <div className="relative">
@@ -262,8 +260,20 @@ const Index = () => {
               </section>
             )}
 
+            {/* My Active Exams - independent skeleton while the user's exams load */}
+            {user && examsLoading && (
+              <section className="mb-8 md:mb-0">
+                <SectionHeader title="My Active Exams" variant="dark" />
+                <div className="flex gap-3 sm:gap-4 overflow-x-hidden px-5 pb-2 md:grid md:grid-cols-4 md:px-0">
+                  {[0, 1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-36 w-[180px] flex-shrink-0 rounded-2xl md:w-auto" />
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* My Active Exams Section - Only show if user has tracked exams */}
-            {activeExams.length > 0 && (
+            {!examsLoading && activeExams.length > 0 && (
               <section className="mb-8 md:mb-0 md:animate-fade-in-up" style={{ animationDelay: "160ms" }}>
                 <SectionHeader title="My Active Exams" variant="dark" />
                 <div className="relative">
@@ -312,13 +322,35 @@ const Index = () => {
               </section>
             )}
 
-            {/* Netflix Rows Feed */}
-            {!isLoading && homeShelves.map((shelf) => (
-              <FeedShelf key={shelf.key} shelf={shelf} />
-            ))}
+            {/* Netflix Rows Feed - skeleton shelf while recommendations compute */}
+            {feedLoading && (
+              <div className="mb-10">
+                <div className="px-4 sm:px-6 mb-4">
+                  <Skeleton className="h-6 w-44 rounded-md" />
+                </div>
+                <div className="flex gap-4 overflow-x-hidden px-4 sm:px-6 pb-4">
+                  {[0, 1, 2].map((i) => (
+                    <Skeleton key={i} className="h-44 w-[290px] sm:w-[320px] flex-shrink-0 rounded-2xl" />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* First shelf renders eagerly; the rest are below the fold and
+                mount lazily as the user scrolls toward them */}
+            {!feedLoading && homeShelves.map((shelf, index) =>
+              index === 0 ? (
+                <FeedShelf key={shelf.key} shelf={shelf} />
+              ) : (
+                <LazySection key={shelf.key} minHeight={360}>
+                  <FeedShelf shelf={shelf} />
+                </LazySection>
+              )
+            )}
 
             {/* Show all jobs if no featured/feed rows split */}
-            {newJobs.length === 0 &&
+            {jobsReady && !feedLoading &&
+              newJobs.length === 0 &&
               shelves.length === 0 &&
               filteredJobs.length > 0 && (
                 <section>
@@ -333,8 +365,7 @@ const Index = () => {
                   </div>
                 </section>
               )}
-          </>
-        )}
+        </>
       </main>
 
       <BottomNav />

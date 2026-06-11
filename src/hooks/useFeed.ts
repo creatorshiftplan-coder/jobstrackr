@@ -8,6 +8,7 @@ import { HybridMatchedJob, hybridRecommend, qualificationToTag } from "@/lib/hyb
 import { buildFeed, FeedShelf } from "@/lib/feedBuilder";
 import { isAlmostEligible, getJobGapSkills } from "@/hooks/useAlmostEligible";
 import { MatchedJob } from "@/lib/jobMatcher";
+import { Job } from "@/types/job";
 
 /**
  * Calculates cosine similarity between two numeric vectors.
@@ -84,13 +85,28 @@ export function vectorRerank(
 /**
  * Main hook for recommendations feed pages (homepage and Recommendations wizard output).
  * Fetches all user contextual data and returns structured rows for rendering.
+ *
+ * Performance: pass `initialJobs` (e.g. from the homepage bundle) to skip the
+ * duplicate /api/cache/jobs download — the full jobs list is multi-MB.
  */
-export function useFeed(enabled: boolean = true) {
-  const { data: jobs, isLoading: jobsLoading } = useJobs({ enabled });
+export function useFeed(
+  enabled: boolean = true,
+  initialJobs?: Job[],
+  /** True while the caller's own jobs request is still in flight — keeps the
+   * feed's fallback fetch disabled so jobs aren't downloaded twice. */
+  initialJobsPending: boolean = false,
+) {
+  // Only fetch jobs if the caller didn't already provide them (and isn't about to)
+  const { data: fetchedJobs, isLoading: fetchedJobsLoading } = useJobs({
+    enabled: enabled && !initialJobs && !initialJobsPending,
+  });
+  const jobs = initialJobs ?? fetchedJobs;
+  const jobsLoading = initialJobs ? false : (initialJobsPending || fetchedJobsLoading);
+
   const { profile, isLoading: profileLoading } = useProfile({ enabled });
   const { userExams } = useExams({ enabled, includeExamCatalog: false });
   const { data: savedJobsData, isLoading: savedLoading } = useSavedJobs();
-  
+
   const { matchedJobs, preferences, isLoading: forYouLoading } = useForYouJobs(
     100, // retrieve enough candidates for shelves selection
     enabled,
@@ -149,13 +165,20 @@ export function useFeed(enabled: boolean = true) {
     });
 
     // Step 4: Build Netflix shelves
-    // We mock top-10 similarity locally by grouping similar departments or matching tags
-    const jobSimilarityMap = new Map<string, any[]>();
-    for (const job of jobs || []) {
-      const similar = (jobs || [])
-        .filter((j) => j.id !== job.id && j.department === job.department)
-        .slice(0, 10);
-      jobSimilarityMap.set(job.id, similar);
+    // We mock top-10 similarity locally by grouping similar departments.
+    // Only computed for the (≤2) recently saved jobs buildFeed actually uses —
+    // computing it for every job was O(n²) and blocked the main thread.
+    const jobSimilarityMap = new Map<string, Job[]>();
+    const allJobs = jobs || [];
+    for (const saved of savedJobs.slice(0, 2)) {
+      const similar: Job[] = [];
+      for (const j of allJobs) {
+        if (j.id !== saved.id && j.department === saved.department) {
+          similar.push(j);
+          if (similar.length >= 10) break;
+        }
+      }
+      jobSimilarityMap.set(saved.id, similar);
     }
 
     const shelves = buildFeed(
