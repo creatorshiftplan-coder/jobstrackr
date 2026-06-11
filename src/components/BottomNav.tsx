@@ -1,14 +1,18 @@
-import { Home, Search, CalendarDays, User, Flame } from "lucide-react";
+import { Home, Search, CalendarDays, GraduationCap, Flame } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { icon: Home, label: "Home", path: "/", color: "#f44336" },
-  { icon: Search, label: "Explore", path: "/search", color: "#ffa117" },
-  { icon: Flame, label: "Trending", path: "/trending", color: "#0fc70f" },
-  { icon: CalendarDays, label: "My Exams", path: "/tracker", color: "#2196f3" },
-  { icon: User, label: "Profile", path: "/profile", color: "#b145e9" },
+  { icon: Home, label: "Home", path: "/" },
+  { icon: Search, label: "Explore", path: "/search" },
+  { icon: Flame, label: "Trending", path: "/trending" },
+  { icon: GraduationCap, label: "My Exams", path: "/tracker" },
+  { icon: CalendarDays, label: "Calendar", path: "/calendar" },
 ];
+
+// 5 tabs across the floating bar: 5 x 58px = 290px content width.
+const TAB_WIDTH = 58;
+const NAV_WIDTH = navItems.length * TAB_WIDTH;
 
 const visiblePaths = new Set(navItems.map((item) => item.path));
 
@@ -25,43 +29,42 @@ export function BottomNav() {
   );
 
   return (
-    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 md:hidden">
-      <div className="glow-nav relative flex items-center justify-center h-[60px] bg-card rounded-2xl shadow-lg px-2">
-        <ul className="flex w-[350px] relative">
-          {navItems.map(({ icon: Icon, label, path, color }, index) => {
+    <nav className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 md:hidden">
+      <div className="glow-nav relative flex h-[60px] items-center justify-center rounded-2xl bg-card px-2 shadow-lg">
+        <ul className="relative flex" style={{ width: NAV_WIDTH }}>
+          {navItems.map(({ icon: Icon, path }, index) => {
             const isActive = activeIndex === index;
             return (
               <li
                 key={path}
-                className="relative w-[70px] h-[60px] z-[2] list-none"
+                className="relative z-[2] h-[60px] w-[58px] list-none"
               >
                 <Link
                   to={path}
-                  className="flex items-center justify-center w-full h-full text-muted-foreground no-underline"
+                  className="flex h-full w-full items-center justify-center text-muted-foreground no-underline"
                 >
                   <span
                     className={cn(
-                      "relative flex items-center justify-center w-[50px] h-[50px] rounded-full bg-card transition-all duration-500",
+                      "relative flex h-[50px] w-[50px] items-center justify-center rounded-full bg-card transition-all duration-500",
                       isActive && "-translate-y-[27px]"
                     )}
                     style={
                       isActive
-                        ? { background: color, transitionDelay: "0.25s" }
+                        ? { background: "hsl(var(--primary))", transitionDelay: "0.25s" }
                         : { transitionDelay: "0s" }
                     }
                   >
                     <Icon
                       className={cn(
                         "h-[22px] w-[22px] transition-colors duration-300",
-                        isActive ? "text-white" : "text-muted-foreground"
+                        isActive ? "text-primary-foreground" : "text-muted-foreground"
                       )}
                       strokeWidth={isActive ? 2.5 : 2}
                     />
-                    {/* Glow blur */}
                     {isActive && (
                       <span
-                        className="absolute top-[8px] left-0 w-full h-full rounded-full opacity-50 blur-[5px] transition-opacity duration-500"
-                        style={{ background: color }}
+                        className="absolute left-0 top-[8px] h-full w-full rounded-full opacity-50 blur-[5px] transition-opacity duration-500"
+                        style={{ background: "hsl(var(--primary))" }}
                       />
                     )}
                   </span>
@@ -69,11 +72,10 @@ export function BottomNav() {
               </li>
             );
           })}
-          {/* Sliding indicator */}
           <div
-            className="glow-indicator absolute -top-[35px] w-[70px] h-[70px] bg-card rounded-full z-[1] transition-transform duration-500"
+            className="glow-indicator absolute -top-[35px] z-[1] h-[70px] w-[70px] rounded-full bg-card transition-transform duration-500"
             style={{
-              transform: `translateX(${activeIndex >= 0 ? activeIndex * 70 : 0}px)`,
+              transform: `translateX(${activeIndex >= 0 ? activeIndex * TAB_WIDTH - 6 : -6}px)`,
             }}
           />
         </ul>

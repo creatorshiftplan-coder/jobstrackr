@@ -79,6 +79,22 @@ const Index = () => {
   // ── Netflix rows feed ──
   const { shelves, isLoading: feedLoading } = useFeed();
 
+  // Homepage shelves: drop "Almost There - 1 Skill Away" and surface the
+  // highest-vacancy jobs from the user's recommendations alongside the
+  // "Because You Liked" rows. Other shelves fill any remaining slots.
+  const homeShelves = useMemo(() => {
+    const homeRank = (key: string) => {
+      if (key === "eligible_for_you") return 0;
+      if (key === "high_vacancies") return 1;
+      if (key.startsWith("because_liked")) return 2;
+      return 3;
+    };
+    return shelves
+      .filter((shelf) => shelf.key !== "almost_there")
+      .sort((a, b) => homeRank(a.key) - homeRank(b.key))
+      .slice(0, 3);
+  }, [shelves]);
+
   const isLoading = homepageLoading || feedLoading;
   const error = homepageError;
 
@@ -297,7 +313,7 @@ const Index = () => {
             )}
 
             {/* Netflix Rows Feed */}
-            {!isLoading && shelves.slice(0, 3).map((shelf) => (
+            {!isLoading && homeShelves.map((shelf) => (
               <FeedShelf key={shelf.key} shelf={shelf} />
             ))}
 

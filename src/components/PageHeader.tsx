@@ -1,6 +1,7 @@
-import { Search, Bookmark } from "lucide-react";
+import { Search } from "lucide-react";
 import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 interface PageHeaderProps {
   showSearchBar?: boolean;
@@ -9,6 +10,8 @@ interface PageHeaderProps {
 
 export function PageHeader({ showSearchBar = true, variant = "transparent" }: PageHeaderProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const initials = user?.email?.slice(0, 2).toUpperCase() || "GU";
 
   // Use theme-aware semantic tokens
   const iconColor = "text-primary";
@@ -38,10 +41,10 @@ export function PageHeader({ showSearchBar = true, variant = "transparent" }: Pa
         </div>
       )}
 
-      {/* Saved Button - Right */}
-      <Link to="/saved">
-        <div className={`h-11 w-11 sm:h-12 sm:w-12 rounded-full ${bgClass} backdrop-blur-sm flex items-center justify-center ${hoverClass} transition-colors`}>
-          <Bookmark className={`h-5 w-5 sm:h-6 sm:w-6 ${iconColor}`} />
+      {/* Profile Button - Right */}
+      <Link to="/profile">
+        <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm sm:text-base font-bold transition-transform hover:scale-105 active:scale-95">
+          {initials}
         </div>
       </Link>
     </header>
