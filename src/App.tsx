@@ -35,6 +35,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const More = lazy(() => import("./pages/More"));
 const Admin = lazy(() => import("./pages/Admin"));
 const ExamTracker = lazy(() => import("./pages/ExamTracker"));
+const ExamCalendar = lazy(() => import("./pages/ExamCalendar"));
 const EditProfile = lazy(() => import("./pages/EditProfile"));
 const EditEducation = lazy(() => import("./pages/EditEducation"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -134,6 +135,7 @@ const App = () => {
                       <Route path="/reset-password" element={<ResetPassword />} />
                       <Route path="/admin" element={<Admin />} />
                       <Route path="/tracker" element={<ExamTracker />} />
+                      <Route path="/calendar" element={<ExamCalendar />} />
                       <Route path="/trending" element={<Trending />} />
                       <Route path="/updates/:slug" element={<UpdateDetails />} />
                       <Route path="/exam-update/:id" element={<ExamUpdateDetail />} />

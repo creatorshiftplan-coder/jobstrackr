@@ -266,6 +266,23 @@
   /* Chrome, Safari, Opera */
 }
 
+/* Exam Calendar: dot under days that have events (react-day-picker modifier) */
+.has-event {
+  position: relative;
+}
+
+.has-event::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+}
+
 /* Animated conic gradient border for AI Search button */
 @property --angle {
   syntax: "<angle>";

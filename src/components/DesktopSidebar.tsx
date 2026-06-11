@@ -4,6 +4,7 @@ import {
   Search,
   TrendingUp,
   FileText,
+  CalendarDays,
   User,
   Briefcase,
   BookOpen,
@@ -61,6 +62,7 @@ const navItems = [
   { title: "Explore", url: "/search", icon: Search },
   { title: "Trending", url: "/trending", icon: TrendingUp },
   { title: "My Exams", url: "/tracker", icon: FileText },
+  { title: "Exam Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Saved Jobs", url: "/saved", icon: Bookmark },
   { title: "Profile", url: "/profile", icon: User },
 ];

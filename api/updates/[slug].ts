@@ -430,10 +430,10 @@ function buildUpdatePage(exam: any, aiData: any, status: { type: string; label: 
   <link rel="modulepreload" crossorigin href="/assets/vendor-react-odAJResg.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-query-nUca_sEF.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-ui--HBZjmSF.js">
-  <link rel="modulepreload" crossorigin href="/assets/vendor-icons-CEfcvYSM.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-icons-D1hV3DAl.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-supabase-BvsnE-zR.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-lottie-8Z6zZkhm.js">
-  <link rel="stylesheet" crossorigin href="/assets/index-CB_gIGAA.css">
+  <link rel="stylesheet" crossorigin href="/assets/index-BLHJ3SW1.css">
   <!-- PROD_HEAD_ASSETS_END -->
 </head>
 <body>
@@ -489,7 +489,7 @@ function buildUpdatePage(exam: any, aiData: any, status: { type: string; label: 
   ${ssrBottomNav()}
   <div id="root"></div>
   <!-- PROD_BODY_ASSETS_START -->
-  <script type="module" crossorigin src="/assets/index-DxuWxdEf.js"></script>
+  <script type="module" crossorigin src="/assets/index-Xx7XhS2S.js"></script>
   <!-- PROD_BODY_ASSETS_END -->
   <script>
     const observer = new MutationObserver(() => {

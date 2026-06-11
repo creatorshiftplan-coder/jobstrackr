@@ -38,7 +38,7 @@ export function isDatePassed(dateStr?: string): boolean {
     return date < new Date();
 }
 
-function getExamDateText(aiData: any): string | undefined {
+export function getExamDateText(aiData: any): string | undefined {
     if (!aiData) return undefined;
 
     const direct = aiData.exam_dates ?? aiData.exam_date;
