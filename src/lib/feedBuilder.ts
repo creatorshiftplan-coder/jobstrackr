@@ -59,32 +59,8 @@ export function buildFeed(
     });
   }
 
-  // 2. Almost There - 1 Skill Away (Failed only 1-2 required skills)
-  const almostEligJobs = almostElig.map((a) => a.job);
-  const almostThereJobs = take(almostEligJobs, 15);
-  if (almostThereJobs.length > 0) {
-    shelves.push({
-      key: "almost_there",
-      title: "Almost There - 1 Skill Away",
-      jobs: almostThereJobs,
-      showGapChips: true,
-    });
-  }
-
-  // 3. Closing Soon (Eligible jobs closing in <= 7 days)
-  const closingSoonCandidates = eligibleJobs.filter(
-    (j) => getDaysLeft(j.last_date) <= 7 && getDaysLeft(j.last_date) >= 0
-  );
-  const closingSoonJobs = take(closingSoonCandidates, 10);
-  if (closingSoonJobs.length > 0) {
-    shelves.push({
-      key: "closing_soon",
-      title: "Closing Soon",
-      jobs: closingSoonJobs,
-    });
-  }
-
-  // 4. Because You Liked {Title} (one shelf per recently saved job, max 2 shelves)
+  // 2. Because You Liked {Title} (one shelf per recently saved job, max 2 shelves)
+  //    Placed before "Almost There" so personalised picks lead the homepage.
   const recentSaved = savedJobs.slice(0, 2);
   for (const saved of recentSaved) {
     const similar = jobSimilarity.get(saved.id) || [];
@@ -98,7 +74,46 @@ export function buildFeed(
     }
   }
 
-  // 5. New in {State} (domicile matching)
+  // 3. High Vacancy Posts (Eligible posts with >= 100 vacancies)
+  //    Surfaced above "Almost There" so big-recruitment exams lead the homepage.
+  const highVacancyCandidates = eligibleJobs
+    .filter((j) => typeof j.vacancies === "number" && j.vacancies >= 100)
+    .sort((a, b) => (b.vacancies || 0) - (a.vacancies || 0));
+  const highVacancyJobs = take(highVacancyCandidates, 10);
+  if (highVacancyJobs.length > 0) {
+    shelves.push({
+      key: "high_vacancies",
+      title: "High Vacancy Posts",
+      jobs: highVacancyJobs,
+    });
+  }
+
+  // 4. Almost There - 1 Skill Away (Failed only 1-2 required skills)
+  const almostEligJobs = almostElig.map((a) => a.job);
+  const almostThereJobs = take(almostEligJobs, 15);
+  if (almostThereJobs.length > 0) {
+    shelves.push({
+      key: "almost_there",
+      title: "Almost There - 1 Skill Away",
+      jobs: almostThereJobs,
+      showGapChips: true,
+    });
+  }
+
+  // 5. Closing Soon (Eligible jobs closing in <= 7 days)
+  const closingSoonCandidates = eligibleJobs.filter(
+    (j) => getDaysLeft(j.last_date) <= 7 && getDaysLeft(j.last_date) >= 0
+  );
+  const closingSoonJobs = take(closingSoonCandidates, 10);
+  if (closingSoonJobs.length > 0) {
+    shelves.push({
+      key: "closing_soon",
+      title: "Closing Soon",
+      jobs: closingSoonJobs,
+    });
+  }
+
+  // 6. New in {State} (domicile matching)
   if (userProfile?.address) {
     const userState = resolveStateFromLocationText(userProfile.address) || userProfile.address;
     const stateCandidates = eligibleJobs.filter((job) => {
@@ -113,19 +128,6 @@ export function buildFeed(
         jobs: stateJobs,
       });
     }
-  }
-
-  // 6. High Vacancies (Eligible posts with >= 100 vacancies)
-  const highVacancyCandidates = eligibleJobs
-    .filter((j) => typeof j.vacancies === "number" && j.vacancies >= 100)
-    .sort((a, b) => (b.vacancies || 0) - (a.vacancies || 0));
-  const highVacancyJobs = take(highVacancyCandidates, 10);
-  if (highVacancyJobs.length > 0) {
-    shelves.push({
-      key: "high_vacancies",
-      title: "High Vacancy Posts",
-      jobs: highVacancyJobs,
-    });
   }
 
   // 7. Saved Jobs (always appended if user has saved jobs, seenIds deduplication bypassed here)
