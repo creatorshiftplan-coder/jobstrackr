@@ -63,3 +63,8 @@ verify_jwt = true
 
 [functions.jobs-recommendations]
 verify_jwt = true
+
+[functions.sync-sheets]
+# Cron/webhook style: the function does its own shared-secret check, so the
+# gateway JWT check is disabled (same as telegram-bot).
+verify_jwt = false

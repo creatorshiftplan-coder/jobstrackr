@@ -6,6 +6,7 @@ import {
   CalendarCheck2,
   CalendarClock,
   CalendarDays,
+  CalendarPlus,
   Clock,
   Download,
   FileText,
@@ -16,6 +17,8 @@ import {
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { CalendarEventSheet } from "@/components/CalendarEventSheet";
+import { AddExamModal } from "@/components/AddExamModal";
+import { AddCustomDateDialog } from "@/components/AddCustomDateDialog";
 import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -311,6 +314,26 @@ export default function ExamCalendar() {
         </div>
       </div>
 
+      {/* Mobile add actions */}
+      <div className="grid grid-cols-2 gap-2 px-4 pt-2 md:hidden">
+        <AddExamModal
+          trigger={
+            <Button variant="outline" size="sm" className="w-full gap-2">
+              <GraduationCap className="h-4 w-4" />
+              Track Exam
+            </Button>
+          }
+        />
+        <AddCustomDateDialog
+          trigger={
+            <Button variant="outline" size="sm" className="w-full gap-2">
+              <CalendarPlus className="h-4 w-4" />
+              Add Date
+            </Button>
+          }
+        />
+      </div>
+
       <section className="hidden border-b border-border/60 bg-[linear-gradient(135deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.5)_48%,hsl(var(--primary)/0.12)_100%)] md:block">
         <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
           <div className="flex items-start justify-between gap-8">
@@ -324,10 +347,28 @@ export default function ExamCalendar() {
                 Plan application deadlines, exam dates, admit cards, and results from your tracked exams and matched jobs.
               </p>
             </div>
-            <Button onClick={handleExportAll} disabled={upcoming.length === 0} className="shrink-0 gap-2">
-              <Download className="h-4 w-4" />
-              Export All ({totalUpcoming})
-            </Button>
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <AddExamModal
+                trigger={
+                  <Button variant="outline" className="gap-2">
+                    <GraduationCap className="h-4 w-4" />
+                    Track an Exam
+                  </Button>
+                }
+              />
+              <AddCustomDateDialog
+                trigger={
+                  <Button variant="outline" className="gap-2">
+                    <CalendarPlus className="h-4 w-4" />
+                    Add a Date
+                  </Button>
+                }
+              />
+              <Button onClick={handleExportAll} disabled={upcoming.length === 0} className="gap-2">
+                <Download className="h-4 w-4" />
+                Export All ({totalUpcoming})
+              </Button>
+            </div>
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
@@ -364,16 +405,23 @@ export default function ExamCalendar() {
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
               Track exams and complete your job preferences to build a personalised exam schedule.
             </p>
-            <div className="mt-5 flex justify-center gap-3">
-              <Link to="/tracker">
-                <Button className="gap-2">
-                  <GraduationCap className="h-4 w-4" />
-                  Track an Exam
-                </Button>
-              </Link>
-              <Link to="/search">
-                <Button variant="outline">Explore Jobs</Button>
-              </Link>
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <AddExamModal
+                trigger={
+                  <Button className="gap-2">
+                    <GraduationCap className="h-4 w-4" />
+                    Track an Exam
+                  </Button>
+                }
+              />
+              <AddCustomDateDialog
+                trigger={
+                  <Button variant="outline" className="gap-2">
+                    <CalendarPlus className="h-4 w-4" />
+                    Add a Date
+                  </Button>
+                }
+              />
             </div>
           </div>
         ) : (
@@ -384,9 +432,9 @@ export default function ExamCalendar() {
                   <CalendarDays className="h-4 w-4" />
                   Calendar
                 </TabsTrigger>
-                <TabsTrigger value="agenda" className="gap-2 rounded-lg">
+                <TabsTrigger value="timeline" className="gap-2 rounded-lg">
                   <ListChecks className="h-4 w-4" />
-                  Agenda
+                  Timeline
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -485,11 +533,11 @@ export default function ExamCalendar() {
               </div>
             </TabsContent>
 
-            <TabsContent value="agenda" className="mt-0">
+            <TabsContent value="timeline" className="mt-0">
               <div className="rounded-2xl border border-border/70 bg-card/90 p-4 shadow-sm backdrop-blur-sm md:p-5">
                 <div className="mb-5 flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-foreground">Upcoming Agenda</h2>
+                    <h2 className="text-lg font-semibold text-foreground">Upcoming Timeline</h2>
                     <p className="mt-1 text-sm text-muted-foreground">Sorted by date across your active calendar filter.</p>
                   </div>
                   <Button variant="outline" size="sm" onClick={handleExportAll} disabled={upcoming.length === 0} className="hidden gap-2 sm:inline-flex">

@@ -40,6 +40,10 @@
       "destination": "/api/scrape_article_links"
     },
     {
+      "source": "/api/sync-sheets",
+      "destination": "/api/sync_sheets"
+    },
+    {
       "source": "/jobs/:slug",
       "destination": "/api/jobs/:slug"
     },

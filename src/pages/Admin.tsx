@@ -1074,6 +1074,9 @@ export default function Admin() {
   const [discoverDuplicateUrls, setDiscoverDuplicateUrls] = useState<Set<string>>(new Set());
   const [discoverExpandedUrl, setDiscoverExpandedUrl] = useState<string | null>(null);
 
+  // Pull scraped rows from the Google Sheet into Supabase (via the sync-sheets function).
+  const [syncingSheet, setSyncingSheet] = useState(false);
+
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
@@ -4502,6 +4505,36 @@ ${hashtagsStr}`;
       toast({ title: "Discovery failed", description: error.message, variant: "destructive" });
     } finally {
       setDiscoverLoading(false);
+    }
+  };
+
+  // Trigger the Sheet → Supabase sync on demand (in addition to the hourly cron).
+  // Calls the admin-only /api/sync-sheets proxy, which forwards to the sync-sheets
+  // edge function server-side — no secret is exposed in the browser.
+  const handleSyncSheets = async () => {
+    setSyncingSheet(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const resp = await fetch("/api/sync-sheets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || ""}`,
+        },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.error || `Sync failed (${resp.status})`);
+      toast({
+        title: "Google Sheet sync complete",
+        description: `Jobs: ${data.jobs_inserted ?? 0} new / ${data.jobs_received ?? 0} received · Updates: ${data.updates_upserted ?? 0} / ${data.updates_received ?? 0} received`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["exam-updates"] });
+    } catch (error: any) {
+      toast({ title: "Sync failed", description: error.message, variant: "destructive" });
+    } finally {
+      setSyncingSheet(false);
     }
   };
 
@@ -8290,14 +8323,25 @@ ${hashtagsStr}`;
           <TabsContent value="discover">
             <Card className="border-0 shadow-card">
               <CardHeader>
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Search className="h-5 w-5 text-primary" />
-                    Discover & Scrape
-                  </CardTitle>
-                  <CardDescription>
-                    Load article links from a FreeJobAlert listing page, then scrape individual articles
-                  </CardDescription>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Search className="h-5 w-5 text-primary" />
+                      Discover & Scrape
+                    </CardTitle>
+                    <CardDescription>
+                      Load article links from a FreeJobAlert listing page, then scrape individual articles
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleSyncSheets}
+                    disabled={syncingSheet}
+                    title="Pull scraped rows from the Google Sheet into Supabase now"
+                  >
+                    {syncingSheet ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                    Sync Google Sheet
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">

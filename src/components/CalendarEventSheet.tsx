@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
-import { CalendarPlus, Clock, Download, ExternalLink, Landmark } from "lucide-react";
+import { CalendarPlus, Clock, Download, ExternalLink, Landmark, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CalendarEvent, EVENT_TYPE_CONFIG } from "@/lib/calendarEvents";
 import { downloadICS, generateGoogleCalendarUrl } from "@/lib/calendarExport";
+import { useUserCalendarEvents } from "@/hooks/useUserCalendarEvents";
 import { cn } from "@/lib/utils";
 
 interface CalendarEventSheetProps {
@@ -23,8 +24,16 @@ function statusText(event: CalendarEvent) {
 }
 
 export function CalendarEventSheet({ event, onClose }: CalendarEventSheetProps) {
+  const { removeEvent } = useUserCalendarEvents();
+
   if (!event) return null;
   const config = EVENT_TYPE_CONFIG[event.type];
+  const isCustom = event.sourceType === "custom";
+
+  const handleRemove = async () => {
+    await removeEvent.mutateAsync(event.sourceId);
+    onClose();
+  };
 
   return (
     <Sheet open={!!event} onOpenChange={(open) => !open && onClose()}>
@@ -95,6 +104,18 @@ export function CalendarEventSheet({ event, onClose }: CalendarEventSheetProps) 
               Save as .ics
             </Button>
           </div>
+
+          {isCustom && (
+            <Button
+              variant="ghost"
+              className="w-full gap-2 text-red-600 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400"
+              onClick={handleRemove}
+              disabled={removeEvent.isPending}
+            >
+              <Trash2 className="h-4 w-4" />
+              Remove from calendar
+            </Button>
+          )}
         </div>
       </SheetContent>
     </Sheet>

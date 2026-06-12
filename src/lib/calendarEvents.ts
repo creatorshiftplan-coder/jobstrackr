@@ -1,6 +1,7 @@
 import { parseFlexibleDate, getExamDateText } from "@/lib/examStatus";
 import { Job } from "@/types/job";
 import { ExamAttempt } from "@/hooks/useExams";
+import { UserCalendarEvent } from "@/hooks/useUserCalendarEvents";
 
 export type CalendarEventType =
   | "apply_start"
@@ -16,8 +17,8 @@ export interface CalendarEvent {
   date: Date; // parsed, always a real Date (local midnight)
   title: string; // e.g. 'SSC CGL — Last Date to Apply'
   org: string; // conducting body / department
-  sourceType: "job" | "exam";
-  sourceId: string; // job.id or exam_attempt.id
+  sourceType: "job" | "exam" | "custom";
+  sourceId: string; // job.id, exam_attempt.id, or user_calendar_event.id
   sourceSlug: string | null; // job.slug for navigation
   isPast: boolean; // date < today (start of day)
   daysLeft: number | null; // null if past
@@ -68,7 +69,8 @@ export function dateKey(d: Date): string {
 
 export function buildCalendarEvents(
   jobs: Job[],
-  examAttempts: ExamAttempt[]
+  examAttempts: ExamAttempt[],
+  customEvents: UserCalendarEvent[] = []
 ): CalendarEvent[] {
   const events: CalendarEvent[] = [];
   const seen = new Set<string>();
@@ -83,12 +85,13 @@ export function buildCalendarEvents(
     type: CalendarEventType,
     suffix: string,
     source: {
-      sourceType: "job" | "exam";
+      sourceType: "job" | "exam" | "custom";
       sourceId: string;
       sourceSlug: string | null;
       label: string;
       org: string;
-    }
+    },
+    titleOverride?: string
   ) => {
     if (!rawDate || typeof rawDate !== "string") return;
     const parsed = parseFlexibleDate(rawDate);
@@ -107,7 +110,7 @@ export function buildCalendarEvents(
       id,
       type,
       date,
-      title: `${source.label} — ${suffix}`,
+      title: titleOverride ?? `${source.label} — ${suffix}`,
       org: source.org,
       sourceType: source.sourceType,
       sourceId: source.sourceId,
@@ -202,6 +205,23 @@ export function buildCalendarEvents(
     push(ai?.phase_1?.result_date, "result", "Result (Phase 1)", source);
     push(ai?.phase_2?.result_date, "result", "Result (Phase 2)", source);
     push(ai?.expected_result_date, "result", "Expected Result", source);
+  }
+
+  // ── User-added personal dates ──────────────────────────
+  for (const custom of customEvents) {
+    push(
+      custom.event_date,
+      custom.event_type,
+      "",
+      {
+        sourceType: "custom",
+        sourceId: custom.id,
+        sourceSlug: null,
+        label: custom.title,
+        org: custom.note?.trim() || "Added by you",
+      },
+      custom.title // use the user's title verbatim, no suffix
+    );
   }
 
   return events.sort((a, b) => a.date.getTime() - b.date.getTime());

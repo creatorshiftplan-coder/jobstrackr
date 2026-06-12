@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useForYouJobs } from "@/hooks/useForYouJobs";
 import { useExams } from "@/hooks/useExams";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
+import { useUserCalendarEvents } from "@/hooks/useUserCalendarEvents";
 import { Job } from "@/types/job";
 import {
   buildCalendarEvents,
@@ -25,6 +26,7 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
   const { forYouJobs, isLoading: jobsLoading } = useForYouJobs(jobLimit, true, initialJobs);
   const { userExams, isLoading: examsLoading } = useExams({ includeExamCatalog: false });
   const { data: savedJobsData, isLoading: savedLoading } = useSavedJobs();
+  const { userEvents, isLoading: customLoading } = useUserCalendarEvents();
 
   // Saved jobs are the primary source; for-you matched jobs enrich the schedule.
   // Merge + de-dupe by job id so a job saved AND matched is only processed once.
@@ -40,8 +42,8 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
   }, [savedJobsData, forYouJobs]);
 
   const allEvents = useMemo(
-    () => buildCalendarEvents(jobs, userExams),
-    [jobs, userExams]
+    () => buildCalendarEvents(jobs, userExams, userEvents),
+    [jobs, userExams, userEvents]
   );
 
   const filtered = useMemo(() => {
@@ -70,7 +72,7 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
     upcoming,
     past,
     byDate,
-    isLoading: jobsLoading || examsLoading || savedLoading,
+    isLoading: jobsLoading || examsLoading || savedLoading || customLoading,
     totalUpcoming: upcoming.length,
   };
 }
