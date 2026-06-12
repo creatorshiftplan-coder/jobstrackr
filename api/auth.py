@@ -1,4 +1,6 @@
+import hashlib
 import os
+import time
 import requests
 from urllib.parse import urlparse
 
@@ -8,22 +10,48 @@ ALLOWED_DOMAINS = [
     "www.freejobalert.com"
 ]
 
+# Short-lived in-memory cache of positive admin-auth results, keyed by a hash of the
+# bearer token. During a "Scrape All"/"Save All" batch the same admin token is validated
+# on every request; without this each call makes two blocking Supabase round-trips
+# (GoTrue /auth/v1/user + has_any_admin_role RPC), flooding Auth and the DB pool.
+# Only successful authorizations are cached; failures always fall through to a live check.
+_AUTH_CACHE_TTL_SECONDS = 60
+_auth_cache: dict[str, float] = {}
+
+
+def _token_key(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def is_request_authorized(auth_header: str) -> bool:
     """
     Verifies that the request is authorized.
     Allows either:
       1. The database/system service role key.
       2. A valid user JWT belonging to an user with admin privileges (role check via RPC).
+
+    Positive results are cached in-process for a short TTL to avoid re-hitting Supabase
+    Auth on every request during scrape/save batches.
     """
     if not auth_header:
         return False
-        
+
     if not auth_header.startswith("Bearer "):
         return False
-        
+
     token = auth_header.split(" ")[1].strip()
     if not token:
         return False
+
+    # Fast path: this token was authorized very recently — skip the Supabase round-trips.
+    cache_key = _token_key(token)
+    expires_at = _auth_cache.get(cache_key)
+    now = time.time()
+    if expires_at is not None:
+        if expires_at > now:
+            return True
+        # Expired entry — drop it and re-validate below.
+        _auth_cache.pop(cache_key, None)
 
     supabase_url = os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL")
     
@@ -74,7 +102,11 @@ def is_request_authorized(auth_header: str) -> bool:
             print(f"[auth] Admin role RPC check failed: status code {rpc_response.status_code}")
             return False
 
-        return rpc_response.json() is True
+        is_admin = rpc_response.json() is True
+        if is_admin:
+            # Cache only successful authorizations for a short TTL.
+            _auth_cache[cache_key] = now + _AUTH_CACHE_TTL_SECONDS
+        return is_admin
 
     except Exception as e:
         print(f"[auth] Verification error exception: {e}")

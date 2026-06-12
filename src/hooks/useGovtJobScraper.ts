@@ -292,7 +292,7 @@ export function useGovtJobScraper() {
     // ── Discover: save article to DB ─────────────────────────────────
 
     const saveArticle = useMutation({
-        mutationFn: async (payload: ArticleData | { article: ArticleData; sourceId?: string }) => {
+        mutationFn: async (payload: ArticleData | { article: ArticleData; sourceId?: string; skipInvalidate?: boolean }) => {
             const article = "article" in payload ? payload.article : payload;
             const sourceId = "article" in payload ? payload.sourceId : undefined;
             const record: Record<string, any> = {
@@ -352,7 +352,13 @@ export function useGovtJobScraper() {
                 return { action: "new" as const };
             }
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["exam-updates"] }),
+        onSuccess: (_data, variables) => {
+            // Batch callers pass skipInvalidate and refresh once after the whole loop.
+            const skip = typeof variables === "object" && variables !== null && "skipInvalidate" in variables && variables.skipInvalidate;
+            if (!skip) {
+                queryClient.invalidateQueries({ queryKey: ["exam-updates"] });
+            }
+        },
     });
 
     return {

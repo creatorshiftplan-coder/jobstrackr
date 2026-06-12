@@ -4531,7 +4531,7 @@ ${hashtagsStr}`;
     }
   };
 
-  const handleDiscoverSaveJob = async (url: string): Promise<"saved" | "duplicate" | "error"> => {
+  const handleDiscoverSaveJob = async (url: string, skipInvalidate = false): Promise<"saved" | "duplicate" | "error"> => {
     const r = discoverScrapedResults[url];
     if (!r) return "error";
     setDiscoverSavingUrl(url);
@@ -4666,8 +4666,10 @@ ${hashtagsStr}`;
       if (error) throw error;
 
       setDiscoverSavedUrls(prev => new Set(prev).add(url));
-      queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      if (!skipInvalidate) {
+        queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      }
       toast({ title: "Saved!", description: `${jobRecord.title} added to database.` });
       return "saved";
     } catch (error: any) {
@@ -8386,10 +8388,15 @@ ${hashtagsStr}`;
                             let duplicateCount = 0;
                             let errorCount = 0;
                             for (const link of unsaved) {
-                              const result = await handleDiscoverSaveJob(link.url);
+                              const result = await handleDiscoverSaveJob(link.url, true);
                               if (result === "saved") savedCount++;
                               else if (result === "duplicate") duplicateCount++;
                               else if (result === "error") errorCount++;
+                            }
+                            // Refresh the jobs lists once after the whole batch instead of per item.
+                            if (savedCount > 0) {
+                              queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+                              queryClient.invalidateQueries({ queryKey: ["jobs"] });
                             }
                             setDiscoverSavingAll(false);
                             
@@ -9131,13 +9138,17 @@ ${hashtagsStr}`;
                               let failed = 0;
                               for (const link of unsaved) {
                                 try {
-                                  await govtScraper.saveArticle.mutateAsync({ article: updatesScrapedResults[link.url] });
+                                  await govtScraper.saveArticle.mutateAsync({ article: updatesScrapedResults[link.url], skipInvalidate: true });
                                   setUpdatesSavedUrls((prev) => new Set(prev).add(link.url));
                                   saved++;
                                 } catch (e: any) {
                                   console.error("Save failed for", link.url, e);
                                   failed++;
                                 }
+                              }
+                              // Refresh the exam-updates list once after the whole batch instead of per item.
+                              if (saved > 0) {
+                                queryClient.invalidateQueries({ queryKey: ["exam-updates"] });
                               }
                               setUpdatesSavingAll(false);
                               const total = unsaved.length;

@@ -84,16 +84,20 @@ def parse_date_safe(raw: str | None) -> str:
 
 
 def is_duplicate_by_title(supabase, title: str) -> bool:
-    """Check if a job with a similar title already exists."""
+    """Check if a job with the same title already exists (case-insensitive).
+
+    Existence check only — avoids the full `count="exact"` scan and is index-backed by
+    the pg_trgm index on jobs.title. Same predicate, so dedup behavior is unchanged.
+    """
     try:
         result = (
             supabase.table("jobs")
-            .select("id", count="exact")
+            .select("id")
             .ilike("title", title)
             .limit(1)
             .execute()
         )
-        return result.count is not None and result.count > 0
+        return bool(result.data)
     except Exception:
         # Fail open: if we can't check, assume not duplicate to avoid data loss
         return False
