@@ -538,6 +538,21 @@ function localCachePlugin(env: Record<string, string>) {
   };
 }
 
+// Dev-only: serve the standalone quiz page at the pretty /quiz URL,
+// mirroring the production rewrite in vercel.json (/quiz -> /quiz.html).
+function quizRouteAlias() {
+  return {
+    name: "quiz-route-alias",
+    configureServer(server: any) {
+      server.middlewares.use((req: any, _res: any, next: any) => {
+        const url = (req.url || "").split("?")[0];
+        if (url === "/quiz" || url === "/quiz/") req.url = "/quiz.html";
+        next();
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -546,10 +561,16 @@ export default defineConfig(({ mode }) => {
       host: "::",
       port: 8080,
     },
-    plugins: [localCachePlugin(env), localScraperPlugin(), localDiscoverPlugin(), localScrapeArticlePlugin(), localScrapeLinksPlugin(), react()],
+    plugins: [quizRouteAlias(), localCachePlugin(env), localScraperPlugin(), localDiscoverPlugin(), localScrapeArticlePlugin(), localScrapeLinksPlugin(), react()],
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
+      // Multi-page build: the main app + a standalone, serverless quiz page
+      // (quiz.html) that ships its own minimal bundle — no app shell required.
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        quiz: path.resolve(__dirname, "quiz.html"),
+      },
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],

@@ -84,6 +84,10 @@
       "destination": "/icon-512x512.png"
     },
     {
+      "source": "/quiz",
+      "destination": "/quiz.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

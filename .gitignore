@@ -40,3 +40,4 @@ build/
 # Nested projects (tracked in their own repos)
 ggg/
 jobstrackr/
+jobstrackr-main/

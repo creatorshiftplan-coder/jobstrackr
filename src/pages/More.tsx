@@ -454,7 +454,7 @@ export default function More() {
             <div>
               <h3 className="font-display font-semibold text-foreground text-lg mb-3">Smart Tools & Utilities</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                
+
                 {/* Jobs For You */}
                 <div onClick={() => navigate("/for-you")} className="block cursor-pointer">
                   <Card className="bg-white dark:bg-card border-border/50 shadow-sm hover:shadow-md transition-shadow h-full">
@@ -546,6 +546,26 @@ export default function More() {
                     </Card>
                   </div>
                 )}
+
+                {/* Which Govt Job Suits You? — standalone serverless quiz page.
+                    Full-page load (not react-router) so it opens its own light
+                    bundle without the app shell, and can be shared & played. */}
+                <a href="/quiz" className="block sm:col-span-2">
+                  <Card className="bg-white dark:bg-card border-border/50 shadow-sm hover:shadow-md transition-shadow h-full">
+                    <CardContent className="p-4 flex items-center justify-between h-full">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-violet-500/10 dark:bg-violet-500/20 flex items-center justify-center flex-shrink-0">
+                          <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-foreground">Which Govt Job Suits You?</h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">Take a 2-min quiz to find exams you're eligible for</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    </CardContent>
+                  </Card>
+                </a>
 
                 {/* Dark Mode Card (Mobile Only) */}
                 <div className="block md:hidden sm:col-span-2">
