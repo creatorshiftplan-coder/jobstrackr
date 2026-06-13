@@ -61,7 +61,7 @@ export function useTrendingExams(category?: string) {
                 return keywords.some(keyword => searchText.includes(keyword.toLowerCase()));
             });
         },
-        staleTime: 1000 * 60 * 5, // 5 minutes
+        staleTime: 1000 * 60 * 15, // 15 minutes — matches the lengthened server cache TTL
     });
 }
 

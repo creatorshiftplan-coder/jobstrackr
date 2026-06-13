@@ -3,6 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { sortByTitleMatch, tokenizeTitle } from "@/lib/titleMatcher";
 import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 
+/**
+ * Columns needed by list/card views. Deliberately omits the heavy `sections`
+ * (full scraped article bodies), `overview`, and `related_articles` JSON — those
+ * are only rendered on the detail page (useExamUpdateById, which keeps select("*")).
+ * Fetching only these columns is the main lever for cutting Supabase PostgREST egress.
+ */
+const LIGHT_UPDATE_COLS =
+  "id, slug, url, title, category, status, published_date, summary, important_dates, download_links, tags, scraped_at, created_at, updated_at, job_id, exam_id";
+
 /** Clean freejobalert URLs from nested links inside updates (but keep the updates themselves) */
 function filterFreeJobAlertFromUpdates(updates: ExamUpdateItem[]): ExamUpdateItem[] {
   return updates.map((u) => ({
@@ -51,7 +60,7 @@ export function useAllExamUpdates(category?: string) {
       if (!res.ok) {
         // Fallback to direct Supabase if cache endpoint fails
         let query = (supabase.from as any)("exam_updates")
-          .select("*")
+          .select(LIGHT_UPDATE_COLS)
           .order("scraped_at", { ascending: false })
           .limit(100);
 
@@ -66,7 +75,7 @@ export function useAllExamUpdates(category?: string) {
 
       return res.json();
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000, // matches the lengthened server cache TTL
   });
 }
 
@@ -108,7 +117,7 @@ export function useExamUpdatesForJob(jobId: string | undefined, jobTitle: string
       // First try direct job_id link
       if (jobId) {
         const { data: byJobId, error: err1 } = await (supabase.from as any)("exam_updates")
-          .select("*")
+          .select(LIGHT_UPDATE_COLS)
           .eq("job_id", jobId)
           .order("scraped_at", { ascending: false })
           .limit(20);
@@ -127,7 +136,7 @@ export function useExamUpdatesForJob(jobId: string | undefined, jobTitle: string
         if (keywords.length > 0) {
           const orQuery = keywords.map((keyword) => `title.ilike.%${keyword}%`).join(",");
           const { data: byTitle, error: err2 } = await (supabase.from as any)("exam_updates")
-            .select("*")
+            .select(LIGHT_UPDATE_COLS)
             .or(orQuery)
             .order("scraped_at", { ascending: false })
             .limit(50);
@@ -157,7 +166,7 @@ export function useExamUpdatesForExam(examId: string | undefined, examName: stri
       // First try direct exam_id link
       if (examId) {
         const { data: byExamId, error: err1 } = await (supabase.from as any)("exam_updates")
-          .select("*")
+          .select(LIGHT_UPDATE_COLS)
           .eq("exam_id", examId)
           .order("scraped_at", { ascending: false })
           .limit(20);
@@ -176,7 +185,7 @@ export function useExamUpdatesForExam(examId: string | undefined, examName: stri
         if (keywords.length > 0) {
           const orQuery = keywords.map((keyword) => `title.ilike.%${keyword}%`).join(",");
           const { data: byName, error: err2 } = await (supabase.from as any)("exam_updates")
-            .select("*")
+            .select(LIGHT_UPDATE_COLS)
             .or(orQuery)
             .order("scraped_at", { ascending: false })
             .limit(50);
@@ -191,7 +200,7 @@ export function useExamUpdatesForExam(examId: string | undefined, examName: stri
           if (coreKeywords.length > 0) {
             const coreOrQuery = coreKeywords.map((keyword) => `title.ilike.%${keyword}%`).join(",");
             const { data: byCore, error: err3 } = await (supabase.from as any)("exam_updates")
-              .select("*")
+              .select(LIGHT_UPDATE_COLS)
               .or(coreOrQuery)
               .order("scraped_at", { ascending: false })
               .limit(50);

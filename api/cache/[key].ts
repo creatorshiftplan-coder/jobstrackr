@@ -18,7 +18,7 @@ async function supabaseFetch(path: string): Promise<any> {
 // ─── Jobs handler ────────────────────────────────────────────────
 async function handleJobs(req: VercelRequest, res: VercelResponse) {
   const CACHE_KEY = 'cache:jobs:all';
-  const CACHE_TTL = 300;
+  const CACHE_TTL = 1800; // 30 min — balances freshness against Supabase egress
 
   const { data, cacheHit } = await cachedFetch<any[]>(CACHE_KEY, CACHE_TTL, async () => {
     const columns = [
@@ -79,7 +79,7 @@ async function handleJobs(req: VercelRequest, res: VercelResponse) {
     });
   });
 
-  setCacheHeaders(res, cacheHit, 120, 300);
+  setCacheHeaders(res, cacheHit, 600, 1800);
   return res.status(200).json(data);
 }
 
@@ -92,7 +92,7 @@ interface HomepageBundle {
 
 async function handleHomepage(req: VercelRequest, res: VercelResponse) {
   const CACHE_KEY = 'cache:homepage:bundle';
-  const CACHE_TTL = 300;
+  const CACHE_TTL = 1800; // 30 min — balances freshness against Supabase egress
 
   const { data, cacheHit } = await cachedFetch<HomepageBundle>(CACHE_KEY, CACHE_TTL, async () => {
     const jobColumns = [
@@ -148,7 +148,7 @@ async function handleHomepage(req: VercelRequest, res: VercelResponse) {
     };
   });
 
-  setCacheHeaders(res, cacheHit, 120, 300);
+  setCacheHeaders(res, cacheHit, 600, 1800);
   return res.status(200).json(data);
 }
 
@@ -191,7 +191,7 @@ interface TrendingExam {
 
 async function handleTrendingExams(req: VercelRequest, res: VercelResponse) {
   const CACHE_KEY = 'cache:trending-exams';
-  const CACHE_TTL = 600;
+  const CACHE_TTL = 1800; // 30 min — balances freshness against Supabase egress
 
   const { data, cacheHit } = await cachedFetch<TrendingExam[]>(CACHE_KEY, CACHE_TTL, async () => {
     const exams: any[] = await supabaseFetch(
@@ -251,7 +251,7 @@ async function handleTrendingExams(req: VercelRequest, res: VercelResponse) {
     return trendingExams;
   });
 
-  setCacheHeaders(res, cacheHit, 120, 600);
+  setCacheHeaders(res, cacheHit, 600, 1800);
   return res.status(200).json(data);
 }
 
@@ -285,10 +285,18 @@ function filterFreeJobAlertFromUpdates(updates: any[]): any[] {
 async function handleExamUpdates(req: VercelRequest, res: VercelResponse) {
   const category = (req.query.category as string) || '';
   const cacheKey = `cache:exam-updates:${category || 'all'}`;
-  const CACHE_TTL = 300;
+  const CACHE_TTL = 900; // 15 min — balances freshness against Supabase egress
 
   const { data, cacheHit } = await cachedFetch<any[]>(cacheKey, CACHE_TTL, async () => {
-    let url = `${SUPABASE_URL}/rest/v1/exam_updates?select=*&order=scraped_at.desc&limit=100`;
+    // Light column set — list/card views never render the heavy `sections`,
+    // `overview`, or `related_articles` JSON (those load on the detail page only).
+    const updateColumns = [
+      'id', 'slug', 'url', 'title', 'category', 'status', 'published_date',
+      'summary', 'important_dates', 'download_links', 'tags',
+      'scraped_at', 'created_at', 'updated_at', 'job_id', 'exam_id',
+    ].join(',');
+
+    let url = `${SUPABASE_URL}/rest/v1/exam_updates?select=${updateColumns}&order=scraped_at.desc&limit=100`;
 
     if (category && category !== 'all') {
       url += `&category=eq.${encodeURIComponent(category)}`;
@@ -309,7 +317,7 @@ async function handleExamUpdates(req: VercelRequest, res: VercelResponse) {
     return filterFreeJobAlertFromUpdates(raw || []);
   });
 
-  setCacheHeaders(res, cacheHit, 120, 300);
+  setCacheHeaders(res, cacheHit, 300, 900);
   return res.status(200).json(data);
 }
 
