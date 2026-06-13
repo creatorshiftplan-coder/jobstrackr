@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, Smartphone, Laptop, LayoutDashboard, Search, FileText, Bookmark, User, Copy, ClipboardList, Bell, Settings, HelpCircle, Sparkles, CheckCircle, Info, ShieldCheck, TrendingUp, Upload, MessageSquare, Plus, Brain, RefreshCw } from "lucide-react";
+import { ArrowLeft, BookOpen, Smartphone, Laptop, LayoutDashboard, Search, FileText, Bookmark, User, Copy, ClipboardList, Bell, Settings, HelpCircle, Sparkles, CheckCircle, Info, ShieldCheck, TrendingUp, Upload, MessageSquare, Plus, Brain, RefreshCw, Download, Share } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -83,8 +83,76 @@ export default function UserManual() {
           </div>
         </Section>
 
-        {/* 2. Navigation Overview */}
-        <Section title="2. Navigation Overview" icon={Laptop}>
+        {/* 2. Download & Install the App */}
+        <Section title="2. Download & Install the App" icon={Download}>
+          <p>
+            JobsTrackr is a <span className="font-semibold text-foreground">Progressive Web App (PWA)</span> — there's no app
+            store needed. Install it straight from your browser to get a home-screen icon, full-screen standalone mode, faster
+            launches, and offline access to previously loaded jobs.
+          </p>
+
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 dark:bg-primary/10 text-xs mt-1 border border-primary/20">
+            <Download className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+            <div className="text-muted-foreground">
+              <span className="font-semibold text-foreground">Easiest way:</span> Keep browsing for a little while and an
+              <span className="font-medium text-foreground"> “Install JobsTrackr”</span> banner appears at the bottom of the
+              screen. Tap <span className="font-medium text-foreground">Install</span>, then confirm — done. If you dismiss it,
+              you can still install manually using the steps below.
+            </div>
+          </div>
+
+          {/* Android / Chrome */}
+          <div className="mt-2">
+            <h4 className="font-semibold text-foreground text-sm flex items-center gap-1.5 mb-2">
+              <Smartphone className="h-4 w-4 text-primary" /> Android (Chrome / Edge)
+            </h4>
+            <div className="space-y-3">
+              <Step num={1} title="Tap Install on the banner — or open the browser menu (⋮)" result="The floating Install banner appears automatically after a short browse." />
+              <Step num={2} title="Choose 'Install app' or 'Add to Home screen'" result="Found in the browser's three-dot menu if the banner isn't showing." />
+              <Step num={3} title="Confirm 'Install'" result="The JobsTrackr icon is added to your home screen and app drawer." />
+            </div>
+          </div>
+
+          {/* iOS / Safari */}
+          <div className="mt-3">
+            <h4 className="font-semibold text-foreground text-sm flex items-center gap-1.5 mb-2">
+              <Share className="h-4 w-4 text-primary" /> iPhone &amp; iPad (Safari)
+            </h4>
+            <p className="text-xs text-muted-foreground mb-2">
+              iOS doesn't show a one-tap install button, so add it manually from Safari (it must be Safari, not Chrome):
+            </p>
+            <div className="space-y-3">
+              <Step num={1} title="Tap the Share button" result="The square-with-an-arrow icon in Safari's bottom toolbar (top bar on iPad)." />
+              <Step num={2} title="Scroll down and tap 'Add to Home Screen'" result="Look for the ➕ Add to Home Screen option in the share sheet." />
+              <Step num={3} title="Tap 'Add' in the top-right" result="JobsTrackr is added to your home screen as a standalone app." />
+            </div>
+          </div>
+
+          {/* Desktop */}
+          <div className="mt-3">
+            <h4 className="font-semibold text-foreground text-sm flex items-center gap-1.5 mb-2">
+              <Laptop className="h-4 w-4 text-primary" /> Desktop (Chrome / Edge)
+            </h4>
+            <div className="space-y-3">
+              <Step num={1} title="Click the install icon in the address bar" result="A small monitor/⊕ Download icon appears at the right edge of the URL bar." />
+              <Step num={2} title="Or open the menu (⋮) → 'Install JobsTrackr'" result="Use this if the address-bar icon isn't visible." />
+              <Step num={3} title="Click 'Install'" result="JobsTrackr opens in its own window and is added to your apps." />
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs mt-3 border border-amber-500/20">
+            <Info className="h-4 w-4 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold">Not seeing an install option?</span> Make sure you're on
+              <span className="font-medium"> jobstrackr.in</span> over a secure (https) connection, the app isn't already
+              installed, and you're using a supported browser (Chrome, Edge, or Safari on iOS). Firefox and desktop Safari
+              don't support PWA installation.
+            </div>
+          </div>
+        </Section>
+
+        {/* 3. Navigation Overview */}
+        <Section title="3. Navigation Overview" icon={Laptop}>
           <div className="space-y-4">
             <div>
               <h4 className="font-semibold text-foreground text-sm flex items-center gap-1.5 mb-2">
@@ -120,7 +188,7 @@ export default function UserManual() {
         </Section>
 
         {/* 3. Home Dashboard & Jobs For You */}
-        <Section title="3. Home Dashboard & Jobs For You" icon={LayoutDashboard}>
+        <Section title="4. Home Dashboard & Jobs For You" icon={LayoutDashboard}>
           <p>
             The Home dashboard is organized to display the most relevant government job opportunities for your profile instantly:
           </p>
@@ -148,7 +216,7 @@ export default function UserManual() {
         </Section>
 
         {/* 4. Search, Explore & AI Search */}
-        <Section title="4. Search, Explore & AI Search" icon={Search}>
+        <Section title="5. Search, Explore & AI Search" icon={Search}>
           <div className="space-y-3 text-xs">
             <p>Our search interface enables you to look up any active recruitment posting on the platform:</p>
             <ol className="list-decimal list-inside space-y-2 ml-1">
@@ -168,7 +236,7 @@ export default function UserManual() {
         </Section>
 
         {/* 5. Job Details & Tracking Exams */}
-        <Section title="5. Job Details & Tracking Exams" icon={FileText}>
+        <Section title="6. Job Details & Tracking Exams" icon={FileText}>
           <p className="text-xs mb-2">Each job details sheet maps important information extracted directly from official alerts:</p>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="p-2 border border-border rounded-lg"><strong>Important Dates:</strong> Form start date, deadline, and exam dates</div>
@@ -192,7 +260,7 @@ export default function UserManual() {
         </Section>
 
         {/* 6. My Active Exams & Syllabus Finder */}
-        <Section title="6. My Active Exams & Syllabus Finder" icon={BookOpen}>
+        <Section title="7. My Active Exams & Syllabus Finder" icon={BookOpen}>
           <div className="space-y-3 text-xs">
             <div>
               <h4 className="font-semibold text-foreground flex items-center gap-1.5 mb-1">
@@ -225,7 +293,7 @@ export default function UserManual() {
         </Section>
 
         {/* 7. Saving & Managing Jobs */}
-        <Section title="7. Saving & Managing Jobs" icon={Bookmark}>
+        <Section title="8. Saving & Managing Jobs" icon={Bookmark}>
           <div className="space-y-2 text-xs">
             <p><span className="font-semibold text-foreground">Bookmark:</span> Tap the bookmark icon on any job card. It turns solid once saved.</p>
             <p><span className="font-semibold text-foreground">View Saved:</span> Navigate to the Saved tab to see all marked listings.</p>
@@ -234,7 +302,7 @@ export default function UserManual() {
         </Section>
 
         {/* 8. Profile & FormMate (Document Upload) */}
-        <Section title="8. Profile & FormMate (Document Upload)" icon={User}>
+        <Section title="9. Profile & FormMate (Document Upload)" icon={User}>
           <p>Complete your profile fields to generate tailored match alerts and use autofill features:</p>
           <div className="space-y-2 text-xs pt-1">
             <div className="flex justify-between border-b pb-1">
@@ -269,7 +337,7 @@ export default function UserManual() {
         </Section>
 
         {/* 9. Telegram Alerts & Settings */}
-        <Section title="9. Telegram Alerts & Settings" icon={Bell}>
+        <Section title="10. Telegram Alerts & Settings" icon={Bell}>
           <div className="space-y-3">
             <div>
               <h4 className="font-semibold text-foreground text-xs uppercase tracking-wider mb-1">Telegram Alerts Channel</h4>
@@ -306,7 +374,7 @@ export default function UserManual() {
         </Section>
 
         {/* 10. Feedback & Grievances Hub */}
-        <Section title="10. Feedback & Grievances Hub" icon={MessageSquare}>
+        <Section title="11. Feedback & Grievances Hub" icon={MessageSquare}>
           <div className="space-y-2 text-xs">
             <p>
               We value your experience and review all bug reports, database errors, and recommendations closely:
@@ -321,7 +389,7 @@ export default function UserManual() {
         </Section>
 
         {/* 11. Pro Tips */}
-        <Section title="11. Pro Tips & Best Practices" icon={Sparkles}>
+        <Section title="12. Pro Tips & Best Practices" icon={Sparkles}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             <div className="p-3 bg-secondary/20 dark:bg-secondary/10 rounded-lg">
               <strong className="text-foreground block mb-1">⚡ Complete the For-You Wizard</strong>
