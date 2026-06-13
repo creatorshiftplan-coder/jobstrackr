@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
+import logoColor from "@/assets/logo-color.png";
 import {
   Dialog,
   DialogContent,
@@ -234,9 +235,11 @@ export function DesktopSidebar() {
       <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="px-4 py-5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary">
-            <Briefcase className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img
+            src={logoColor}
+            alt="JobsTrackr Logo"
+            className="h-8 w-8 shrink-0 object-contain invert dark:invert-0"
+          />
           {!collapsed && (
             <span className="text-lg font-bold text-foreground tracking-tight">
               JobsTrackr

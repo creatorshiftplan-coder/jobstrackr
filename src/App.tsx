@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { persister, shouldDehydrateQuery, PERSIST_BUSTER } from "@/lib/queryPersister";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -75,6 +75,75 @@ const queryClient = new QueryClient({
   },
 });
 
+const AppContent = () => {
+  const location = useLocation();
+  const hideNavigation = ["/welcome", "/auth", "/reset-password"].includes(location.pathname);
+
+  const routes = (
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/welcome" element={<Welcome />} />
+        <Route path="/jobs/:slug" element={<JobDetails />} />
+        <Route path="/job/:id" element={<JobRedirect />} />
+        <Route path="/search" element={<Search />} />
+        <Route path="/saved" element={<Saved />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/edit-profile" element={<EditProfile />} />
+        <Route path="/edit-education" element={<EditEducation />} />
+        <Route path="/formmate" element={<FormMate />} />
+        <Route path="/documents" element={<Documents />} />
+        <Route path="/help" element={<Help />} />
+        <Route path="/user-manual" element={<UserManual />} />
+        <Route path="/faq" element={<FAQ />} />
+        <Route path="/settings/notifications" element={<TelegramAlerts />} />
+        <Route path="/more" element={<More />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/admin" element={<Admin />} />
+        <Route path="/tracker" element={<ExamTracker />} />
+        <Route path="/calendar" element={<ExamCalendar />} />
+        <Route path="/trending" element={<Trending />} />
+        <Route path="/updates/:slug" element={<UpdateDetails />} />
+        <Route path="/exam-update/:id" element={<ExamUpdateDetail />} />
+        <Route path="/syllabus" element={<SyllabusCheck />} />
+        <Route path="/syllabus/result" element={<SyllabusResult />} />
+        <Route path="/edit-sector-preferences" element={<EditSectorPreferences />} />
+        <Route path="/for-you" element={<Recommendations />} />
+        <Route path="/for-you/shelf/:shelfKey" element={<ShelfDetails />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/refund-policy" element={<RefundPolicy />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  );
+
+  if (hideNavigation) {
+    return (
+      <div className="flex min-h-screen w-full flex-col">
+        <main id="main-scroll" className="flex-1 overflow-y-auto">
+          {routes}
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <SidebarProvider defaultOpen={true}>
+      <div className="flex min-h-screen w-full">
+        <DesktopSidebar />
+        <div className="flex flex-1 flex-col min-w-0">
+          <TopBar />
+          <main id="main-scroll" className="flex-1 overflow-y-auto">
+            {routes}
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+};
+
 const App = () => {
   const [showSplash, setShowSplash] = useState(() => shouldShowSplash());
 
@@ -107,53 +176,7 @@ const App = () => {
                 <AuthRequiredProvider>
                   <OfflineIndicator />
                   <InstallPrompt />
-                  <SidebarProvider defaultOpen={true}>
-                    <div className="flex min-h-screen w-full">
-                      <DesktopSidebar />
-                      <div className="flex flex-1 flex-col min-w-0">
-                        <TopBar />
-                        <main id="main-scroll" className="flex-1 overflow-y-auto">
-                          <Suspense fallback={<PageLoader />}>
-                            <Routes>
-                      <Route path="/" element={<Index />} />
-                      <Route path="/welcome" element={<Welcome />} />
-                      <Route path="/jobs/:slug" element={<JobDetails />} />
-                      <Route path="/job/:id" element={<JobRedirect />} />
-                      <Route path="/search" element={<Search />} />
-                      <Route path="/saved" element={<Saved />} />
-                      <Route path="/profile" element={<Profile />} />
-                      <Route path="/edit-profile" element={<EditProfile />} />
-                      <Route path="/edit-education" element={<EditEducation />} />
-                      <Route path="/formmate" element={<FormMate />} />
-                      <Route path="/documents" element={<Documents />} />
-                      <Route path="/help" element={<Help />} />
-                      <Route path="/user-manual" element={<UserManual />} />
-                      <Route path="/faq" element={<FAQ />} />
-                      <Route path="/settings/notifications" element={<TelegramAlerts />} />
-                      <Route path="/more" element={<More />} />
-                      <Route path="/auth" element={<Auth />} />
-                      <Route path="/reset-password" element={<ResetPassword />} />
-                      <Route path="/admin" element={<Admin />} />
-                      <Route path="/tracker" element={<ExamTracker />} />
-                      <Route path="/calendar" element={<ExamCalendar />} />
-                      <Route path="/trending" element={<Trending />} />
-                      <Route path="/updates/:slug" element={<UpdateDetails />} />
-                      <Route path="/exam-update/:id" element={<ExamUpdateDetail />} />
-                      <Route path="/syllabus" element={<SyllabusCheck />} />
-                      <Route path="/syllabus/result" element={<SyllabusResult />} />
-                      <Route path="/edit-sector-preferences" element={<EditSectorPreferences />} />
-                      <Route path="/for-you" element={<Recommendations />} />
-                      <Route path="/for-you/shelf/:shelfKey" element={<ShelfDetails />} />
-                      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                      <Route path="/refund-policy" element={<RefundPolicy />} />
-                      <Route path="/terms-of-service" element={<TermsOfService />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                          </Suspense>
-                        </main>
-                      </div>
-                    </div>
-                  </SidebarProvider>
+                  <AppContent />
                 </AuthRequiredProvider>
               </AnalyticsProvider>
             </BrowserRouter>

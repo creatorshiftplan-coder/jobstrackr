@@ -538,7 +538,7 @@ export default function More() {
                           </div>
                           <div>
                             <h4 className="font-semibold text-sm text-foreground">Telegram Alerts</h4>
-                            <p className="text-xs text-muted-foreground mt-0.5">Configure state, qualification, and job category alerts</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Get personalised notifications and job update alerts on your Telegram</p>
                           </div>
                         </div>
                         <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
