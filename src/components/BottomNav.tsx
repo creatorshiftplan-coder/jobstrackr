@@ -3,24 +3,19 @@ import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { icon: Home, label: "Home", path: "/" },
-  { icon: Search, label: "Explore", path: "/search" },
-  { icon: Flame, label: "Trending", path: "/trending" },
-  { icon: GraduationCap, label: "My Exams", path: "/tracker" },
-  { icon: CalendarDays, label: "Calendar", path: "/calendar" },
+  { icon: Home, label: "Home", path: "/", color: "#f44336" },
+  { icon: Search, label: "Explore", path: "/search", color: "#ffa117" },
+  { icon: Flame, label: "Trending", path: "/trending", color: "#0fc70f" },
+  { icon: GraduationCap, label: "My Exams", path: "/tracker", color: "#2196f3" },
+  { icon: CalendarDays, label: "Calendar", path: "/calendar", color: "#00bcd4" },
 ];
 
-// 5 tabs across the floating bar: 5 x 58px = 290px content width.
+// Tabs must fit a 360px-wide viewport
 const TAB_WIDTH = 58;
 const NAV_WIDTH = navItems.length * TAB_WIDTH;
 
-// The 5 tab paths are always shown. These extra paths aren't tabs themselves but
-// still show the bar (with no tab active) so users can jump back to a main section.
-const EXTRA_VISIBLE_PATHS = ["/profile"];
-const visiblePaths = new Set([
-  ...navItems.map((item) => item.path),
-  ...EXTRA_VISIBLE_PATHS,
-]);
+// Profile moved to the top-right of page headers, but the nav stays visible there
+const visiblePaths = new Set([...navItems.map((item) => item.path), "/profile"]);
 
 export function BottomNav() {
   const location = useLocation();
@@ -35,57 +30,52 @@ export function BottomNav() {
   );
 
   return (
-    <nav className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 md:hidden">
-      <div className="glow-nav relative flex h-[60px] items-center justify-center rounded-2xl bg-card px-2 shadow-lg">
-        <ul className="relative flex" style={{ width: NAV_WIDTH }}>
-          {navItems.map(({ icon: Icon, path }, index) => {
-            const isActive = activeIndex === index;
-            return (
-              <li
-                key={path}
-                className="relative z-[2] h-[60px] w-[58px] list-none"
-              >
-                <Link
-                  to={path}
-                  className="flex h-full w-full items-center justify-center text-muted-foreground no-underline"
-                >
-                  <span
-                    className={cn(
-                      "relative flex h-[50px] w-[50px] items-center justify-center rounded-full bg-card transition-all duration-500",
-                      isActive && "-translate-y-[27px]"
-                    )}
-                    style={
-                      isActive
-                        ? { background: "hsl(var(--primary))", transitionDelay: "0.25s" }
-                        : { transitionDelay: "0s" }
-                    }
-                  >
-                    <Icon
-                      className={cn(
-                        "h-[22px] w-[22px] transition-colors duration-300",
-                        isActive ? "text-primary-foreground" : "text-muted-foreground"
-                      )}
-                      strokeWidth={isActive ? 2.5 : 2}
-                    />
-                    {isActive && (
-                      <span
-                        className="absolute left-0 top-[8px] h-full w-full rounded-full opacity-50 blur-[5px] transition-opacity duration-500"
-                        style={{ background: "hsl(var(--primary))" }}
-                      />
-                    )}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-          <div
-            className="glow-indicator absolute -top-[35px] z-[1] h-[70px] w-[70px] rounded-full bg-card transition-transform duration-500"
-            style={{
-              transform: `translateX(${activeIndex >= 0 ? activeIndex * TAB_WIDTH - 6 : -6}px)`,
-            }}
-          />
-        </ul>
+    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 md:hidden w-[290px] h-[55px] bg-transparent">
+      {/* Backdrop bar */}
+      <div className="absolute left-0 right-0 bottom-0 h-[45px] bg-card rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-border/30 z-0">
+        {/* Notch cutout */}
+        <div
+          className="absolute -top-[20px] w-[56px] h-[56px] bg-background rounded-full transition-transform duration-300 ease-out z-0"
+          style={{
+            transform: `translateX(${activeIndex >= 0 ? activeIndex * 58 + 1 : 1}px)`,
+          }}
+        />
       </div>
+
+      {/* Navigation Links */}
+      <ul className="flex w-[290px] relative z-10">
+        {navItems.map(({ icon: Icon, path, color }, index) => {
+          const isActive = activeIndex === index;
+          return (
+            <li
+              key={path}
+              className="relative w-[58px] h-[55px] z-[2] list-none"
+            >
+              <Link
+                to={path}
+                className="flex items-center justify-center w-full h-full text-muted-foreground no-underline"
+              >
+                <span
+                  className={cn(
+                    "relative flex items-center justify-center w-[42px] h-[42px] rounded-full bg-card transition-all duration-300 ease-out cursor-pointer",
+                    isActive
+                      ? "-translate-y-[7px] shadow-[0_8px_20px_-3px_rgba(0,0,0,0.2)]"
+                      : "translate-y-[5px]"
+                  )}
+                >
+                  <Icon
+                    className="h-[22px] w-[22px] transition-colors duration-300"
+                    style={{
+                      color: isActive ? color : "hsl(var(--muted-foreground))",
+                    }}
+                    strokeWidth={isActive ? 2.5 : 2}
+                  />
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }
