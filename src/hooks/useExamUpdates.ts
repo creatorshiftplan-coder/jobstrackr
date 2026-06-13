@@ -27,6 +27,7 @@ function filterFreeJobAlertFromUpdates(updates: ExamUpdateItem[]): ExamUpdateIte
 
 export interface ExamUpdateItem {
   id: string;
+  slug?: string | null;
   url: string;
   title: string;
   category: string;

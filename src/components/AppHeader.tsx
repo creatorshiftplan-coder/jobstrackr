@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, Search, Bookmark, RefreshCw, Home, CalendarDays, User, Settings, HelpCircle, Flame, ArrowLeft } from "lucide-react";
+import { Menu, Search, Bookmark, RefreshCw, Home, CalendarDays, User, Settings, HelpCircle, Flame, Timer, ArrowLeft } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useSmartBack } from "@/hooks/useSmartBack";
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
     { icon: Home, label: "Home", path: "/" },
     { icon: Search, label: "Explore", path: "/search" },
     { icon: Flame, label: "Trending", path: "/trending" },
+    { icon: Timer, label: "Countdown", path: "/countdown" },
     { icon: CalendarDays, label: "My Exams", path: "/tracker" },
     { icon: User, label: "Profile", path: "/profile" },
     { icon: Settings, label: "Settings", path: "/more" },
