@@ -37,6 +37,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 const ExamTracker = lazy(() => import("./pages/ExamTracker"));
 const ExamCalendar = lazy(() => import("./pages/ExamCalendar"));
 const CountdownWall = lazy(() => import("./pages/CountdownWall"));
+const CountdownShare = lazy(() => import("./pages/CountdownShare"));
 const EditProfile = lazy(() => import("./pages/EditProfile"));
 const EditEducation = lazy(() => import("./pages/EditEducation"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -105,6 +106,7 @@ const AppContent = () => {
         <Route path="/tracker" element={<ExamTracker />} />
         <Route path="/calendar" element={<ExamCalendar />} />
         <Route path="/countdown" element={<CountdownWall />} />
+        <Route path="/countdown/:slug" element={<CountdownShare />} />
         <Route path="/trending" element={<Trending />} />
         <Route path="/updates/:slug" element={<UpdateDetails />} />
         <Route path="/exam-update/:id" element={<ExamUpdateDetail />} />

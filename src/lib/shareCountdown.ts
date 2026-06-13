@@ -11,8 +11,12 @@ export function appOrigin(): string {
 
 /** Canonical shareable URL for a single exam's countdown. */
 export function countdownShareUrl(item: CountdownItem): string {
-  const slugOrId = item.update.slug || item.update.id;
-  return `${appOrigin()}/countdown/${slugOrId}`;
+  // Jobs have a rich, server-rendered detail page (with OG previews); link
+  // straight to it. Exam-updates use the dedicated countdown share landing.
+  if (item.sourceType === "job") {
+    return `${appOrigin()}${item.slug ? `/jobs/${item.slug}` : `/job/${item.sourceId}`}`;
+  }
+  return `${appOrigin()}/countdown/${item.slug || item.sourceId}`;
 }
 
 /** Human countdown phrase, e.g. "Only 23 days left" / "is TODAY". */
@@ -26,7 +30,7 @@ export function countdownPhrase(daysLeft: number): string {
 export function buildShareText(item: CountdownItem): string {
   const phrase = countdownPhrase(item.daysLeft);
   const dateStr = format(item.examDate, "EEE, d MMM yyyy");
-  const title = item.update.title?.trim() || "this exam";
+  const title = item.title?.trim() || "this exam";
   return `⏰ ${phrase} for ${title}!\n📅 ${item.eventLabel}: ${dateStr}\n\nTrack the live countdown on JobsTrackr 👇`;
 }
 

@@ -3,7 +3,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { User, HelpCircle, LogOut, ChevronRight, Shield, ShieldCheck, CreditCard, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key, Sparkles, SearchCheck, Target, Share2, BookOpen, MessageSquare, Bell, Send, Flame, EyeOff } from "lucide-react";
+import { User, HelpCircle, LogOut, ChevronRight, Shield, ShieldCheck, CreditCard, Loader2, Bookmark, ArrowLeft, FileText, Moon, Sun, Upload, ClipboardList, Search, Edit, Key, Sparkles, SearchCheck, Target, Share2, BookOpen, MessageSquare, Bell, Send, Flame, EyeOff, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -546,6 +546,24 @@ export default function More() {
                     </Card>
                   </div>
                 )}
+
+                {/* Exam Countdown */}
+                <Link to="/countdown" className="block sm:col-span-2">
+                  <Card className="bg-white dark:bg-card border-border/50 shadow-sm hover:shadow-md transition-shadow h-full">
+                    <CardContent className="p-4 flex items-center justify-between h-full">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center flex-shrink-0">
+                          <Timer className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm text-foreground">Exam Countdown</h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">Live countdowns to upcoming exams — bookmark & share</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    </CardContent>
+                  </Card>
+                </Link>
 
                 {/* Which Govt Job Suits You? — standalone serverless quiz page.
                     Full-page load (not react-router) so it opens its own light

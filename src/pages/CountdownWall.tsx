@@ -3,11 +3,12 @@ import { Timer, Search, Flame, X, Bookmark, Compass } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { CountdownCard } from "@/components/CountdownCard";
-import { useCountdownExams } from "@/hooks/useCountdownExams";
+import { useCountdownExams, CountdownItem } from "@/hooks/useCountdownExams";
 import { useDebouncedValue } from "@/hooks/useDebounce";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { useSavedExamUpdateIds } from "@/hooks/useSavedExamUpdates";
+import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,22 +20,32 @@ export default function CountdownWall() {
   const { items, isLoading, isError, refetch } = useCountdownExams();
   const { user } = useAuth();
   const { showAuthRequired } = useAuthRequired();
-  const savedIds = useSavedExamUpdateIds();
+  const savedExamIds = useSavedExamUpdateIds();
+  const { data: savedJobs } = useSavedJobs();
   const [view, setView] = useState<WallView>("discover");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 250);
 
+  const savedJobIds = useMemo(
+    () => new Set((savedJobs ?? []).map((j) => j.job_id)),
+    [savedJobs]
+  );
+
+  const isItemSaved = (i: CountdownItem) =>
+    i.sourceType === "job" ? savedJobIds.has(i.sourceId) : savedExamIds.has(i.sourceId);
+
   const filtered = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
     return items.filter((i) => {
-      if (view === "mine" && !savedIds.has(i.update.id)) return false;
+      if (view === "mine" && !isItemSaved(i)) return false;
       if (!q) return true;
       return (
-        i.update.title?.toLowerCase().includes(q) ||
+        i.title?.toLowerCase().includes(q) ||
         i.eventLabel?.toLowerCase().includes(q)
       );
     });
-  }, [items, debouncedSearch, view, savedIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, debouncedSearch, view, savedExamIds, savedJobIds]);
 
   const handleViewChange = (next: WallView) => {
     if (next === "mine" && !user) {

@@ -435,6 +435,20 @@ function localCachePlugin(env: Record<string, string>) {
         }
       });
 
+      // /api/cache/exam-countdown — wide window so upcoming exam dates surface
+      server.middlewares.use("/api/cache/exam-countdown", async (_req: any, res: any) => {
+        try {
+          const data = await supabaseFetch(
+            "exam_updates?select=*&order=scraped_at.desc&limit=1000"
+          );
+          res.writeHead(200, { "Content-Type": "application/json", "X-Cache-Hit": "0" });
+          res.end(JSON.stringify(data || []));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+
       // /api/cache/homepage
       server.middlewares.use("/api/cache/homepage", async (_req: any, res: any) => {
         try {

@@ -69,12 +69,12 @@ export function ShareCountdownDialog({ item, open, onOpenChange }: ShareCountdow
         height: POSTER_SIZE,
       });
       const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `countdown-${item.update.slug || item.update.id}.png`, {
+      const file = new File([blob], `countdown-${item.slug || item.sourceId}.png`, {
         type: "image/png",
       });
 
       if (navigator.canShare?.({ files: [file] }) && navigator.share) {
-        await navigator.share({ files: [file], title: item.update.title, text: `${shareText}\n${shareUrl}` });
+        await navigator.share({ files: [file], title: item.title, text: `${shareText}\n${shareUrl}` });
       } else {
         const a = document.createElement("a");
         a.href = dataUrl;
@@ -161,7 +161,7 @@ export function ShareCountdownDialog({ item, open, onOpenChange }: ShareCountdow
                       overflow: "hidden",
                     }}
                   >
-                    {item.update.title}
+                    {item.title}
                   </div>
                   <div
                     style={{

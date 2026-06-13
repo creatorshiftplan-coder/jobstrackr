@@ -321,6 +321,41 @@ async function handleExamUpdates(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json(data);
 }
 
+// ─── Exam Countdown handler ─────────────────────────────────────
+// Powers the /countdown wall. Unlike `exam-updates` (100 most-recent rows,
+// dominated by results/admit cards), this returns a wide window so upcoming
+// exam-date notifications actually surface. Redis-cached, so egress stays low.
+async function handleExamCountdown(req: VercelRequest, res: VercelResponse) {
+  const CACHE_KEY = 'cache:exam-countdown:all';
+  const CACHE_TTL = 900; // 15 min
+
+  const { data, cacheHit } = await cachedFetch<any[]>(CACHE_KEY, CACHE_TTL, async () => {
+    const updateColumns = [
+      'id', 'slug', 'url', 'title', 'category', 'status', 'published_date',
+      'summary', 'important_dates', 'download_links', 'tags',
+      'scraped_at', 'created_at', 'updated_at', 'job_id', 'exam_id',
+    ].join(',');
+
+    const url = `${SUPABASE_URL}/rest/v1/exam_updates?select=${updateColumns}&order=scraped_at.desc&limit=1000`;
+    const response = await fetch(url, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Supabase fetch failed: ${response.status} ${response.statusText}`);
+    }
+
+    const raw = await response.json();
+    return filterFreeJobAlertFromUpdates(raw || []);
+  });
+
+  setCacheHeaders(res, cacheHit, 300, 900);
+  return res.status(200).json(data);
+}
+
 // ─── Logos handler ──────────────────────────────────────────────
 interface LogoEntry {
   id: string;
@@ -397,6 +432,7 @@ const HANDLERS: Record<string, (req: VercelRequest, res: VercelResponse) => Prom
   homepage: handleHomepage,
   'trending-exams': handleTrendingExams,
   'exam-updates': handleExamUpdates,
+  'exam-countdown': handleExamCountdown,
   logos: handleLogos,
 };
 

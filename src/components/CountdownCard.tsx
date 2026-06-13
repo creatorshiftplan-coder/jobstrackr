@@ -8,6 +8,7 @@ import { CountdownItem } from "@/hooks/useCountdownExams";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { useSavedExamUpdateIds, useToggleSavedExamUpdate } from "@/hooks/useSavedExamUpdates";
+import { useSavedJobs, useSaveJob, useUnsaveJob } from "@/hooks/useSavedJobs";
 import { ShareCountdownDialog } from "@/components/ShareCountdownDialog";
 
 interface CountdownCardProps {
@@ -141,14 +142,25 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
   const { days, hours, minutes, seconds } = useLiveCountdown(item.examDate);
   const urgency = urgencyFor(item.daysLeft);
   const theme = URGENCY_THEME[urgency];
-  const to = `/exam-update/${item.update.slug || item.update.id}`;
+  const to = item.href;
 
   const { user } = useAuth();
   const { showAuthRequired } = useAuthRequired();
-  const savedIds = useSavedExamUpdateIds();
-  const toggleSaved = useToggleSavedExamUpdate();
-  const isSaved = savedIds.has(item.update.id);
   const [shareOpen, setShareOpen] = useState(false);
+
+  // Bookmarking routes to the right table by source type: jobs → saved_jobs,
+  // exam_updates → saved_exam_updates. Both hooks run (rules of hooks); we read
+  // whichever applies to this card.
+  const examSavedIds = useSavedExamUpdateIds();
+  const toggleExamSaved = useToggleSavedExamUpdate();
+  const { data: savedJobs } = useSavedJobs();
+  const saveJob = useSaveJob();
+  const unsaveJob = useUnsaveJob();
+
+  const isJob = item.sourceType === "job";
+  const isSaved = isJob
+    ? savedJobs?.some((j) => j.job_id === item.sourceId) ?? false
+    : examSavedIds.has(item.sourceId);
 
   const handleBookmark = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -157,7 +169,12 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
       showAuthRequired("Login to bookmark exams and build your countdown wall");
       return;
     }
-    toggleSaved.mutate({ updateId: item.update.id, save: !isSaved });
+    if (isJob) {
+      if (isSaved) unsaveJob.mutate(item.sourceId);
+      else saveJob.mutate(item.sourceId);
+    } else {
+      toggleExamSaved.mutate({ updateId: item.sourceId, save: !isSaved });
+    }
   };
 
   const handleShare = (e: React.MouseEvent) => {
@@ -172,7 +189,7 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.4) }}
     >
-      <Link to={to} className="block group" aria-label={`${item.update.title} — exam in ${item.daysLeft} days`}>
+      <Link to={to} className="block group" aria-label={`${item.title} — exam in ${item.daysLeft} days`}>
         <div
           className={cn(
             "relative overflow-hidden rounded-2xl border border-border/60 bg-card transition-all duration-300 hover:-translate-y-0.5",
@@ -198,7 +215,7 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
                     hero ? "text-lg sm:text-xl line-clamp-2" : "text-sm line-clamp-2"
                   )}
                 >
-                  {item.update.title}
+                  {item.title}
                 </h3>
                 <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                   <CalendarDays className="h-3.5 w-3.5 shrink-0" />
