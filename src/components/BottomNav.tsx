@@ -14,7 +14,13 @@ const navItems = [
 const TAB_WIDTH = 58;
 const NAV_WIDTH = navItems.length * TAB_WIDTH;
 
-const visiblePaths = new Set(navItems.map((item) => item.path));
+// The 5 tab paths are always shown. These extra paths aren't tabs themselves but
+// still show the bar (with no tab active) so users can jump back to a main section.
+const EXTRA_VISIBLE_PATHS = ["/profile"];
+const visiblePaths = new Set([
+  ...navItems.map((item) => item.path),
+  ...EXTRA_VISIBLE_PATHS,
+]);
 
 export function BottomNav() {
   const location = useLocation();
