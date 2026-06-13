@@ -7,8 +7,8 @@ Returns: { "entries": [{update_date, title, url}, ...], "total": 25 }
 
 import json
 from http.server import BaseHTTPRequestHandler
-from api.scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
-from api.auth import is_request_authorized, is_domain_allowed
+from api.lib.scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
+from api.lib.auth import is_request_authorized, is_domain_allowed
 
 
 class handler(BaseHTTPRequestHandler):

@@ -10,12 +10,12 @@ import json
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib"))
 
 from http.server import BaseHTTPRequestHandler
-from scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
-from article_scraper import detect_category, _parse_status, collect_article_links
-from auth import is_request_authorized, is_domain_allowed
+from api.lib.scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
+from api.lib.article_scraper import detect_category, _parse_status, collect_article_links
+from api.lib.auth import is_request_authorized, is_domain_allowed
 
 def _normalize(entry: dict) -> dict:
     """Convert scraper_v3 entry to ArticleLink shape expected by the frontend."""

@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { useForYouJobs } from "@/hooks/useForYouJobs";
 import { useExams } from "@/hooks/useExams";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useUserCalendarEvents } from "@/hooks/useUserCalendarEvents";
@@ -13,33 +12,25 @@ import {
 
 interface UseCalendarEventsOptions {
   filter?: CalendarEventType | "all";
-  /** Pre-fetched jobs (e.g. from useHomepageData) to avoid a redundant Supabase call */
-  initialJobs?: Job[];
-  /** How many profile-matched jobs to include — keeps the calendar personal, not exhaustive */
-  jobLimit?: number;
 }
 
 export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
-  const { filter = "all", initialJobs, jobLimit = 30 } = options;
+  const { filter = "all" } = options;
 
-  // Reuse existing hooks — no new bespoke queries
-  const { forYouJobs, isLoading: jobsLoading } = useForYouJobs(jobLimit, true, initialJobs);
+  // Reuse existing hooks — no new bespoke queries.
+  // Dates come only from what the user explicitly chose: saved jobs + tracked exams + custom dates.
   const { userExams, isLoading: examsLoading } = useExams({ includeExamCatalog: false });
   const { data: savedJobsData, isLoading: savedLoading } = useSavedJobs();
   const { userEvents, isLoading: customLoading } = useUserCalendarEvents();
 
-  // Saved jobs are the primary source; for-you matched jobs enrich the schedule.
-  // Merge + de-dupe by job id so a job saved AND matched is only processed once.
+  // De-dupe saved jobs by id so a job saved more than once is processed once.
   const jobs = useMemo(() => {
     const byId = new Map<string, Job>();
     for (const saved of savedJobsData ?? []) {
       if (saved.jobs) byId.set(saved.jobs.id, saved.jobs);
     }
-    for (const job of forYouJobs) {
-      if (!byId.has(job.id)) byId.set(job.id, job);
-    }
     return [...byId.values()];
-  }, [savedJobsData, forYouJobs]);
+  }, [savedJobsData]);
 
   const allEvents = useMemo(
     () => buildCalendarEvents(jobs, userExams, userEvents),
@@ -72,7 +63,7 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
     upcoming,
     past,
     byDate,
-    isLoading: jobsLoading || examsLoading || savedLoading || customLoading,
+    isLoading: examsLoading || savedLoading || customLoading,
     totalUpcoming: upcoming.length,
   };
 }

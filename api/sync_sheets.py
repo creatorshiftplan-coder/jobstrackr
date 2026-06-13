@@ -17,7 +17,7 @@ import os
 import requests
 from http.server import BaseHTTPRequestHandler
 
-from api.auth import is_request_authorized
+from api.lib.auth import is_request_authorized
 
 
 def _json(handler, status_code: int, data: dict):

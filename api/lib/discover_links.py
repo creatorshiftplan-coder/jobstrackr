@@ -8,7 +8,7 @@ import argparse
 # Add api/ to path so we can import scraper_v3
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 
-from scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
+from api.lib.scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
 
 def main():
     parser = argparse.ArgumentParser()

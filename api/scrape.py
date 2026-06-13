@@ -7,8 +7,8 @@ Returns: { "status": "ok", "job": { ... } } or { "status": "error", "error": "..
 
 import json
 from http.server import BaseHTTPRequestHandler
-from api.scraper_v5 import scrape_url
-from api.auth import is_request_authorized, is_domain_allowed
+from api.lib.scraper_v5 import scrape_url
+from api.lib.auth import is_request_authorized, is_domain_allowed
 
 
 class handler(BaseHTTPRequestHandler):

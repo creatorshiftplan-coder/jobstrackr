@@ -32,7 +32,7 @@ function localScraperPlugin() {
             }
 
             // Run scraper_v5.py with --url flag
-            const scriptPath = path.resolve(__dirname, "api/scraper_v5.py");
+            const scriptPath = path.resolve(__dirname, "api/lib/scraper_v5.py");
             const proc = execFile(
               "python3",
               [scriptPath, "--url", url],
@@ -99,7 +99,7 @@ function localDiscoverPlugin() {
               return;
             }
 
-            const scriptPath = path.resolve(__dirname, "api/discover_links.py");
+            const scriptPath = path.resolve(__dirname, "api/lib/discover_links.py");
             const args = [scriptPath, "--url", url, "--pages", String(pages)];
             if (follow_pages) args.push("--follow-pages");
 
@@ -162,10 +162,10 @@ function localScrapeArticlePlugin() {
               return;
             }
 
-            const apiDir = path.resolve(__dirname, "api");
+            const apiLibDir = path.resolve(__dirname, "api/lib");
             const args = ["-c", `
 import sys, json
-sys.path.insert(0, ${JSON.stringify(apiDir)})
+sys.path.insert(0, ${JSON.stringify(apiLibDir)})
 from article_scraper import scrape_article
 from rephraser import rephrase_article
 article = scrape_article(${JSON.stringify(url)})
@@ -238,11 +238,11 @@ function localScrapeLinksPlugin() {
               return;
             }
 
-            const apiDir = path.resolve(__dirname, "api");
+            const apiLibDir = path.resolve(__dirname, "api/lib");
             const args = ["-c", `
 import sys, json, logging
 logging.disable(logging.CRITICAL)
-sys.path.insert(0, ${JSON.stringify(apiDir)})
+sys.path.insert(0, ${JSON.stringify(apiLibDir)})
 from scraper_v3 import fetch_html, extract_links_from_master, get_pagination_urls
 from article_scraper import detect_category, _parse_status, collect_article_links
 

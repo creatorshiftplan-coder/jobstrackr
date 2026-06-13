@@ -10,13 +10,13 @@ import json
 import sys
 import os
 
-# Ensure api/ is on path for local imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+# Ensure api/lib/ is on path for local imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib"))
 
 from http.server import BaseHTTPRequestHandler
-from article_scraper import scrape_article
-from rephraser import rephrase_article
-from auth import is_request_authorized, is_domain_allowed
+from api.lib.article_scraper import scrape_article
+from api.lib.rephraser import rephrase_article
+from api.lib.auth import is_request_authorized, is_domain_allowed
 
 
 class handler(BaseHTTPRequestHandler):

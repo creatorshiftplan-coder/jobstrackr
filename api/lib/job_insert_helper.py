@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from supabase import create_client
-from api.scraper_v5 import parse_date
+from api.lib.scraper_v5 import parse_date
 
 
 def get_supabase_client():

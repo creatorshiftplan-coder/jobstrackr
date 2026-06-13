@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import type { DayContentProps } from "react-day-picker";
 import {
   AlertCircle,
   BookOpen,
+  Briefcase,
   CalendarCheck2,
   CalendarClock,
   CalendarDays,
@@ -14,6 +16,7 @@ import {
   ListChecks,
   Sparkles,
   Trophy,
+  X,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { CalendarEventSheet } from "@/components/CalendarEventSheet";
@@ -50,6 +53,20 @@ function urgencyLabel(event: CalendarEvent) {
   if (event.daysLeft === 0) return "Today";
   if (event.daysLeft === 1) return "Tomorrow";
   return `${event.daysLeft} days left`;
+}
+
+// Stable display order for the per-day type markers on the calendar grid.
+const TYPE_ORDER: CalendarEventType[] = [
+  "exam_date",
+  "apply_end",
+  "admit_card",
+  "result",
+  "apply_start",
+  "answer_key",
+];
+
+function distinctTypes(events: CalendarEvent[]): CalendarEventType[] {
+  return TYPE_ORDER.filter((type) => events.some((e) => e.type === type));
 }
 
 function EventRow({
@@ -235,13 +252,55 @@ export default function ExamCalendar() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [promptDismissed, setPromptDismissed] = useState(false);
 
   const { allEvents, upcoming, byDate, isLoading, totalUpcoming } = useCalendarEvents({ filter });
 
-  const eventDates = useMemo(
-    () => [...byDate.values()].flat().map((e) => e.date),
-    [byDate]
-  );
+  // Renders each calendar grid cell: the day number plus colored, labelled pills
+  // (one per distinct event type that day) so notification vs exam dates read at a glance.
+  // Memoized on `byDate` so DayPicker doesn't remount cells every render.
+  const DayCell = useMemo(() => {
+    function CalendarDayContent({ date, displayMonth }: DayContentProps) {
+      const outside = date.getMonth() !== displayMonth.getMonth();
+      const types = outside ? [] : distinctTypes(byDate.get(dateKey(date)) ?? []);
+      return (
+        <div className="flex h-full w-full flex-col items-start gap-0.5">
+          <span className={cn("text-xs font-semibold sm:text-sm", outside && "opacity-40")}>
+            {date.getDate()}
+          </span>
+          {types.length > 0 && (
+            <>
+              {/* Mobile: colored mini-dots (cells too narrow for text pills) */}
+              <div className="flex flex-wrap items-center gap-0.5 sm:hidden">
+                {types.slice(0, 4).map((type) => (
+                  <span key={type} className={cn("h-1.5 w-1.5 rounded-full", EVENT_TYPE_CONFIG[type].dotClass)} />
+                ))}
+              </div>
+              {/* sm+: colored pills with short labels */}
+              <div className="hidden w-full flex-col gap-0.5 sm:flex">
+                {types.slice(0, 2).map((type) => (
+                  <span
+                    key={type}
+                    className={cn(
+                      "w-full truncate rounded px-1 py-0.5 text-left text-[9px] font-semibold leading-tight",
+                      EVENT_TYPE_CONFIG[type].badgeClass
+                    )}
+                  >
+                    {EVENT_TYPE_CONFIG[type].short}
+                  </span>
+                ))}
+                {types.length > 2 && (
+                  <span className="px-1 text-[9px] font-semibold text-muted-foreground">+{types.length - 2}</span>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+    return CalendarDayContent;
+  }, [byDate]);
+
   const selectedDayEvents = byDate.get(dateKey(selectedDate)) ?? [];
   const nextEvent = upcoming[0] ?? null;
   const urgentCount = upcoming.filter((event) => event.daysLeft !== null && event.daysLeft <= 7).length;
@@ -403,7 +462,8 @@ export default function ExamCalendar() {
             </div>
             <h2 className="mt-5 text-xl font-semibold text-foreground">No dates yet</h2>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-              Track exams and complete your job preferences to build a personalised exam schedule.
+              Your calendar is built from the exams you track and the jobs you save. Track an exam or save a
+              job to start building your schedule.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-3">
               <AddExamModal
@@ -414,6 +474,12 @@ export default function ExamCalendar() {
                   </Button>
                 }
               />
+              <Button asChild variant="outline" className="gap-2">
+                <Link to="/search">
+                  <Briefcase className="h-4 w-4" />
+                  Browse &amp; save jobs
+                </Link>
+              </Button>
               <AddCustomDateDialog
                 trigger={
                   <Button variant="outline" className="gap-2">
@@ -425,7 +491,46 @@ export default function ExamCalendar() {
             </div>
           </div>
         ) : (
-          <Tabs defaultValue="calendar" className="pt-1">
+          <>
+            {totalUpcoming < 3 && !promptDismissed && (
+              <div className="relative mt-2 flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3 pr-6">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Keep your calendar complete</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Track more exams or save jobs and their key dates appear here automatically.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <AddExamModal
+                    trigger={
+                      <Button size="sm" className="gap-2">
+                        <GraduationCap className="h-4 w-4" />
+                        Track an Exam
+                      </Button>
+                    }
+                  />
+                  <Button asChild size="sm" variant="outline" className="gap-2">
+                    <Link to="/search">
+                      <Briefcase className="h-4 w-4" />
+                      Save jobs
+                    </Link>
+                  </Button>
+                </div>
+                <button
+                  onClick={() => setPromptDismissed(true)}
+                  aria-label="Dismiss"
+                  className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            <Tabs defaultValue="calendar" className="pt-3">
             <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
               <TabsList className="grid w-full max-w-sm grid-cols-2 rounded-xl bg-card/80 p-1 shadow-sm">
                 <TabsTrigger value="calendar" className="gap-2 rounded-lg">
@@ -457,21 +562,21 @@ export default function ExamCalendar() {
                       mode="single"
                       selected={selectedDate}
                       onDayClick={(day) => setSelectedDate(day)}
-                      modifiers={{ hasEvent: eventDates }}
-                      modifiersClassNames={{ hasEvent: "has-event" }}
+                      components={{ DayContent: DayCell }}
                       className="calendar-dashboard w-full p-0"
                       classNames={{
                         months: "flex w-full flex-col",
-                        month: "w-full space-y-2 sm:space-y-4",
+                        month: "w-full space-y-2 sm:space-y-3",
                         table: "w-full border-collapse",
                         head_row: "grid grid-cols-7 w-full",
-                        row: "grid grid-cols-7 w-full mt-1 sm:mt-2",
+                        row: "grid grid-cols-7 w-full mt-1 sm:mt-1.5",
                         head_cell: "text-muted-foreground rounded-md text-center font-semibold text-[0.75rem]",
-                        cell: "relative flex items-center justify-center p-0 text-center text-sm focus-within:relative focus-within:z-20",
-                        day: "mx-auto flex aspect-square w-full max-w-[2rem] items-center justify-center rounded-xl p-0 text-sm font-medium transition-colors hover:bg-secondary aria-selected:opacity-100 sm:max-w-[2.75rem]",
-                        day_today: "bg-secondary text-foreground",
+                        cell: "relative p-0.5 text-left align-top focus-within:relative focus-within:z-20",
+                        day: "flex h-full min-h-[3.25rem] w-full flex-col items-start justify-start rounded-xl border border-transparent p-1 text-left text-sm font-medium transition-colors hover:border-primary/30 hover:bg-secondary/50 aria-selected:opacity-100 sm:min-h-[4.75rem] sm:p-1.5",
+                        day_today: "border-primary/40 bg-primary/5 text-foreground",
                         day_selected:
-                          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                          "border-primary bg-primary/10 text-foreground ring-1 ring-primary hover:bg-primary/10 focus:bg-primary/10",
+                        day_outside: "opacity-60",
                       }}
                     />
                   </div>
@@ -548,7 +653,8 @@ export default function ExamCalendar() {
                 <TimelineList upcoming={upcoming} onEventClick={setSelectedEvent} />
               </div>
             </TabsContent>
-          </Tabs>
+            </Tabs>
+          </>
         )}
       </main>
 

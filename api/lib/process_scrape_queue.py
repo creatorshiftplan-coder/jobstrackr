@@ -15,8 +15,8 @@ import os
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
 
-from api.scraper_v5 import scrape_url
-from api.job_insert_helper import get_supabase_client, insert_job
+from api.lib.scraper_v5 import scrape_url
+from api.lib.job_insert_helper import get_supabase_client, insert_job
 
 BATCH_SIZE = 10  # Max jobs to process per invocation
 MAX_RETRIES = 3

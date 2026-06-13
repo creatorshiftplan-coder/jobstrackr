@@ -14,8 +14,8 @@ import os
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler
 
-from api.scraper_v3 import fetch_html, extract_links_from_master
-from api.job_insert_helper import get_supabase_client
+from api.lib.scraper_v3 import fetch_html, extract_links_from_master
+from api.lib.job_insert_helper import get_supabase_client
 
 TARGET_URL = "https://www.freejobalert.com/new-updates/"
 MAX_LINKS = 50
