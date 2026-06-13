@@ -25,6 +25,7 @@ function ensureSheets() {
   getTab_(CONFIG.TAB_JOBS, JOB_COLUMNS);
   getTab_(CONFIG.TAB_UPDATES_QUEUE, QUEUE_COLUMNS);
   getTab_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS);
+  getTab_(CONFIG.TAB_CHANNELS, CHANNEL_COLUMNS);
   getTab_(CONFIG.TAB_LOGS, ['ts', 'message']);
 }
 
@@ -58,6 +59,29 @@ function existingValues_(tabName, columns, colName) {
   const vals = sh.getRange(2, idx + 1, last - 1, 1).getValues();
   vals.forEach(function (r) { const v = String(r[0] || '').trim().toLowerCase(); if (v) set[v] = true; });
   return set;
+}
+
+/** Read a whole data tab as objects, each tagged with its 1-based sheet row in `_row`. */
+function readObjects_(tabName, columns) {
+  const sh = getTab_(tabName, columns);
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const data = sh.getRange(2, 1, last - 1, columns.length).getValues();
+  return data.map(function (rowVals, i) {
+    const obj = { _row: i + 2 };
+    columns.forEach(function (c, ci) {
+      const v = rowVals[ci];
+      obj[c] = v instanceof Date ? v.toISOString() : v;
+    });
+    return obj;
+  });
+}
+
+/** Write one cell by column name on a given 1-based row. */
+function setCell_(tabName, columns, row, colName, value) {
+  const idx = columns.indexOf(colName);
+  if (idx < 0) return;
+  getTab_(tabName, columns).getRange(row, idx + 1).setValue(value);
 }
 
 // ─────────────────────────── queue ──────────────────────────────────────────
@@ -119,14 +143,27 @@ function requeueStuck(queueTab) {
 
 // ─────────────────────────── cursor reads (for the Web App) ──────────────────
 
-/** Read rows of a data tab as objects where scraped_at > sinceIso (or all). */
+/**
+ * Read rows of a data tab as objects where scraped_at > sinceIso (or all).
+ *
+ * Rows are returned **oldest-first** so the caller can page through with a cursor:
+ * take a batch, advance the cursor to the last row's scraped_at, and resume there
+ * next time. Combined with the exclusive `scraped_at <= sinceIso` filter this is
+ * keyset pagination — no row is ever skipped.
+ *
+ * `limit` is a *soft* cap: if the row at the limit boundary shares its scraped_at
+ * with later rows, those ties are included too. Splitting a group of equal
+ * timestamps would strand the rows left behind (the next cursor would be == their
+ * scraped_at and the exclusive filter would drop them), so ties are kept together.
+ */
 function readSince(tabName, columns, sinceIso, limit) {
   const sh = getTab_(tabName, columns);
   const last = sh.getLastRow();
   if (last < 2) return [];
   const data = sh.getRange(2, 1, last - 1, columns.length).getValues();
   const sidx = columns.indexOf('scraped_at');
-  const out = [];
+
+  const matched = [];
   for (let i = 0; i < data.length; i++) {
     // Sheets may coerce the ISO string into a Date — normalize back to ISO.
     const rawTs = data[i][sidx];
@@ -138,8 +175,19 @@ function readSince(tabName, columns, sinceIso, limit) {
       obj[c] = v instanceof Date ? v.toISOString() : v;
     });
     obj.scraped_at = scrapedAt;
-    out.push(obj);
-    if (limit && out.length >= limit) break;
+    matched.push(obj);
   }
-  return out;
+
+  // Oldest-first for stable cursor paging.
+  matched.sort(function (a, b) {
+    return a.scraped_at < b.scraped_at ? -1 : a.scraped_at > b.scraped_at ? 1 : 0;
+  });
+
+  if (!limit || matched.length <= limit) return matched;
+
+  // Cut at `limit`, then extend through any rows sharing the boundary timestamp.
+  let end = limit;
+  const boundary = matched[limit - 1].scraped_at;
+  while (end < matched.length && matched[end].scraped_at === boundary) end++;
+  return matched.slice(0, end);
 }

@@ -538,6 +538,60 @@ function localCachePlugin(env: Record<string, string>) {
   };
 }
 
+// Local dev plugin: proxy /api/sync-sheets to the Supabase `sync-sheets` edge
+// function. In production this route is handled by api/sync_sheets.py (a Vercel
+// serverless function), but Vite doesn't run the Python `api/` files in dev — so
+// without this middleware the manual sync button 404s on localhost. We authorize
+// with the shared SHEETS_SYNC_SECRET (x-sync-secret header) the function accepts,
+// and pass the anon/publishable key so the platform gateway lets the call through.
+function localSyncSheetsPlugin(env: Record<string, string>) {
+  return {
+    name: "local-sync-sheets",
+    configureServer(server: any) {
+      server.middlewares.use("/api/sync-sheets", async (req: any, res: any, next: any) => {
+        if (req.method === "OPTIONS") {
+          res.writeHead(200, {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          });
+          res.end();
+          return;
+        }
+        if (req.method !== "POST") return next();
+
+        const supabaseUrl = env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        const anonKey = env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const syncSecret = env.SHEETS_SYNC_SECRET || process.env.SHEETS_SYNC_SECRET;
+        if (!supabaseUrl || !anonKey || !syncSecret) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Dev sync not configured (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY / SHEETS_SYNC_SECRET)" }));
+          return;
+        }
+
+        try {
+          const resp = await fetch(`${supabaseUrl}/functions/v1/sync-sheets`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${anonKey}`,
+              "apikey": anonKey,
+              "x-sync-secret": syncSecret,
+            },
+            body: JSON.stringify({ trigger: "manual" }),
+          });
+          const text = await resp.text();
+          res.writeHead(resp.status, { "Content-Type": "application/json" });
+          res.end(text || "{}");
+        } catch (err: any) {
+          res.writeHead(502, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: `Could not reach sync-sheets function: ${err.message}` }));
+        }
+      });
+    },
+  };
+}
+
 // Dev-only: serve the standalone quiz page at the pretty /quiz URL,
 // mirroring the production rewrite in vercel.json (/quiz -> /quiz.html).
 function quizRouteAlias() {
@@ -561,7 +615,7 @@ export default defineConfig(({ mode }) => {
       host: "::",
       port: 8080,
     },
-    plugins: [quizRouteAlias(), localCachePlugin(env), localScraperPlugin(), localDiscoverPlugin(), localScrapeArticlePlugin(), localScrapeLinksPlugin(), react()],
+    plugins: [quizRouteAlias(), localCachePlugin(env), localScraperPlugin(), localDiscoverPlugin(), localScrapeArticlePlugin(), localScrapeLinksPlugin(), localSyncSheetsPlugin(env), react()],
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {

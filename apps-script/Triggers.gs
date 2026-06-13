@@ -21,6 +21,9 @@ function installTriggers() {
   ScriptApp.newTrigger('discoverUpdates').timeBased().everyDays(1).atHour(2).create();
   ScriptApp.newTrigger('processJobsQueue').timeBased().everyMinutes(30).create();
   ScriptApp.newTrigger('processUpdatesQueue').timeBased().everyMinutes(30).create();
+  // Telegram poster — runs hourly, posts rows old enough to have synced to Supabase
+  // (TELEGRAM_MIN_AGE_MS gate) so the deep-links resolve. Dedups via posted_at.
+  ScriptApp.newTrigger('postPendingToTelegram').timeBased().everyHours(1).create();
 }
 
 // ─────────────────────────── jobs ───────────────────────────────────────────
@@ -41,6 +44,7 @@ function processJobsQueue() {
   requeueStuck(CONFIG.TAB_JOBS_QUEUE); // self-heal items stranded by a prior hard-kill
   const deadline = Date.now() + CONFIG.MAX_RUNTIME_MS;
   const knownTitles = existingValues_(CONFIG.TAB_JOBS, JOB_COLUMNS, 'title');
+  const knownSlugs = existingValues_(CONFIG.TAB_JOBS, JOB_COLUMNS, 'slug'); // reserve unique deep-link slugs
   let processed = 0;
   while (Date.now() < deadline) {
     const batch = takePending(CONFIG.TAB_JOBS_QUEUE, CONFIG.JOBS_BATCH);
@@ -58,6 +62,9 @@ function processJobsQueue() {
         if (titleKey && knownTitles[titleKey]) {
           setQueueStatus(CONFIG.TAB_JOBS_QUEUE, item.row, 'duplicate');
         } else {
+          // Compute the deep-link slug now so it's in the Sheet before the sync
+          // imports the row — keeps the Telegram link and jobs.slug identical.
+          rowObj.slug = uniqueSlug_(makeJobSlug_(rowObj.title), knownSlugs);
           appendObject_(CONFIG.TAB_JOBS, JOB_COLUMNS, rowObj);
           knownTitles[titleKey] = true;
           setQueueStatus(CONFIG.TAB_JOBS_QUEUE, item.row, 'done');
@@ -96,6 +103,7 @@ function processUpdatesQueue() {
   requeueStuck(CONFIG.TAB_UPDATES_QUEUE); // self-heal items stranded by a prior hard-kill
   const deadline = Date.now() + CONFIG.MAX_RUNTIME_MS;
   const knownUrls = existingValues_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS, 'url');
+  const knownSlugs = existingValues_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS, 'slug'); // reserve unique deep-link slugs
   let processed = 0;
   while (Date.now() < deadline) {
     const batch = takePending(CONFIG.TAB_UPDATES_QUEUE, CONFIG.UPDATES_BATCH);
@@ -112,7 +120,9 @@ function processUpdatesQueue() {
           const html = fetchHtml(item.url, 2);
           if (!html) throw new Error('fetch failed');
           const scraped = scrapeUpdateArticle(item.url, html);
-          appendObject_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS, buildUpdateRow(scraped));
+          const rowObj = buildUpdateRow(scraped);
+          rowObj.slug = uniqueSlug_(makeUpdateSlug_(rowObj.title, rowObj.category), knownSlugs);
+          appendObject_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS, rowObj);
           knownUrls[key] = true;
           setQueueStatus(CONFIG.TAB_UPDATES_QUEUE, item.row, 'done');
           processed++;

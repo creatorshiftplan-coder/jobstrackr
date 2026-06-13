@@ -58,7 +58,7 @@ class handler(BaseHTTPRequestHandler):
                     "Authorization": f"Bearer {service_key}",
                     "Content-Type": "application/json",
                 },
-                json={},
+                json={"trigger": "manual"},
                 timeout=120,
             )
             try:

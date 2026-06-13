@@ -23,17 +23,18 @@ This is a faithful port of the Python scraper (`api/scraper_v5.py`, `api/scraper
 | `Rephraser.gs` | Rule-based (non-AI) rephraser for update text |
 | `Sheets.gs` | Sheet tabs, append, queue, dedup, cursor reads, logging |
 | `WebApp.gs` | Secret-protected `doGet` JSON endpoint the sync function pulls |
-| `Triggers.gs` | `setup()` + cron orchestration (discover daily, process every 30 min) |
+| `Triggers.gs` | `setup()` + cron orchestration (discover daily, process every 30 min, Telegram hourly) |
+| `Telegram.gs` | Posts new jobs/updates to Telegram channels with in-app deep-links (slug, matcher, dedup) |
 
 ## Setup
 
 ### A. Google Apps Script
 1. Create a Google Sheet → **Extensions → Apps Script**.
-2. Create the 8 script files above and paste each file's contents.
+2. Create the 9 script files above and paste each file's contents.
 3. **Project Settings → Script Properties → Add**: `SHEETS_SYNC_SECRET` = a long random
    string (remember it; the Supabase side uses the same value).
 4. Back in the editor, run **`setup`** once and authorize. It creates the tabs
-   (`JobsQueue`, `Jobs`, `UpdatesQueue`, `ExamUpdates`, `Logs`) and installs the triggers.
+   (`JobsQueue`, `Jobs`, `UpdatesQueue`, `ExamUpdates`, `Channels`, `Logs`) and installs the triggers.
 5. Test now (don't wait for cron): run `discoverAllNow`, then `processJobsQueue` and
    `processUpdatesQueue`. Check the `Jobs` / `ExamUpdates` tabs fill in, columns line up,
    and that **no freejobalert names/links** appear and junk links are stripped.
@@ -67,6 +68,40 @@ This is a faithful port of the Python scraper (`api/scraper_v5.py`, `api/scraper
 > **Auth:** `sync-sheets` accepts either the `x-sync-secret` header (= `SHEETS_SYNC_SECRET`)
 > or a `Bearer <service-role key>` token. A 401 means neither was presented — e.g. invoking
 > from the Dashboard or curling with the anon key.
+
+### C. Telegram auto-post (direct from the Sheet)
+
+Posts every new job/update straight to your Telegram channels from Apps Script — no app or
+edge function involved — with an **in-app deep-link** built from a slug computed at scrape
+time. The slug is written into the Sheet before the sync runs, so `jobs.slug` /
+`exam_updates.slug` match the link exactly.
+
+1. Apply both slug migrations and redeploy `sync-sheets`:
+   - `20260613_job_slug_respect_provided.sql` (jobs keep a sheet-provided slug)
+   - `20260613_exam_update_slug.sql` (adds `exam_updates.slug` + the `/exam-update/<slug>` route)
+2. In Apps Script, re-paste `Config.gs`, `Sheets.gs`, `Triggers.gs`, `WebApp.gs` and add the
+   new **`Telegram.gs`**, then run **`setup`** again (creates the `Channels` tab + installs
+   the hourly `postPendingToTelegram` trigger).
+3. Create a Telegram bot via **@BotFather**, then add it to each channel as an **admin** with
+   "Post messages". Fill the **`Channels`** tab — one row per channel:
+
+   | name | bot_token | channel_id | sector | active |
+   |------|-----------|------------|--------|--------|
+   | Main | `123:ABC…` | `@mychannel` or `-1001234567890` | `All Jobs` | yes |
+
+   `sector` = `All Jobs` / `Government Jobs` / `Sarkari Naukri` for a catch-all, or a specific
+   label (`SSC`, `Banking Jobs`, `Railway Jobs`, `Defence Jobs`, `UPSC`, `PSU Jobs`, `PSC`,
+   `Teaching Jobs`, `Judiciary`, `Stenographer`, `RRB`) to filter.
+4. Run **`testTelegramChannels`** to confirm each channel receives a message.
+5. Run **`markAllPostedNow`** once to skip the historical backlog (otherwise the first run
+   posts every existing row). After this, only newly-scraped rows post.
+
+> **Timing:** the poster only posts a row once it's older than `TELEGRAM_MIN_AGE_MS`
+> (~75 min) so the hourly `sync-sheets` has already imported it and the deep-link resolves.
+> Lower it only if you run the sync more often than hourly.
+>
+> **Don't double-post:** this replaces the edge-function broadcaster — leave the
+> `SHEETS_SYNC_TELEGRAM` function secret **unset** (or `false`) so both don't fire.
 
 ## Design notes / guarantees
 

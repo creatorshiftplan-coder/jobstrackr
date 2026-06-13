@@ -991,6 +991,58 @@ export default function Admin() {
     return feedbackItems.filter((item: any) => item.status === "pending").length;
   }, [feedbackItems]);
 
+  // Google Sheet sync health — last-fetch time, status, and per-run counts.
+  const { data: sheetSyncRuns = [], isLoading: sheetSyncRunsLoading } = useQuery({
+    queryKey: ["admin-sheet-sync-runs"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("sheet_sync_runs")
+        .select("*")
+        .order("ran_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+    enabled: !!user && isAdmin,
+    refetchInterval: 5 * 60 * 1000, // keep "last fetch" fresh against the hourly cron
+  });
+
+  const lastSheetSync = sheetSyncRuns[0] || null;
+
+  // Health: healthy if the most recent run succeeded within the last ~90 min
+  // (the cron runs hourly), warning if stale, error if the last run failed.
+  const sheetSyncHealth = useMemo<{ status: "healthy" | "stale" | "error" | "unknown"; label: string }>(() => {
+    if (!lastSheetSync) return { status: "unknown", label: "No syncs recorded yet" };
+    if (!lastSheetSync.success) return { status: "error", label: "Last sync failed" };
+    const ageMs = Date.now() - new Date(lastSheetSync.ran_at).getTime();
+    if (ageMs > 90 * 60 * 1000) return { status: "stale", label: "Sync is overdue" };
+    return { status: "healthy", label: "Healthy" };
+  }, [lastSheetSync]);
+
+  // Aggregate received/inserted counts per calendar date (most recent first).
+  const sheetSyncByDate = useMemo(() => {
+    const byDate = new Map<string, {
+      date: string; runs: number; failures: number;
+      jobsReceived: number; jobsInserted: number;
+      updatesReceived: number; updatesUpserted: number;
+    }>();
+    for (const r of sheetSyncRuns) {
+      const date = format(new Date(r.ran_at), "yyyy-MM-dd");
+      const acc = byDate.get(date) || {
+        date, runs: 0, failures: 0,
+        jobsReceived: 0, jobsInserted: 0, updatesReceived: 0, updatesUpserted: 0,
+      };
+      acc.runs += 1;
+      if (!r.success) acc.failures += 1;
+      acc.jobsReceived += r.jobs_received || 0;
+      acc.jobsInserted += r.jobs_inserted || 0;
+      acc.updatesReceived += r.updates_received || 0;
+      acc.updatesUpserted += r.updates_upserted || 0;
+      byDate.set(date, acc);
+    }
+    return Array.from(byDate.values()).sort((a, b) => b.date.localeCompare(a.date));
+  }, [sheetSyncRuns]);
+
   const resolveFeedbackMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -4531,6 +4583,7 @@ ${hashtagsStr}`;
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["exam-updates"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-sheet-sync-runs"] });
     } catch (error: any) {
       toast({ title: "Sync failed", description: error.message, variant: "destructive" });
     } finally {
@@ -8345,6 +8398,117 @@ ${hashtagsStr}`;
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Google Sheet sync health — last fetch time + per-date counts */}
+                <div className="rounded-lg border bg-secondary/30 p-4 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <Activity className="h-4 w-4 text-primary" />
+                      Google Sheet Sync Health
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={
+                        sheetSyncHealth.status === "healthy"
+                          ? "border-green-500 text-green-600"
+                          : sheetSyncHealth.status === "error"
+                          ? "border-red-500 text-red-600"
+                          : sheetSyncHealth.status === "stale"
+                          ? "border-amber-500 text-amber-600"
+                          : "border-muted-foreground text-muted-foreground"
+                      }
+                    >
+                      {sheetSyncHealth.status === "healthy" && <CheckCircle className="h-3 w-3 mr-1" />}
+                      {sheetSyncHealth.status === "error" && <XCircle className="h-3 w-3 mr-1" />}
+                      {sheetSyncHealth.status === "stale" && <AlertTriangle className="h-3 w-3 mr-1" />}
+                      {sheetSyncHealth.label}
+                    </Badge>
+                  </div>
+
+                  {/* Summary row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> Last Fetch
+                      </div>
+                      <div className="text-sm font-medium">
+                        {lastSheetSync ? format(new Date(lastSheetSync.ran_at), "dd MMM yyyy, HH:mm") : "—"}
+                      </div>
+                      {lastSheetSync && (
+                        <div className="text-[11px] text-muted-foreground capitalize">
+                          {lastSheetSync.trigger} trigger
+                          {typeof lastSheetSync.duration_ms === "number" && ` · ${(lastSheetSync.duration_ms / 1000).toFixed(1)}s`}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Jobs (last run)</div>
+                      <div className="text-sm font-medium">
+                        {lastSheetSync ? `${lastSheetSync.jobs_inserted ?? 0} new / ${lastSheetSync.jobs_received ?? 0} fetched` : "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Updates (last run)</div>
+                      <div className="text-sm font-medium">
+                        {lastSheetSync ? `${lastSheetSync.updates_upserted ?? 0} / ${lastSheetSync.updates_received ?? 0} fetched` : "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Runs Logged</div>
+                      <div className="text-sm font-medium">{sheetSyncRuns.length}</div>
+                    </div>
+                  </div>
+
+                  {lastSheetSync && !lastSheetSync.success && lastSheetSync.error && (
+                    <div className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 break-words">
+                      {lastSheetSync.error}
+                    </div>
+                  )}
+
+                  {/* Per-date breakdown */}
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Fetched by Date</div>
+                    {sheetSyncRunsLoading ? (
+                      <div className="text-xs text-muted-foreground py-2">Loading sync history…</div>
+                    ) : sheetSyncByDate.length === 0 ? (
+                      <div className="text-xs text-muted-foreground py-2">No syncs recorded yet.</div>
+                    ) : (
+                      <div className="max-h-64 overflow-auto rounded-md border bg-background">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs">Date</TableHead>
+                              <TableHead className="text-xs text-center">Runs</TableHead>
+                              <TableHead className="text-xs text-center">Jobs (new/fetched)</TableHead>
+                              <TableHead className="text-xs text-center">Updates (saved/fetched)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {sheetSyncByDate.map((d) => (
+                              <TableRow key={d.date}>
+                                <TableCell className="text-xs font-medium whitespace-nowrap">
+                                  {format(new Date(`${d.date}T00:00:00`), "dd MMM yyyy")}
+                                </TableCell>
+                                <TableCell className="text-xs text-center">
+                                  {d.runs}
+                                  {d.failures > 0 && (
+                                    <span className="text-red-600"> ({d.failures} failed)</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-xs text-center">
+                                  {d.jobsInserted} / {d.jobsReceived}
+                                </TableCell>
+                                <TableCell className="text-xs text-center">
+                                  {d.updatesUpserted} / {d.updatesReceived}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Step 1: Load links */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold flex items-center gap-2">

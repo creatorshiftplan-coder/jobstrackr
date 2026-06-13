@@ -42,6 +42,16 @@ const CONFIG = {
   // Whether to rule-based-rephrase update text (mirrors the Updates "rephrase" toggle).
   REPHRASE_UPDATES: true,
 
+  // ── Telegram auto-post (Telegram.gs) ──────────────────────────────────────
+  // Public site origin used to build in-app deep-links posted to Telegram.
+  SITE_ORIGIN: 'https://jobstrackr.in',
+  // Only post a row once it's old enough to have been imported into Supabase by
+  // the hourly `sync-sheets` function — otherwise the deep-link would 404. Must be
+  // safely longer than the sync interval (hourly). Default ~75 min.
+  TELEGRAM_MIN_AGE_MS: 75 * 60 * 1000,
+  // Rows posted per channel-send loop, and the polite gap between Telegram calls.
+  TELEGRAM_SEND_DELAY_MS: 1200,
+
   // HTTP (api/scraper_v5.py + api/article_scraper.py headers).
   USER_AGENT:
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -56,6 +66,7 @@ const CONFIG = {
   TAB_JOBS: 'Jobs',
   TAB_UPDATES_QUEUE: 'UpdatesQueue',
   TAB_UPDATES: 'ExamUpdates',
+  TAB_CHANNELS: 'Channels',
   TAB_LOGS: 'Logs',
 };
 
@@ -69,6 +80,10 @@ const JOB_COLUMNS = [
   'last_date', 'last_date_display', 'apply_link', 'official_website',
   'is_featured', 'auto_discovered', 'job_metadata',
   'source_url', 'scraped_at',
+  // Telegram poster bookkeeping (appended last so existing sheets stay aligned):
+  // `slug` is the deep-link slug (synced into jobs.slug); `posted_at` is set once
+  // the row has been broadcast to Telegram so it's never reposted.
+  'slug', 'posted_at',
 ];
 
 // Column order for the ExamUpdates tab — maps to the `exam_updates` table
@@ -79,6 +94,15 @@ const UPDATE_COLUMNS = [
   'important_dates', 'overview', 'vacancy_table', 'fee_table', 'eligibility_table',
   'cutoff_table', 'download_links', 'official_links', 'related_links', 'images',
   'tags', 'sections', 'related_articles', 'scraped_at',
+  // Telegram poster bookkeeping (see JOB_COLUMNS note). `slug` syncs into
+  // exam_updates.slug and powers the /exam-update/<slug> deep-link.
+  'slug', 'posted_at',
 ];
 
 const QUEUE_COLUMNS = ['url', 'status', 'retry_count', 'discovered_at'];
+
+// Channels tab — one row per Telegram destination. `sector` matches the labels
+// the poster's matcher emits ('All Jobs' / 'Government Jobs' / 'Sarkari Naukri'
+// catch everything; e.g. 'SSC', 'Banking Jobs', 'Railway Jobs' narrow it).
+// `active` is 'yes'/'no' (blank = yes).
+const CHANNEL_COLUMNS = ['name', 'bot_token', 'channel_id', 'sector', 'active'];

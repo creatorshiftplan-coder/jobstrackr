@@ -73,21 +73,27 @@ export function useAllExamUpdates(category?: string) {
 /**
  * Fetch a single exam_update by its UUID (for the detail page)
  */
-export function useExamUpdateById(id: string | undefined) {
+// Matches a v4-style UUID; anything else is treated as a slug.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function useExamUpdateById(idOrSlug: string | undefined) {
   return useQuery({
-    queryKey: ["exam-update-by-id", id],
+    queryKey: ["exam-update-by-id", idOrSlug],
     queryFn: async (): Promise<ExamUpdateItem | null> => {
-      if (!id) return null;
+      if (!idOrSlug) return null;
+      // The /exam-update/:id route param may be a UUID (legacy links) or a slug
+      // (links the Sheets poster builds from the title). Resolve either.
+      const column = UUID_RE.test(idOrSlug) ? "id" : "slug";
       const { data, error } = await (supabase.from as any)("exam_updates")
         .select("*")
-        .eq("id", id)
+        .eq(column, idOrSlug)
         .single();
       if (error) throw error;
       if (!data) return null;
       const [filtered] = filterFreeJobAlertFromUpdates([data as ExamUpdateItem]);
       return filtered;
     },
-    enabled: !!id,
+    enabled: !!idOrSlug,
     staleTime: 5 * 60 * 1000,
   });
 }
