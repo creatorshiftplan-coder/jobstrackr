@@ -29,7 +29,8 @@ export function buildFeed(
   userProfile: Profile | null,
   savedJobs: Job[],
   viewedJobIds: Set<string> = new Set(),
-  jobSimilarity: Map<string, Job[]> = new Map()
+  jobSimilarity: Map<string, Job[]> = new Map(),
+  allJobs: Job[] = []
 ): FeedShelf[] {
   const seenIds = new Set<string>();
 
@@ -84,7 +85,7 @@ export function buildFeed(
     });
   }
 
-  // 4. Because You Liked {Title} (one shelf per recently saved job, max 2 shelves)
+  // 4. Because You Saved {Title} (one shelf per recently saved job, max 2 shelves)
   const recentSaved = savedJobs.slice(0, 2);
   for (const saved of recentSaved) {
     const similar = jobSimilarity.get(saved.id) || [];
@@ -92,7 +93,7 @@ export function buildFeed(
     if (recommendedSimilar.length > 0) {
       shelves.push({
         key: `because_liked:${saved.id}`,
-        title: `Because You Liked ${saved.title.split("-")[0].split("(")[0].trim()}`,
+        title: `Because You Saved ${saved.title.split("-")[0].split("(")[0].trim()}`,
         jobs: recommendedSimilar,
       });
     }
@@ -128,7 +129,25 @@ export function buildFeed(
     });
   }
 
-  // 7. Saved Jobs (always appended if user has saved jobs, seenIds deduplication bypassed here)
+  // 7. Expiring Soon (any active job closing within 7 days, soonest first).
+  // Drawn from the full jobs pool — not just eligible matches — and bypasses
+  // seenIds dedup so deadlines surface even if the job already appeared above.
+  const expiringSoonCandidates = allJobs
+    .filter((j) => {
+      const days = getDaysLeft(j.last_date);
+      return days >= 0 && days <= 7;
+    })
+    .sort((a, b) => getDaysLeft(a.last_date) - getDaysLeft(b.last_date));
+  const expiringSoonJobs = expiringSoonCandidates.slice(0, 10);
+  if (expiringSoonJobs.length > 0) {
+    shelves.push({
+      key: "expiring_soon",
+      title: "Expiring Soon",
+      jobs: expiringSoonJobs,
+    });
+  }
+
+  // 8. Saved Jobs (always appended if user has saved jobs, seenIds deduplication bypassed here)
   if (savedJobs.length > 0) {
     shelves.push({
       key: "saved",

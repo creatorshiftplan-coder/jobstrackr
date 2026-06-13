@@ -434,7 +434,7 @@ function buildUpdatePage(exam: any, aiData: any, status: { type: string; label: 
   <link rel="modulepreload" crossorigin href="/assets/vendor-icons-C5lFJxf7.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-supabase-BvsnE-zR.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-lottie-8Z6zZkhm.js">
-  <link rel="stylesheet" crossorigin href="/assets/main-B_9iAAL1.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-BWVQOKj6.css">
   <!-- PROD_HEAD_ASSETS_END -->
 </head>
 <body>
@@ -490,7 +490,7 @@ function buildUpdatePage(exam: any, aiData: any, status: { type: string; label: 
   ${ssrBottomNav()}
   <div id="root"></div>
   <!-- PROD_BODY_ASSETS_START -->
-  <script type="module" crossorigin src="/assets/main-DKuwdnuN.js"></script>
+  <script type="module" crossorigin src="/assets/main-BrH5kT2R.js"></script>
   <!-- PROD_BODY_ASSETS_END -->
   <script>
     const observer = new MutationObserver(() => {

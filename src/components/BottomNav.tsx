@@ -1,20 +1,17 @@
 import { Home, Search, CalendarDays, GraduationCap, Flame } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { cn } from "@/lib/utils";
 
 const navItems = [
-  { icon: Home, label: "Home", path: "/", color: "#f44336" },
-  { icon: Search, label: "Explore", path: "/search", color: "#ffa117" },
-  { icon: Flame, label: "Trending", path: "/trending", color: "#0fc70f" },
-  { icon: GraduationCap, label: "My Exams", path: "/tracker", color: "#2196f3" },
-  { icon: CalendarDays, label: "Calendar", path: "/calendar", color: "#00bcd4" },
+  { icon: Home, label: "Home", path: "/", color: "#f43f5e" },
+  { icon: Search, label: "Explore", path: "/search", color: "#f59e0b" },
+  { icon: Flame, label: "Trending", path: "/trending", color: "#10b981" },
+  { icon: GraduationCap, label: "My Exams", path: "/tracker", color: "#3b82f6" },
+  { icon: CalendarDays, label: "Calendar", path: "/calendar", color: "#8b5cf6" },
 ];
 
-// Tabs must fit a 360px-wide viewport
 const TAB_WIDTH = 58;
-const NAV_WIDTH = navItems.length * TAB_WIDTH;
+const PILL_WIDTH = 46;
 
-// Profile moved to the top-right of page headers, but the nav stays visible there
 const visiblePaths = new Set([...navItems.map((item) => item.path), "/profile"]);
 
 export function BottomNav() {
@@ -28,45 +25,49 @@ export function BottomNav() {
   const activeIndex = navItems.findIndex(
     (item) => item.path === normalizedPath
   );
+  
+  const hasActive = activeIndex >= 0;
+  const slideIndex = hasActive ? activeIndex : 0;
 
   return (
-    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 md:hidden w-[290px] h-[55px] bg-transparent">
-      {/* Backdrop bar */}
-      <div className="absolute left-0 right-0 bottom-0 h-[45px] bg-card rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-border/30 z-0">
-        {/* Notch cutout */}
-        <div
-          className="absolute -top-[20px] w-[56px] h-[56px] bg-background rounded-full transition-transform duration-300 ease-out z-0"
-          style={{
-            transform: `translateX(${activeIndex >= 0 ? activeIndex * 58 + 1 : 1}px)`,
-          }}
-        />
-      </div>
+    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 md:hidden w-[302px] h-[58px] bg-card/85 backdrop-blur-lg rounded-full border border-border/40 shadow-[0_12px_32px_rgba(0,0,0,0.08)] flex items-center px-1.5">
+      {/* Sliding Pill Background Indicator */}
+      <div
+        className="absolute top-1/2 left-[12px] h-[38px] rounded-full pointer-events-none z-0"
+        style={{
+          width: `${PILL_WIDTH}px`,
+          transform: `translate3d(${slideIndex * TAB_WIDTH}px, -50%, 0)`,
+          backgroundColor: hasActive ? `${navItems[slideIndex].color}15` : "transparent",
+          border: hasActive ? `1px solid ${navItems[slideIndex].color}25` : "1px solid transparent",
+          opacity: hasActive ? 1 : 0,
+          transition: "transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 250ms ease, background-color 380ms ease, border-color 380ms ease",
+        }}
+      />
 
       {/* Navigation Links */}
-      <ul className="flex w-[290px] relative z-10">
+      <ul className="flex w-[290px] h-full items-center relative z-10 p-0 m-0">
         {navItems.map(({ icon: Icon, path, color }, index) => {
           const isActive = activeIndex === index;
           return (
             <li
               key={path}
-              className="relative w-[58px] h-[55px] z-[2] list-none"
+              className="relative w-[58px] h-full flex items-center justify-center list-none"
             >
               <Link
                 to={path}
-                className="flex items-center justify-center w-full h-full text-muted-foreground no-underline"
+                className="flex items-center justify-center w-full h-full text-muted-foreground/60 no-underline"
               >
                 <span
-                  className={cn(
-                    "relative flex items-center justify-center w-[42px] h-[42px] rounded-full bg-card transition-all duration-300 ease-out cursor-pointer",
-                    isActive
-                      ? "-translate-y-[7px] shadow-[0_8px_20px_-3px_rgba(0,0,0,0.2)]"
-                      : "translate-y-[5px]"
-                  )}
+                  className="relative flex items-center justify-center w-[42px] h-[42px] rounded-full transition-all duration-300 ease-out cursor-pointer"
+                  style={{
+                    transform: isActive ? "scale(1.12)" : "scale(1)",
+                    opacity: isActive ? 1 : 0.7,
+                  }}
                 >
                   <Icon
                     className="h-[22px] w-[22px] transition-colors duration-300"
                     style={{
-                      color: isActive ? color : "hsl(var(--muted-foreground))",
+                      color: isActive ? color : "currentColor",
                     }}
                     strokeWidth={isActive ? 2.5 : 2}
                   />
@@ -79,3 +80,4 @@ export function BottomNav() {
     </nav>
   );
 }
+

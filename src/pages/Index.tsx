@@ -63,19 +63,20 @@ const Index = () => {
   const { shelves, isLoading: feedLoading } = useFeed(true, jobs, homepageLoading);
 
   // Homepage shelves: drop "Almost There - 1 Skill Away" and surface the
-  // highest-vacancy jobs from the user's recommendations alongside the
-  // "Because You Liked" rows. Other shelves fill any remaining slots.
+  // highest-vacancy jobs followed by the "Expiring Soon" deadline row, then the
+  // "Because You Saved" rows. Other shelves fill any remaining slots.
   const homeShelves = useMemo(() => {
     const homeRank = (key: string) => {
       if (key === "eligible_for_you") return 0;
       if (key === "high_vacancies") return 1;
-      if (key.startsWith("because_liked")) return 2;
-      return 3;
+      if (key === "expiring_soon") return 2;
+      if (key.startsWith("because_liked")) return 3;
+      return 4;
     };
     return shelves
       .filter((shelf) => shelf.key !== "almost_there")
       .sort((a, b) => homeRank(a.key) - homeRank(b.key))
-      .slice(0, 3);
+      .slice(0, 4);
   }, [shelves]);
 
   // Jobs-scoped readiness — sections render independently, no global gate

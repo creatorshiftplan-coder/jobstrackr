@@ -187,7 +187,8 @@ export function useFeed(
       profile,
       savedJobs,
       new Set(), // viewed jobs placeholder
-      jobSimilarityMap
+      jobSimilarityMap,
+      allJobs
     );
 
     return {
