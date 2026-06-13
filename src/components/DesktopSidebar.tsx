@@ -24,6 +24,7 @@ import {
   Share2,
   EyeOff,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -202,6 +203,9 @@ export function DesktopSidebar() {
 
   const toolItems = [
     { title: "Jobs For You", url: "/for-you", icon: Briefcase },
+    // Standalone page (separate Vite entry), not a Router route — needs a full
+    // navigation, so it's flagged `external` and rendered as an <a> below.
+    { title: "Govt Job Quiz", url: "/quiz", icon: Sparkles, external: true },
     { title: "Syllabus Finder", url: "/syllabus", icon: BookOpen },
     { title: "Application Guide", url: "/formmate", icon: ClipboardList },
     { title: "Upload Documents", url: "/documents", icon: Upload },
@@ -275,14 +279,24 @@ export function DesktopSidebar() {
               {toolItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      activeClassName="bg-sidebar-accent text-primary font-semibold"
-                    >
-                      <item.icon className="h-[18px] w-[18px] shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
+                    {item.external ? (
+                      <a
+                        href={item.url}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      >
+                        <item.icon className="h-[18px] w-[18px] shrink-0" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </a>
+                    ) : (
+                      <NavLink
+                        to={item.url}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        activeClassName="bg-sidebar-accent text-primary font-semibold"
+                      >
+                        <item.icon className="h-[18px] w-[18px] shrink-0" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
