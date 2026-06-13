@@ -579,21 +579,27 @@ const APP_URL = "https://www.jobstrackr.in/";
 // ─── UI Components ────────────────────────────────────────────────────────────
 
 // Wordmark with the real app icon. `light` adapts the text for dark backgrounds.
-function JobsTrackrLogo({ size = 36, light = false, showWord = true }) {
+function JobsTrackrLogo({ size = 26, light = false, showWord = true }) {
+  const sizeValue = typeof size === "number" ? `${size}px` : size;
   return (
-    <div style={{ display:"flex", alignItems:"center", gap: size * 0.3 }}>
+    <div style={{ display:"flex", alignItems:"center", gap: `calc(${sizeValue} * 0.25)` }}>
       <img
-        src={LOGO_SRC} alt="JobsTrackr" width={size} height={size}
+        src={LOGO_SRC} alt="JobsTrackr"
         style={{
-          display:"block", borderRadius: size * 0.26,
-          boxShadow: light ? "0 8px 22px rgba(4,12,40,0.5)" : "0 6px 16px rgba(15,37,87,0.2)",
+          display:"block",
+          width: sizeValue,
+          height: sizeValue,
+          borderRadius: `calc(${sizeValue} * 0.22)`,
+          boxShadow: light ? "0 4px 12px rgba(4,12,40,0.3)" : "0 3px 8px rgba(15,37,87,0.15)",
         }}
       />
       {showWord && (
         <span style={{
-          fontFamily: FONT, fontWeight: 800, fontSize: size * 0.52,
+          fontFamily: FONT, fontWeight: 800, fontSize: sizeValue,
           letterSpacing: "-0.5px", lineHeight: 1,
           color: light ? "#fff" : "#0f2557",
+          display: "inline-flex",
+          alignItems: "center"
         }}>
           Jobs<span style={{ color: light ? "#74B9FF" : "#2563EB" }}>Trackr</span>
         </span>
@@ -603,38 +609,75 @@ function JobsTrackrLogo({ size = 36, light = false, showWord = true }) {
 }
 
 // "What is JobsTrackr?" blurb — shown on both the landing and results pages.
-function AboutJobsTrackr({ light = false }) {
+function AboutJobsTrackr({ light = false, showAppLink = false }) {
   const features = [
-    ["🔔", "Live exam & job alerts"],
-    ["🎯", "AI job recommendations"],
-    ["✅", "Instant eligibility checks"],
-    ["📝", "Form-filling assistant"],
+    { icon: "🎯", title: "Eligible Jobs", desc: "Auto-match across 1,000s of exams—no manual search." },
+    { icon: "🔄", title: "Auto-Track", desc: "Track exam status for all your preparing exams in one place." },
+    { icon: "📝", title: "Form Help", desc: "Get smart guidance to fill application forms easily." },
+    { icon: "✨", title: "Try Free", desc: "Plus many more tools—100% free and ready to use!" }
   ];
+
   return (
     <div style={{
-      borderRadius: 18, padding: "20px 18px", fontFamily: FONT,
-      background: light ? "rgba(255,255,255,0.05)" : "#fff",
-      border: light ? "1px solid rgba(147,197,253,0.18)" : "1px solid #E2E8F0",
-      boxShadow: light ? "none" : "0 2px 14px rgba(15,37,87,0.05)",
+      borderRadius: 16,
+      padding: "12px 14px",
+      fontFamily: FONT,
+      background: light ? "rgba(255,255,255,0.04)" : "#fff",
+      border: light ? "1px solid rgba(147,197,253,0.15)" : "1px solid #E2E8F0",
+      boxShadow: light ? "none" : "0 4px 18px rgba(15,37,87,0.04)",
     }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
-        <img src={LOGO_SRC} alt="" width={32} height={32} style={{ borderRadius:9 }} />
-        <span style={{ fontWeight:800, fontSize:15, letterSpacing:"-0.3px", color: light ? "#fff" : "#0f2557" }}>
-          What is JobsTrackr?
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom: 10 }}>
+        <img src={LOGO_SRC} alt="" width={22} height={22} style={{ borderRadius:5 }} />
+        <span style={{ fontWeight:800, fontSize:13.5, letterSpacing:"-0.2px", color: light ? "#fff" : "#0f2557" }}>
+          Why use JobsTrackr?
         </span>
       </div>
-      <p style={{ margin:"0 0 14px", fontSize:13.5, lineHeight:1.7, color: light ? "#a7b6d6" : "#475569" }}>
-        India's smartest companion for government job aspirants. Track every exam
-        notification, get AI-powered matches for your profile, check eligibility in
-        seconds, and never miss a deadline again — 100% free.
-      </p>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:9 }}>
-        {features.map(([ic, t]) => (
-          <div key={t} style={{ display:"flex", alignItems:"center", gap:7, fontSize:12, fontWeight:600, color: light ? "#cdd8ee" : "#334155" }}>
-            <span style={{ fontSize:14 }}>{ic}</span>{t}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {features.map((f, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 13, lineHeight: 1.2, marginTop: 1 }}>{f.icon}</span>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: light ? "#fff" : "#1e293b" }}>
+                {f.title}:
+              </span>
+              <span style={{ fontSize: 11.5, color: light ? "#a7b6d6" : "#64748b", lineHeight: 1.35 }}>
+                {f.desc}
+              </span>
+            </div>
           </div>
         ))}
       </div>
+      {showAppLink && (
+        <div style={{
+          marginTop: 12,
+          borderTop: light ? "1px solid rgba(255,255,255,0.08)" : "1px solid #E2E8F0",
+          paddingTop: 10,
+          display: "flex",
+          justifyContent: "center"
+        }}>
+          <a href={APP_URL} target="_blank" rel="noopener noreferrer" style={{
+            fontSize: 12.5,
+            fontWeight: 800,
+            color: "#fff",
+            background: "linear-gradient(90deg,#2563EB,#1d4ed8)",
+            padding: "8px 20px",
+            borderRadius: 8,
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
+            transition: "all 0.2s"
+          }} onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = 0.9;
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }} onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = 1;
+            e.currentTarget.style.transform = "none";
+          }}>
+            Check JobsTrackr for free
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -763,7 +806,7 @@ function ResultCard({ results, onRetake }) {
       }}>
         <div style={{ position:"absolute", top:-90, left:"50%", transform:"translateX(-50%)", width:260, height:260, background:"radial-gradient(circle, rgba(116,185,255,0.22), transparent 70%)", pointerEvents:"none" }} />
         <div style={{ position:"relative", display:"flex", justifyContent:"center" }}>
-          <JobsTrackrLogo size={36} light />
+          <JobsTrackrLogo size={28} light />
         </div>
         <div style={{ position:"relative", fontSize:30, marginTop:16, marginBottom:6 }}>🎯</div>
         <h2 style={{ position:"relative", margin:0, fontSize:24, fontWeight:900, letterSpacing:"-0.7px", color:"#fff" }}>Your Top Matches</h2>
@@ -931,151 +974,385 @@ export default function GovtJobQuiz() {
 
   const retake = () => { setStep(-1); setAnswers({}); setResults(null); };
 
+  const shareQuizGeneral = async () => {
+    const text = "Which Govt Job suits you best? 🎯 Take this quick 2-minute quiz on JobsTrackr to find out your top matches! No signup required.\n\nFind your match 👉 jobstrackr.in/quiz";
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Which Govt Job Suits You? — JobsTrackr Quiz",
+          text: "Which Govt Job suits you best? 🎯 Take this quick 2-minute quiz on JobsTrackr to find out your top matches!",
+          url: "https://jobstrackr.in/quiz",
+        });
+      } catch (err) {
+        console.log("Error sharing:", err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText("https://jobstrackr.in/quiz");
+        alert("Quiz link copied to clipboard!");
+      } catch (err) {
+        console.log("Copy failed:", err);
+      }
+    }
+  };
+
+  const stylesBlock = (
+    <style>{`
+      /* Custom scrollbar for premium feel */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.35);
+        border-radius: 99px;
+        border: 1px solid transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(148, 163, 184, 0.55);
+      }
+
+      /* Premium share buttons */
+      .share-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        color: #cdd8ee;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        text-decoration: none;
+      }
+      .share-btn:hover {
+        transform: translateY(-2px) scale(1.08);
+        color: #fff;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      }
+      .share-btn.whatsapp:hover {
+        background: #25D366;
+        border-color: #25D366;
+        box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4);
+      }
+      .share-btn.telegram:hover {
+        background: #0088cc;
+        border-color: #0088cc;
+        box-shadow: 0 6px 20px rgba(0, 136, 204, 0.4);
+      }
+      .share-btn.facebook:hover {
+        background: #1877F2;
+        border-color: #1877F2;
+        box-shadow: 0 6px 20px rgba(24, 119, 242, 0.4);
+      }
+      .share-btn.more:hover {
+        background: linear-gradient(135deg, #74B9FF, #1A56DB);
+        border-color: #1A56DB;
+        box-shadow: 0 6px 20px rgba(26, 86, 219, 0.4);
+      }
+
+      /* Dynamic sizing and height constraints for mobile screens */
+      @media (max-height: 740px) {
+        .landing-wrapper {
+          padding: clamp(10px, 2.5vh, 18px) 18px clamp(10px, 2vh, 16px) !important;
+        }
+        .compact-eyebrow {
+          margin-bottom: 6px !important;
+          padding: 4px 10px !important;
+        }
+        .compact-title {
+          font-size: clamp(20px, 4.8vh, 28px) !important;
+          margin-bottom: 4px !important;
+        }
+        .compact-subtitle {
+          font-size: 12.5px !important;
+          margin-bottom: 10px !important;
+          line-height: 1.4 !important;
+        }
+        .compact-stats {
+          gap: 6px !important;
+        }
+        .compact-stats > div {
+          padding: 6px 12px !important;
+          min-width: 62px !important;
+          border-radius: 8px !important;
+        }
+        .compact-stats .stat-number {
+          font-size: 15px !important;
+        }
+        .compact-stats .stat-label {
+          font-size: 8.5px !important;
+          margin-top: 1px !important;
+        }
+      }
+      @media (max-width: 480px) {
+        .option-btn {
+          padding: 10px 14px !important;
+          margin-bottom: 7px !important;
+          gap: 10px !important;
+          border-radius: 10px !important;
+        }
+        .option-btn-title {
+          font-size: 13.5px !important;
+        }
+        .option-btn-sub {
+          font-size: 11.5px !important;
+        }
+      }
+    `}</style>
+  );
+
   // ── Landing ──
   if (step === -1) return (
-    <div style={{
-      minHeight:"100vh", position:"relative", overflow:"hidden", fontFamily: FONT,
-      background:"radial-gradient(125% 80% at 50% -8%, #16397f 0%, #0a1f4d 46%, #050f2b 100%)",
-    }}>
-      {/* ambient glow */}
-      <div style={{ position:"absolute", top:-130, left:"50%", transform:"translateX(-50%)", width:440, height:440, background:"radial-gradient(circle, rgba(116,185,255,0.18), transparent 70%)", pointerEvents:"none" }} />
-
+    <>
+      {stylesBlock}
       <div style={{
-        position:"relative", maxWidth:480, margin:"0 auto",
-        padding:"clamp(40px,9vh,76px) 22px 40px",
-        display:"flex", flexDirection:"column", alignItems:"center",
+        height:"100dvh", position:"relative", overflow:"hidden", fontFamily: FONT,
+        background:"radial-gradient(125% 80% at 50% -8%, #16397f 0%, #0a1f4d 46%, #050f2b 100%)",
       }}>
-        {/* App icon hero */}
-        <div style={{ position:"relative", marginBottom:20 }}>
-          <div style={{ position:"absolute", inset:-16, borderRadius:36, background:"radial-gradient(circle, rgba(116,185,255,0.4), transparent 70%)", filter:"blur(8px)" }} />
-          <img src={LOGO_SRC} alt="JobsTrackr" width={92} height={92}
-            style={{ position:"relative", borderRadius:24, boxShadow:"0 20px 52px rgba(4,12,40,0.6)" }} />
-        </div>
+        {/* ambient glow */}
+        <div style={{ position:"absolute", top:-130, left:"50%", transform:"translateX(-50%)", width:440, height:440, background:"radial-gradient(circle, rgba(116,185,255,0.18), transparent 70%)", pointerEvents:"none" }} />
 
-        <div style={{ fontWeight:800, fontSize:19, letterSpacing:"-0.5px", color:"#fff", marginBottom:18 }}>
-          Jobs<span style={{ color:"#74B9FF" }}>Trackr</span>
-        </div>
-
-        {/* eyebrow pill */}
-        <div style={{ display:"inline-flex", alignItems:"center", gap:7, padding:"6px 14px", borderRadius:99, background:"rgba(116,185,255,0.1)", border:"1px solid rgba(116,185,255,0.25)", marginBottom:22 }}>
-          <span style={{ width:7, height:7, borderRadius:99, background:"#4ade80", boxShadow:"0 0 8px #4ade80" }} />
-          <span style={{ fontSize:12, fontWeight:600, color:"#bcd4ff", letterSpacing:"0.2px" }}>Free Career Quiz</span>
-        </div>
-
-        <h1 style={{ fontSize:"clamp(31px,8.5vw,47px)", fontWeight:900, color:"#fff", textAlign:"center", margin:"0 0 16px", lineHeight:1.08, letterSpacing:"-1.3px" }}>
-          Which Govt Job<br/>
-          <span style={{ background:"linear-gradient(100deg,#74B9FF,#BFDBFE)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>suits you best?</span>
-        </h1>
-
-        <p style={{ color:"#9fb3d9", fontSize:15.5, textAlign:"center", maxWidth:344, lineHeight:1.7, margin:"0 0 30px" }}>
-          Answer 10 quick questions and get a personalised, ranked list of the exams
-          you're actually eligible for — and can crack.
-        </p>
-
-        {/* stat pills */}
-        <div style={{ display:"flex", gap:10, marginBottom:30, flexWrap:"wrap", justifyContent:"center" }}>
-          {[["50","Exams"],["10","Questions"],["2 min","To finish"]].map(([n,l]) => (
-            <div key={l} style={{ padding:"11px 20px", borderRadius:14, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(147,197,253,0.15)", textAlign:"center", minWidth:80 }}>
-              <div style={{ fontSize:20, fontWeight:900, color:"#fff", letterSpacing:"-0.6px" }}>{n}</div>
-              <div style={{ fontSize:11, color:"#7e93ba", marginTop:2, fontWeight:600 }}>{l}</div>
-            </div>
-          ))}
-        </div>
-
-        <button onClick={() => setStep(0)} style={{
-          width:"100%", maxWidth:340, padding:"17px",
-          background:"linear-gradient(90deg,#4A90D9,#1A4FAF)",
-          color:"#fff", border:"none", borderRadius:15, fontSize:17, fontWeight:800,
-          cursor:"pointer", boxShadow:"0 12px 36px rgba(26,80,175,0.55)",
-          letterSpacing:"-0.3px", fontFamily: FONT,
+        <div className="landing-wrapper" style={{
+          position:"relative", maxWidth:480, margin:"0 auto",
+          height: "100%",
+          padding:"clamp(14px, 4vh, 32px) 22px clamp(12px, 3vh, 24px)",
+          boxSizing: "border-box",
+          display:"flex", flexDirection:"column", alignItems:"center",
+          justifyContent: "space-between",
+          overflow: "hidden"
         }}>
-          Find My Match →
-        </button>
-        <p style={{ color:"#5f74a0", fontSize:12, margin:"14px 0 0", fontWeight:500 }}>No signup · Results in 2 minutes</p>
+          {/* Header Branding (Side by Side logo and text) */}
+          <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
+            <JobsTrackrLogo size="clamp(24px, 4.2vh, 32px)" light />
+          </div>
 
-        {/* About JobsTrackr + open the full app */}
-        <div style={{ width:"100%", marginTop:42, display:"flex", flexDirection:"column", gap:14 }}>
-          <AboutJobsTrackr light />
-          <OpenAppButton />
-          <p style={{ textAlign:"center", fontSize:11.5, color:"#5f74a0", margin:0 }}>
-            jobstrackr.in · Smart App for Smart Aspirants
-          </p>
+          {/* Middle Content Section (Eyebrow + Title + Subtitle) */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%", marginTop: "auto", marginBottom: "auto" }}>
+            {/* eyebrow pill */}
+            <div style={{ display:"inline-flex", alignItems:"center", gap:7, padding:"5px 12px", borderRadius:99, background:"rgba(116,185,255,0.1)", border:"1px solid rgba(116,185,255,0.25)", marginBottom:10, transition:"all 0.3s" }} className="compact-eyebrow">
+              <span style={{ width:6, height:6, borderRadius:99, background:"#4ade80", boxShadow:"0 0 8px #4ade80" }} />
+              <span style={{ fontSize:11, fontWeight:600, color:"#bcd4ff", letterSpacing:"0.2px" }}>Free Career Quiz</span>
+            </div>
+
+            <h1 style={{ fontSize:"clamp(24px, 4.5vh, 34px)", fontWeight:900, color:"#fff", textAlign:"center", margin:"0 0 8px", lineHeight:1.1, letterSpacing:"-1px", transition:"all 0.3s" }} className="compact-title">
+              Which Govt Job<br/>
+              <span style={{ background:"linear-gradient(100deg,#74B9FF,#BFDBFE)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>suits you best?</span>
+            </h1>
+
+            <p style={{ color:"#9fb3d9", fontSize:13.5, textAlign:"center", maxWidth:344, lineHeight:1.5, margin:"0", transition:"all 0.3s" }} className="compact-subtitle">
+              Answer 10 quick questions and get a personalised, ranked list of the exams
+              you're actually eligible for.
+            </p>
+          </div>
+
+          {/* Bottom Group (CTA, Share Row, Advertisement & Footer) */}
+          <div style={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "clamp(12px, 2vh, 16px)",
+            marginTop: "auto"
+          }}>
+            {/* stat pills (placed closer to CTA button) */}
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"center", marginBottom: 4 }} className="compact-stats">
+              {[["50","Exams"],["10","Questions"],["2 min","To finish"]].map(([n,l]) => (
+                <div key={l} style={{ padding:"8px 14px", borderRadius:12, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(147,197,253,0.12)", textAlign:"center", minWidth:70, transition:"all 0.3s" }}>
+                  <div style={{ fontSize:17, fontWeight:900, color:"#fff", letterSpacing:"-0.5px" }} className="stat-number">{n}</div>
+                  <div style={{ fontSize:10, color:"#7e93ba", marginTop:1, fontWeight:600 }} className="stat-label">{l}</div>
+                </div>
+              ))}
+            </div>
+            {/* Action section (CTA + Share Row) */}
+            <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <button onClick={() => setStep(0)} style={{
+                width:"100%", maxWidth:340, padding:"14px",
+                background:"linear-gradient(90deg,#4A90D9,#1A4FAF)",
+                color:"#fff", border:"none", borderRadius:12, fontSize:15.5, fontWeight:800,
+                cursor:"pointer", boxShadow:"0 8px 24px rgba(26,80,175,0.45)",
+                letterSpacing:"-0.2px", fontFamily: FONT,
+              }}>
+                Find My Match →
+              </button>
+              <p style={{ color:"#5f74a0", fontSize:11, margin:"6px 0 0", fontWeight:500 }}>No signup · Results in 2 minutes</p>
+
+              {/* General Share drawer */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, marginTop: 14, width: "100%", maxWidth: 340 }}>
+                <span style={{ fontSize: 12.5, color: "#bcd4ff", fontWeight: 600, letterSpacing: "0.2px", textAlign: "center" }}>
+                  Share quiz with friends to know which govt jobs suits them
+                </span>
+                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                  <a href={`https://api.whatsapp.com/send?text=${encodeURIComponent("Which Govt Job suits you best? 🎯 Take this quick 2-minute quiz on JobsTrackr to find out! https://jobstrackr.in/quiz")}`}
+                     target="_blank" rel="noopener noreferrer" className="share-btn whatsapp" title="Share on WhatsApp">
+                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                       <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.66.986 3.298 1.448 5.355 1.449 5.483 0 9.944-4.461 9.947-9.948.002-2.656-1.03-5.153-2.906-7.03C17.168 1.749 14.673.715 12.012.715c-5.485 0-9.948 4.463-9.95 9.95-.001 2.01.526 3.974 1.53 5.714l-.997 3.64 3.73-.978zm12.395-5.91c-.33-.165-1.954-.964-2.256-1.074-.3-.11-.52-.165-.74.165-.22.33-.85 1.074-1.04 1.293-.19.22-.38.247-.71.082-.33-.165-1.393-.513-2.653-1.638-.98-.874-1.64-1.953-1.83-2.28-.19-.33-.02-.508.145-.671.15-.148.33-.385.495-.578.165-.192.22-.33.33-.55.11-.22.05-.412-.025-.577-.075-.165-.74-1.785-1.012-2.445-.267-.64-.563-.55-.774-.56-.2-.01-.43-.01-.66-.01-.23 0-.605.087-.92.43-.315.345-1.2 1.173-1.2 2.861s1.23 3.32 1.4 3.55c.17.23 2.42 3.692 5.86 5.17.82.35 1.46.56 1.96.72.825.26 1.575.225 2.167.14.66-.1 1.954-.8 2.23-1.57.275-.77.275-1.43.19-1.57-.08-.14-.3-.22-.63-.385z"/>
+                     </svg>
+                  </a>
+                  <a href={`https://t.me/share/url?url=${encodeURIComponent("https://jobstrackr.in/quiz")}&text=${encodeURIComponent("Which Govt Job suits you best? 🎯 Take this quick 2-minute quiz on JobsTrackr to find out!")}`}
+                     target="_blank" rel="noopener noreferrer" className="share-btn telegram" title="Share on Telegram">
+                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-1-.65-.35-1 .22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.94-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .24z"/>
+                     </svg>
+                  </a>
+                  <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent("https://jobstrackr.in/quiz")}`}
+                     target="_blank" rel="noopener noreferrer" className="share-btn facebook" title="Share on Facebook">
+                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                       <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c4.56-.93 8-4.96 8-9.75z"/>
+                     </svg>
+                  </a>
+                  <button onClick={shareQuizGeneral} className="share-btn more" title="More Sharing Options" style={{ padding: 0 }}>
+                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                       <circle cx="18" cy="5" r="3"/>
+                       <circle cx="6" cy="12" r="3"/>
+                       <circle cx="18" cy="19" r="3"/>
+                       <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                       <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                     </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Advertisement Section */}
+            <div style={{ width:"100%", boxSizing:"border-box" }}>
+              <AboutJobsTrackr light showAppLink />
+            </div>
+
+            {/* Footer copyright link */}
+            <p style={{ textAlign:"center", fontSize:11, color:"#5f74a0", margin:0 }}>
+              jobstrackr.in · Smart App for Smart Aspirants
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 
   // ── Results ──
   if (step === QUESTIONS.length && results) return (
-    <div style={{ minHeight:"100vh", background:"#F0F6FF", padding:"20px 16px 48px" }}>
-      <div style={{ maxWidth:500, margin:"0 auto" }}>
-        <ResultCard results={results} onRetake={retake} />
+    <>
+      {stylesBlock}
+      <div style={{ minHeight:"100vh", background:"#F0F6FF", padding:"20px 16px 48px" }}>
+        <div style={{ maxWidth:500, margin:"0 auto" }}>
+          <ResultCard results={results} onRetake={retake} />
+        </div>
       </div>
-    </div>
+    </>
   );
 
   // ── Quiz ──
   return (
-    <div style={{ minHeight:"100vh", background:"#F0F6FF", padding:"18px 16px" }}>
-      <div style={{ maxWidth:500, margin:"0 auto" }}>
-        {/* Topbar */}
-        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:18 }}>
-          <JobsTrackrLogo size={28} />
-          {step > 0 && (
-            <button onClick={() => setStep(s => s - 1)} style={{
-              background:"#fff", border:"1px solid #DBEAFE",
-              borderRadius:8, padding:"5px 10px", cursor:"pointer",
-              color:"#3B82F6", fontSize:13, fontWeight:700, marginLeft:4,
-            }}>← Back</button>
-          )}
-          <ProgressBar current={step + 1} total={QUESTIONS.length} />
-        </div>
-
-        {/* Question card */}
+    <>
+      {stylesBlock}
+      <div style={{
+        height:"100dvh",
+        background:"#F0F6FF",
+        padding:"clamp(12px, 3.2vh, 20px) 16px",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        overflow: "hidden"
+      }}>
         <div style={{
-          background:"#fff", borderRadius:20, padding:"26px 20px",
-          boxShadow:"0 4px 24px rgba(37,99,235,0.1)",
-          border:"1px solid #DBEAFE", marginBottom:14,
+          maxWidth:500,
+          width:"100%",
+          margin:"0 auto",
+          display:"flex",
+          flexDirection:"column",
+          height:"100%",
+          overflow:"hidden"
         }}>
-          <div style={{ fontSize:36, marginBottom:10 }}>{q.emoji}</div>
-          <h2 style={{
-            margin:"0 0 6px", fontSize:19, fontWeight:800, color:"#0f172a", lineHeight:1.3,
+          {/* Topbar */}
+          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:"clamp(10px, 2vh, 18px)", flexShrink:0 }}>
+            <JobsTrackrLogo size={22} />
+            {step > 0 && (
+              <button onClick={() => setStep(s => s - 1)} style={{
+                background:"#fff", border:"1px solid #DBEAFE",
+                borderRadius:8, padding:"5px 10px", cursor:"pointer",
+                color:"#3B82F6", fontSize:13, fontWeight:700, marginLeft:4,
+              }}>← Back</button>
+            )}
+            <ProgressBar current={step + 1} total={QUESTIONS.length} />
+          </div>
+
+          {/* Question card */}
+          <div style={{
+            background:"#fff",
+            borderRadius:20,
+            padding:"clamp(16px, 3vh, 26px) clamp(16px, 4.5vw, 22px)",
+            boxShadow:"0 4px 24px rgba(37,99,235,0.06)",
+            border:"1px solid #DBEAFE",
+            marginBottom:"clamp(10px, 2vh, 14px)",
+            display:"flex",
+            flexDirection:"column",
+            flex:1,
+            overflow:"hidden"
           }}>
-            {q.question}
-          </h2>
-          {q.type === "multi" && (
-            <p style={{ margin:"0 0 18px", fontSize:13, color:"#64748b" }}>
-              Select all that apply
-            </p>
-          )}
-          {q.type !== "multi" && <div style={{ marginBottom:18 }} />}
-          {q.options.map(opt => (
-            <OptionBtn key={opt.value} option={opt}
-              selected={answers[q.id]} onClick={handleAnswer} multi={q.type==="multi"} />
-          ))}
+            <div style={{ fontSize:"clamp(28px, 4.5vh, 36px)", marginBottom:10, flexShrink:0 }}>{q.emoji}</div>
+            <h2 style={{
+              margin:"0 0 6px",
+              fontSize:"clamp(16px, 2.4vh, 19px)",
+              fontWeight:800,
+              color:"#0f172a",
+              lineHeight:1.3,
+              flexShrink:0
+            }}>
+              {q.question}
+            </h2>
+            {q.type === "multi" && (
+              <p style={{ margin:"0 0 12px", fontSize:12.5, color:"#64748b", flexShrink:0 }}>
+                Select all that apply
+              </p>
+            )}
+            {q.type !== "multi" && <div style={{ marginBottom:14, flexShrink:0 }} />}
+
+            {/* Scrollable option container */}
+            <div className="custom-scrollbar" style={{
+              flex:1,
+              overflowY:"auto",
+              paddingRight:4,
+              marginRight:-4,
+              display:"flex",
+              flexDirection:"column"
+            }}>
+              {q.options.map(opt => (
+                <OptionBtn key={opt.value} option={opt}
+                  selected={answers[q.id]} onClick={handleAnswer} multi={q.type==="multi"} />
+              ))}
+            </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div style={{ flexShrink: 0 }}>
+            {/* Next button — only shown for multi-select */}
+            {q.type === "multi" && (
+              <button onClick={handleNext} disabled={!canNext()} style={{
+                width:"100%", padding:"clamp(13px, 2.2vh, 16px)",
+                background: canNext() ? "linear-gradient(90deg,#4A90D9,#1A4FAF)" : "#E2E8F0",
+                color: canNext() ? "#fff" : "#94a3b8",
+                border:"none", borderRadius:12, fontSize:15.5, fontWeight:800,
+                cursor: canNext() ? "pointer" : "not-allowed", transition:"all 0.2s",
+                boxShadow: canNext() ? "0 4px 16px rgba(37,99,235,0.3)" : "none",
+              }}>
+                {step === QUESTIONS.length - 1 ? "See My Matches 🎯" : "Next →"}
+              </button>
+            )}
+
+            {/* Single select hint */}
+            {q.type === "single" && (
+              <p style={{ textAlign:"center", fontSize:11.5, color:"#94a3b8", margin:"4px 0 0" }}>
+                Tap an option to continue automatically
+              </p>
+            )}
+          </div>
         </div>
-
-        {/* Next button — only shown for multi-select */}
-        {q.type === "multi" && (
-          <button onClick={handleNext} disabled={!canNext()} style={{
-            width:"100%", padding:15,
-            background: canNext() ? "linear-gradient(90deg,#4A90D9,#1A4FAF)" : "#E2E8F0",
-            color: canNext() ? "#fff" : "#94a3b8",
-            border:"none", borderRadius:12, fontSize:15, fontWeight:800,
-            cursor: canNext() ? "pointer" : "not-allowed", transition:"all 0.2s",
-            boxShadow: canNext() ? "0 4px 16px rgba(37,99,235,0.3)" : "none",
-          }}>
-            {step === QUESTIONS.length - 1 ? "See My Matches 🎯" : "Next →"}
-          </button>
-        )}
-
-        {/* Single select hint */}
-        {q.type === "single" && (
-          <p style={{ textAlign:"center", fontSize:12, color:"#94a3b8", margin:"8px 0 0" }}>
-            Tap an option to continue automatically
-          </p>
-        )}
       </div>
-    </div>
+    </>
   );
 }
