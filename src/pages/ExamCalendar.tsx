@@ -183,7 +183,7 @@ function FilterBar({
   );
 }
 
-function AgendaList({
+function TimelineList({
   upcoming,
   onEventClick,
 }: {
@@ -545,7 +545,7 @@ export default function ExamCalendar() {
                     Export
                   </Button>
                 </div>
-                <AgendaList upcoming={upcoming} onEventClick={setSelectedEvent} />
+                <TimelineList upcoming={upcoming} onEventClick={setSelectedEvent} />
               </div>
             </TabsContent>
           </Tabs>
