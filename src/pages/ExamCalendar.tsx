@@ -264,36 +264,37 @@ export default function ExamCalendar() {
       const outside = date.getMonth() !== displayMonth.getMonth();
       const types = outside ? [] : distinctTypes(byDate.get(dateKey(date)) ?? []);
       return (
-        <div className="flex h-full w-full flex-col items-start gap-0.5">
-          <span className={cn("text-xs font-semibold sm:text-sm", outside && "opacity-40")}>
+        <div className="flex h-full w-full flex-col gap-0.5 overflow-hidden text-left">
+          <span className={cn("text-[11px] font-semibold leading-none sm:text-sm", outside && "opacity-40")}>
             {date.getDate()}
           </span>
           {types.length > 0 && (
-            <>
-              {/* Mobile: colored mini-dots (cells too narrow for text pills) */}
-              <div className="flex flex-wrap items-center gap-0.5 sm:hidden">
-                {types.slice(0, 4).map((type) => (
-                  <span key={type} className={cn("h-1.5 w-1.5 rounded-full", EVENT_TYPE_CONFIG[type].dotClass)} />
-                ))}
-              </div>
-              {/* sm+: colored pills with short labels */}
-              <div className="hidden w-full flex-col gap-0.5 sm:flex">
-                {types.slice(0, 2).map((type) => (
-                  <span
-                    key={type}
-                    className={cn(
-                      "w-full truncate rounded px-1 py-0.5 text-left text-[9px] font-semibold leading-tight",
-                      EVENT_TYPE_CONFIG[type].badgeClass
-                    )}
-                  >
-                    {EVENT_TYPE_CONFIG[type].short}
-                  </span>
-                ))}
-                {types.length > 2 && (
-                  <span className="px-1 text-[9px] font-semibold text-muted-foreground">+{types.length - 2}</span>
-                )}
-              </div>
-            </>
+            <div className="flex flex-col gap-0.5 overflow-hidden">
+              {/* Colored, labelled pills — 1 visible on phones, up to 2 on sm+ */}
+              {types.slice(0, 2).map((type, i) => (
+                <span
+                  key={type}
+                  className={cn(
+                    "truncate rounded px-1 py-px text-left text-[8px] font-semibold leading-tight sm:py-0.5 sm:text-[10px]",
+                    EVENT_TYPE_CONFIG[type].badgeClass,
+                    i === 1 && "hidden sm:block"
+                  )}
+                >
+                  {EVENT_TYPE_CONFIG[type].short}
+                </span>
+              ))}
+              {/* Overflow counter — thresholds differ per breakpoint (1 pill mobile, 2 desktop) */}
+              {types.length > 1 && (
+                <span className="px-0.5 text-[8px] font-semibold leading-none text-muted-foreground sm:hidden">
+                  +{types.length - 1}
+                </span>
+              )}
+              {types.length > 2 && (
+                <span className="hidden px-0.5 text-[9px] font-semibold leading-none text-muted-foreground sm:block">
+                  +{types.length - 2}
+                </span>
+              )}
+            </div>
           )}
         </div>
       );
@@ -571,12 +572,12 @@ export default function ExamCalendar() {
                         head_row: "grid grid-cols-7 w-full",
                         row: "grid grid-cols-7 w-full mt-1 sm:mt-1.5",
                         head_cell: "text-muted-foreground rounded-md text-center font-semibold text-[0.75rem]",
-                        cell: "relative p-0.5 text-left align-top focus-within:relative focus-within:z-20",
-                        day: "flex h-full min-h-[3.25rem] w-full flex-col items-start justify-start rounded-xl border border-transparent p-1 text-left text-sm font-medium transition-colors hover:border-primary/30 hover:bg-secondary/50 aria-selected:opacity-100 sm:min-h-[4.75rem] sm:p-1.5",
+                        cell: "relative p-0.5 align-top focus-within:relative focus-within:z-20",
+                        day: "flex h-12 w-full flex-col items-stretch justify-start overflow-hidden rounded-lg border border-transparent p-1 text-left text-sm font-medium transition-colors hover:border-primary/40 hover:bg-secondary/50 aria-selected:opacity-100 sm:h-[4.5rem] sm:p-1.5",
                         day_today: "border-primary/40 bg-primary/5 text-foreground",
                         day_selected:
-                          "border-primary bg-primary/10 text-foreground ring-1 ring-primary hover:bg-primary/10 focus:bg-primary/10",
-                        day_outside: "opacity-60",
+                          "border-primary bg-primary/10 text-foreground hover:bg-primary/15 focus:bg-primary/10",
+                        day_outside: "opacity-50",
                       }}
                     />
                   </div>
