@@ -1,12 +1,15 @@
 """
 Admin-only proxy to trigger the `sync-sheets` Supabase edge function on demand.
 
-The edge function authorizes with a shared secret / service-role key — neither of
-which should live in the browser. This route verifies the caller is an admin
-(via the same is_request_authorized used by the other scrape routes) and then
-forwards the request to the edge function using the service-role key that is
-already present in the server environment. The edge function and the Apps Script
-are unchanged.
+The edge function accepts EITHER a shared secret (x-sync-secret header) OR the
+service-role key as a bearer token. Neither belongs in the browser, so this route
+verifies the caller is an admin (same is_request_authorized as the scrape routes)
+and forwards to the edge function from the server.
+
+Prefers the shared secret (SHEETS_SYNC_SECRET) because it's the same secret the
+Apps Script Web App and the pg_cron job already use, and keeps the service-role
+key out of this proxy. Falls back to the service-role key if the shared secret
+isn't configured.
 
 POST /api/sync-sheets   (Authorization: Bearer <admin user JWT>)
 """
@@ -44,20 +47,41 @@ class handler(BaseHTTPRequestHandler):
             _json(self, 401, {"error": "Unauthorized"})
             return
 
-        supabase_url = os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL")
+        supabase_url = (
+            os.environ.get("SUPABASE_URL")
+            or os.environ.get("VITE_SUPABASE_URL")
+        )
+        sync_secret = os.environ.get("SHEETS_SYNC_SECRET")
         service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-        if not supabase_url or not service_key:
-            _json(self, 500, {"error": "Server not configured (SUPABASE_URL / SERVICE_ROLE_KEY)"})
+
+        if not supabase_url:
+            _json(self, 500, {"error": "Server not configured: SUPABASE_URL (or VITE_SUPABASE_URL) is missing"})
+            return
+        if not sync_secret and not service_key:
+            _json(self, 500, {"error": "Server not configured: SHEETS_SYNC_SECRET or SUPABASE_SERVICE_ROLE_KEY is required"})
             return
 
-        # 2. Forward to the edge function with the service-role key (server-side only).
+        # 2. Forward to the edge function. Prefer the shared secret (header auth)
+        #    so this proxy doesn't need the service-role key.
+        headers = {"Content-Type": "application/json"}
+        if sync_secret:
+            headers["x-sync-secret"] = sync_secret
+            # Edge functions on Supabase still expect a Bearer for the platform-level
+            # check; the publishable/anon key satisfies it without granting privileges.
+            anon = (
+                os.environ.get("SUPABASE_ANON_KEY")
+                or os.environ.get("VITE_SUPABASE_PUBLISHABLE_KEY")
+                or service_key
+            )
+            if anon:
+                headers["Authorization"] = f"Bearer {anon}"
+        else:
+            headers["Authorization"] = f"Bearer {service_key}"
+
         try:
             resp = requests.post(
                 f"{supabase_url}/functions/v1/sync-sheets",
-                headers={
-                    "Authorization": f"Bearer {service_key}",
-                    "Content-Type": "application/json",
-                },
+                headers=headers,
                 json={"trigger": "manual"},
                 timeout=120,
             )
