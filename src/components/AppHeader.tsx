@@ -1,23 +1,10 @@
 import { ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, Search, Bookmark, RefreshCw, Home, CalendarDays, User, Settings, HelpCircle, Flame, Timer, ArrowLeft } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Link, useNavigate } from "react-router-dom";
+import { Menu, Search, RefreshCw, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import logoColor from "@/assets/logo-color.png";
 import logoWhite from "@/assets/logo-white.png";
-
-// Navigation items for the menu
-const NAV_ITEMS = [
-    { icon: Home, label: "Home", path: "/" },
-    { icon: Search, label: "Explore", path: "/search" },
-    { icon: Flame, label: "Trending", path: "/trending" },
-    { icon: Timer, label: "Countdown", path: "/countdown" },
-    { icon: CalendarDays, label: "My Exams", path: "/tracker" },
-    { icon: User, label: "Profile", path: "/profile" },
-    { icon: Settings, label: "Settings", path: "/more" },
-    { icon: HelpCircle, label: "Help", path: "/help" },
-];
 
 interface AppHeaderProps {
     title: string;
@@ -46,7 +33,6 @@ export function AppHeader({
     onRefresh,
     isRefreshing = false,
 }: AppHeaderProps) {
-    const location = useLocation();
     const navigate = useNavigate();
     const handleBack = useSmartBack("/");
 
@@ -84,42 +70,13 @@ export function AppHeader({
                         </button>
                     )}
                     {showMenu && !showBack && (
-                        <Sheet>
-                            <SheetTrigger asChild>
-                                <button className={cn("p-2 -ml-2 rounded-lg transition-colors", iconClass)}>
-                                    <Menu className="h-6 w-6" />
-                                </button>
-                            </SheetTrigger>
-                            <SheetContent side="left" className="w-72">
-                                <SheetHeader className="pb-6">
-                                    <div className="flex items-center gap-3">
-                                        <img src={logoColor} alt="JobsTrackr" className="h-10 w-10 dark:hidden invert dark:invert-0" />
-                                        <img src={logoWhite} alt="JobsTrackr" className="h-10 w-10 hidden dark:block" />
-                                        <SheetTitle className="text-xl font-bold">JobsTrackr</SheetTitle>
-                                    </div>
-                                </SheetHeader>
-                                <nav className="space-y-1">
-                                    {NAV_ITEMS.map(({ icon: Icon, label, path }) => {
-                                        const isActive = location.pathname === path;
-                                        return (
-                                            <Link
-                                                key={path}
-                                                to={path}
-                                                className={cn(
-                                                    "flex items-center gap-3 px-3 py-3 rounded-xl transition-all",
-                                                    isActive
-                                                        ? "bg-primary/10 text-primary font-medium"
-                                                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                                                )}
-                                            >
-                                                <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                                                <span>{label}</span>
-                                            </Link>
-                                        );
-                                    })}
-                                </nav>
-                            </SheetContent>
-                        </Sheet>
+                        <Link
+                            to="/more"
+                            aria-label="Open menu"
+                            className={cn("p-2 -ml-2 rounded-lg transition-colors inline-flex items-center justify-center", iconClass)}
+                        >
+                            <Menu className="h-6 w-6" />
+                        </Link>
                     )}
                 </div>
 
