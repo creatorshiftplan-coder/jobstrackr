@@ -144,12 +144,31 @@ function requeueStuck(queueTab) {
 // ─────────────────────────── cursor reads (for the Web App) ──────────────────
 
 /**
+ * Parse a timestamp to epoch ms for comparison, or null if unparseable.
+ *
+ * The cursor and the sheet's stored timestamps reach this function in DIFFERENT
+ * serializations: the sheet produces `new Date().toISOString()` ("…Z" / UTC),
+ * while the cursor round-trips through Supabase's TIMESTAMPTZ column and comes
+ * back from PostgREST as "…+00:00". A lexicographic string compare of those two
+ * forms is wrong — they're identical up to the seconds, then 'Z' (90) > '+' (43),
+ * so a row would read as *newer* than a cursor pointing at the same instant and be
+ * re-fetched every run. Comparing parsed epoch ms makes the two forms equal.
+ */
+function tsMs_(v) {
+  if (v == null || v === '') return null;
+  const t = (v instanceof Date) ? v.getTime() : Date.parse(String(v));
+  return isNaN(t) ? null : t;
+}
+
+/**
  * Read rows of a data tab as objects where scraped_at > sinceIso (or all).
  *
  * Rows are returned **oldest-first** so the caller can page through with a cursor:
  * take a batch, advance the cursor to the last row's scraped_at, and resume there
  * next time. Combined with the exclusive `scraped_at <= sinceIso` filter this is
- * keyset pagination — no row is ever skipped.
+ * keyset pagination — no row is ever skipped. Comparison is by parsed epoch ms
+ * (see tsMs_) so a "…Z" sheet value and a "…+00:00" cursor for the same instant
+ * compare equal.
  *
  * `limit` is a *soft* cap: if the row at the limit boundary shares its scraped_at
  * with later rows, those ties are included too. Splitting a group of equal
@@ -162,32 +181,41 @@ function readSince(tabName, columns, sinceIso, limit) {
   if (last < 2) return [];
   const data = sh.getRange(2, 1, last - 1, columns.length).getValues();
   const sidx = columns.indexOf('scraped_at');
+  const sinceMs = tsMs_(sinceIso);
 
   const matched = [];
   for (let i = 0; i < data.length; i++) {
     // Sheets may coerce the ISO string into a Date — normalize back to ISO.
     const rawTs = data[i][sidx];
     const scrapedAt = rawTs instanceof Date ? rawTs.toISOString() : String(rawTs || '');
-    if (sinceIso && scrapedAt && scrapedAt <= sinceIso) continue;
+    const scrapedMs = tsMs_(scrapedAt);
+    if (sinceMs != null && scrapedMs != null && scrapedMs <= sinceMs) continue;
     const obj = {};
     columns.forEach(function (c, ci) {
       const v = data[i][ci];
       obj[c] = v instanceof Date ? v.toISOString() : v;
     });
     obj.scraped_at = scrapedAt;
+    obj._ms = scrapedMs; // sort/tie key; stripped before returning
     matched.push(obj);
   }
 
-  // Oldest-first for stable cursor paging.
+  // Oldest-first for stable cursor paging (unparseable timestamps sort first).
   matched.sort(function (a, b) {
-    return a.scraped_at < b.scraped_at ? -1 : a.scraped_at > b.scraped_at ? 1 : 0;
+    return (a._ms == null ? -Infinity : a._ms) - (b._ms == null ? -Infinity : b._ms);
   });
 
-  if (!limit || matched.length <= limit) return matched;
+  let result;
+  if (!limit || matched.length <= limit) {
+    result = matched;
+  } else {
+    // Cut at `limit`, then extend through any rows sharing the boundary timestamp.
+    let end = limit;
+    const boundaryMs = matched[limit - 1]._ms;
+    while (end < matched.length && matched[end]._ms === boundaryMs) end++;
+    result = matched.slice(0, end);
+  }
 
-  // Cut at `limit`, then extend through any rows sharing the boundary timestamp.
-  let end = limit;
-  const boundary = matched[limit - 1].scraped_at;
-  while (end < matched.length && matched[end].scraped_at === boundary) end++;
-  return matched.slice(0, end);
+  result.forEach(function (o) { delete o._ms; });
+  return result;
 }

@@ -17,7 +17,13 @@ const CONFIG = {
 
   // Job listings discovery (api/auto_discover_cron.py).
   JOBS_LISTING_URL: 'https://www.freejobalert.com/new-updates/',
-  JOBS_MAX_LINKS: 50,
+  // The /new-updates/ feed is a rolling, paginated list (~80 entries/page), newest
+  // first. Discovery examines the newest JOBS_MAX_LINKS entries each run (walking
+  // across pages as needed), enqueuing every *new* link. It also stops early once a
+  // page is entirely already-known (caught up to a prior run). JOBS_MAX_PAGES is a
+  // safety bound so a layout change can't make it crawl unbounded.
+  JOBS_MAX_LINKS: 100,
+  JOBS_MAX_PAGES: 10,
 
   // Exam/job-update feeds (supabase 20260505_exam_updates.sql scraper_sources seed).
   UPDATE_FEEDS: [

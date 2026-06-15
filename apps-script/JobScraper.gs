@@ -60,7 +60,61 @@ function extractListingLinks(html, baseUrl) {
       if (a) add(stripTags(cells[0]), stripTags(cells[2]), a[1]);
     }
   }
+
+  // FORMAT 3 — <div class="org_tab"> card layout (search-jobs / jobs-in-<city> pages),
+  // ported from api/lib/scraper_v3.py extract_links_from_master. Each card carries an
+  // <a class="kc_btn"> "Apply/Get Details" link; the title comes from the header tag.
+  const cardRe = /<div\b[^>]*class\s*=\s*["'][^"']*\borg_tab\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi;
+  let dm;
+  while ((dm = cardRe.exec(html)) !== null) {
+    const card = dm[1] || '';
+    const a = card.match(/<a\b[^>]*class\s*=\s*["'][^"']*\bkc_btn\b[^"']*["'][^>]*href\s*=\s*["']([^"']+)["']/i)
+      || card.match(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*class\s*=\s*["'][^"']*\bkc_btn\b[^"']*["']/i);
+    if (!a) continue;
+    const header = card.match(/<(?:span|h2|h6)\b[^>]*>([\s\S]*?)<\/(?:span|h2|h6)>/i);
+    add('', header ? stripTags(header[1]) : '', a[1]);
+  }
+
   return out;
+}
+
+/**
+ * Return forward pagination URLs from a listing page, oldest-page-first in document
+ * order. Ports api/lib/scraper_v3.py get_pagination_urls (Style A `li.disp_inblock`,
+ * Style B `ul.pagination`). The caller walks forward by picking the first URL it has
+ * not yet visited, so the shifting [1..5][NEXT] window advances one page at a time.
+ */
+function paginationUrls_(html, baseUrl) {
+  const urls = [];
+  const seen = {};
+  const push = function (href) {
+    if (!href) return;
+    href = absUrl(baseUrl, href.trim());
+    if (!href || seen[href]) return;
+    seen[href] = true;
+    urls.push(href);
+  };
+  // Style A — <li class="disp_inblock"> (skip the active/current one).
+  const liRe = /<li\b([^>]*class\s*=\s*["'][^"']*\bdisp_inblock\b[^"']*["'][^>]*)>([\s\S]*?)<\/li>/gi;
+  let lm;
+  while ((lm = liRe.exec(html)) !== null) {
+    if (/\bactive\b/i.test(lm[1])) continue;
+    const a = lm[2].match(/<a\b[^>]*href\s*=\s*["']([^"']+)["']/i);
+    if (a) push(a[1]);
+  }
+  // Style B — <ul class="pagination"> (skip current/dots/prev controls).
+  const ulRe = /<ul\b[^>]*class\s*=\s*["'][^"']*\bpagination\b[^"']*["'][^>]*>([\s\S]*?)<\/ul>/gi;
+  let um;
+  while ((um = ulRe.exec(html)) !== null) {
+    const liRe2 = /<li\b([^>]*)>([\s\S]*?)<\/li>/gi;
+    let l2;
+    while ((l2 = liRe2.exec(um[1])) !== null) {
+      if (/\b(currentpage|dots|prev)\b/i.test(l2[1] || '')) continue;
+      const a = l2[2].match(/<a\b[^>]*href\s*=\s*["']([^"']+)["']/i);
+      if (a) push(a[1]);
+    }
+  }
+  return urls;
 }
 
 /** Port of api/scraper_v5.py parse_page → scraped job dict. */

@@ -1,9 +1,9 @@
 /**
  * Triggers.gs — orchestration + time-driven (cron) triggers.
  *
- * Mirrors the Python cron model: a daily "discover" phase fills the queue tabs,
- * and a frequent "process" phase scrapes a small batch (Apps Script has a 6-min
- * execution limit, so batches are kept small — see CONFIG.*_BATCH).
+ * Mirrors the Python cron model: a periodic "discover" phase (every 2h) fills the
+ * queue tabs, and a frequent "process" phase scrapes a small batch (Apps Script has
+ * a 6-min execution limit, so batches are kept small — see CONFIG.*_BATCH).
  *
  * One-time setup: run `setup` once (creates tabs + installs triggers).
  */
@@ -17,8 +17,12 @@ function setup() {
 /** Install time-driven triggers (clears any previous ones first). */
 function installTriggers() {
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('discoverJobs').timeBased().everyDays(1).atHour(1).create();
-  ScriptApp.newTrigger('discoverUpdates').timeBased().everyDays(1).atHour(2).create();
+  // Discover every 2 hours, not once a day: /new-updates/ is a rolling feed, so a
+  // daily snapshot misses everything posted-and-buried between runs. Each run scans
+  // the newest JOBS_MAX_LINKS (~100) entries. Discovery only fetches listing pages +
+  // dedups, so it's cheap to run often.
+  ScriptApp.newTrigger('discoverJobs').timeBased().everyHours(2).create();
+  ScriptApp.newTrigger('discoverUpdates').timeBased().everyHours(2).create();
   ScriptApp.newTrigger('processJobsQueue').timeBased().everyMinutes(30).create();
   ScriptApp.newTrigger('processUpdatesQueue').timeBased().everyMinutes(30).create();
   // Telegram poster — runs hourly, posts rows old enough to have synced to Supabase
@@ -30,13 +34,53 @@ function installTriggers() {
 
 function discoverJobs() {
   ensureSheets();
-  const html = fetchHtml(CONFIG.JOBS_LISTING_URL, 2);
-  if (!html) { log_('discoverJobs: could not fetch listing'); return; }
-  const links = extractListingLinks(html, CONFIG.JOBS_LISTING_URL).slice(0, CONFIG.JOBS_MAX_LINKS);
+  // Scan the newest JOBS_MAX_LINKS (~100) entries of the rolling /new-updates/ feed,
+  // walking across pages as needed (~80/page), and enqueue every link not already
+  // scraped. Stops early once a page is entirely already-known (caught up to a prior
+  // run); JOBS_MAX_PAGES is a final safety bound. This replaces the old "first 50
+  // links of page 1 only" logic, which silently dropped every entry past the 50th
+  // and every later page.
   const known = existingValues_(CONFIG.TAB_JOBS, JOB_COLUMNS, 'source_url');
-  const fresh = links.map(function (l) { return l.url; }).filter(function (u) { return !known[u.toLowerCase()]; });
-  const added = enqueueUrls(CONFIG.TAB_JOBS_QUEUE, fresh);
-  log_('discoverJobs: found ' + links.length + ', queued ' + added);
+  const visited = {};
+  let pageUrl = CONFIG.JOBS_LISTING_URL;
+  let pages = 0, totalFound = 0, totalQueued = 0;
+  let remaining = CONFIG.JOBS_MAX_LINKS; // examine only the newest N entries of the feed
+
+  while (pageUrl && pages < CONFIG.JOBS_MAX_PAGES && remaining > 0) {
+    if (visited[pageUrl]) break; // guard against pagination loops
+    visited[pageUrl] = true;
+    pages++;
+
+    const html = fetchHtml(pageUrl, 2);
+    if (!html) { log_('discoverJobs: could not fetch ' + pageUrl); break; }
+
+    let links = extractListingLinks(html, pageUrl);
+    if (links.length > remaining) links = links.slice(0, remaining); // honour the first-N cap
+    remaining -= links.length;
+    totalFound += links.length;
+    const fresh = links.map(function (l) { return l.url; }).filter(function (u) {
+      const k = u.toLowerCase();
+      if (known[k]) return false;
+      known[k] = true; // mark now so later pages in this run don't re-add
+      return true;
+    });
+    totalQueued += enqueueUrls(CONFIG.TAB_JOBS_QUEUE, fresh);
+
+    // A page with links but nothing new → we've reached previously-discovered
+    // territory; older pages hold only older (already-known) jobs, so stop.
+    if (links.length && fresh.length === 0) break;
+    if (remaining <= 0) break; // hit the first-N cap
+
+    // Walk to the next page: first pagination target we haven't visited yet.
+    const pageLinks = paginationUrls_(html, pageUrl);
+    pageUrl = '';
+    for (let i = 0; i < pageLinks.length; i++) {
+      if (!visited[pageLinks[i]]) { pageUrl = pageLinks[i]; break; }
+    }
+    if (pageUrl) Utilities.sleep(CONFIG.FETCH_DELAY_MS);
+  }
+
+  log_('discoverJobs: pages ' + pages + ', found ' + totalFound + ', queued ' + totalQueued);
 }
 
 function processJobsQueue() {
