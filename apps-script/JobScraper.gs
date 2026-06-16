@@ -5,7 +5,9 @@
  */
 
 // City/state names sometimes embedded in titles (api/scraper_v5.py).
+// Expanded with Tier-2/3 cities and alternate spellings commonly seen in FJA titles.
 const TITLE_LOCATIONS = [
+  // Metros & Tier-1
   'New Delhi', 'Delhi', 'Mumbai', 'Kolkata', 'Chennai', 'Bengaluru', 'Bangalore',
   'Hyderabad', 'Pune', 'Ahmedabad', 'Jaipur', 'Lucknow', 'Patna', 'Bhopal',
   'Bhubaneswar', 'Chandigarh', 'Dehradun', 'Guwahati', 'Jodhpur', 'Raipur', 'Ranchi',
@@ -16,11 +18,58 @@ const TITLE_LOCATIONS = [
   'Madurai', 'Tiruchirappalli', 'Mysuru', 'Mysore', 'Hubli', 'Mangaluru', 'Mangalore',
   'Rajkot', 'Jammu', 'Leh', 'Imphal', 'Shillong', 'Aizawl', 'Kohima', 'Itanagar',
   'Agartala', 'Gangtok', 'Panaji', 'Goa', 'Port Blair',
+  // Tier-2/3 — AP & Telangana
+  'Warangal', 'Tirupati', 'Guntur', 'Nellore', 'Kakinada', 'Rajahmundry', 'Karimnagar',
+  'Nizamabad', 'Khammam', 'Vizag',
+  // Tier-2/3 — Odisha
+  'Cuttack', 'Rourkela', 'Sambalpur', 'Berhampur',
+  // Tier-2/3 — Chhattisgarh
+  'Bilaspur', 'Durg', 'Korba', 'Bhilai',
+  // Tier-2/3 — Jharkhand
+  'Jamshedpur', 'Dhanbad', 'Bokaro', 'Hazaribagh', 'Deoghar',
+  // Tier-2/3 — Uttar Pradesh
+  'Gorakhpur', 'Bareilly', 'Aligarh', 'Mathura', 'Firozabad', 'Moradabad',
+  'Saharanpur', 'Jhansi', 'Ghaziabad', 'Sultanpur', 'Ayodhya',
+  // Tier-2/3 — Rajasthan
+  'Udaipur', 'Ajmer', 'Kota', 'Bikaner', 'Sikar', 'Alwar', 'Bharatpur',
+  // Tier-2/3 — Karnataka
+  'Dharwad', 'Bellary', 'Gulbarga', 'Kalaburagi', 'Davangere', 'Shimoga', 'Shivamogga',
+  'Tumkur', 'Tumakuru', 'Udupi', 'Hassan',
+  // Tier-2/3 — Kerala
+  'Thrissur', 'Kannur', 'Palakkad', 'Kollam', 'Alappuzha', 'Malappuram', 'Kasaragod',
+  // Tier-2/3 — Tamil Nadu
+  'Salem', 'Tirunelveli', 'Erode', 'Vellore', 'Thoothukudi', 'Thanjavur', 'Trichy',
+  'Dindigul', 'Tirupur', 'Tiruvallur', 'Kancheepuram', 'Chengalpattu',
+  // Tier-2/3 — Madhya Pradesh
+  'Jabalpur', 'Gwalior', 'Ujjain', 'Sagar', 'Satna', 'Rewa',
+  // Tier-2/3 — Gujarat
+  'Bhavnagar', 'Junagadh', 'Gandhinagar', 'Anand', 'Bharuch', 'Mehsana',
+  // Tier-2/3 — Maharashtra
+  'Thane', 'Navi Mumbai', 'Solapur', 'Kolhapur', 'Sangli', 'Ahmednagar', 'Latur',
+  'Nanded', 'Jalgaon', 'Dhule', 'Akola', 'Amravati',
+  // Tier-2/3 — West Bengal
+  'Siliguri', 'Durgapur', 'Asansol', 'Howrah', 'Kharagpur', 'Kalyani', 'Bardhaman',
+  // Tier-2/3 — Bihar
+  'Gaya', 'Muzaffarpur', 'Bhagalpur', 'Darbhanga', 'Purnia',
+  // Tier-2/3 — Punjab / Haryana
+  'Patiala', 'Bathinda', 'Mohali', 'Ambala', 'Karnal', 'Panipat', 'Hisar', 'Rohtak',
+  // Tier-2/3 — Assam & NE
+  'Dibrugarh', 'Silchar', 'Jorhat', 'Tezpur',
+  // Tier-2/3 — Uttarakhand
+  'Haridwar', 'Roorkee', 'Haldwani', 'Nainital', 'Rishikesh',
+  // Tier-2/3 — J&K / Ladakh
+  'Anantnag', 'Baramulla', 'Kupwara', 'Kargil',
+  // Alternate spellings / anglicizations commonly seen
+  'Madras', 'Calcutta', 'Bombay', 'Vizianagaram', 'Baroda',
+  'Pondicherry', 'Puducherry', 'Daman', 'Silvassa', 'Kavaratti',
+  // States & UTs
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Gujarat',
   'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh',
   'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
   'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh',
-  'Uttarakhand', 'West Bengal',
+  'Uttarakhand', 'West Bengal', 'Jammu and Kashmir', 'Ladakh',
+  'Dadra and Nagar Haveli', 'Daman and Diu', 'Lakshadweep',
+  'Andaman and Nicobar', 'Andaman',
 ];
 
 const STATE_DOMAINS = {
@@ -31,6 +80,264 @@ const STATE_DOMAINS = {
   rpsc: 'Rajasthan', uppsc: 'Uttar Pradesh', wbpsc: 'West Bengal', assam: 'Assam',
   jkpsc: 'Jammu & Kashmir', cgpsc: 'Chhattisgarh', jpsc: 'Jharkhand', gpsc: 'Gujarat',
 };
+
+/**
+ * Source 5: Institution / organisation → location mapping.
+ * Scanned against both the title (examName) and the agency field.
+ * Order: specific campus names first, then bare abbreviations.
+ * Uses whole-word matching to avoid false positives.
+ */
+const INSTITUTION_LOCATIONS = [
+  // ── Central / National bodies → "All India" ────────────────────────────────
+  { pattern: /\bUPSC\b/i, location: 'All India' },
+  { pattern: /\bSSC\b/i, location: 'All India' },
+  { pattern: /\bIBPS\b/i, location: 'All India' },
+  { pattern: /\bRBI\b/i, location: 'All India' },
+  { pattern: /\bSBI\b/i, location: 'All India' },
+  { pattern: /\bNTA\b/i, location: 'All India' },
+  { pattern: /\bRRB\b/i, location: 'All India' },
+  { pattern: /\bNHM\b/i, location: 'All India' },
+  { pattern: /\bNHPC\b/i, location: 'All India' },
+  { pattern: /\bNTPCL?\b/i, location: 'All India' },
+  { pattern: /\bBHEL\b/i, location: 'All India' },
+  { pattern: /\bONGC\b/i, location: 'All India' },
+  { pattern: /\bIOCL\b/i, location: 'All India' },
+  { pattern: /\bHPCL\b/i, location: 'All India' },
+  { pattern: /\bBPCL\b/i, location: 'All India' },
+  { pattern: /\bGAIL\b/i, location: 'All India' },
+  { pattern: /\bHAL\b/i, location: 'All India' },
+  { pattern: /\bBEL\b/i, location: 'All India' },
+  { pattern: /\bECIL\b/i, location: 'All India' },
+  { pattern: /\bSAIL\b/i, location: 'All India' },
+  { pattern: /\bCOAL INDIA\b/i, location: 'All India' },
+  { pattern: /\bNABARD\b/i, location: 'All India' },
+  { pattern: /\bSIDBI\b/i, location: 'All India' },
+  { pattern: /\bLIC\b/i, location: 'All India' },
+  { pattern: /\bESIC\b/i, location: 'All India' },
+  { pattern: /\bEPFO\b/i, location: 'All India' },
+  { pattern: /\bFCI\b/i, location: 'All India' },
+
+  // ── Defense / Paramilitary → "All India" ───────────────────────────────────
+  { pattern: /\bIndian Army\b/i, location: 'All India' },
+  { pattern: /\bIndian Navy\b/i, location: 'All India' },
+  { pattern: /\bIndian Air Force\b/i, location: 'All India' },
+  { pattern: /\bBSF\b/i, location: 'All India' },
+  { pattern: /\bCRPF\b/i, location: 'All India' },
+  { pattern: /\bCISF\b/i, location: 'All India' },
+  { pattern: /\bITBP\b/i, location: 'All India' },
+  { pattern: /\bSSB\b/i, location: 'All India' },
+  { pattern: /\bAssam Rifles\b/i, location: 'All India' },
+  { pattern: /\bDRDO\b/i, location: 'All India' },
+  { pattern: /\bISRO\b/i, location: 'All India' },
+  { pattern: /\bBAARC\b/i, location: 'All India' },
+  { pattern: /\bIndian Coast Guard\b/i, location: 'All India' },
+
+  // ── State PSCs → State name ────────────────────────────────────────────────
+  { pattern: /\bTNPSC\b/i, location: 'Tamil Nadu' },
+  { pattern: /\bTamilnadu PSC\b/i, location: 'Tamil Nadu' },
+  { pattern: /\bAPPSC\b/i, location: 'Andhra Pradesh' },
+  { pattern: /\bTSPSC\b/i, location: 'Telangana' },
+  { pattern: /\bTelangana PSC\b/i, location: 'Telangana' },
+  { pattern: /\bKPSC\b/i, location: 'Karnataka' },
+  { pattern: /\bKarnataka PSC\b/i, location: 'Karnataka' },
+  { pattern: /\bKerala PSC\b/i, location: 'Kerala' },
+  { pattern: /\bUPPSC\b/i, location: 'Uttar Pradesh' },
+  { pattern: /\bMPPSC\b/i, location: 'Madhya Pradesh' },
+  { pattern: /\bRPSC\b/i, location: 'Rajasthan' },
+  { pattern: /\bBPSC\b/i, location: 'Bihar' },
+  { pattern: /\bUKPSC\b/i, location: 'Uttarakhand' },
+  { pattern: /\bOPSC\b/i, location: 'Odisha' },
+  { pattern: /\bWBPSC\b/i, location: 'West Bengal' },
+  { pattern: /\bCGPSC\b/i, location: 'Chhattisgarh' },
+  { pattern: /\bJPSC\b/i, location: 'Jharkhand' },
+  { pattern: /\bGPSC\b/i, location: 'Gujarat' },
+  { pattern: /\bHPSC\b/i, location: 'Haryana' },
+  { pattern: /\bHPPSC\b/i, location: 'Himachal Pradesh' },
+  { pattern: /\bPPSC\b/i, location: 'Punjab' },
+  { pattern: /\bPSSSB\b/i, location: 'Punjab' },
+  { pattern: /\bJKPSC\b/i, location: 'Jammu & Kashmir' },
+  { pattern: /\bJKSSB\b/i, location: 'Jammu & Kashmir' },
+  { pattern: /\bAPSC\b/i, location: 'Assam' },
+  { pattern: /\bMPSC\b/i, location: 'Maharashtra' },
+
+  // ── State-level boards / corps ─────────────────────────────────────────────
+  { pattern: /\bTN\s*MRB\b/i, location: 'Tamil Nadu' },
+  { pattern: /\bTN\s*TRB\b/i, location: 'Tamil Nadu' },
+  { pattern: /\bUP\s*Police\b/i, location: 'Uttar Pradesh' },
+  { pattern: /\bMP\s*Police\b/i, location: 'Madhya Pradesh' },
+  { pattern: /\bRajasthan\s*Police\b/i, location: 'Rajasthan' },
+  { pattern: /\bBihar\s*Police\b/i, location: 'Bihar' },
+  { pattern: /\bGujarat\s*Police\b/i, location: 'Gujarat' },
+  { pattern: /\bMaharashtra\s*Police\b/i, location: 'Maharashtra' },
+  { pattern: /\bKarnataka\s*Police\b/i, location: 'Karnataka' },
+  { pattern: /\bKerala\s*Police\b/i, location: 'Kerala' },
+  { pattern: /\bWB\s*Police\b/i, location: 'West Bengal' },
+  { pattern: /\bOdisha\s*Police\b/i, location: 'Odisha' },
+  { pattern: /\bHP\s*Police\b/i, location: 'Himachal Pradesh' },
+  { pattern: /\bDelhi\s*Police\b/i, location: 'Delhi' },
+  { pattern: /\bTelangana\s*Police\b/i, location: 'Telangana' },
+  { pattern: /\bAP\s*Police\b/i, location: 'Andhra Pradesh' },
+  { pattern: /\bHSSC\b/i, location: 'Haryana' },
+  { pattern: /\bHSSSB\b/i, location: 'Haryana' },
+  { pattern: /\bDSSS?B\b/i, location: 'Delhi' },
+  { pattern: /\bUPSSS?C\b/i, location: 'Uttar Pradesh' },
+
+  // ── IITs (specific campus first, then bare "IIT") ─────────────────────────
+  { pattern: /\bIIT\s*Delhi\b/i, location: 'Delhi' },
+  { pattern: /\bIIT\s*Bombay\b/i, location: 'Mumbai' },
+  { pattern: /\bIIT\s*Madras\b/i, location: 'Chennai' },
+  { pattern: /\bIIT\s*Kanpur\b/i, location: 'Kanpur' },
+  { pattern: /\bIIT\s*Kharagpur\b/i, location: 'Kharagpur' },
+  { pattern: /\bIIT\s*Roorkee\b/i, location: 'Roorkee' },
+  { pattern: /\bIIT\s*Guwahati\b/i, location: 'Guwahati' },
+  { pattern: /\bIIT\s*Hyderabad\b/i, location: 'Hyderabad' },
+  { pattern: /\bIIT\s*Indore\b/i, location: 'Indore' },
+  { pattern: /\bIIT\s*BHU\b/i, location: 'Varanasi' },
+  { pattern: /\bIIT\s*Varanasi\b/i, location: 'Varanasi' },
+  { pattern: /\bIIT\s*Patna\b/i, location: 'Patna' },
+  { pattern: /\bIIT\s*Ropar\b/i, location: 'Punjab' },
+  { pattern: /\bIIT\s*Jodhpur\b/i, location: 'Jodhpur' },
+  { pattern: /\bIIT\s*Mandi\b/i, location: 'Himachal Pradesh' },
+  { pattern: /\bIIT\s*Bhubaneswar\b/i, location: 'Bhubaneswar' },
+  { pattern: /\bIIT\s*Gandhinagar\b/i, location: 'Gandhinagar' },
+  { pattern: /\bIIT\s*Tirupati\b/i, location: 'Tirupati' },
+  { pattern: /\bIIT\s*Dhanbad\b/i, location: 'Dhanbad' },
+  { pattern: /\bISM\s*Dhanbad\b/i, location: 'Dhanbad' },
+  { pattern: /\bIIT\s*Dharwad\b/i, location: 'Dharwad' },
+  { pattern: /\bIIT\s*Palakkad\b/i, location: 'Palakkad' },
+  { pattern: /\bIIT\s*Jammu\b/i, location: 'Jammu' },
+  { pattern: /\bIIT\s*Goa\b/i, location: 'Goa' },
+  { pattern: /\bIIT\s*Bhilai\b/i, location: 'Bhilai' },
+
+  // ── AIIMS (specific campus first, then bare → New Delhi) ──────────────────
+  { pattern: /\bAIIMS\s*Delhi\b/i, location: 'Delhi' },
+  { pattern: /\bAIIMS\s*New\s*Delhi\b/i, location: 'New Delhi' },
+  { pattern: /\bAIIMS\s*Bhopal\b/i, location: 'Bhopal' },
+  { pattern: /\bAIIMS\s*Bhubaneswar\b/i, location: 'Bhubaneswar' },
+  { pattern: /\bAIIMS\s*Jodhpur\b/i, location: 'Jodhpur' },
+  { pattern: /\bAIIMS\s*Patna\b/i, location: 'Patna' },
+  { pattern: /\bAIIMS\s*Raipur\b/i, location: 'Raipur' },
+  { pattern: /\bAIIMS\s*Rishikesh\b/i, location: 'Rishikesh' },
+  { pattern: /\bAIIMS\s*Nagpur\b/i, location: 'Nagpur' },
+  { pattern: /\bAIIMS\s*Mangalagiri\b/i, location: 'Andhra Pradesh' },
+  { pattern: /\bAIIMS\s*Kalyani\b/i, location: 'Kalyani' },
+  { pattern: /\bAIIMS\s*Gorakhpur\b/i, location: 'Gorakhpur' },
+  { pattern: /\bAIIMS\s*Bathinda\b/i, location: 'Bathinda' },
+  { pattern: /\bAIIMS\s*Deoghar\b/i, location: 'Deoghar' },
+  { pattern: /\bAIIMS\s*Bibinagar\b/i, location: 'Telangana' },
+  { pattern: /\bAIIMS\s*Rajkot\b/i, location: 'Rajkot' },
+  { pattern: /\bAIIMS\s*Madurai\b/i, location: 'Madurai' },
+  { pattern: /\bAIIMS\b/i, location: 'New Delhi' },  // bare AIIMS → primary campus
+
+  // ── NITs ───────────────────────────────────────────────────────────────────
+  { pattern: /\bNIT\s*Trichy\b/i, location: 'Tiruchirappalli' },
+  { pattern: /\bNIT\s*Tiruchirappalli\b/i, location: 'Tiruchirappalli' },
+  { pattern: /\bNIT\s*Warangal\b/i, location: 'Warangal' },
+  { pattern: /\bNIT\s*Surathkal\b/i, location: 'Mangaluru' },
+  { pattern: /\bNIT\s*Karnataka\b/i, location: 'Mangaluru' },
+  { pattern: /\bNIT\s*Calicut\b/i, location: 'Kozhikode' },
+  { pattern: /\bNIT\s*Rourkela\b/i, location: 'Rourkela' },
+  { pattern: /\bNIT\s*Kurukshetra\b/i, location: 'Haryana' },
+  { pattern: /\bNIT\s*Durgapur\b/i, location: 'Durgapur' },
+  { pattern: /\bNIT\s*Allahabad\b/i, location: 'Prayagraj' },
+  { pattern: /\bMNNIT\b/i, location: 'Prayagraj' },
+  { pattern: /\bNIT\s*Jamshedpur\b/i, location: 'Jamshedpur' },
+  { pattern: /\bNIT\s*Silchar\b/i, location: 'Silchar' },
+  { pattern: /\bNIT\s*Hamirpur\b/i, location: 'Himachal Pradesh' },
+  { pattern: /\bNIT\s*Jalandhar\b/i, location: 'Jalandhar' },
+  { pattern: /\bNIT\s*Srinagar\b/i, location: 'Srinagar' },
+  { pattern: /\bNIT\s*Patna\b/i, location: 'Patna' },
+  { pattern: /\bNIT\s*Raipur\b/i, location: 'Raipur' },
+  { pattern: /\bNIT\s*Agartala\b/i, location: 'Agartala' },
+  { pattern: /\bNIT\s*Goa\b/i, location: 'Goa' },
+  { pattern: /\bNIT\s*Meghalaya\b/i, location: 'Shillong' },
+  { pattern: /\bNIT\s*Manipur\b/i, location: 'Imphal' },
+  { pattern: /\bNIT\s*Mizoram\b/i, location: 'Aizawl' },
+  { pattern: /\bNIT\s*Nagaland\b/i, location: 'Nagaland' },
+  { pattern: /\bNIT\s*Sikkim\b/i, location: 'Sikkim' },
+  { pattern: /\bNIT\s*Arunachal\b/i, location: 'Arunachal Pradesh' },
+  { pattern: /\bNIT\s*Delhi\b/i, location: 'Delhi' },
+  { pattern: /\bNIT\s*Uttarakhand\b/i, location: 'Uttarakhand' },
+  { pattern: /\bNIT\s*Puducherry\b/i, location: 'Puducherry' },
+  { pattern: /\bNIT\s*Andhra\b/i, location: 'Andhra Pradesh' },
+  { pattern: /\bVNIT\s*Nagpur\b/i, location: 'Nagpur' },
+  { pattern: /\bVNIT\b/i, location: 'Nagpur' },
+  { pattern: /\bSVNIT\b/i, location: 'Surat' },
+  { pattern: /\bMNIT\s*Jaipur\b/i, location: 'Jaipur' },
+  { pattern: /\bMNIT\b/i, location: 'Jaipur' },
+
+  // ── IISc / IISERs / central universities ───────────────────────────────────
+  { pattern: /\bIISc\b/i, location: 'Bengaluru' },
+  { pattern: /\bIISER\s*Pune\b/i, location: 'Pune' },
+  { pattern: /\bIISER\s*Kolkata\b/i, location: 'Kolkata' },
+  { pattern: /\bIISER\s*Mohali\b/i, location: 'Mohali' },
+  { pattern: /\bIISER\s*Bhopal\b/i, location: 'Bhopal' },
+  { pattern: /\bIISER\s*Thiruvananthapuram\b/i, location: 'Thiruvananthapuram' },
+  { pattern: /\bIISER\s*Tirupati\b/i, location: 'Tirupati' },
+  { pattern: /\bIISER\s*Berhampur\b/i, location: 'Berhampur' },
+  { pattern: /\bJNU\b/i, location: 'New Delhi' },
+  { pattern: /\bJamia\s*Millia\b/i, location: 'New Delhi' },
+  { pattern: /\bAMU\b/i, location: 'Aligarh' },
+  { pattern: /\bBHU\b/i, location: 'Varanasi' },
+  { pattern: /\bDU\b(?:\s+Recruitment|\s+Jobs)/i, location: 'Delhi' },
+  { pattern: /\bDelhi\s*University\b/i, location: 'Delhi' },
+  { pattern: /\bCalcutta\s*University\b/i, location: 'Kolkata' },
+  { pattern: /\bMumbai\s*University\b/i, location: 'Mumbai' },
+  { pattern: /\bMadras\s*University\b/i, location: 'Chennai' },
+  { pattern: /\bAnna\s*University\b/i, location: 'Chennai' },
+  { pattern: /\bOsmania\s*University\b/i, location: 'Hyderabad' },
+
+  // ── IIIT / IIM ─────────────────────────────────────────────────────────────
+  { pattern: /\bIIIT\s*Hyderabad\b/i, location: 'Hyderabad' },
+  { pattern: /\bIIIT\s*Allahabad\b/i, location: 'Prayagraj' },
+  { pattern: /\bIIIT\s*Delhi\b/i, location: 'Delhi' },
+  { pattern: /\bIIIT\s*Bangalore\b/i, location: 'Bengaluru' },
+  { pattern: /\bIIIT\s*Bengaluru\b/i, location: 'Bengaluru' },
+  { pattern: /\bIIM\s*Ahmedabad\b/i, location: 'Ahmedabad' },
+  { pattern: /\bIIM\s*Bangalore\b/i, location: 'Bengaluru' },
+  { pattern: /\bIIM\s*Bengaluru\b/i, location: 'Bengaluru' },
+  { pattern: /\bIIM\s*Calcutta\b/i, location: 'Kolkata' },
+  { pattern: /\bIIM\s*Lucknow\b/i, location: 'Lucknow' },
+  { pattern: /\bIIM\s*Indore\b/i, location: 'Indore' },
+  { pattern: /\bIIM\s*Kozhikode\b/i, location: 'Kozhikode' },
+
+  // ── Banking / PSU (headquarters-based when known) ─────────────────────────
+  { pattern: /\bBank of Baroda\b/i, location: 'All India' },
+  { pattern: /\bBank of India\b/i, location: 'All India' },
+  { pattern: /\bBank of Maharashtra\b/i, location: 'All India' },
+  { pattern: /\bCanara Bank\b/i, location: 'All India' },
+  { pattern: /\bPunjab National Bank\b/i, location: 'All India' },
+  { pattern: /\bPNB\b/i, location: 'All India' },
+  { pattern: /\bUnion Bank\b/i, location: 'All India' },
+  { pattern: /\bIndian Bank\b/i, location: 'All India' },
+  { pattern: /\bCentral Bank\b/i, location: 'All India' },
+  { pattern: /\bIndian Overseas Bank\b/i, location: 'All India' },
+  { pattern: /\bIOB\b/i, location: 'All India' },
+  { pattern: /\bUCO Bank\b/i, location: 'All India' },
+  { pattern: /\bIndian Railways\b/i, location: 'All India' },
+  { pattern: /\bIndia Post\b/i, location: 'All India' },
+  { pattern: /\bPostal\s*Circle\b/i, location: 'All India' },
+
+  // ── Research labs / other central institutions ─────────────────────────────
+  { pattern: /\bCSIR\b/i, location: 'All India' },
+  { pattern: /\bICMR\b/i, location: 'All India' },
+  { pattern: /\bICAR\b/i, location: 'All India' },
+  { pattern: /\bCBI\b/i, location: 'New Delhi' },
+  { pattern: /\bNIA\b/i, location: 'New Delhi' },
+  { pattern: /\bNCERT\b/i, location: 'New Delhi' },
+  { pattern: /\bKVS\b/i, location: 'All India' },
+  { pattern: /\bNVS\b/i, location: 'All India' },
+  { pattern: /\bKendriya Vidyalaya\b/i, location: 'All India' },
+  { pattern: /\bNavodaya Vidyalaya\b/i, location: 'All India' },
+];
+
+/** Phrases in title / overview / description that indicate a nationwide posting. */
+const ALL_INDIA_PHRASES = [
+  'all india', 'all over india', 'various locations', 'across india', 'pan india',
+  'multiple locations', 'throughout india', 'anywhere in india', 'various places',
+  'various states', 'all states', 'any location', 'multiple states',
+  'posts across the country', 'posts across india',
+];
 
 /** Extract article links from a listing page (formats edthr + lattrbord). */
 function extractListingLinks(html, baseUrl) {
@@ -201,9 +508,12 @@ function parseJobPage(url, html) {
     if (vacRaw) vacancies = [{ total_posts: vacRaw }];
   }
 
-  // Location (4 sources)
+  // Location (7 sources — original 4 + 3 new ones for institution/agency/"All India")
+  // Source 1: Overview table explicit location fields
   let locationRaw = ovGet('Location', 'Place of Posting', 'Job Location', 'Work Location',
     'Place of Work', 'Posting Location', 'State', 'City') || '';
+
+  // Source 2: scan body <p>/<li>/<td> for "Location: <value>" label
   if (!locationRaw) {
     const tagRe = /<(?:p|li|td)\b[^>]*>([\s\S]*?)<\/(?:p|li|td)>/gi;
     let g;
@@ -215,6 +525,8 @@ function parseJobPage(url, html) {
       }
     }
   }
+
+  // Source 3: extract location from the article title (h1 / examName)
   if (!locationRaw) {
     const titleLower = examName.toLowerCase();
     for (let i = 0; i < TITLE_LOCATIONS.length; i++) {
@@ -224,6 +536,8 @@ function parseJobPage(url, html) {
       }
     }
   }
+
+  // Source 4: infer location from official website domain for state govt sites
   if (!locationRaw) {
     const site = (ovGet('Application Website', 'Official Website', 'Website', 'Apply Online') || '').toLowerCase();
     if (site) {
@@ -231,6 +545,34 @@ function parseJobPage(url, html) {
       for (let i = 0; i < keys.length; i++) { if (site.indexOf(keys[i]) !== -1) { locationRaw = STATE_DOMAINS[keys[i]]; break; } }
     }
   }
+
+  // Source 5: Institution / organisation → location mapping (title + agency)
+  if (!locationRaw) {
+    var searchTexts = [examName, agency].filter(function (s) { return s; });
+    for (let si = 0; si < searchTexts.length && !locationRaw; si++) {
+      for (let ii = 0; ii < INSTITUTION_LOCATIONS.length; ii++) {
+        if (INSTITUTION_LOCATIONS[ii].pattern.test(searchTexts[si])) {
+          locationRaw = INSTITUTION_LOCATIONS[ii].location;
+          break;
+        }
+      }
+    }
+  }
+
+  // Source 6: "All India" / "Various Locations" phrase detection in title, overview, description
+  if (!locationRaw) {
+    var combinedText = [examName, description].join(' ');
+    // Also check overview values
+    Object.keys(ovKv).forEach(function (k) { combinedText += ' ' + ovKv[k]; });
+    var combinedLower = combinedText.toLowerCase();
+    for (let ai = 0; ai < ALL_INDIA_PHRASES.length; ai++) {
+      if (combinedLower.indexOf(ALL_INDIA_PHRASES[ai]) !== -1) {
+        locationRaw = 'All India';
+        break;
+      }
+    }
+  }
+
   const location = cleanLocation(locationRaw); // may be '' — build step marks Not Available
 
   // Employment type
