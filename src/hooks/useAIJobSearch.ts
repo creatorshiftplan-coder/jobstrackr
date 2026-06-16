@@ -143,7 +143,6 @@ export function useAIJobSearch() {
           setAiResults(validJobs);
           setSearchStatus("new");
           queryClient.invalidateQueries({ queryKey: ["jobs"] });
-          toast.success(`Found ${validJobs.length} exam(s)! Auto-saved to database.`);
           return validJobs[0];
         } else {
           // No high confidence results - show "not found" message

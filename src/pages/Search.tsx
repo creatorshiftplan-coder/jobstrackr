@@ -21,6 +21,7 @@ import { useDebouncedValue } from "@/hooks/useDebounce";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { inferCategory, isJobActive, matchesSectorPreference } from "@/lib/jobUtils";
+import { parseSearchQuery, scoreJobForQuery } from "@/lib/jobSearch";
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -52,17 +53,7 @@ export default function Search() {
     if (!jobs) return [];
     let filtered = jobs;
 
-    if (debouncedQuery) {
-      const q = debouncedQuery.toLowerCase();
-      filtered = filtered.filter(
-        (job) =>
-          job.title.toLowerCase().includes(q) ||
-          job.department.toLowerCase().includes(q) ||
-          job.location.toLowerCase().includes(q) ||
-          job.qualification.toLowerCase().includes(q)
-      );
-    }
-
+    // ── Structured filters (location / sector / qualification) ──────────────
     if (selectedLocations.length > 0) {
       if (!selectedLocations.includes("All India")) {
       filtered = filtered.filter((job) =>
@@ -89,9 +80,30 @@ export default function Search() {
       );
     }
 
-    // Sort by newest active jobs first
-    const now = new Date();
-    filtered = [...filtered].sort((a, b) => {
+    // ── Relevance-ranked text search ────────────────────────────────────────
+    // When there's a query, score every job and rank by relevance (best match
+    // first). Active-vs-expired and recency only break ties between jobs of
+    // equal relevance, so an exact title match always beats a newer unrelated
+    // job. With no query, fall back to "active + newest first".
+    const parsed = debouncedQuery.trim() ? parseSearchQuery(debouncedQuery) : null;
+
+    if (parsed && parsed.tokens.length > 0) {
+      const scored = filtered
+        .map((job) => ({ job, score: scoreJobForQuery(job, parsed) }))
+        .filter((entry) => entry.score > 0);
+
+      scored.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        const aActive = isJobActive(a.job.last_date);
+        const bActive = isJobActive(b.job.last_date);
+        if (aActive !== bActive) return bActive ? 1 : -1;
+        return new Date(b.job.created_at).getTime() - new Date(a.job.created_at).getTime();
+      });
+
+      return scored.map((entry) => entry.job);
+    }
+
+    return [...filtered].sort((a, b) => {
       const aActive = isJobActive(a.last_date);
       const bActive = isJobActive(b.last_date);
       // Prioritize active jobs
@@ -99,8 +111,6 @@ export default function Search() {
       // Then sort by created_at descending (newest first)
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-
-    return filtered;
   }, [jobs, debouncedQuery, selectedLocations, selectedSectors, selectedQualifications]);
 
   const deferredFilteredJobs = useDeferredValue(filteredJobs);
