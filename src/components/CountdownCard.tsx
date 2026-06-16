@@ -1,15 +1,19 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CalendarDays, ChevronRight, Flame, Clock, Bookmark, Share2 } from "lucide-react";
+import { CalendarDays, ChevronRight, Flame, Clock, Bookmark, Share2, Maximize2, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { CountdownItem } from "@/hooks/useCountdownExams";
+import { useLiveCountdown, urgencyFor, pad, fullscreenCountdownUrl, type Urgency } from "@/lib/countdown";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { useSavedExamUpdateIds, useToggleSavedExamUpdate } from "@/hooks/useSavedExamUpdates";
 import { useSavedJobs, useSaveJob, useUnsaveJob } from "@/hooks/useSavedJobs";
 import { ShareCountdownDialog } from "@/components/ShareCountdownDialog";
+import { FullscreenCountdown } from "@/components/FullscreenCountdown";
 
 interface CountdownCardProps {
   item: CountdownItem;
@@ -18,96 +22,39 @@ interface CountdownCardProps {
   hero?: boolean;
 }
 
-type Urgency = "critical" | "soon" | "calm";
-
-function urgencyFor(daysLeft: number): Urgency {
-  if (daysLeft <= 7) return "critical";
-  if (daysLeft <= 30) return "soon";
-  return "calm";
-}
-
 // Theme tokens per urgency — gradients reuse the app's category-accent style.
 const URGENCY_THEME: Record<
   Urgency,
-  { gradient: string; ring: string; chip: string; glow: string; accent: string }
+  { gradient: string; ring: string; chip: string; glow: string; glowHover: string; accent: string; bar: string }
 > = {
   critical: {
     gradient: "from-rose-500/20 via-red-500/10 to-transparent",
     ring: "ring-1 ring-rose-500/40",
     chip: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
     glow: "shadow-[0_8px_30px_-12px_rgba(244,63,94,0.5)]",
+    glowHover: "hover:shadow-[0_18px_50px_-12px_rgba(244,63,94,0.6)]",
     accent: "text-rose-600 dark:text-rose-400",
+    bar: "from-rose-500 to-red-500",
   },
   soon: {
     gradient: "from-amber-500/20 via-orange-500/10 to-transparent",
     ring: "ring-1 ring-amber-500/30",
     chip: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
     glow: "shadow-[0_8px_30px_-12px_rgba(245,158,11,0.45)]",
+    glowHover: "hover:shadow-[0_18px_50px_-12px_rgba(245,158,11,0.55)]",
     accent: "text-amber-600 dark:text-amber-400",
+    bar: "from-amber-500 to-orange-500",
   },
   calm: {
     gradient: "from-violet-500/20 via-purple-500/10 to-transparent",
     ring: "ring-1 ring-violet-500/25",
     chip: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
     glow: "shadow-[0_8px_30px_-12px_rgba(139,92,246,0.4)]",
+    glowHover: "hover:shadow-[0_18px_50px_-12px_rgba(139,92,246,0.5)]",
     accent: "text-violet-600 dark:text-violet-400",
+    bar: "from-violet-500 to-fuchsia-500",
   },
 };
-
-interface TimeParts {
-  days: number;
-  hours: number;
-  minutes: number;
-  seconds: number;
-}
-
-function diffTo(target: Date): TimeParts {
-  const ms = Math.max(0, target.getTime() - Date.now());
-  const totalSeconds = Math.floor(ms / 1000);
-  return {
-    days: Math.floor(totalSeconds / 86400),
-    hours: Math.floor((totalSeconds % 86400) / 3600),
-    minutes: Math.floor((totalSeconds % 3600) / 60),
-    seconds: totalSeconds % 60,
-  };
-}
-
-/** Ticks once per second; pauses when the tab is hidden to save battery. */
-function useLiveCountdown(target: Date): TimeParts {
-  const [parts, setParts] = useState<TimeParts>(() => diffTo(target));
-
-  useEffect(() => {
-    setParts(diffTo(target));
-    let id: number | undefined;
-    const start = () => {
-      stop();
-      id = window.setInterval(() => setParts(diffTo(target)), 1000);
-    };
-    const stop = () => {
-      if (id !== undefined) window.clearInterval(id);
-      id = undefined;
-    };
-    const onVisibility = () => {
-      if (document.hidden) stop();
-      else {
-        setParts(diffTo(target));
-        start();
-      }
-    };
-    start();
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      stop();
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [target]);
-
-  return parts;
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
 
 function TimeBlock({
   value,
@@ -124,12 +71,16 @@ function TimeBlock({
     <div className="flex flex-col items-center">
       <div
         className={cn(
-          "tabular-nums font-display font-bold leading-none rounded-lg bg-background/70 dark:bg-background/40 backdrop-blur-sm border border-border/50",
+          "relative overflow-hidden tabular-nums font-display font-bold leading-none rounded-xl",
+          "bg-gradient-to-b from-background/80 to-background/50 dark:from-white/[0.08] dark:to-white/[0.02]",
+          "backdrop-blur-sm border border-border/50 ring-1 ring-inset ring-white/5",
+          "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]",
           accent,
           big ? "text-3xl sm:text-4xl px-2.5 py-2 min-w-[3rem]" : "text-lg sm:text-xl px-2 py-1.5 min-w-[2.25rem]"
         )}
       >
-        {value}
+        <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent" />
+        <span className="relative">{value}</span>
       </div>
       <span className="mt-1 text-[9px] sm:text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
@@ -143,10 +94,12 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
   const urgency = urgencyFor(item.daysLeft);
   const theme = URGENCY_THEME[urgency];
   const to = item.href;
+  const isMobile = useIsMobile();
 
   const { user } = useAuth();
   const { showAuthRequired } = useAuthRequired();
   const [shareOpen, setShareOpen] = useState(false);
+  const [fsOpen, setFsOpen] = useState(false);
 
   // Bookmarking routes to the right table by source type: jobs → saved_jobs,
   // exam_updates → saved_exam_updates. Both hooks run (rules of hooks); we read
@@ -183,6 +136,24 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
     setShareOpen(true);
   };
 
+  // Mobile → immersive in-app overlay (best-effort native fullscreen).
+  // Desktop → open the standalone fullscreen view in a new tab.
+  const handleExpand = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isMobile) {
+      setFsOpen(true);
+      void document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      window.open(fullscreenCountdownUrl(item), "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const handleCloseFs = () => {
+    if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+    setFsOpen(false);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -192,14 +163,19 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
       <Link to={to} className="block group" aria-label={`${item.title} — exam in ${item.daysLeft} days`}>
         <div
           className={cn(
-            "relative overflow-hidden rounded-2xl border border-border/60 bg-card transition-all duration-300 hover:-translate-y-0.5",
+            "relative overflow-hidden rounded-2xl border border-border/60 bg-card transition-all duration-300 hover:-translate-y-1",
             theme.ring,
             theme.glow,
+            theme.glowHover,
             hero ? "p-5 sm:p-6" : "p-4"
           )}
         >
+          {/* Top accent bar */}
+          <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r opacity-70", theme.bar)} />
           {/* Urgency gradient wash */}
           <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br", theme.gradient)} />
+          {/* Corner sheen that brightens on hover */}
+          <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-white/5 blur-2xl transition-opacity duration-300 group-hover:opacity-80 opacity-40" />
 
           <div className="relative">
             {/* Header */}
@@ -225,6 +201,14 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={handleExpand}
+                  aria-label={isMobile ? "Open fullscreen countdown" : "Open fullscreen countdown in new tab"}
+                  className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+                >
+                  {isMobile ? <Maximize2 className="h-5 w-5" /> : <ExternalLink className="h-5 w-5" />}
+                </button>
                 <button
                   type="button"
                   onClick={handleShare}
@@ -266,6 +250,20 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
       </Link>
 
       <ShareCountdownDialog item={item} open={shareOpen} onOpenChange={setShareOpen} />
+
+      {/* Immersive mobile overlay — portaled to body so `fixed` escapes the
+          transformed motion ancestor and truly covers the viewport. */}
+      {fsOpen &&
+        createPortal(
+          <FullscreenCountdown
+            title={item.title}
+            eventLabel={item.eventLabel}
+            examDate={item.examDate}
+            href={item.href}
+            onClose={handleCloseFs}
+          />,
+          document.body
+        )}
     </motion.div>
   );
 }

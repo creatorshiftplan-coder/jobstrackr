@@ -38,6 +38,7 @@ const ExamTracker = lazy(() => import("./pages/ExamTracker"));
 const ExamCalendar = lazy(() => import("./pages/ExamCalendar"));
 const CountdownWall = lazy(() => import("./pages/CountdownWall"));
 const CountdownShare = lazy(() => import("./pages/CountdownShare"));
+const CountdownLive = lazy(() => import("./pages/CountdownLive"));
 const EditProfile = lazy(() => import("./pages/EditProfile"));
 const EditEducation = lazy(() => import("./pages/EditEducation"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -79,7 +80,7 @@ const queryClient = new QueryClient({
 
 const AppContent = () => {
   const location = useLocation();
-  const hideNavigation = ["/welcome", "/auth", "/reset-password"].includes(location.pathname);
+  const hideNavigation = ["/welcome", "/auth", "/reset-password", "/countdown/live"].includes(location.pathname);
 
   const routes = (
     <Suspense fallback={<PageLoader />}>
@@ -106,6 +107,7 @@ const AppContent = () => {
         <Route path="/tracker" element={<ExamTracker />} />
         <Route path="/calendar" element={<ExamCalendar />} />
         <Route path="/countdown" element={<CountdownWall />} />
+        <Route path="/countdown/live" element={<CountdownLive />} />
         <Route path="/countdown/:slug" element={<CountdownShare />} />
         <Route path="/trending" element={<Trending />} />
         <Route path="/updates/:slug" element={<UpdateDetails />} />
