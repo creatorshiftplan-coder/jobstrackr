@@ -105,16 +105,20 @@ const parseVacancies = (value: string | number | null | undefined): number | nul
   return isNaN(parsed) ? null : parsed;
 };
 
-// Helper to extract vacancies from job title
-// Robust against the many ways recruitment titles express a count:
-//   "17727 Vacancies", "2000 Posts", "18,799 Post", "1,55,000 Posts" (Indian grouping),
-//   "10000+ Vacancies" (with +), "150 Vacancy", "123 Vacant", "456 Positions",
-//   "5000 Seats", "300 Openings", "250 Nos", "Vacancy: 500", "Posts - 2000".
+// Helper to extract vacancies from job title.
+// Titles follow the pattern "<Dept> Recruitment <Year> ... for <N> ... Posts", e.g.
+//   "Karnataka High Court ... Recruitment 2026 - Apply Online for 70 Posts" -> 70
+//   "BNPM ... Recruitment 2026 Notification OUT - Apply for 06 Posts"       -> 6
+//   "MMRDA Recruitment 2026: Assistant Engineer & Other Posts"              -> null (no count)
+// The count always appears AFTER the "Recruitment" word, while the year sits directly
+// after it — so we anchor on "Recruitment", drop that trailing year, then read the count.
 const extractVacanciesFromTitle = (title: string): number | null => {
   if (!title) return null;
 
-  // Vacancy-like keywords. Kept tight so generic words (year, "10th pass", etc.) don't match.
-  const KEYWORDS = "vacanc(?:y|ies)|posts?|vacant|positions?|seats?|openings?|intakes?|nos?\\.?";
+  // Vacancy-like keywords. Deliberately excludes ambiguous tokens like "no/nos"
+  // (which match "Notification", "Now", etc.) and requires a trailing word boundary
+  // so "Posts" matches but "Posted" does not.
+  const KEYWORDS = "posts?|vacanc(?:y|ies)|vacant|positions?|seats?|openings?|intakes?";
   // A number with optional grouping commas — handles both international (18,799)
   // and Indian (1,55,000) styles. Commas are stripped before parsing.
   const NUM = "(\\d[\\d,]*\\d|\\d)";
@@ -123,24 +127,40 @@ const extractVacanciesFromTitle = (title: string): number | null => {
     const parsed = parseInt(raw.replace(/,/g, ""), 10);
     return isNaN(parsed) || parsed <= 0 ? null : parsed;
   };
+  const isYear = (n: number): boolean => n >= 1990 && n <= 2099 && /^\d{4}$/.test(String(n));
 
-  // Pattern 1 — number then keyword, allowing a "+" suffix and optional spacing:
-  // "17727 Vacancies", "10000+ Posts", "2000posts".
-  const forwardRegex = new RegExp(`${NUM}\\s*\\+?\\s*(?:${KEYWORDS})`, "i");
-  const forward = title.match(forwardRegex);
-  if (forward) {
-    const n = toNumber(forward[1]);
-    if (n !== null) return n;
+  // Anchor on the "Recruitment" word and search only the text after it. Strip the
+  // year that immediately follows (e.g. "Recruitment 2026 - ...") so it is never read
+  // as the count. Titles without the word fall back to scanning the whole string.
+  let scope = title;
+  const recMatch = title.match(/\brecruitments?\b/i);
+  if (recMatch && recMatch.index !== undefined) {
+    scope = title.slice(recMatch.index + recMatch[0].length)
+      .replace(/^\s*[:\-–—]?\s*(?:19|20)\d{2}\b/, "");
   }
 
-  // Pattern 2 — keyword then number with a separator: "Vacancy: 500", "Posts - 2000".
-  // A separator (":" or "-") is required so trailing years ("Posts 2024") aren't misread.
-  const reverseRegex = new RegExp(`(?:${KEYWORDS})\\s*[:\\-]\\s*\\+?\\s*${NUM}`, "i");
-  const reverse = title.match(reverseRegex);
-  if (reverse) {
-    const n = toNumber(reverse[1]);
-    if (n !== null) return n;
-  }
+  // Collect every keyword-adjacent number, then prefer the first that is not a
+  // 4-digit year (but still return a lone year-like count such as "2000 Posts").
+  const pickFrom = (regex: RegExp): number | null => {
+    const nums = [...scope.matchAll(regex)]
+      .map(m => toNumber(m[1]))
+      .filter((n): n is number => n !== null);
+    if (nums.length === 0) return null;
+    return nums.find(n => !isYear(n)) ?? nums[0];
+  };
+
+  // Pattern 1 — number then keyword, allowing role words in between
+  // ("70 Posts", "22 Community Health Officer Posts", "10000+ Vacancies", "2000posts").
+  // The gap words must be non-numeric, so the number nearest the keyword is chosen and
+  // an intervening date/year can never bridge to it.
+  const forward = pickFrom(
+    new RegExp(`${NUM}\\+?(?:\\s+[A-Za-z][^\\s]*){0,10}?\\s*(?:${KEYWORDS})\\b`, "gi")
+  );
+  if (forward !== null) return forward;
+
+  // Pattern 2 — keyword then number with a separator ("Vacancy: 500", "Posts - 2000").
+  const reverse = pickFrom(new RegExp(`(?:${KEYWORDS})\\b\\s*[:\\-]\\s*\\+?\\s*${NUM}`, "gi"));
+  if (reverse !== null) return reverse;
 
   return null;
 };
