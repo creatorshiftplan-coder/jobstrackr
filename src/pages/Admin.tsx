@@ -106,27 +106,42 @@ const parseVacancies = (value: string | number | null | undefined): number | nul
 };
 
 // Helper to extract vacancies from job title
+// Robust against the many ways recruitment titles express a count:
+//   "17727 Vacancies", "2000 Posts", "18,799 Post", "1,55,000 Posts" (Indian grouping),
+//   "10000+ Vacancies" (with +), "150 Vacancy", "123 Vacant", "456 Positions",
+//   "5000 Seats", "300 Openings", "250 Nos", "Vacancy: 500", "Posts - 2000".
 const extractVacanciesFromTitle = (title: string): number | null => {
   if (!title) return null;
-  // Match numbers followed by vacancy-like keywords
-  // Examples: 17727 Vacancies, 2000 Posts, 18,799 Post, 150 Vacancy, 123 Vacant, 456 Positions
-  const regex = /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:vacanc(?:y|ies)|posts?|vacant|positions?)/i;
-  const match = title.match(regex);
-  if (match) {
-    const numStr = match[1].replace(/,/g, "");
-    const parsed = parseInt(numStr, 10);
-    return isNaN(parsed) ? null : parsed;
+
+  // Vacancy-like keywords. Kept tight so generic words (year, "10th pass", etc.) don't match.
+  const KEYWORDS = "vacanc(?:y|ies)|posts?|vacant|positions?|seats?|openings?|intakes?|nos?\\.?";
+  // A number with optional grouping commas — handles both international (18,799)
+  // and Indian (1,55,000) styles. Commas are stripped before parsing.
+  const NUM = "(\\d[\\d,]*\\d|\\d)";
+
+  const toNumber = (raw: string): number | null => {
+    const parsed = parseInt(raw.replace(/,/g, ""), 10);
+    return isNaN(parsed) || parsed <= 0 ? null : parsed;
+  };
+
+  // Pattern 1 — number then keyword, allowing a "+" suffix and optional spacing:
+  // "17727 Vacancies", "10000+ Posts", "2000posts".
+  const forwardRegex = new RegExp(`${NUM}\\s*\\+?\\s*(?:${KEYWORDS})`, "i");
+  const forward = title.match(forwardRegex);
+  if (forward) {
+    const n = toNumber(forward[1]);
+    if (n !== null) return n;
   }
-  
-  // Also check alternative formats: e.g. "Vacancy: 500"
-  const revRegex = /(?:vacanc(?:y|ies)|posts?|vacant|positions?):\s*(\d{1,3}(?:,\d{3})*|\d+)/i;
-  const revMatch = title.match(revRegex);
-  if (revMatch) {
-    const numStr = revMatch[1].replace(/,/g, "");
-    const parsed = parseInt(numStr, 10);
-    return isNaN(parsed) ? null : parsed;
+
+  // Pattern 2 — keyword then number with a separator: "Vacancy: 500", "Posts - 2000".
+  // A separator (":" or "-") is required so trailing years ("Posts 2024") aren't misread.
+  const reverseRegex = new RegExp(`(?:${KEYWORDS})\\s*[:\\-]\\s*\\+?\\s*${NUM}`, "i");
+  const reverse = title.match(reverseRegex);
+  if (reverse) {
+    const n = toNumber(reverse[1]);
+    if (n !== null) return n;
   }
-  
+
   return null;
 };
 
@@ -727,6 +742,16 @@ export default function Admin() {
     try {
       const { env, pipeline } = await import("@xenova/transformers");
       env.allowLocalModels = false;
+      // The onnxruntime-web WASM binaries are not emitted into the production build,
+      // so in deployment the bundler-relative request for them falls through the SPA
+      // catch-all rewrite and returns index.html (HTML), breaking the WASM load — it
+      // only worked locally because the Vite dev server serves them from node_modules.
+      // Pin the WASM binaries to the version-matched CDN so they load in both modes.
+      env.backends.onnx.wasm.wasmPaths =
+        "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/";
+      // Force single-threaded execution: multi-threaded WASM needs SharedArrayBuffer,
+      // which requires COOP/COEP headers the production host does not send.
+      env.backends.onnx.wasm.numThreads = 1;
       const extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
       extractorRef.current = extractor;
       return extractor;
