@@ -10,6 +10,14 @@ from typing import Any, Optional
 
 from supabase import create_client
 from api.lib.scraper_v5 import parse_date
+from api.lib.google_indexing import notify_google_indexing
+
+SITE_URL = "https://jobstrackr.in"
+
+
+def job_public_url(slug_or_id: str) -> str:
+    """Canonical public URL for a job page (matches SSR route and sitemap)."""
+    return f"{SITE_URL}/jobs/{slug_or_id}"
 
 
 def get_supabase_client():
@@ -229,8 +237,23 @@ def insert_job(supabase, scraped: dict) -> dict:
         return {"status": "duplicate", "title": title, "error": None}
 
     try:
-        result = supabase.table("jobs").insert(record).select("id").execute()
-        job_id = result.data[0]["id"] if result.data else None
-        return {"status": "inserted", "title": title, "job_id": job_id, "error": None}
+        result = supabase.table("jobs").insert(record).select("id,slug").execute()
+        row = result.data[0] if result.data else {}
+        job_id = row.get("id")
+        slug = row.get("slug") or job_id
+
+        # Push the new JobPosting URL to Google's Indexing API so it gets
+        # crawled promptly. Non-blocking: never raises, never fails the insert.
+        indexing = None
+        if slug:
+            indexing = notify_google_indexing(job_public_url(slug), "URL_UPDATED")
+
+        return {
+            "status": "inserted",
+            "title": title,
+            "job_id": job_id,
+            "error": None,
+            "indexing": indexing,
+        }
     except Exception as e:
         return {"status": "error", "title": title, "error": str(e)}
