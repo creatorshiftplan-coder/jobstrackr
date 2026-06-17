@@ -236,23 +236,38 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
   if (metaDescription.length > 160) metaDescription = metaDescription.substring(0, 157) + '...';
 
   // ── Module 4: JSON-LD Structured Data ──
+  // Google requires non-empty title, description, hiringOrganization and
+  // jobLocation. Build sturdy fallbacks so a sparse record never emits an
+  // empty (and therefore "missing") required field.
+  const orgName = (job.department && String(job.department).trim()) || 'Government of India';
+  const jobTitle = (job.title && String(job.title).trim()) || `${orgName} Recruitment`;
+  const locationName = (job.location && String(job.location).trim()) || 'All India';
+  const vacancyText = job.vacancies_display
+    ? `A total of ${job.vacancies_display} vacancies have been announced. `
+    : (job.vacancies ? `A total of ${job.vacancies} vacancies have been announced. ` : '');
+  const jobDescription =
+    (job.description && String(job.description).trim()) ||
+    `${orgName} has released the official notification for ${jobTitle}. ${vacancyText}` +
+      `Check eligibility, qualification, age limit, salary and how to apply online for this government job.`;
+
   const jsonLd: any = {
     '@context': 'https://schema.org',
     '@type': 'JobPosting',
-    title: job.title,
-    description: job.description || `${job.title} recruitment notification from ${job.department}. Check eligibility, salary, age limit and apply online.`,
+    title: jobTitle,
+    description: jobDescription,
     datePosted: job.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
     validThrough: job.last_date || undefined,
     hiringOrganization: {
       '@type': 'Organization',
-      name: job.department,
+      name: orgName,
     },
     jobLocation: {
       '@type': 'Place',
       address: {
         '@type': 'PostalAddress',
         addressCountry: 'IN',
-        addressRegion: job.location || 'All India',
+        addressRegion: locationName,
+        addressLocality: locationName,
       },
     },
     employmentType: 'FULL_TIME',
@@ -385,13 +400,10 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
 <body>
   ${ssrNavbar()}
   <!-- SEO Content (visible to crawlers and pre-render) -->
-  <article data-ssr-content itemprop="item" itemscope itemtype="https://schema.org/JobPosting">
-    <meta itemprop="datePosted" content="${job.created_at?.split('T')[0] || ''}">
-    <meta itemprop="validThrough" content="${job.last_date || ''}">
-
+  <article data-ssr-content>
     <header>
       <p style="font-size:0.9rem;color:#64748b;margin-bottom:4px">${escapeHtml(job.department)}</p>
-      <h1 itemprop="title">${escapeHtml(job.title)}</h1>
+      <h1>${escapeHtml(job.title)}</h1>
       <div style="margin:12px 0">
         <span class="badge">📍 ${escapeHtml(job.location || 'All India')}</span>
         ${job.vacancies_display ? `<span class="badge">👥 ${escapeHtml(job.vacancies_display)} Vacancies</span>` : ''}
@@ -411,7 +423,7 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
       <div class="info-grid">
         <div class="info-item">
           <div class="info-label">Qualification</div>
-          <div class="info-value" itemprop="qualifications">${escapeHtml(job.qualification)}</div>
+          <div class="info-value">${escapeHtml(job.qualification)}</div>
         </div>
         <div class="info-item">
           <div class="info-label">Age Limit</div>
