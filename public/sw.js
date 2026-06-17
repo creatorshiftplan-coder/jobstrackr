@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jobstrackr-pwa-cache-v2';
+const CACHE_NAME = 'jobstrackr-pwa-cache-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -45,8 +45,18 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
-  // Skip non-GET requests and external Supabase REST requests that aren't API cache calls
-  if (event.request.method !== 'GET' || event.request.url.includes('supabase.co/rest/v1/')) {
+  // Skip non-GET requests.
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // Never intercept cross-origin requests. The browser handles them natively
+  // under the document's CSP (which whitelists e.g. huggingface.co / jsdelivr for
+  // the WASM embedding model). If the SW re-issued these with its own fetch(),
+  // the request would be evaluated against the SW's stale CSP context and could
+  // be refused, turning the FetchEvent into a hard network error. Letting them
+  // pass through also avoids caching opaque third-party responses.
+  if (requestUrl.origin !== self.location.origin) {
     return;
   }
 
