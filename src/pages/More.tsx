@@ -198,14 +198,6 @@ export default function More() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   const userName = user?.user_metadata?.full_name || profile?.full_name || user?.email?.split("@")[0] || (isGuestMode ? GUEST_PROFILE.full_name : "User");
   const userInitials = userName.substring(0, 2).toUpperCase();
   const userEmail = user?.email || (isGuestMode ? GUEST_PROFILE.email : "");
@@ -293,7 +285,17 @@ export default function More() {
           {/* Left Column (Profile & Settings) */}
           <div className="md:col-span-1 space-y-6">
             {/* Profile Card */}
-            {!user ? (
+            {loading ? (
+              <Card className="bg-white dark:bg-card border-border/50 shadow-md">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-full bg-secondary animate-pulse flex-shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="h-4 w-32 rounded bg-secondary animate-pulse" />
+                    <div className="h-3 w-40 rounded bg-secondary animate-pulse" />
+                  </div>
+                </CardContent>
+              </Card>
+            ) : !user ? (
               <Card
                 className="bg-white dark:bg-card border-border/50 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => navigate("/profile")}

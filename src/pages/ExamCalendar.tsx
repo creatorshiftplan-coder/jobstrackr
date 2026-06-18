@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { DayContentProps } from "react-day-picker";
 import {
   AlertCircle,
@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/hooks/useAuth";
 import { useCalendarEvents } from "@/hooks/useCalendarEvents";
 import { CalendarEvent, CalendarEventType, EVENT_TYPE_CONFIG, dateKey } from "@/lib/calendarEvents";
 import { downloadICS } from "@/lib/calendarExport";
@@ -249,6 +250,8 @@ function TimelineList({
 }
 
 export default function ExamCalendar() {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<FilterKey>("all");
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -321,6 +324,60 @@ export default function ExamCalendar() {
   }, [allEvents]);
 
   const handleExportAll = () => downloadICS(upcoming);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <header className="sticky top-0 z-40 bg-card">
+          <div className="px-4 h-14 flex items-center">
+            <Skeleton className="h-6 w-32" />
+          </div>
+        </header>
+        <main className="px-4 py-4 space-y-4">
+          <Skeleton className="h-40 w-full rounded-lg" />
+          <Skeleton className="h-40 w-full rounded-lg" />
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_hsl(204_100%_99%),_hsl(205_85%_96%)_55%,_hsl(206_70%_94%)_100%)] dark:bg-[radial-gradient(circle_at_top,_hsl(224_55%_18%),_hsl(222_50%_14%)_55%,_hsl(220_45%_10%)_100%)] pb-20">
+        <header className="sticky top-0 z-40 bg-primary dark:bg-card dark:border-b dark:border-border backdrop-blur-xl border-b border-primary-foreground/10">
+          <div className="flex items-center justify-between gap-2 px-4 h-14">
+            <Link to="/more" className="flex-shrink-0">
+              <div className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-primary-foreground/10 dark:hover:bg-secondary/80 transition-colors">
+                <MenuBarsIcon className="h-5 w-5 text-primary-foreground dark:text-primary" />
+              </div>
+            </Link>
+            <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground flex items-center gap-2 min-w-0">
+              <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
+              <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
+              <span className="truncate">Exam Calendar</span>
+            </h1>
+            <div className="h-10 w-10 flex-shrink-0" />
+          </div>
+        </header>
+        <main className="px-4 py-8">
+          <div className="text-center space-y-4">
+            <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mx-auto">
+              <CalendarDays className="h-10 w-10 text-primary" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">Your Exam Calendar</h2>
+            <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+              Sign in to see application deadlines, exam dates, admit cards, and results from your tracked exams and saved jobs
+            </p>
+            <Button onClick={() => navigate("/auth")}>
+              Sign In
+            </Button>
+          </div>
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_hsl(204_100%_99%),_hsl(205_85%_96%)_55%,_hsl(206_70%_94%)_100%)] pb-24 dark:bg-[radial-gradient(circle_at_top,_hsl(224_55%_18%),_hsl(222_50%_14%)_55%,_hsl(220_45%_10%)_100%)] md:pb-10">
