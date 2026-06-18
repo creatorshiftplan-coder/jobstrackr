@@ -25,6 +25,7 @@ import {
   EyeOff,
   Loader2,
   Sparkles,
+  Timer,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -207,6 +208,7 @@ export function DesktopSidebar() {
     // Standalone page (separate Vite entry), not a Router route — needs a full
     // navigation, so it's flagged `external` and rendered as an <a> below.
     { title: "Govt Job Quiz", url: "/quiz", icon: Sparkles, external: true },
+    { title: "Exam Countdown", url: "/countdown", icon: Timer },
     { title: "Syllabus Finder", url: "/syllabus", icon: BookOpen },
     { title: "Application Guide", url: "/formmate", icon: ClipboardList },
     { title: "Upload Documents", url: "/documents", icon: Upload },
