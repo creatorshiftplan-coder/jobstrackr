@@ -44,6 +44,18 @@ function jobSlug(title: string): string {
   return s;
 }
 
+// Normalized duplicate key. MUST stay byte-for-byte in step with the `dedupe_key`
+// generated column (supabase/migrations/20260620_jobs_dedupe_key.sql): lowercase,
+// collapse every run of non-alphanumerics to a single space, trim, then join the
+// title and department with "||". The DB's UNIQUE(dedupe_key) is the real backstop;
+// computing the same key here lets us skip known dupes before they reach the insert.
+function normPart(s: unknown): string {
+  return String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+function dedupeKey(r: any): string {
+  return `${normPart(r.title)}||${normPart(r.department)}`;
+}
+
 function mapJobRow(r: any, slug: string) {
   const rec: Record<string, unknown> = {
     title: r.title, department: r.department, location: r.location, qualification: r.qualification,
@@ -70,13 +82,21 @@ function mapUpdateRow(r: any) {
   return rec;
 }
 
-async function chunkedInsert(supabase: any, table: string, rows: any[], opts?: { onConflict?: string }) {
+async function chunkedInsert(
+  supabase: any,
+  table: string,
+  rows: any[],
+  opts?: { onConflict?: string; ignoreDuplicates?: boolean },
+) {
   const SIZE = 200;
+  const upsertOpts = opts?.onConflict
+    ? { onConflict: opts.onConflict, ignoreDuplicates: opts.ignoreDuplicates ?? false }
+    : null;
   let written = 0;
   for (let i = 0; i < rows.length; i += SIZE) {
     const batch = rows.slice(i, i + SIZE);
-    const q = opts?.onConflict
-      ? supabase.from(table).upsert(batch, { onConflict: opts.onConflict })
+    const q = upsertOpts
+      ? supabase.from(table).upsert(batch, upsertOpts)
       : supabase.from(table).insert(batch);
     const { error } = await q;
     if (!error) {
@@ -88,8 +108,8 @@ async function chunkedInsert(supabase: any, table: string, rows: any[], opts?: {
     // row-by-row so the good rows still land.
     console.error(`[sync-sheets] ${table} batch write error (retrying per-row):`, error.message);
     for (const row of batch) {
-      const rq = opts?.onConflict
-        ? supabase.from(table).upsert(row, { onConflict: opts.onConflict })
+      const rq = upsertOpts
+        ? supabase.from(table).upsert(row, upsertOpts)
         : supabase.from(table).insert(row);
       const { error: rowErr } = await rq;
       if (rowErr) console.error(`[sync-sheets] ${table} row skipped:`, rowErr.message);
@@ -223,20 +243,21 @@ Deno.serve(async (req) => {
       const updateRows: any[] = payload.updates || [];
       if (jobRows.length === 0 && updateRows.length === 0) break;
 
-      // 3a. Jobs — dedup by title (case-insensitive) against existing rows, assign
-      //     a collision-free slug, then bulk insert the new ones.
+      // 3a. Jobs — dedup by normalized title+department (the same `dedupe_key` the
+      //     DB enforces) against existing rows, assign a collision-free slug, then
+      //     bulk insert the new ones with ON CONFLICT DO NOTHING as the backstop.
       if (jobRows.length) {
         jobsReceived += jobRows.length;
-        const titles = [...new Set(jobRows.map((r) => String(r.title || "")).filter(Boolean))];
+        const keys = [...new Set(jobRows.map(dedupeKey).filter((k) => k !== "||"))];
         const existing = new Set<string>();
-        for (let i = 0; i < titles.length; i += 200) {
-          const { data } = await supabase.from("jobs").select("title").in("title", titles.slice(i, i + 200));
-          (data || []).forEach((d: any) => existing.add(String(d.title || "").toLowerCase()));
+        for (let i = 0; i < keys.length; i += 200) {
+          const { data } = await supabase.from("jobs").select("dedupe_key").in("dedupe_key", keys.slice(i, i + 200));
+          (data || []).forEach((d: any) => { if (d.dedupe_key) existing.add(String(d.dedupe_key)); });
         }
         const seenInBatch = new Set<string>();
         const candidates = jobRows.filter((r) => {
-          const key = String(r.title || "").toLowerCase();
-          if (!key || existing.has(key) || seenInBatch.has(key)) return false;
+          const key = dedupeKey(r);
+          if (key === "||" || existing.has(key) || seenInBatch.has(key)) return false;
           seenInBatch.add(key);
           return true;
         });
@@ -261,7 +282,12 @@ Deno.serve(async (req) => {
             assignedSlugs.push(slug);
             return mapJobRow(r, slug);
           });
-          jobsInserted += await chunkedInsert(supabase, "jobs", fresh);
+          // ON CONFLICT (dedupe_key) DO NOTHING: the in-code filter above catches
+          // dupes against rows we could see, this catches the rest — a concurrent
+          // run inserting the same row, or a normalization edge we missed.
+          jobsInserted += await chunkedInsert(supabase, "jobs", fresh, {
+            onConflict: "dedupe_key", ignoreDuplicates: true,
+          });
 
           // Broadcast the just-inserted jobs to the matched public channels. We
           // re-fetch by the unique slugs we assigned to get the DB-generated id +
