@@ -11,16 +11,21 @@ export const config = {
 
 const SITE_URL = 'https://jobstrackr.in';
 
+// Public, indexable pages only. Auth-gated / personalised / noindex routes
+// (e.g. /auth, /tracker, /profile, /saved) are intentionally excluded so the
+// sitemap stays consistent with the per-route robots directives.
 const STATIC_PAGES = [
     { path: '/', changefreq: 'daily', priority: '1.0' },
     { path: '/welcome', changefreq: 'monthly', priority: '0.9' },
     { path: '/search', changefreq: 'daily', priority: '0.9' },
-    { path: '/tracker', changefreq: 'daily', priority: '0.8' },
     { path: '/trending', changefreq: 'daily', priority: '0.8' },
+    { path: '/calendar', changefreq: 'daily', priority: '0.8' },
+    { path: '/countdown', changefreq: 'daily', priority: '0.7' },
     { path: '/syllabus', changefreq: 'weekly', priority: '0.7' },
     { path: '/formmate', changefreq: 'weekly', priority: '0.7' },
-    { path: '/auth', changefreq: 'monthly', priority: '0.6' },
     { path: '/help', changefreq: 'monthly', priority: '0.5' },
+    { path: '/user-manual', changefreq: 'monthly', priority: '0.5' },
+    { path: '/faq', changefreq: 'monthly', priority: '0.5' },
     { path: '/privacy-policy', changefreq: 'yearly', priority: '0.3' },
     { path: '/terms-of-service', changefreq: 'yearly', priority: '0.3' },
     { path: '/refund-policy', changefreq: 'yearly', priority: '0.3' },

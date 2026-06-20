@@ -12,6 +12,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AnalyticsProvider } from "@/components/AnalyticsProvider";
 import { AuthRequiredProvider } from "@/components/AuthRequiredDialog";
 import { ScrollRestoration } from "@/components/ScrollRestoration";
+import { useRouteSeo } from "@/hooks/useRouteSeo";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { TopBar } from "@/components/TopBar";
@@ -80,6 +81,7 @@ const queryClient = new QueryClient({
 
 const AppContent = () => {
   const location = useLocation();
+  useRouteSeo();
   const hideNavigation = ["/welcome", "/auth", "/reset-password", "/countdown/live"].includes(location.pathname);
 
   const routes = (
