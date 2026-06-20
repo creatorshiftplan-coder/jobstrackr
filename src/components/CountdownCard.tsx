@@ -231,7 +231,7 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
                 <span className="text-border">·</span>
               </>
             )}
-            <span className="font-medium text-foreground">{format(item.examDate, "EEE, d MMM yyyy")}</span>
+            <span className="font-medium text-foreground">Exam date: {format(item.examDate, "EEE, d MMM yyyy")}</span>
           </div>
 
           {/* Live timer */}
