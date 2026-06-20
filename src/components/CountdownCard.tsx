@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CalendarDays, ChevronRight, Flame, Clock, Bookmark, Share2, Maximize2, ExternalLink } from "lucide-react";
+import { CalendarDays, Flame, Clock, Bookmark, Share2, Maximize2, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { CountdownItem } from "@/hooks/useCountdownExams";
@@ -22,37 +22,35 @@ interface CountdownCardProps {
   hero?: boolean;
 }
 
-// Theme tokens per urgency — gradients reuse the app's category-accent style.
+/**
+ * Restrained urgency accents. The card stays on a neutral surface; urgency is
+ * conveyed by a single semantic colour applied only to the status spine, the
+ * status pill, and the timer numerals — never as a full-surface wash.
+ */
 const URGENCY_THEME: Record<
   Urgency,
-  { gradient: string; ring: string; chip: string; glow: string; glowHover: string; accent: string; bar: string }
+  { spine: string; pill: string; dot: string; num: string; hoverBorder: string }
 > = {
   critical: {
-    gradient: "from-rose-500/20 via-red-500/10 to-transparent",
-    ring: "ring-1 ring-rose-500/40",
-    chip: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
-    glow: "shadow-[0_8px_30px_-12px_rgba(244,63,94,0.5)]",
-    glowHover: "hover:shadow-[0_18px_50px_-12px_rgba(244,63,94,0.6)]",
-    accent: "text-rose-600 dark:text-rose-400",
-    bar: "from-rose-500 to-red-500",
+    spine: "bg-gradient-to-b from-rose-500 via-rose-600 to-rose-700",
+    pill: "border-rose-300 bg-rose-100 text-rose-800 dark:border-rose-500/35 dark:bg-rose-500/15 dark:text-rose-200",
+    dot: "bg-rose-500",
+    num: "text-rose-600 dark:text-rose-400",
+    hoverBorder: "group-hover:border-rose-400 dark:group-hover:border-rose-500/50",
   },
   soon: {
-    gradient: "from-amber-500/20 via-orange-500/10 to-transparent",
-    ring: "ring-1 ring-amber-500/30",
-    chip: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-    glow: "shadow-[0_8px_30px_-12px_rgba(245,158,11,0.45)]",
-    glowHover: "hover:shadow-[0_18px_50px_-12px_rgba(245,158,11,0.55)]",
-    accent: "text-amber-600 dark:text-amber-400",
-    bar: "from-amber-500 to-orange-500",
+    spine: "bg-gradient-to-b from-amber-400 via-amber-500 to-orange-500",
+    pill: "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/35 dark:bg-amber-500/15 dark:text-amber-200",
+    dot: "bg-amber-500",
+    num: "text-amber-600 dark:text-amber-400",
+    hoverBorder: "group-hover:border-amber-400 dark:group-hover:border-amber-500/50",
   },
   calm: {
-    gradient: "from-violet-500/20 via-purple-500/10 to-transparent",
-    ring: "ring-1 ring-violet-500/25",
-    chip: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
-    glow: "shadow-[0_8px_30px_-12px_rgba(139,92,246,0.4)]",
-    glowHover: "hover:shadow-[0_18px_50px_-12px_rgba(139,92,246,0.5)]",
-    accent: "text-violet-600 dark:text-violet-400",
-    bar: "from-violet-500 to-fuchsia-500",
+    spine: "bg-gradient-to-b from-sky-400 via-sky-500 to-blue-600",
+    pill: "border-sky-300 bg-sky-100 text-sky-800 dark:border-sky-500/35 dark:bg-sky-500/15 dark:text-sky-200",
+    dot: "bg-sky-500",
+    num: "text-sky-600 dark:text-sky-400",
+    hoverBorder: "group-hover:border-sky-400 dark:group-hover:border-sky-500/50",
   },
 };
 
@@ -71,18 +69,15 @@ function TimeBlock({
     <div className="flex flex-col items-center">
       <div
         className={cn(
-          "relative overflow-hidden tabular-nums font-display font-bold leading-none rounded-xl",
-          "bg-gradient-to-b from-background/80 to-background/50 dark:from-white/[0.08] dark:to-white/[0.02]",
-          "backdrop-blur-sm border border-border/50 ring-1 ring-inset ring-white/5",
-          "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]",
+          "flex w-full items-center justify-center rounded-xl border border-border/70 bg-muted/40 tabular-nums",
+          "font-display font-bold leading-none dark:bg-white/[0.035]",
           accent,
-          big ? "text-3xl sm:text-4xl px-2.5 py-2 min-w-[3rem]" : "text-lg sm:text-xl px-2 py-1.5 min-w-[2.25rem]"
+          big ? "h-14 text-[1.75rem] sm:h-16 sm:text-3xl" : "h-11 text-xl"
         )}
       >
-        <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent" />
-        <span className="relative">{value}</span>
+        {value}
       </div>
-      <span className="mt-1 text-[9px] sm:text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <span className="mt-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
     </div>
@@ -109,6 +104,9 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
   const { data: savedJobs } = useSavedJobs();
   const saveJob = useSaveJob();
   const unsaveJob = useUnsaveJob();
+  const actionButtonClass =
+    "grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60";
+  const showEventLabel = item.eventLabel.trim().toLowerCase() !== "exam date";
 
   const isJob = item.sourceType === "job";
   const isSaved = isJob
@@ -160,91 +158,88 @@ export function CountdownCard({ item, index, hero = false }: CountdownCardProps)
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.4) }}
     >
-      <Link to={to} className="block group" aria-label={`${item.title} — exam in ${item.daysLeft} days`}>
+      <Link to={to} className="group block" aria-label={`${item.title} - exam in ${item.daysLeft} days`}>
         <div
           className={cn(
-            "relative overflow-hidden rounded-2xl border border-border/60 bg-card transition-all duration-300 hover:-translate-y-1",
-            theme.ring,
-            theme.glow,
-            theme.glowHover,
-            hero ? "p-5 sm:p-6" : "p-4"
+            "relative isolate overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300",
+            "hover:-translate-y-0.5 hover:shadow-md",
+            theme.hoverBorder,
+            hero ? "p-5 sm:p-6" : "p-4 sm:p-5"
           )}
         >
-          {/* Top accent bar */}
-          <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r opacity-70", theme.bar)} />
-          {/* Urgency gradient wash */}
-          <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br", theme.gradient)} />
-          {/* Corner sheen that brightens on hover */}
-          <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-white/5 blur-2xl transition-opacity duration-300 group-hover:opacity-80 opacity-40" />
+          {/* Urgency status spine */}
+          <span className={cn("absolute inset-y-0 left-0 w-1.5", theme.spine)} aria-hidden />
 
-          <div className="relative">
-            {/* Header */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", theme.chip)}>
-                  {urgency === "critical" ? <Flame className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                  {item.daysLeft === 0 ? "Exam Today" : `${item.daysLeft} day${item.daysLeft === 1 ? "" : "s"} left`}
-                </span>
-                <h3
-                  className={cn(
-                    "mt-2 font-bold text-foreground leading-tight",
-                    hero ? "text-lg sm:text-xl line-clamp-2" : "text-sm line-clamp-2"
-                  )}
-                >
-                  {item.title}
-                </h3>
-                <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">
-                    {item.eventLabel} · {format(item.examDate, "EEE, d MMM yyyy")}
-                  </span>
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={handleExpand}
-                  aria-label={isMobile ? "Open fullscreen countdown" : "Open fullscreen countdown in new tab"}
-                  className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
-                >
-                  {isMobile ? <Maximize2 className="h-5 w-5" /> : <ExternalLink className="h-5 w-5" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleShare}
-                  aria-label="Share countdown"
-                  className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
-                >
-                  <Share2 className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBookmark}
-                  aria-label={isSaved ? "Remove from My Wall" : "Add to My Wall"}
-                  aria-pressed={isSaved}
-                  className="rounded-full p-1.5 transition-colors hover:bg-background/70"
-                >
-                  <Bookmark
-                    className={cn(
-                      "h-5 w-5 transition-colors",
-                      isSaved ? cn("fill-current", theme.accent) : "text-muted-foreground"
-                    )}
-                  />
-                </button>
-                <ChevronRight className="hidden h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:block" />
-              </div>
-            </div>
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                theme.pill
+              )}
+            >
+              <span className="relative flex h-1.5 w-1.5 items-center justify-center">
+                {urgency === "critical" && (
+                  <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-75", theme.dot)} />
+                )}
+                <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full", theme.dot)} />
+              </span>
+              {urgency === "critical" ? <Flame className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+              {item.daysLeft === 0 ? "Exam Today" : `${item.daysLeft} day${item.daysLeft === 1 ? "" : "s"} left`}
+            </span>
 
-            {/* Live timer */}
-            <div className={cn("mt-4 flex items-end gap-1.5 sm:gap-2", hero && "justify-center")}>
-              <TimeBlock value={String(days)} label="Days" accent={theme.accent} big={hero} />
-              <span className={cn("pb-3 font-bold", theme.accent, hero ? "text-2xl" : "text-base")}>:</span>
-              <TimeBlock value={pad(hours)} label="Hrs" accent={theme.accent} big={hero} />
-              <span className={cn("pb-3 font-bold", theme.accent, hero ? "text-2xl" : "text-base")}>:</span>
-              <TimeBlock value={pad(minutes)} label="Min" accent={theme.accent} big={hero} />
-              <span className={cn("pb-3 font-bold", theme.accent, hero ? "text-2xl" : "text-base")}>:</span>
-              <TimeBlock value={pad(seconds)} label="Sec" accent={theme.accent} big={hero} />
+            <div className="-mr-1 flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                onClick={handleExpand}
+                aria-label={isMobile ? "Open fullscreen countdown" : "Open fullscreen countdown in new tab"}
+                className={actionButtonClass}
+              >
+                {isMobile ? <Maximize2 className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
+              </button>
+              <button type="button" onClick={handleShare} aria-label="Share countdown" className={actionButtonClass}>
+                <Share2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleBookmark}
+                aria-label={isSaved ? "Remove from My Wall" : "Add to My Wall"}
+                aria-pressed={isSaved}
+                className={actionButtonClass}
+              >
+                <Bookmark className={cn("h-4 w-4 transition-colors", isSaved && cn("fill-current", theme.num))} />
+              </button>
             </div>
+          </div>
+
+          {/* Title */}
+          <h3
+            className={cn(
+              "mt-3 break-words font-display font-bold leading-snug tracking-tight text-foreground line-clamp-2",
+              hero ? "text-xl" : "text-base"
+            )}
+          >
+            {item.title}
+          </h3>
+
+          {/* Date */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+            {showEventLabel && (
+              <>
+                <span>{item.eventLabel}</span>
+                <span className="text-border">·</span>
+              </>
+            )}
+            <span className="font-medium text-foreground">{format(item.examDate, "EEE, d MMM yyyy")}</span>
+          </div>
+
+          {/* Live timer */}
+          <div className={cn("grid grid-cols-4 gap-2 sm:gap-2.5", hero ? "mt-5" : "mt-4")}>
+            <TimeBlock value={String(days)} label="Days" accent={theme.num} big={hero} />
+            <TimeBlock value={pad(hours)} label="Hrs" accent={theme.num} big={hero} />
+            <TimeBlock value={pad(minutes)} label="Min" accent={theme.num} big={hero} />
+            <TimeBlock value={pad(seconds)} label="Sec" accent={theme.num} big={hero} />
           </div>
         </div>
       </Link>
