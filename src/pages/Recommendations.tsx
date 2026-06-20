@@ -18,6 +18,7 @@ import { useExams } from "@/hooks/useExams";
 import { Job } from "@/types/job";
 import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
 import { QualStream, matchAndSort, getEducationRank, getQualLabel, getQualStreamLabel, getSkillLabel, inferQualificationStream, MatchPreferences, MatchedJob, getBestJobLocation, canApply, needsReview } from "@/lib/jobMatcher";
+import { checkAllSkills } from "@/lib/skillMatcher";
 import { isAllIndiaLocationText, resolveStateFromLocationText } from "@/lib/jobUtils";
 import { hybridRecommend, qualificationToTag, HybridMatchedJob } from "@/lib/hybridScorer";
 import { cn } from "@/lib/utils";
@@ -657,8 +658,20 @@ export default function Recommendations() {
     return new Set(hybridMatchedJobs.filter((h) => h.matchesTrackedExam).map((h) => h.job.id));
   }, [hybridMatchedJobs]);
 
+  // True skill-gap test: regex gaps (eligibility.skillsMissing) UNION structured
+  // JSONB gaps (job.required_skills). The feed's "Almost There" shelf counts the
+  // JSONB gaps too, so the stat tiers must as well — otherwise a job whose only gap
+  // is a structured skill is counted "Can Apply" while rendering under "Almost There".
+  const hasUnmetSkill = useCallback((m: MatchedJob) => {
+    if (m.eligibility.skillsMissing.length > 0) return true;
+    return checkAllSkills(m.job.required_skills, preferences.skills).gap_skills.length > 0;
+  }, [preferences.skills]);
+
   // Four-tier classification (use hybrid-ranked order for eligible jobs)
-  const canApplyJobs = useMemo(() => hybridMatchedJobs.filter((m) => canApply(m.eligibility)), [hybridMatchedJobs]);
+  const canApplyJobs = useMemo(
+    () => hybridMatchedJobs.filter((m) => canApply(m.eligibility) && !hasUnmetSkill(m)),
+    [hybridMatchedJobs, hasUnmetSkill]
+  );
   const reviewEligibilityJobs = useMemo(() => hybridMatchedJobs.filter((m) => needsReview(m.eligibility)), [hybridMatchedJobs]);
 
   // Split canApply into preferred location -> all India -> other state buckets
@@ -706,7 +719,7 @@ export default function Recommendations() {
     );
   }, [canApplyJobs, hasPreferredLocations, isAllIndiaJob, matchesSelectedLocation]);
 
-  const skillsNeededJobs = useMemo(() => hybridMatchedJobs.filter((m) => m.eligibility.blockers.length === 0 && m.eligibility.skillsMissing.length > 0), [hybridMatchedJobs]);
+  const skillsNeededJobs = useMemo(() => hybridMatchedJobs.filter((m) => m.eligibility.blockers.length === 0 && hasUnmetSkill(m)), [hybridMatchedJobs, hasUnmetSkill]);
   const preferredLocationSkillsNeededJobs = useMemo(() => {
     if (!hasPreferredLocations) return [];
     return skillsNeededJobs.filter(({ job }) => matchesSelectedLocation(job));

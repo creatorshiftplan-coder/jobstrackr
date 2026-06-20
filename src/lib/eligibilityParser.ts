@@ -550,7 +550,13 @@ function splitAlternatives(baseText: string, qualityFlags: string[]): string[] {
 
   if (alternatives.length > 1) return alternatives;
 
-  if (/^[A-Za-z0-9+().\-\s]+(?:\/[A-Za-z0-9+().\-\s]+){1,5}$/.test(baseText) && /\b(10\+2|12th|graduate|d\.pharm|b\.pharm|iti|diploma|degree)\b/i.test(baseText)) {
+  // Slash-separated alternatives ("10+2 / Diploma / Degree"), but NOT when a "/" sits
+  // inside parentheses — "Diploma (MLT/DMLT)" is one credential, not two paths.
+  if (
+    !/\([^)]*\/[^)]*\)/.test(baseText) &&
+    /^[A-Za-z0-9+().\-\s]+(?:\/[A-Za-z0-9+().\-\s]+){1,5}$/.test(baseText) &&
+    /\b(10\+2|12th|graduate|d\.pharm|b\.pharm|iti|diploma|degree)\b/i.test(baseText)
+  ) {
     return baseText.split("/").map((part) => normalizeWhitespace(part)).filter(Boolean);
   }
 

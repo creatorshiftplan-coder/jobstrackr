@@ -458,17 +458,27 @@ function hasSpecificQualificationStream(streams: string[]): boolean {
 }
 
 function userMatchesSpecialization(userQualificationName: string | null, specializations: string[]): boolean {
-  if (specializations.length === 0) return true;
+  // Drop generic, non-constraining "specializations" ("any discipline", "relevant
+  // stream", "concerned subject") — these impose no real requirement, so a job that
+  // only carries them must not be hard-failed for a mismatch.
+  const meaningful = specializations.filter((specialization) => {
+    const normalized = specialization.toLowerCase().trim();
+    if (!normalized) return false;
+    if (/\b(related|relevant|concerned|same|equivalent|appropriate|respective)\b/.test(normalized)) return false;
+    const firstWord = normalized.split(/\s+/)[0];
+    return !GENERIC_FIELD_WORDS.has(normalized) && !GENERIC_FIELD_WORDS.has(firstWord);
+  });
+  if (meaningful.length === 0) return true;
+
   const userText = (userQualificationName || "").toLowerCase();
   if (!userText) return false;
 
-  return specializations.some((specialization) => {
+  return meaningful.some((specialization) => {
     const normalized = specialization.toLowerCase();
-    if (!normalized || /\b(related|relevant|concerned|same|equivalent)\b/.test(normalized)) return false;
     if (userText.includes(normalized)) return true;
     return normalized
       .split(/\s+/)
-      .filter((word) => word.length > 3)
+      .filter((word) => word.length > 3 && !GENERIC_FIELD_WORDS.has(word))
       .some((word) => userText.includes(word));
   });
 }
@@ -755,6 +765,264 @@ const BLOCKER_SKILL_KEYS = new Set([
   "rci_registration",   // statutory registration
 ]);
 
+// ═════════════════════════════════════════════════════════════════════════
+// CONJUNCTIVE / SPECIALIZED QUALIFICATION GATE  ("X AND Y", specific subject)
+//
+// The level/stream matcher confirms eligibility on LEVEL alone. That silently
+// passes a job when its path actually demands something SPECIFIC the user may
+// not hold — a named diploma/specialization ("Diploma (MLT/DMLT)"), a required
+// subject ("…with Biological Science as paper"), or a second stacked credential
+// ("Graduation AND B.Ed").
+//
+// This gate decomposes the qualification text into OR-paths (the user needs to
+// satisfy ANY ONE), where WITHIN a path requirements are conjunctive (AND).
+// It returns short "needs" labels ONLY when NO path is fully satisfiable, so the
+// caller can route the job to "Worth Checking — Verify Eligibility" with a chip
+// naming exactly what is unmet. Strict-when-ambiguous: an unconfirmable specific
+// never silently passes.
+// ═════════════════════════════════════════════════════════════════════════
+
+// Field words that impose no real specialization — they make a requirement generic.
+const GENERIC_FIELD_WORDS = new Set([
+  ...GENERIC_QUAL_WORDS,
+  "discipline", "disciplines", "stream", "streams", "subject", "subjects", "field",
+  "fields", "branch", "branches", "faculty", "specialisation", "specialization",
+  "group", "groups", "any stream", "any discipline", "any subject",
+]);
+
+// Qualification-level tokens — used to detect where a comma segment starts a NEW
+// eligibility path vs. continues a subject list ("Physics, Chemistry and Maths").
+const QUAL_LEVEL_TOKEN_RE = /\b(diploma|degree|graduat\w*|bachelor'?s?|master'?s?|post[\s-]?graduat\w*|b\.?\s*sc|b\.?\s*tech|b\.?\s*e|b\.?\s*a|b\.?\s*com|b\.?\s*ed|m\.?\s*sc|m\.?\s*a|m\.?\s*com|m\.?\s*tech|llb|llm|mbbs|bds|iti|sslc|ssc|matric\w*|hsc|10th|12th|10\+2|intermediate|pg\s*diploma|mba|mca|bca|certificate|d\.?\s*pharm|b\.?\s*pharm|gnm|anm|mlt|dmlt)\b/i;
+
+// Quick, acquirable skills — these belong in `skillsMissing` (Almost There), so the
+// gate must NOT surface them as conjunctive credential blockers.
+const QUICK_SKILL_KEYS = new Set([
+  "stenography", "computer", "typing_hindi", "typing_english", "driving", "swimming",
+]);
+
+function isGenericField(field: string): boolean {
+  const f = field.trim().toLowerCase();
+  if (f.length < 2) return true;
+  if (GENERIC_FIELD_WORDS.has(f)) return true;
+  const firstWord = f.split(/\s+/)[0];
+  if (GENERIC_FIELD_WORDS.has(firstWord)) return true;
+  // Pure qualification-level phrasing carries no specialization of its own.
+  return /^(master'?s?|bachelor'?s?|hons?\.?|honou?rs|regular|full[\s-]?time|part[\s-]?time|degree|diploma|graduation|graduate|pass(?:ed)?|10\+2|llb|llm|b\.?ed)$/i.test(f);
+}
+
+function isAcquirableSkillField(field: string): boolean {
+  const f = ` ${field.toLowerCase()} `;
+  for (const key of QUICK_SKILL_KEYS) {
+    const pattern = SKILL_KEYWORDS[key];
+    if (pattern && pattern.test(f)) return true;
+  }
+  return /typewrit/i.test(f);
+}
+
+function looksLikeSubject(field: string): boolean {
+  const f = field.toLowerCase();
+  if (/\bscience\b/.test(f)) return true;
+  return /\b(physics|chemistry|maths?|mathematics|biology|biological|botany|zoology|statistics|economics|geography|history|commerce|accountancy|computer|electronics|agriculture|geology|microbiology|biotechnology|sociology|psychology|political|philosophy|sanskrit|hindi|english|geog)\b/.test(f);
+}
+
+function cleanField(raw: string): string {
+  return raw
+    .replace(/[()]/g, "")
+    .replace(/\s*\/\s*/g, "/")
+    .replace(/\s+/g, " ")
+    .replace(/[.,;:]+$/g, "")
+    .trim();
+}
+
+// Low-signal subject words that need not independently match — the distinctive
+// token carries the meaning ("Biological Science" ↔ "B.Sc Biology").
+const SUBJECT_STOPWORDS = new Set([
+  "science", "sciences", "studies", "applied", "general", "hons", "honours",
+  "honors", "degree", "graduate", "graduation", "and",
+]);
+
+// Does the user's free-form qualification name satisfy a required field/subject?
+// Root-based so "B.Sc Biology" matches a "Biological Science" requirement.
+function userHoldsField(userQualificationName: string | null, field: string): boolean {
+  const user = (userQualificationName || "").toLowerCase();
+  if (!user) return false;
+  const tokens = field.toLowerCase().split(/[\s/&,]+/).filter(Boolean);
+  // Every distinctive token of the requirement must be reflected in the user's name.
+  let meaningful = tokens.filter((t) => t.length >= 3 && !GENERIC_FIELD_WORDS.has(t) && !SUBJECT_STOPWORDS.has(t));
+  // If only low-signal words remained (e.g. the field was just "Science"), fall back
+  // to those so we still require *some* overlap rather than matching everything.
+  if (meaningful.length === 0) meaningful = tokens.filter((t) => t.length >= 3 && !GENERIC_FIELD_WORDS.has(t));
+  if (meaningful.length === 0) return false;
+  return meaningful.every((token) => {
+    if (user.includes(token)) return true;
+    const root = token.slice(0, Math.min(5, token.length));
+    return new RegExp(`\\b${root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(user);
+  });
+}
+
+interface SpecificRequirement {
+  label: string;   // short, human chip text (e.g. "Diploma (MLT/DMLT)", "Biological Science")
+  field: string;   // matchable field for userHoldsField
+}
+
+function extractPathSpecifics(path: string): SpecificRequirement[] {
+  const specifics: SpecificRequirement[] = [];
+  const seen = new Set<string>();
+  const push = (label: string, field: string) => {
+    const key = field.toLowerCase();
+    if (!field || seen.has(key)) return;
+    if (isAcquirableSkillField(field)) return; // acquirable → skillsMissing, not a blocker
+    seen.add(key);
+    specifics.push({ label, field });
+  };
+
+  // 1. Parenthetical specialization after a qualification keyword: "Diploma (MLT/DMLT)".
+  for (const m of path.matchAll(/\b(diploma|degree|graduat\w*|certificate|b\.?\s*sc|b\.?\s*tech|b\.?\s*ed|b\.?\s*a|m\.?\s*sc|pg\s*diploma)\s*\(([^)]+)\)/gi)) {
+    const field = cleanField(m[2]);
+    if (isGenericField(field)) continue;
+    const qual = toTitleCase(cleanField(m[1]).replace(/\s+/g, ""));
+    push(`${qual} (${field.toUpperCase().length <= 8 ? field.toUpperCase() : toTitleCase(field)})`, field);
+  }
+
+  // 2. "<qualification> in <field>": "Diploma in Surveyorship", "Degree in Agriculture".
+  for (const m of path.matchAll(/\b(diploma|degree|bachelor'?s?|master'?s?|graduat\w*|certificate|pg\s*diploma|b\.?\s*sc|b\.?\s*tech|m\.?\s*sc|b\.?\s*a|b\.?\s*ed|b\.?\s*pharm|d\.?\s*pharm)\s+(?:in|of)\s+([a-z][a-z &/]*?)(?=\s+(?:with|from|or\b|and\b|as\b|under|recognized|recognised|having|plus|\+|issued|approved|degree|diploma)|[.,;]|$)/gi)) {
+    const field = cleanField(m[2]);
+    if (isGenericField(field)) continue;
+    push(toTitleCase(field), field);
+  }
+
+  // 3. Required subject "<subject> as a paper/subject/optional".
+  for (const m of path.matchAll(/(?:^|\bwith\b|\bhaving\b|\bincluding\b|,)\s*([a-z][a-z]+(?:\s+[a-z]+){0,2})\s+as\s+(?:an?\s+)?(?:paper|subject|optional|elective|main\s+subject)\b/gi)) {
+    const field = cleanField(m[1]);
+    if (isGenericField(field) || !looksLikeSubject(field)) continue;
+    push(toTitleCase(field), field);
+  }
+
+  // 4. "with <subject>" where the field reads like an academic subject.
+  for (const m of path.matchAll(/\bwith\s+([a-z][a-z &]*?)(?=\s+(?:as\b|in\s+class|in\s+xi|in\s+11|in\s+10|subject|paper|degree|diploma)|[.,;]|$)/gi)) {
+    const field = cleanField(m[1]);
+    if (isGenericField(field) || !looksLikeSubject(field)) continue;
+    push(toTitleCase(field), field);
+  }
+
+  // 5. Second stacked credential after an AND-conjunction: "Graduation AND B.Ed".
+  for (const m of path.matchAll(/\b(?:and|&|along\s+with|in\s+addition\s+to|as\s+well\s+as|plus)\s+(?:an?\s+|a\s+)?((?:pg\s*diploma|b\.?\s*ed|d\.?\s*el\.?\s*ed|llb|llm|b\.?\s*tech|m\.?\s*tech|mba|mca|diploma(?:\s+in\s+[a-z &]+)?|degree\s+in\s+[a-z &]+)\b)/gi)) {
+    const cred = cleanField(m[1]);
+    if (!cred) continue;
+    // Generic-only ("…and a degree") carries no extra specificity.
+    if (/^(degree|diploma|graduation|graduate)$/i.test(cred)) continue;
+    push(toTitleCase(cred), cred);
+  }
+
+  return specifics;
+}
+
+// Split qualification text into OR-paths. ` or ` and spaced ` / ` are disjunctions;
+// commas start a new path ONLY when the next segment names its own qualification
+// level (so "Physics, Chemistry and Maths" stays one subject list). Parentheses are
+// protected so "(MLT/DMLT)" is never split.
+function splitQualificationPaths(text: string): string[] {
+  const parens: string[] = [];
+  const protectedText = text.replace(/\([^)]*\)/g, (m) => {
+    parens.push(m);
+    return ` ${parens.length - 1} `;
+  });
+
+  const restore = (s: string) => s.replace(/ (\d+) /g, (_, i) => parens[Number(i)] ?? "");
+
+  const orPaths = protectedText
+    .split(/\s+\bor\b\s+|\s+\/\s+/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const result: string[] = [];
+  for (const orPath of orPaths) {
+    const segments = orPath.split(",");
+    let current = "";
+    for (const seg of segments) {
+      const trimmed = seg.trim();
+      if (!trimmed) continue;
+      if (current && !QUAL_LEVEL_TOKEN_RE.test(trimmed)) {
+        current += `, ${trimmed}`; // continuation (subject list / experience clause)
+      } else {
+        if (current) result.push(restore(current));
+        current = trimmed;
+      }
+    }
+    if (current) result.push(restore(current));
+  }
+  return result.length > 0 ? result : [restore(protectedText)];
+}
+
+/**
+ * Returns 1–2 short "needs" labels when NO eligibility path is fully satisfiable
+ * for the user, i.e. every path demands a specific specialization / subject /
+ * stacked credential the user cannot be confirmed to hold. Returns [] when at
+ * least one path is cleanly satisfiable (no veto).
+ */
+export function findUnmetQualificationSpecifics(
+  job: Job,
+  userQual: QualProfile,
+  userQualificationName: string | null,
+): string[] {
+  const unmet: SpecificRequirement[] = [];
+  const seen = new Set<string>();
+  const addUnmet = (specifics: SpecificRequirement[]) => {
+    for (const spec of specifics) {
+      const key = spec.field.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unmet.push(spec);
+    }
+  };
+
+  // ── (A) Authoritative OR-path analysis on the QUALIFICATION column ──────────
+  // The user needs to satisfy ANY ONE path; only the qualification column carries
+  // these alternatives. (Eligibility/summary prose must never become an easy
+  // alternative path — that would re-open the leak — so it is handled in (B).)
+  const qualText = (job.qualification || "").trim();
+  if (qualText) {
+    const paths = splitQualificationPaths(qualText);
+    let closestUnmet: SpecificRequirement[] | null = null;
+    let cleanPathExists = false;
+
+    for (const path of paths) {
+      const parsed = parseJobQualRequirement(path);
+      const levelStreamOk = isQualificationEligible(userQual, parsed);
+      const specifics = extractPathSpecifics(path).filter((s) => !userHoldsField(userQualificationName, s.field));
+
+      if (levelStreamOk && specifics.length === 0) {
+        cleanPathExists = true;
+        break;
+      }
+
+      // Track unmet specifics only on paths whose level is reachable; a pure level
+      // shortfall is the structured matcher's job, not this gate's.
+      const levelReachable = parsed.level === 0 || userQual.level >= parsed.level;
+      if (specifics.length > 0 && levelReachable) {
+        if (!closestUnmet || specifics.length < closestUnmet.length) closestUnmet = specifics;
+      }
+    }
+
+    if (!cleanPathExists && closestUnmet) addUnmet(closestUnmet);
+  }
+
+  // ── (B) Extra AND-constraints from the eligibility text + Grok AI summary ────
+  // These ADD requirements on top of the qualification (subjects, named diplomas,
+  // stacked credentials the recruiter spells out in prose), so an unmet one routes
+  // the job to "Worth Checking" even when the qualification column looked clean.
+  const extraText = [job.eligibility, job.eligibility_summary]
+    .filter(Boolean)
+    .join(" . ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (extraText) {
+    addUnmet(extractPathSpecifics(extraText).filter((s) => !userHoldsField(userQualificationName, s.field)));
+  }
+
+  return unmet.slice(0, 2).map((s) => s.label);
+}
+
 export function checkEligibility(
   userAge: number | null,
   userQual: QualProfile | null,
@@ -828,6 +1096,17 @@ export function checkEligibility(
   } else if (userQual === null && (job.qualification || "").trim()) {
     // We don't know the user's qualification but the job requires one.
     addUniqueLabel(blockers, "Add your qualification to confirm eligibility");
+  }
+
+  // ── Conjunctive / specialized qualification gate ("X AND Y", required subject) ──
+  // The level/stream check above can confirm on level alone while the path actually
+  // demands a specific specialization, subject, or stacked credential the user does
+  // not hold. When NO path is cleanly satisfiable, surface the unmet part as a short
+  // "Needs: X" blocker so the job routes to "Worth Checking" instead of can-apply.
+  if (userQual !== null && qualOk !== false) {
+    for (const label of findUnmetQualificationSpecifics(job, userQual, userQualificationName)) {
+      addUniqueLabel(blockers, `Needs: ${label}`);
+    }
   }
 
   // ── Gender Check ──────────────────────────────────────────────
@@ -966,7 +1245,7 @@ const SKILL_KEYWORDS: Record<string, RegExp> = {
   stenography: /\b(steno|stenograph|shorthand)\b/i,
   computer: /\b(computer|ccc|nielit|rscit|ms[\s-]?cit|pgdca|\bdca\b|o[\s-]?level|copa|data\s*entry|ms[\s-]?office|tally|computer\s*(?:knowledge|proficien|applicat|basics|literat))\b/i,
   typing_hindi: /\b(hindi\s*typ|typing.*hindi|hindi.*typing|mangal)\b/i,
-  typing_english: /\b(english\s*typ|typing.*english|english.*typing|typing\s*speed|35\s*wpm|40\s*wpm)\b/i,
+  typing_english: /\b(english\s*typ|typing.*english|english.*typing|typewrit\w*|typing\s*speed|35\s*wpm|40\s*wpm)\b/i,
   driving: /\b(driv|lmv|hmv|motor\s*vehicle|driving\s*licen)\b/i,
   swimming: /\b(swim)\b/i,
   physical_fitness: /\b(physical\s*(test|fitness|standard|efficien|endurance)|1600\s*m|800\s*m|height.*\d{2,3}\s*cm|chest.*\d{2,3}\s*cm|\d+\s*(?:km|meters?)\s*(?:run|walk)|(?:long|high)\s*jump|height.*chest)\b/i,

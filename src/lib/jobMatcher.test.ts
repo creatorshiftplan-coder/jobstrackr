@@ -197,3 +197,82 @@ describe("checkEligibility — precision-first taxonomy", () => {
     expect(canApply(e)).toBe(true);
   });
 });
+
+/**
+ * Conjunctive / specialized-qualification gate. A BSc-general user must never see
+ * a job in "can apply" when its path actually requires a specific specialization,
+ * subject, or stacked credential they cannot be confirmed to hold. Anchored to real
+ * leaking examples reported from production.
+ */
+describe("checkEligibility — conjunctive / specialized qualification gate", () => {
+  // The user holds only a plain BSc (general stream, no recorded subject).
+  const bsc = getUserQualProfileWithStream("graduation", "general");
+  const evalBsc = (qualification: string, name: string | null = "BSc") =>
+    checkEligibility(25, bsc, makeJob({ qualification }), null, null, [], name);
+
+  it("LEAK FIX (real): specialized paramedical diploma routes to Review, not can-apply", () => {
+    const e = evalBsc("Diploma (MLT/ DMLT) graduate");
+    expect(canApply(e)).toBe(false);
+    expect(needsReview(e)).toBe(true);
+    expect(e.blockers.some((b) => /MLT/i.test(b))).toBe(true);
+  });
+
+  it("LEAK FIX (real): required subject 'Biological Science' routes to Review", () => {
+    const e = evalBsc(
+      "Science Graduate with Biological Science as paper or any Graduate with Bio Science in Class XI & XII",
+    );
+    expect(canApply(e)).toBe(false);
+    expect(needsReview(e)).toBe(true);
+    expect(e.blockers.some((b) => /Needs:/i.test(b))).toBe(true);
+  });
+
+  it("CONFIRM: a BSc whose recorded subject matches the required subject can apply", () => {
+    // userHoldsField is root-based, so "B.Sc Biology" satisfies a "Biological Science" gate.
+    const e = evalBsc("Graduate with Biological Science as a subject", "B.Sc Biology");
+    expect(canApply(e)).toBe(true);
+    expect(e.blockers).toHaveLength(0);
+  });
+
+  it("STACKED CREDENTIAL: 'Graduation and B.Ed' keeps a non-teaching graduate out of can-apply", () => {
+    // B.Ed pins the path to the teaching stream, so a general graduate is excluded.
+    const e = evalBsc("Graduation and B.Ed");
+    expect(canApply(e)).toBe(false);
+  });
+
+  it("GUARD: 'Degree in any discipline' is generic and still cleanly passes (no false veto)", () => {
+    const e = evalBsc("Bachelor's Degree in any discipline from a recognized university");
+    expect(canApply(e)).toBe(true);
+    expect(e.blockers).toHaveLength(0);
+  });
+
+  it("GUARD: an alternative path the user satisfies wins over a specialized sibling", () => {
+    // The BSc cannot do the engineering diploma, but satisfies the "any Graduate" path.
+    const e = evalBsc("Diploma in Civil Engineering OR any Graduate");
+    expect(canApply(e)).toBe(true);
+    expect(e.blockers).toHaveLength(0);
+  });
+
+  it("AI SUMMARY: a required subject stated only in the Grok summary still routes to Review", () => {
+    // Qualification column is a clean "Graduate"; the specific subject lives in the summary.
+    const job = makeJob({
+      qualification: "Graduate",
+      eligibility: null,
+      eligibility_summary: "Bachelor's degree with Botany as a subject from a recognized university.",
+    });
+    const e = checkEligibility(25, bsc, job, null, null, [], "BSc");
+    expect(canApply(e)).toBe(false);
+    expect(needsReview(e)).toBe(true);
+    expect(e.blockers.some((b) => /Botany/i.test(b))).toBe(true);
+  });
+
+  it("GUARD: ordinary eligibility prose (domicile, fees, experience) does not false-trigger", () => {
+    const job = makeJob({
+      qualification: "Graduate",
+      eligibility:
+        "Candidate must be a graduate. 2 years of experience in administration. Application fee Rs. 500. Knowledge of computer is desirable.",
+    });
+    const e = checkEligibility(25, bsc, job, null, null, ["computer"], "BSc");
+    expect(canApply(e)).toBe(true);
+    expect(e.blockers).toHaveLength(0);
+  });
+});
