@@ -3983,6 +3983,12 @@ ${hashtagsStr}`;
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState<boolean>(false);
   const [bulkDeleting, setBulkDeleting] = useState<boolean>(false);
 
+  // ---- Duplicate detection (Jobs tab) ----
+  const [duplicatesOnly, setDuplicatesOnly] = useState<boolean>(false);
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [showJobsBulkDeleteConfirm, setShowJobsBulkDeleteConfirm] = useState<boolean>(false);
+  const [bulkDeletingJobs, setBulkDeletingJobs] = useState<boolean>(false);
+
   const handleExpiredSort = (field: "last_date" | "vacancies" | "created_at") => {
     if (expiredSortField === field) {
       setExpiredSortDirection(prev => prev === "asc" ? "desc" : "asc");
@@ -4030,16 +4036,19 @@ ${hashtagsStr}`;
     if (selectedExpiredJobs.size === 0) return;
     setBulkDeleting(true);
     try {
-      const { error } = await supabase
-        .from("jobs")
-        .delete()
-        .in("id", Array.from(selectedExpiredJobs));
-
-      if (error) throw error;
+      const ids = Array.from(selectedExpiredJobs);
+      // Delete in chunks to avoid exceeding the server's max URL length when many
+      // ids are selected (a single huge `.in()` fails with net::ERR_FAILED).
+      const CHUNK_SIZE = 100;
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        const chunk = ids.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase.from("jobs").delete().in("id", chunk);
+        if (error) throw error;
+      }
 
       toast({
         title: "Success",
-        description: `${selectedExpiredJobs.size} expired jobs deleted successfully`,
+        description: `${ids.length} expired jobs deleted successfully`,
       });
       setSelectedExpiredJobs(new Set());
       setExpiredPage(1);
@@ -4200,6 +4209,91 @@ ${hashtagsStr}`;
 
     return 0;
   });
+
+  // ---- Duplicate detection ----
+  // Normalize text so casing, punctuation and extra spacing don't cause misses.
+  const normalizeDupeText = (s?: string | null) =>
+    (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+
+  // Group jobs that share the same normalized title + department. Each group with
+  // more than one listing is considered a set of duplicates. The newest listing in
+  // each group is kept first so it can be preserved by default.
+  const duplicateGroups = useMemo(() => {
+    const map = new Map<string, Job[]>();
+    (jobs || []).forEach((job) => {
+      const titleKey = normalizeDupeText(job.title);
+      if (!titleKey) return; // skip blank titles
+      const key = `${titleKey}||${normalizeDupeText(job.department)}`;
+      const arr = map.get(key);
+      if (arr) arr.push(job);
+      else map.set(key, [job]);
+    });
+
+    return Array.from(map.values())
+      .filter((group) => group.length > 1)
+      .map((group) =>
+        [...group].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+      )
+      .sort((a, b) => b.length - a.length);
+  }, [jobs]);
+
+  const duplicateListingCount = useMemo(
+    () => duplicateGroups.reduce((sum, group) => sum + group.length, 0),
+    [duplicateGroups]
+  );
+
+  const toggleSelectJob = (jobId: string) => {
+    setSelectedJobIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
+  };
+
+  // Select every duplicate except the newest in each group (the sensible default
+  // when cleaning up – keep one, delete the rest).
+  const selectOlderDuplicates = () => {
+    const next = new Set<string>();
+    duplicateGroups.forEach((group) => {
+      group.slice(1).forEach((job) => next.add(job.id));
+    });
+    setSelectedJobIds(next);
+  };
+
+  const handleBulkDeleteSelectedJobs = async () => {
+    if (selectedJobIds.size === 0) return;
+    setBulkDeletingJobs(true);
+    try {
+      const ids = Array.from(selectedJobIds);
+      // Delete in chunks – passing thousands of ids in a single `.in()` builds a
+      // huge query string that exceeds the server's max URL length (net::ERR_FAILED).
+      const CHUNK_SIZE = 100;
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        const chunk = ids.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase.from("jobs").delete().in("id", chunk);
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: `${ids.length} duplicate job${ids.length === 1 ? "" : "s"} deleted successfully`,
+      });
+      setSelectedJobIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    } catch (error: any) {
+      toast({
+        title: "Error deleting jobs",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setBulkDeletingJobs(false);
+      setShowJobsBulkDeleteConfirm(false);
+    }
+  };
 
   if (authLoading || roleLoading) {
     return (
@@ -5307,10 +5401,42 @@ ${hashtagsStr}`;
               <CardHeader className="space-y-4">
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                   <div>
-                    <CardTitle>Jobs ({filteredJobs?.length || 0} of {jobs?.length || 0})</CardTitle>
-                    <CardDescription>Manage government job listings</CardDescription>
+                    <CardTitle>
+                      {duplicatesOnly
+                        ? `Duplicate Jobs (${duplicateListingCount} listing${duplicateListingCount === 1 ? "" : "s"} in ${duplicateGroups.length} group${duplicateGroups.length === 1 ? "" : "s"})`
+                        : `Jobs (${filteredJobs?.length || 0} of ${jobs?.length || 0})`}
+                    </CardTitle>
+                    <CardDescription>
+                      {duplicatesOnly
+                        ? "Listings sharing the same title & department. Keep one and delete the rest."
+                        : "Manage government job listings"}
+                    </CardDescription>
                   </div>
                   <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    {selectedJobIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="w-full sm:w-auto gap-2 animate-fade-in"
+                        onClick={() => setShowJobsBulkDeleteConfirm(true)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete Selected ({selectedJobIds.size})
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant={duplicatesOnly ? "default" : "outline"}
+                      className="w-full sm:w-auto"
+                      onClick={() => {
+                        setDuplicatesOnly((v) => !v);
+                        setSelectedJobIds(new Set());
+                      }}
+                      disabled={jobsLoading}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      {duplicatesOnly ? "Exit Duplicates" : "Find Duplicates"}
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
@@ -5338,6 +5464,31 @@ ${hashtagsStr}`;
                   </div>
                 </div>
 
+                {duplicatesOnly ? (
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={selectOlderDuplicates}
+                      disabled={duplicateGroups.length === 0}
+                      className="h-9 gap-1"
+                    >
+                      <Check className="h-4 w-4" />
+                      Select older (keep newest in each group)
+                    </Button>
+                    {selectedJobIds.size > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedJobIds(new Set())}
+                        className="text-muted-foreground"
+                      >
+                        Clear selection
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                <>
                 {/* Filters */}
                 <div className="flex flex-wrap gap-3 items-center">
                   <div className="flex items-center gap-2">
@@ -5403,12 +5554,79 @@ ${hashtagsStr}`;
                     </Button>
                   )}
                 </div>
+                </>
+                )}
               </CardHeader>
               <CardContent className="p-0">
                 {jobsLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
+                ) : duplicatesOnly ? (
+                  duplicateGroups.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+                      <Copy className="h-10 w-10 mb-3 opacity-40" />
+                      <p className="font-medium">No duplicate listings found</p>
+                      <p className="text-sm">Every job has a unique title &amp; department.</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[500px] w-full">
+                      <div className="min-w-[800px] divide-y divide-border">
+                        {duplicateGroups.map((group, groupIndex) => (
+                          <div key={`dupe-group-${groupIndex}`}>
+                            <div className="flex items-center justify-between gap-2 bg-muted/50 px-4 py-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold">{group[0].title}</p>
+                                <p className="truncate text-xs text-muted-foreground">{group[0].department}</p>
+                              </div>
+                              <Badge variant="outline" className="shrink-0">{group.length} duplicates</Badge>
+                            </div>
+                            <Table>
+                              <TableBody>
+                                {group.map((job, jobIndex) => (
+                                  <TableRow key={job.id} className={selectedJobIds.has(job.id) ? "bg-muted/40" : ""}>
+                                    <TableCell className="w-[50px] text-center">
+                                      <input
+                                        type="checkbox"
+                                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                                        checked={selectedJobIds.has(job.id)}
+                                        onChange={() => toggleSelectJob(job.id)}
+                                      />
+                                    </TableCell>
+                                    <TableCell className="font-medium max-w-[220px] truncate">
+                                      {job.title}
+                                      {jobIndex === 0 && (
+                                        <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">Newest</Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="max-w-[150px] truncate">{job.department}</TableCell>
+                                    <TableCell>
+                                      <span className={(() => { const d = getJobDeadlineDate(job); return d && d < new Date() ? "text-destructive" : ""; })()}>
+                                        {(() => { const d = getJobDeadlineDate(job); return d ? format(d, "dd MMM yyyy") : job.last_date_display || job.last_date; })()}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell>{job.vacancies || 1}</TableCell>
+                                    <TableCell>{format(new Date(job.created_at), "dd MMM yyyy")}</TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex justify-end gap-1">
+                                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(job)} title="Edit Job">
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" onClick={() => handleDeleteJob(job.id)} title="Delete Job">
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        ))}
+                      </div>
+                      <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
+                  )
                 ) : (
                   <ScrollArea className="h-[500px] w-full">
                     <div className="min-w-[800px]">
@@ -11366,6 +11584,29 @@ ${hashtagsStr}`;
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Duplicate Jobs Confirmation AlertDialog */}
+      <AlertDialog open={showJobsBulkDeleteConfirm} onOpenChange={(open) => !open && setShowJobsBulkDeleteConfirm(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Selected Jobs</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the {selectedJobIds.size} selected job{selectedJobIds.size === 1 ? "" : "s"}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeletingJobs}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDeleteSelectedJobs}
+              disabled={bulkDeletingJobs}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeletingJobs ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
