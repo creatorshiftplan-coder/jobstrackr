@@ -11,6 +11,7 @@ import {
   getEducationRank,
   inferQualificationStream,
   MatchPreferences,
+  canApply,
 } from "@/lib/jobMatcher";
 import { hybridRecommend, qualificationToTag, HybridMatchedJob } from "@/lib/hybridScorer";
 
@@ -168,8 +169,8 @@ export function useForYouJobs(
   const forYouJobs = useMemo((): Job[] => {
     if (!enabled || !hasWizardAnswers || matchedJobs.length === 0) return [];
 
-    // Filter to jobs where they pass all hard filters AND have no missing skills
-    const eligible = matchedJobs.filter((m) => m.eligibility.eligible && m.eligibility.skillsMissing.length === 0);
+    // Filter to jobs the user can definitively apply to (no skill gaps, no unverifiable blockers)
+    const eligible = matchedJobs.filter((m) => canApply(m.eligibility));
     const qualTag = qualificationToTag(preferences.qualificationType);
 
     const hybrid = hybridRecommend(

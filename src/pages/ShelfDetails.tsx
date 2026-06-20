@@ -7,10 +7,12 @@ import { GapChip } from "@/components/GapChip";
 import { BottomNav } from "@/components/BottomNav";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { Job } from "@/types/job";
+import { SkillGap } from "@/hooks/useAlmostEligible";
 
 interface CustomJob extends Job {
   matchScore?: number;
-  gapSkills?: string[];
+  gapSkills?: SkillGap[];
+  experienceNote?: string | null;
 }
 
 export default function ShelfDetails() {
@@ -86,6 +88,7 @@ export default function ShelfDetails() {
             <div key={job.id} className="w-full">
               <RecommendedJobCard
                 job={job}
+                experienceNote={customJob.experienceNote}
                 matchBadge={shelf.showMatchScore && typeof matchScore === "number" ? <MatchBadge score={matchScore} /> : undefined}
                 gapChips={shelf.showGapChips && gapSkills && gapSkills.length > 0 ? (
                   gapSkills.map((skill, idx) => (

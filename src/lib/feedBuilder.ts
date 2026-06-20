@@ -30,7 +30,8 @@ export function buildFeed(
   savedJobs: Job[],
   viewedJobIds: Set<string> = new Set(),
   jobSimilarity: Map<string, Job[]> = new Map(),
-  allJobs: Job[] = []
+  allJobs: Job[] = [],
+  reviewElig: MatchedJob[] = []
 ): FeedShelf[] {
   const seenIds = new Set<string>();
 
@@ -68,6 +69,18 @@ export function buildFeed(
       key: "almost_there",
       title: "Almost There - 1 Skill Away",
       jobs: almostThereJobs,
+      showGapChips: true,
+    });
+  }
+
+  // 2b. Worth Checking — Verify Eligibility (passes hard checks but has an
+  //     unverifiable gate: domicile, registration, manual-review, unknown age/qual…)
+  const reviewJobs = take(reviewElig.map((r) => r.job), 15);
+  if (reviewJobs.length > 0) {
+    shelves.push({
+      key: "review_eligibility",
+      title: "Worth Checking — Verify Eligibility",
+      jobs: reviewJobs,
       showGapChips: true,
     });
   }

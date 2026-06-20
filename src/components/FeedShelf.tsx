@@ -4,12 +4,14 @@ import { Job } from "@/types/job";
 import { RecommendedJobCard } from "./RecommendedJobCard";
 import { MatchBadge } from "./MatchBadge";
 import { GapChip } from "./GapChip";
+import { SkillGap } from "@/hooks/useAlmostEligible";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 
 interface CustomJob extends Job {
   matchScore?: number;
-  gapSkills?: string[];
+  gapSkills?: SkillGap[];
+  experienceNote?: string | null;
 }
 
 interface FeedShelfProps {
@@ -97,6 +99,7 @@ export function FeedShelf({ shelf }: FeedShelfProps) {
             <div key={job.id} className="flex-shrink-0 w-[290px] sm:w-[320px] snap-start">
               <RecommendedJobCard
                 job={job}
+                experienceNote={customJob.experienceNote}
                 matchBadge={shelf.showMatchScore && typeof matchScore === "number" ? <MatchBadge score={matchScore} /> : undefined}
                 gapChips={shelf.showGapChips && gapSkills && gapSkills.length > 0 ? (
                   gapSkills.map((gap, idx) => (

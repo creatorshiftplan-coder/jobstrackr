@@ -7,7 +7,7 @@ import { useForYouJobs } from "@/hooks/useForYouJobs";
 import { HybridMatchedJob, hybridRecommend, qualificationToTag } from "@/lib/hybridScorer";
 import { buildFeed, FeedShelf } from "@/lib/feedBuilder";
 import { isAlmostEligible, getJobGapSkills } from "@/hooks/useAlmostEligible";
-import { MatchedJob } from "@/lib/jobMatcher";
+import { MatchedJob, canApply, needsReview } from "@/lib/jobMatcher";
 import { Job } from "@/types/job";
 
 /**
@@ -132,9 +132,10 @@ export function useFeed(
       return { shelves: [] as FeedShelf[], totalEligible: 0 };
     }
 
-    // Step 1: Split into eligible vs almost-eligible
-    const eligible = matchedJobs.filter((m) => m.eligibility.eligible && m.eligibility.skillsMissing.length === 0);
+    // Step 1: Split into can-apply / almost-eligible / review-eligibility tiers
+    const eligible = matchedJobs.filter((m) => canApply(m.eligibility));
     const almostElig = matchedJobs.filter((m) => isAlmostEligible(m, userSkills));
+    const reviewElig = matchedJobs.filter((m) => needsReview(m.eligibility));
 
     // Step 2: Apply hybrid ranking (exam intent + tag overlap + recency)
     const preferredSectors = profile?.preferred_sectors || [];
@@ -150,7 +151,14 @@ export function useFeed(
 
     // Step 3: Vector re-rank using stored profile_embedding
     const userEmbeddingRaw = profile?.embedding || (profile as any)?.profile_embedding;
-    const vectorRanked = vectorRerank(hybridRanked, userEmbeddingRaw);
+    const vectorRankedBase = vectorRerank(hybridRanked, userEmbeddingRaw);
+
+    // Surface the (informational) experience requirement on eligible cards.
+    const vectorRanked = vectorRankedBase.map((m) =>
+      m.eligibility.experienceNote
+        ? ({ ...m, job: { ...m.job, experienceNote: m.eligibility.experienceNote } })
+        : m
+    );
 
     // Map gap skills to almost eligible jobs for rendering in job cards
     const almostEligWithGaps = almostElig.map((matched) => {
@@ -160,9 +168,20 @@ export function useFeed(
         job: {
           ...matched.job,
           gapSkills: gaps,
+          experienceNote: matched.eligibility.experienceNote,
         },
       } as MatchedJob;
     });
+
+    // Map blockers (unverifiable hard gates) onto review-eligibility jobs as chips.
+    const reviewEligWithGaps = reviewElig.map((matched) => ({
+      ...matched,
+      job: {
+        ...matched.job,
+        gapSkills: matched.eligibility.blockers.map((label) => ({ label, type: "blocker", required: true })),
+        experienceNote: matched.eligibility.experienceNote,
+      },
+    }) as MatchedJob);
 
     // Step 4: Build Netflix shelves
     // We mock top-10 similarity locally by grouping similar departments.
@@ -188,7 +207,8 @@ export function useFeed(
       savedJobs,
       new Set(), // viewed jobs placeholder
       jobSimilarityMap,
-      allJobs
+      allJobs,
+      reviewEligWithGaps
     );
 
     return {

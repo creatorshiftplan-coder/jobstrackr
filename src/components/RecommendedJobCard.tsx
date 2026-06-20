@@ -1,7 +1,7 @@
 import { memo, useMemo, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Job } from "@/types/job";
-import { Users, Calendar, GraduationCap, Tag } from "lucide-react";
+import { Users, Calendar, GraduationCap, Tag, Briefcase } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { SaveJobButton } from "@/components/SaveJobButton";
@@ -14,6 +14,8 @@ interface RecommendedJobCardProps {
   job: Job;
   matchBadge?: ReactNode;
   gapChips?: ReactNode;
+  /** Informational experience requirement (does not affect eligibility) */
+  experienceNote?: string | null;
 }
 
 const formatVacancy = (vacancies: number | null, vacanciesDisplay: string | null) => {
@@ -25,7 +27,8 @@ const formatVacancy = (vacancies: number | null, vacanciesDisplay: string | null
 export const RecommendedJobCard = memo(function RecommendedJobCard({
   job,
   matchBadge,
-  gapChips
+  gapChips,
+  experienceNote
 }: RecommendedJobCardProps) {
   const { getLogoByName } = useConductingBodyLogos();
   const logoUrl = getLogoByName(job.department);
@@ -99,6 +102,12 @@ export const RecommendedJobCard = memo(function RecommendedJobCard({
             {shortQualification}
           </Badge>
           {matchBadge}
+          {experienceNote && (
+            <Badge variant="secondary" className="bg-slate-500/10 text-slate-600 dark:text-slate-300 border-0 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1">
+              <Briefcase className="h-3 w-3" />
+              {experienceNote}
+            </Badge>
+          )}
         </div>
 
         {/* Gap Chips */}

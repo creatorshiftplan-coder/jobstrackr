@@ -1,4 +1,4 @@
-import { Job } from "@/types/job";
+import { Job, EligibilityAlternative } from "@/types/job";
 import { getEligibilityProfile } from "@/lib/eligibilityParser";
 import { matchesSectorPreference, parseJobDeadline, extractLocationFromText, cleanLocationString, resolveStateFromLocationText, isAllIndiaLocationText } from "@/lib/jobUtils";
 /**
@@ -391,11 +391,30 @@ export function inferGrade(title: string, department: string): string | null {
 // ═════════════════════════════════════════════════════════════════════════
 
 export interface EligibilityResult {
-  eligible: boolean;
+  eligible: boolean;          // No DEFINITE (verifiable) failure — age/qual confirmed-fail, gender, higher-qual
   ageOk: boolean | null;
   qualOk: boolean | null;
-  skillsMissing: string[];   // Skills the job requires but user lacks
-  reasons: string[];
+  skillsMissing: string[];    // Acquirable skills the user lacks → "Almost There"
+  blockers: string[];         // Unverifiable / non-acquirable hard gates → "Review eligibility"
+  experienceNote: string | null; // Informational experience requirement — never blocks
+  reasons: string[];          // Human-readable failure reasons (for "Not Eligible" display)
+}
+
+/**
+ * Single source of truth for the eligibility taxonomy. Keep all consumers
+ * routed through these helpers so the rule cannot drift across the codebase.
+ *
+ * - canApply:    every hard, verifiable dimension affirmatively passes →
+ *                show in "Eligible For You" / "Can Apply".
+ * - needsReview: passes hard checks but has an unverifiable gate we cannot
+ *                confirm → show in "Worth Checking — Verify Eligibility".
+ */
+export function canApply(e: EligibilityResult): boolean {
+  return e.eligible && e.skillsMissing.length === 0 && e.blockers.length === 0;
+}
+
+export function needsReview(e: EligibilityResult): boolean {
+  return e.eligible && e.blockers.length > 0;
 }
 
 export interface MatchPreferences {
@@ -462,67 +481,67 @@ function getAlternativeLevelLabel(levels: string[]): string {
   return getQualLabel(highestLevel);
 }
 
+/**
+ * Tri-state qualification evaluation.
+ *  - true  → user satisfies a concrete requirement path (CONFIRMED eligible)
+ *  - false → concrete requirement(s) existed but the user matches none (CONFIRMED fail)
+ *  - null  → the job states a qualification we could not resolve into anything
+ *            concrete (CANNOT confirm → caller treats as a blocker, not a pass)
+ * Returns the matched alternative so the caller can surface its path-specific
+ * hard gates (registrations, languages, experience).
+ */
 function evaluateStructuredQualification(
   userQual: QualProfile,
   userQualificationName: string | null,
   job: Job,
-): { qualOk: boolean; reason: string | null; requirementLabels: string[] } {
+): { qualOk: boolean | null; reason: string | null; matchedAlternative: EligibilityAlternative | null } {
   const profile = getEligibilityProfile(job);
-  const requirementLabels: string[] = [];
-
-  if (profile.quality_flags.includes("review_needed") || profile.quality_flags.includes("manual_review") || profile.quality_flags.includes("post_wise_eligibility")) {
-    addUniqueLabel(requirementLabels, "Eligibility needs manual review");
-  }
 
   const alternatives = profile.alternatives.filter((alternative) => alternative.qualification_levels.length > 0 || alternative.specializations.length > 0 || alternative.qualification_streams.length > 0);
   if (alternatives.length === 0) {
-    const jobQual = parseJobQualRequirement(job.qualification);
+    const hasQualText = (job.qualification || "").trim().length > 0;
+    const jobQual = parseJobQualRequirement(job.qualification || "");
+    // Couldn't read a concrete level/stream from the free-form text.
+    if (jobQual.level === 0 && jobQual.stream === "general") {
+      // Job states a requirement we can't parse → indeterminate (do NOT auto-pass).
+      // No qualification text at all → genuinely no requirement → satisfied.
+      return { qualOk: hasQualText ? null : true, reason: null, matchedAlternative: null };
+    }
     const qualOk = isQualificationEligible(userQual, jobQual);
     return {
       qualOk,
       reason: qualOk ? null : `Requires ${getJobQualLabel(job.qualification)}`,
-      requirementLabels,
+      matchedAlternative: null,
     };
   }
 
+  let sawConcreteRequirement = false;
   for (const alternative of alternatives) {
     const highestRequiredLevel = alternative.qualification_levels.reduce((current, level) =>
       Math.max(current, qualLevelToNumber(level)), 0);
-    if (highestRequiredLevel > 0 && userQual.level < highestRequiredLevel) {
-      continue;
-    }
+    const hasStream = hasSpecificQualificationStream(alternative.qualification_streams);
+    const hasSpec = alternative.specializations.length > 0;
+    const hasSubjects = !!(alternative.required_subjects && alternative.required_subjects.length > 0);
+    const isConcrete = highestRequiredLevel > 0 || hasStream || hasSpec || hasSubjects;
+    if (isConcrete) sawConcreteRequirement = true;
 
-    if (hasSpecificQualificationStream(alternative.qualification_streams) && !alternative.qualification_streams.includes(userQual.stream)) {
-      continue;
-    }
+    if (highestRequiredLevel > 0 && userQual.level < highestRequiredLevel) continue;
+    if (hasStream && !alternative.qualification_streams.includes(userQual.stream)) continue;
+    if (hasSpec && !userMatchesSpecialization(userQualificationName, alternative.specializations)) continue;
+    if (hasSubjects && !userMatchesSpecialization(userQualificationName, alternative.required_subjects)) continue;
 
-    if (alternative.specializations.length > 0 && !userMatchesSpecialization(userQualificationName, alternative.specializations)) {
-      continue;
-    }
+    // A purely-vacuous match (matched on nothing concrete) cannot confirm eligibility.
+    if (!isConcrete) continue;
 
-    if (alternative.required_subjects && alternative.required_subjects.length > 0 && !userMatchesSpecialization(userQualificationName, alternative.required_subjects)) {
-      continue;
-    }
-
-    for (const registration of [...profile.global_rules.required_registrations, ...alternative.required_registrations]) {
-      addUniqueLabel(requirementLabels, registration.label);
-    }
-    for (const language of [...profile.global_rules.required_languages, ...alternative.required_languages]) {
-      addUniqueLabel(requirementLabels, language.label);
-    }
-    for (const residency of profile.global_rules.residency_rules) {
-      addUniqueLabel(requirementLabels, residency.label);
-    }
-    for (const skill of [...profile.global_rules.required_skills, ...alternative.required_skills]) {
-      addUniqueLabel(requirementLabels, skill.label);
-    }
-    for (const physicalRule of profile.global_rules.physical_rules) {
-      addUniqueLabel(requirementLabels, physicalRule.label);
-    }
-
-    return { qualOk: true, reason: null, requirementLabels };
+    return { qualOk: true, reason: null, matchedAlternative: alternative };
   }
 
+  // No path satisfied. If none carried a concrete requirement, we cannot confirm.
+  if (!sawConcreteRequirement) {
+    return { qualOk: null, reason: null, matchedAlternative: null };
+  }
+
+  // Concrete requirements existed but the user satisfied none → CONFIRMED fail.
   const bestAlternative = alternatives.reduce((best, alternative) => {
     const bestLevel = best.qualification_levels.reduce((current, level) => Math.max(current, qualLevelToNumber(level)), 0);
     const nextLevel = alternative.qualification_levels.reduce((current, level) => Math.max(current, qualLevelToNumber(level)), 0);
@@ -530,28 +549,15 @@ function evaluateStructuredQualification(
   }, alternatives[0]);
 
   if (bestAlternative.specializations.length > 0) {
-    const specializationLabel = bestAlternative.specializations[0];
-    return {
-      qualOk: false,
-      reason: `Requires ${toTitleCase(specializationLabel)}`,
-      requirementLabels,
-    };
+    return { qualOk: false, reason: `Requires ${toTitleCase(bestAlternative.specializations[0])}`, matchedAlternative: null };
   }
 
   if (hasSpecificQualificationStream(bestAlternative.qualification_streams)) {
     const streamLabel = getQualStreamLabel(bestAlternative.qualification_streams[0] as QualStream);
-    return {
-      qualOk: false,
-      reason: `Requires ${streamLabel}`,
-      requirementLabels,
-    };
+    return { qualOk: false, reason: `Requires ${streamLabel}`, matchedAlternative: null };
   }
 
-  return {
-    qualOk: false,
-    reason: `Requires ${getAlternativeLevelLabel(bestAlternative.qualification_levels)}`,
-    requirementLabels,
-  };
+  return { qualOk: false, reason: `Requires ${getAlternativeLevelLabel(bestAlternative.qualification_levels)}`, matchedAlternative: null };
 }
 
 function evaluateStructuredConstraints(
@@ -738,6 +744,17 @@ function extractDomainRequirements(
   return missing;
 }
 
+// Regex skill keys that are NOT quick, acquirable skills — they are hard gates
+// the user either has or does not, so they route to `blockers` (Review) rather
+// than `skillsMissing` (Almost There).
+const BLOCKER_SKILL_KEYS = new Set([
+  "hindi_proficiency",  // language proficiency gate (strict regex, not a mere mention)
+  "local_language",
+  "sanskrit",
+  "physical_fitness",   // height/chest/running standards — cannot be "learned" quickly
+  "rci_registration",   // statutory registration
+]);
+
 export function checkEligibility(
   userAge: number | null,
   userQual: QualProfile | null,
@@ -748,17 +765,26 @@ export function checkEligibility(
   userQualificationName: string | null = null
 ): EligibilityResult {
   const reasons: string[] = [];
+  const blockers: string[] = [];
   let ageOk: boolean | null = null;
   let qualOk: boolean | null = null;
   const profile = getEligibilityProfile(job);
   const structuredQualification = userQual ? evaluateStructuredQualification(userQual, userQualificationName, job) : null;
+  const matchedAlt = structuredQualification?.matchedAlternative ?? null;
+  const reviewNeeded =
+    profile.quality_flags.includes("review_needed") ||
+    profile.quality_flags.includes("manual_review") ||
+    profile.quality_flags.includes("post_wise_eligibility");
 
   // ── STRICT Age Check (with category relaxation) ───────────────
-  if (userAge !== null) {
-    const profileAgeRule = profile.global_rules.age_rule;
-    const hasProfileAgeReq = (profileAgeRule?.min && profileAgeRule.min >= 10) || (profileAgeRule?.max && profileAgeRule.max >= 10);
-    const hasAgeReq = hasProfileAgeReq || (job.age_min && job.age_min >= 10) || (job.age_max && job.age_max >= 10);
-    if (hasAgeReq) {
+  const profileAgeRule = profile.global_rules.age_rule;
+  const hasProfileAgeReq = (profileAgeRule?.min && profileAgeRule.min >= 10) || (profileAgeRule?.max && profileAgeRule.max >= 10);
+  const hasAgeReq = hasProfileAgeReq || (job.age_min && job.age_min >= 10) || (job.age_max && job.age_max >= 10);
+  if (hasAgeReq) {
+    if (userAge === null) {
+      // Job has an age bar but we don't know the user's age → cannot confirm.
+      addUniqueLabel(blockers, "Age limit applies — add your date of birth to confirm");
+    } else {
       let relaxation = 0;
       if (category) {
         const userCatLower = category.toLowerCase();
@@ -790,12 +816,18 @@ export function checkEligibility(
     }
   }
 
-  // ── STRICT Qualification Check ────────────────────────────────
+  // ── STRICT Qualification Check (tri-state) ────────────────────
   if (userQual !== null && job.qualification) {
     qualOk = structuredQualification?.qualOk ?? null;
-    if (!qualOk) {
-      if (structuredQualification?.reason) reasons.push(structuredQualification.reason);
+    if (qualOk === false && structuredQualification?.reason) {
+      reasons.push(structuredQualification.reason);
+    } else if (qualOk === null) {
+      // Job states a qualification we couldn't resolve → cannot confirm.
+      addUniqueLabel(blockers, "Qualification criteria need manual review");
     }
+  } else if (userQual === null && (job.qualification || "").trim()) {
+    // We don't know the user's qualification but the job requires one.
+    addUniqueLabel(blockers, "Add your qualification to confirm eligibility");
   }
 
   // ── Gender Check ──────────────────────────────────────────────
@@ -818,47 +850,64 @@ export function checkEligibility(
     addUniqueLabel(reasons, constraintReason);
   }
 
-  // ── STRICT Skill Requirement Check ────────────────────────────
+  // ── Unverifiable hard gates → BLOCKERS (Review eligibility) ────
+  if (reviewNeeded) {
+    addUniqueLabel(blockers, "Eligibility varies by post — verify manually");
+  }
+  for (const residency of profile.global_rules.residency_rules) {
+    addUniqueLabel(blockers, residency.label);
+  }
+  for (const registration of [...profile.global_rules.required_registrations, ...(matchedAlt?.required_registrations ?? [])]) {
+    if (registration.key !== "rci") addUniqueLabel(blockers, registration.label); // rci handled by regex below
+  }
+  for (const language of [...profile.global_rules.required_languages, ...(matchedAlt?.required_languages ?? [])]) {
+    // Generic English/Hindi mentions are too noisy to gate on; regional-language and
+    // strict Hindi-proficiency gates are handled via regional rules + the regex loop.
+    if (!["english", "hindi", "local_language"].includes(language.key)) addUniqueLabel(blockers, language.label);
+  }
+  for (const physicalRule of profile.global_rules.physical_rules) {
+    if (physicalRule.type === "medical_fitness") addUniqueLabel(blockers, physicalRule.label); // height/chest covered by regex
+  }
+
+  // ── Skill Requirement Check (acquirable → skillsMissing; gates → blockers) ──
   const jobText = `${job.qualification || ""} ${job.eligibility || ""} ${job.title || ""}`.toLowerCase();
   const skillsMissing: string[] = [];
   const normalizedUserSkills = userSkills.map((skill) => skill.trim().toLowerCase()).filter(Boolean);
 
-  if (structuredQualification) {
-    for (const label of structuredQualification.requirementLabels) {
-      if (
-        !/requires /i.test(label) &&
-        !/qualification/i.test(label)
-      ) {
-        addUniqueLabel(skillsMissing, label);
-      }
-    }
-  }
-
   for (const [skillKey, pattern] of Object.entries(SKILL_KEYWORDS)) {
     if (pattern.test(jobText) && !normalizedUserSkills.includes(skillKey)) {
-      skillsMissing.push(getSkillLabel(skillKey));
-    }
-  }
-
-  if (!profile.quality_flags.includes("review_needed") && !profile.quality_flags.includes("manual_review")) {
-    // Only check specialized requirements as missing skills if the user has NOT successfully matched the hard qualifications check.
-    // If qualOk is true, they matched at least one path, so they don't have qualification-level skills missing.
-    if (qualOk !== true) {
-      const specializedMissing = detectSpecializedRequirements(jobText, userQualificationName);
-      for (const label of specializedMissing) {
-        if (!skillsMissing.includes(label)) {
-          skillsMissing.push(label);
-        }
+      if (BLOCKER_SKILL_KEYS.has(skillKey)) {
+        addUniqueLabel(blockers, getSkillLabel(skillKey));
+      } else {
+        addUniqueLabel(skillsMissing, getSkillLabel(skillKey));
       }
     }
-  } else {
-    addUniqueLabel(skillsMissing, "Eligibility needs manual review");
   }
 
-  // All hard checks must pass. Skills missing is a separate tier.
+  // Specialized-subject requirements (e.g. "Diploma in Surveyorship") are qualification
+  // gates the user does not visibly hold — route to Review, not Almost There.
+  if (!reviewNeeded && qualOk !== true) {
+    const specializedMissing = detectSpecializedRequirements(jobText, userQualificationName);
+    for (const label of specializedMissing) {
+      addUniqueLabel(blockers, label);
+    }
+  }
+
+  // ── Experience requirement → informational only (never blocks) ──
+  let experienceNote: string | null = null;
+  const expRule = matchedAlt?.experience_rule || profile.global_rules.experience_rule;
+  if (expRule && expRule.minimum_years && expRule.minimum_years > 0) {
+    experienceNote = `${expRule.minimum_years}+ yr${expRule.minimum_years > 1 ? "s" : ""} experience`;
+    if (expRule.domains && expRule.domains.length > 0) {
+      experienceNote += ` (${expRule.domains.slice(0, 2).join(", ")})`;
+    }
+  }
+
+  // `eligible` = no DEFINITE verifiable failure. The "can apply" list is gated by
+  // canApply() which additionally requires blockers + skills to be empty.
   const eligible = (ageOk === null || ageOk) && (qualOk === null || qualOk) && (genderOk === null || genderOk);
 
-  return { eligible, ageOk, qualOk, skillsMissing, reasons };
+  return { eligible, ageOk, qualOk, skillsMissing, blockers, experienceNote, reasons };
 }
 
 // ═════════════════════════════════════════════════════════════════════════

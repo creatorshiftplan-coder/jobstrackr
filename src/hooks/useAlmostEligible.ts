@@ -6,12 +6,15 @@ import { checkAllSkills } from "../lib/skillMatcher";
  * Almost eligible = passes age, qualification, and gender, but missing 1-2 required skills.
  */
 export function isAlmostEligible(matchedJob: MatchedJob, userSkills: string[] = []): boolean {
-  const { eligible, ageOk, qualOk, skillsMissing } = matchedJob.eligibility;
+  const { eligible, ageOk, qualOk, skillsMissing, blockers } = matchedJob.eligibility;
 
   // Must pass hard checks (age, qualification, gender)
   if (!eligible) return false;
   if (ageOk === false) return false;
   if (qualOk === false) return false;
+  // Unverifiable hard gates (domicile, registration, manual review…) belong in
+  // "Review eligibility", not "Almost There".
+  if (blockers.length > 0) return false;
 
   // Run JSONB required skills matcher
   const jsonbResult = checkAllSkills(matchedJob.job.required_skills, userSkills);

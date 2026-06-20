@@ -18,7 +18,9 @@ import {
   Job,
 } from "@/types/job";
 
-const PROFILE_VERSION = 4;
+// v5: alternatives are built only from qualification-bearing segments so that
+// registration/physical/language prose no longer leaks in as fake specializations.
+const PROFILE_VERSION = 5;
 
 const qualificationLevelPatterns: Array<{ level: EligibilityQualificationLevel; pattern: RegExp }> = [
   { level: "phd", pattern: /\b(ph\.?\s*d\.?|doctorate)\b/i },
@@ -692,9 +694,14 @@ export function parseEligibilityProfileFromText(
     }
   }
 
+  // Build qualification alternatives ONLY from qualification-bearing text. Pulling
+  // registration / physical / language / experience prose in here caused their
+  // words (e.g. "medically fit", "enrolled as an advocate") to be mis-extracted as
+  // qualification "specializations", wrongly failing otherwise-qualified users.
+  // Those hard gates are already captured in global_rules and surfaced as blockers.
   const alternativeSource = normalizeWhitespace(
     sourceSegments
-      .filter((segment) => segment.type !== "noise" && segment.type !== "age" && segment.type !== "nationality" && segment.type !== "residency")
+      .filter((segment) => segment.type === "qualification" || segment.type === "other")
       .map((segment) => segment.text)
       .join(" | "),
   ) || rawText;

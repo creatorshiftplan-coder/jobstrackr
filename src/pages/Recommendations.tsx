@@ -17,7 +17,7 @@ import { useJobs } from "@/hooks/useJobs";
 import { useExams } from "@/hooks/useExams";
 import { Job } from "@/types/job";
 import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
-import { QualStream, matchAndSort, getEducationRank, getQualLabel, getQualStreamLabel, getSkillLabel, inferQualificationStream, MatchPreferences, MatchedJob, getBestJobLocation } from "@/lib/jobMatcher";
+import { QualStream, matchAndSort, getEducationRank, getQualLabel, getQualStreamLabel, getSkillLabel, inferQualificationStream, MatchPreferences, MatchedJob, getBestJobLocation, canApply, needsReview } from "@/lib/jobMatcher";
 import { isAllIndiaLocationText, resolveStateFromLocationText } from "@/lib/jobUtils";
 import { hybridRecommend, qualificationToTag, HybridMatchedJob } from "@/lib/hybridScorer";
 import { cn } from "@/lib/utils";
@@ -658,7 +658,8 @@ export default function Recommendations() {
   }, [hybridMatchedJobs]);
 
   // Four-tier classification (use hybrid-ranked order for eligible jobs)
-  const canApplyJobs = useMemo(() => hybridMatchedJobs.filter((m) => m.eligibility.skillsMissing.length === 0), [hybridMatchedJobs]);
+  const canApplyJobs = useMemo(() => hybridMatchedJobs.filter((m) => canApply(m.eligibility)), [hybridMatchedJobs]);
+  const reviewEligibilityJobs = useMemo(() => hybridMatchedJobs.filter((m) => needsReview(m.eligibility)), [hybridMatchedJobs]);
 
   // Split canApply into preferred location -> all India -> other state buckets
   const selectedLocations = useMemo(() => {
@@ -705,7 +706,7 @@ export default function Recommendations() {
     );
   }, [canApplyJobs, hasPreferredLocations, isAllIndiaJob, matchesSelectedLocation]);
 
-  const skillsNeededJobs = useMemo(() => hybridMatchedJobs.filter((m) => m.eligibility.skillsMissing.length > 0), [hybridMatchedJobs]);
+  const skillsNeededJobs = useMemo(() => hybridMatchedJobs.filter((m) => m.eligibility.blockers.length === 0 && m.eligibility.skillsMissing.length > 0), [hybridMatchedJobs]);
   const preferredLocationSkillsNeededJobs = useMemo(() => {
     if (!hasPreferredLocations) return [];
     return skillsNeededJobs.filter(({ job }) => matchesSelectedLocation(job));
@@ -1225,7 +1226,7 @@ export default function Recommendations() {
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </Button>
-              <div className="grid min-w-[340px] grid-cols-3 gap-4">
+              <div className="grid min-w-[440px] grid-cols-4 gap-4">
               <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 shadow-sm">
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Can Apply</p>
                 <p className="mt-2 text-3xl font-bold text-emerald-700 dark:text-emerald-300">{canApplyJobs.length}</p>
@@ -1233,6 +1234,10 @@ export default function Recommendations() {
               <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 shadow-sm">
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">Skills Gap</p>
                 <p className="mt-2 text-3xl font-bold text-amber-700 dark:text-amber-300">{skillsNeededJobs.length}</p>
+              </div>
+              <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">Review</p>
+                <p className="mt-2 text-3xl font-bold text-sky-700 dark:text-sky-300">{reviewEligibilityJobs.length}</p>
               </div>
               <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 shadow-sm">
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-red-700 dark:text-red-300">Not Eligible</p>
@@ -1281,7 +1286,7 @@ export default function Recommendations() {
 
         {/* ── Stat cards ── */}
         {!jobsLoading && (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3 text-center">
               <div className="text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400">{canApplyJobs.length}</div>
               <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium mt-0.5 leading-tight">Can Apply</div>
@@ -1289,6 +1294,10 @@ export default function Recommendations() {
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 text-center">
               <div className="text-2xl font-display font-bold text-amber-600 dark:text-amber-400">{skillsNeededJobs.length}</div>
               <div className="text-[10px] text-amber-700 dark:text-amber-300 font-medium mt-0.5 leading-tight">Skills Gap</div>
+            </div>
+            <div className="bg-sky-500/10 border border-sky-500/20 rounded-2xl p-3 text-center">
+              <div className="text-2xl font-display font-bold text-sky-600 dark:text-sky-400">{reviewEligibilityJobs.length}</div>
+              <div className="text-[10px] text-sky-700 dark:text-sky-300 font-medium mt-0.5 leading-tight">Review</div>
             </div>
             <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 text-center">
               <div className="text-2xl font-display font-bold text-red-600 dark:text-red-400">{notEligibleJobs.length}</div>

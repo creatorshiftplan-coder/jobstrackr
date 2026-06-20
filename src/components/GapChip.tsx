@@ -13,9 +13,11 @@ import {
   Briefcase,
   Activity,
   HelpCircle,
-  ExternalLink
+  ExternalLink,
+  ShieldAlert
 } from "lucide-react";
 import { SkillGap } from "@/hooks/useAlmostEligible";
+import { cn } from "@/lib/utils";
 
 const iconMap: Record<string, any> = {
   typing: Keyboard,
@@ -28,6 +30,7 @@ const iconMap: Record<string, any> = {
   experience: Briefcase,
   physical: Activity,
   custom: HelpCircle,
+  blocker: ShieldAlert,
 };
 
 const guideMap: Record<string, string> = {
@@ -41,6 +44,7 @@ const guideMap: Record<string, string> = {
   experience: "Gain relevant domain experience in junior posts or contractual employment. Keep all official experience certificates, relieving letters, and salary statements signed by registered authorities.",
   physical: "Standard physical standards (height, chest, running/long jump) are essential for police, forestry, and defense jobs. Follow a structured running program (Couch to 5k) and check specific eligibility heights.",
   custom: "This specialized skill is required by the recruiting body. Check their official recruitment brochure or local training institutes to fulfill this specific criteria.",
+  blocker: "This is an eligibility condition set by the recruiter (e.g. domicile/residency, statutory registration, an age limit, a language requirement, or post-specific criteria). We could not automatically confirm it from your profile — read the official notification and verify you meet it before applying.",
 };
 
 interface GapChipProps {
@@ -49,6 +53,7 @@ interface GapChipProps {
 
 export function GapChip({ skill }: GapChipProps) {
   const [open, setOpen] = useState(false);
+  const isBlocker = skill.type === "blocker";
   const IconComponent = iconMap[skill.type] || iconMap.custom;
   const guideText = guideMap[skill.type] || guideMap.custom;
 
@@ -61,7 +66,12 @@ export function GapChip({ skill }: GapChipProps) {
           setOpen(true);
         }}
         variant="outline"
-        className="cursor-pointer bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30 dark:border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 text-[10px] sm:text-xs transition-all duration-200 active:scale-95 shadow-sm"
+        className={cn(
+          "cursor-pointer px-2 py-0.5 rounded-full flex items-center gap-1 text-[10px] sm:text-xs transition-all duration-200 active:scale-95 shadow-sm",
+          isBlocker
+            ? "bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-400 border-sky-500/30 dark:border-sky-500/20"
+            : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30 dark:border-amber-500/20"
+        )}
       >
         <IconComponent className="h-3 w-3 shrink-0" />
         <span>{skill.label}</span>
@@ -70,14 +80,22 @@ export function GapChip({ skill }: GapChipProps) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
           <DialogHeader className="flex flex-col items-center text-center space-y-3">
-            <div className="h-14 w-14 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
-              <IconComponent className="h-7 w-7 text-amber-600 dark:text-amber-400" />
+            <div className={cn(
+              "h-14 w-14 rounded-2xl flex items-center justify-center border",
+              isBlocker ? "bg-sky-500/10 border-sky-500/20" : "bg-amber-500/10 border-amber-500/20"
+            )}>
+              <IconComponent className={cn("h-7 w-7", isBlocker ? "text-sky-600 dark:text-sky-400" : "text-amber-600 dark:text-amber-400")} />
             </div>
             <DialogTitle className="font-display font-bold text-lg text-foreground">
               {skill.label}
             </DialogTitle>
-            <DialogDescription className="text-xs text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/5 px-2.5 py-1 rounded-full border border-amber-500/15">
-              Achievable skill gap
+            <DialogDescription className={cn(
+              "text-xs font-semibold px-2.5 py-1 rounded-full border",
+              isBlocker
+                ? "text-sky-600 dark:text-sky-400 bg-sky-500/5 border-sky-500/15"
+                : "text-amber-600 dark:text-amber-400 bg-amber-500/5 border-amber-500/15"
+            )}>
+              {isBlocker ? "Verify eligibility yourself" : "Achievable skill gap"}
             </DialogDescription>
           </DialogHeader>
 
@@ -87,9 +105,14 @@ export function GapChip({ skill }: GapChipProps) {
             </div>
 
             <div className="p-3 bg-secondary/20 rounded-xl border border-border/50 flex items-start gap-2 text-xs">
-              <div className="mt-0.5 rounded bg-amber-500/10 p-0.5 text-amber-600 dark:text-amber-400 font-bold">Tip</div>
+              <div className={cn(
+                "mt-0.5 rounded p-0.5 font-bold",
+                isBlocker ? "bg-sky-500/10 text-sky-600 dark:text-sky-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              )}>Tip</div>
               <p className="text-muted-foreground leading-normal">
-                Earning this skill makes you eligible for this post. Add it to your wizard profile once completed!
+                {isBlocker
+                  ? "We list this job under “Worth Checking” because we couldn’t auto-confirm this condition. Open the official notification and make sure you qualify before applying."
+                  : "Earning this skill makes you eligible for this post. Add it to your wizard profile once completed!"}
               </p>
             </div>
           </div>
@@ -109,7 +132,10 @@ export function GapChip({ skill }: GapChipProps) {
                 setOpen(false);
                 window.open("https://www.google.com/search?q=how+to+get+" + encodeURIComponent(skill.label), "_blank");
               }}
-              className="flex-1 rounded-xl bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5"
+              className={cn(
+                "flex-1 rounded-xl text-white flex items-center gap-1.5",
+                isBlocker ? "bg-sky-600 hover:bg-sky-700" : "bg-amber-600 hover:bg-amber-700"
+              )}
             >
               Learn More
               <ExternalLink className="h-3.5 w-3.5" />
