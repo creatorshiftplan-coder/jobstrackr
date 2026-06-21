@@ -83,12 +83,14 @@ export function useJobBySlug(slugOrId: string) {
   return useQuery({
     queryKey: ["job", "slug", slugOrId],
     queryFn: async (): Promise<Job | null> => {
-      // First try finding by slug
+      // First try finding by slug. maybeSingle() returns null for a missing slug
+      // (HTTP 200) instead of single()'s 406, so a not-found job doesn't spam the
+      // console with errors — the UUID fallback / null return handles it.
       const { data: bySlug } = await supabase
         .from("jobs")
         .select("*")
         .eq("slug", slugOrId)
-        .single();
+        .maybeSingle();
 
       if (bySlug) return bySlug as any;
 
