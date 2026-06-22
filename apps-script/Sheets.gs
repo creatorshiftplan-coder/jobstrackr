@@ -61,6 +61,30 @@ function existingValues_(tabName, columns, colName) {
   return set;
 }
 
+/**
+ * Serialize a cell value to a plain string.
+ * Google Sheets auto-coerces ISO date strings (e.g. "2026-03-15") stored in cells
+ * to Date objects when read back via getValues(). Using toISOString() on those
+ * produces full UTC timestamps ("2026-03-15T00:00:00.000Z") which corrupt
+ * date-only fields like `last_date` and `last_date_display`.
+ *
+ * Date-only fields get formatted as "yyyy-MM-dd" via Utilities.formatDate (UTC).
+ * Full-timestamp fields (scraped_at — a time string set via new Date().toISOString())
+ * are stored as plain strings by GAS's appendRow and do not become Date objects,
+ * so they pass through the `instanceof Date` branch only when they legitimately
+ * carry a time component; those still use formatDate to preserve the date.
+ */
+function serializeCell_(c, v) {
+  if (!(v instanceof Date)) return v;
+  // Date-only columns: format without time component.
+  const DATE_ONLY_COLS = ['last_date', 'last_date_display', 'application_start_date', 'published_date', 'exam_date'];
+  if (DATE_ONLY_COLS.indexOf(c) !== -1) {
+    return Utilities.formatDate(v, 'UTC', 'yyyy-MM-dd');
+  }
+  // All other Date objects (edge case): full ISO-like string without the "Z" time confusion.
+  return Utilities.formatDate(v, 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'");
+}
+
 /** Read a whole data tab as objects, each tagged with its 1-based sheet row in `_row`. */
 function readObjects_(tabName, columns) {
   const sh = getTab_(tabName, columns);
@@ -70,8 +94,7 @@ function readObjects_(tabName, columns) {
   return data.map(function (rowVals, i) {
     const obj = { _row: i + 2 };
     columns.forEach(function (c, ci) {
-      const v = rowVals[ci];
-      obj[c] = v instanceof Date ? v.toISOString() : v;
+      obj[c] = serializeCell_(c, rowVals[ci]);
     });
     return obj;
   });
@@ -192,8 +215,7 @@ function readSince(tabName, columns, sinceIso, limit) {
     if (sinceMs != null && scrapedMs != null && scrapedMs <= sinceMs) continue;
     const obj = {};
     columns.forEach(function (c, ci) {
-      const v = data[i][ci];
-      obj[c] = v instanceof Date ? v.toISOString() : v;
+      obj[c] = serializeCell_(c, data[i][ci]);
     });
     obj.scraped_at = scrapedAt;
     obj._ms = scrapedMs; // sort/tie key; stripped before returning

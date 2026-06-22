@@ -25,6 +25,37 @@ function toJson(v: unknown, fallback: unknown): unknown {
   try { return JSON.parse(String(v)); } catch { return fallback; }
 }
 
+const DATE_SENTINELS = new Set(["tbd", "not available", "not applicable", "na", "n/a", "-", "–", "nil", ""]);
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * Normalise a raw date value arriving from Google Sheets.
+ *
+ * GAS auto-coerces stored "YYYY-MM-DD" strings back to Date objects; calling
+ * toISOString() on them produces full UTC timestamps ("…T00:00:00.000Z").
+ * This function strips the time component and returns null for TBD sentinels.
+ * Returns null if the value cannot be resolved to a YYYY-MM-DD date.
+ */
+function parseDateOnly(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (DATE_SENTINELS.has(s.toLowerCase())) return null;
+  // Full ISO timestamp — take the date part only ("2026-03-15T00:00:00.000Z" → "2026-03-15")
+  if (s.includes("T")) {
+    const datePart = s.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+  }
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return null;
+}
+
+/** Format a YYYY-MM-DD string as "DD Mon YYYY" for last_date_display. */
+function isoToDisplay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+}
+
 // Deterministic title → slug. Mirrors the `generate_job_slug` Postgres trigger
 // (supabase/migrations/20260218_add_slug_column.sql) byte-for-byte so the sync can
 // compute a job's slug — and therefore its deep-link — before inserting, and the
@@ -57,9 +88,17 @@ function dedupeKey(r: any): string {
 }
 
 function mapJobRow(r: any, slug: string) {
+  const lastDate = parseDateOnly(r.last_date);
+  // last_date_display: prefer the sheet's own display field if it contains a date,
+  // else fall back to formatting the parsed last_date. Raw text sentinels become null.
+  const displayIso = parseDateOnly(r.last_date_display) ?? lastDate;
+  const lastDateDisplay = displayIso ? isoToDisplay(displayIso) : null;
+
   const rec: Record<string, unknown> = {
     title: r.title, department: r.department, location: r.location, qualification: r.qualification,
-    vacancies_display: r.vacancies_display, last_date: r.last_date, last_date_display: r.last_date_display,
+    vacancies_display: r.vacancies_display,
+    last_date: lastDate,
+    last_date_display: lastDateDisplay,
     is_featured: false, auto_discovered: true, slug,
     job_metadata: toJson(r.job_metadata, null),
   };
