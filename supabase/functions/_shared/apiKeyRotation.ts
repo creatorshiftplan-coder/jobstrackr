@@ -229,11 +229,19 @@ export async function callWithRotation(
 
     try {
       const { url, headers, body } = buildProviderRequest(key, req);
-      const response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20_000);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (response.ok) {
         const data = await response.json();
@@ -317,9 +325,10 @@ export async function callWithRotation(
         continue;
       }
 
-      // Client error (4xx except handled cases) — stop trying
-      console.error(`Key ${i + 1} client error (${statusCode}):`, errorText.slice(0, 200));
-      lastError = `API error ${statusCode}: ${errorText.slice(0, 100)}`;
+      // Other client error (4xx) — log and keep rotating; the error may be key-specific
+      // (wrong model tier, feature not enabled, quota exhausted by a different dimension)
+      console.warn(`Key ${i + 1} client error (${statusCode}), rotating:`, errorText.slice(0, 300));
+      lastError = `API error ${statusCode}: ${errorText.slice(0, 200)}`;
 
       if (!key.id.startsWith("env-")) {
         (async () => {
@@ -336,11 +345,17 @@ export async function callWithRotation(
           }
         })();
       }
-      break;
+      continue;
 
     } catch (fetchErr) {
-      console.error(`Key ${i + 1} network error:`, fetchErr);
-      lastError = `Network error: ${(fetchErr as Error).message}`;
+      const isTimeout = (fetchErr as Error).name === "AbortError";
+      if (isTimeout) {
+        console.warn(`Key ${i + 1} timed out after 20s, rotating...`);
+        lastError = `Key ${key.label || key.provider} timed out`;
+      } else {
+        console.error(`Key ${i + 1} network error:`, fetchErr);
+        lastError = `Network error: ${(fetchErr as Error).message}`;
+      }
       continue;
     }
   }

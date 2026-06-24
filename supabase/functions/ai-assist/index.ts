@@ -301,11 +301,33 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
       });
       aiContent = rotationResult.content;
     } catch (rotationError) {
-      console.error("All keys failed:", rotationError);
-      return new Response(
-        JSON.stringify({ data: null, error: "AI service temporarily unavailable. Please try again later.", success: false }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
-      );
+      // If Google Search was requested and all keys failed, retry once without it.
+      // Some key tiers don't support grounding; this surfaces results rather than failing entirely.
+      if (useGoogleSearch) {
+        console.warn("All keys failed with Google Search enabled, retrying without grounding:", (rotationError as Error).message);
+        try {
+          const fallbackResult = await callWithRotation(supabase, apiKeys, {
+            systemPrompt,
+            userPrompt: dateAwarePrompt,
+            temperature: 0.3,
+            maxTokens: 4096,
+            useGoogleSearch: false,
+          });
+          aiContent = fallbackResult.content;
+        } catch (fallbackError) {
+          console.error("All keys failed (with and without Google Search):", fallbackError);
+          return new Response(
+            JSON.stringify({ data: null, error: "AI service temporarily unavailable. Please try again later.", success: false }),
+            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+          );
+        }
+      } else {
+        console.error("All keys failed:", rotationError);
+        return new Response(
+          JSON.stringify({ data: null, error: "AI service temporarily unavailable. Please try again later.", success: false }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+        );
+      }
     }
 
     console.log("AI raw response:", aiContent);
