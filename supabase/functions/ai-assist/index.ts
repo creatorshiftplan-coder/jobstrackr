@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DAILY_LIMIT = 7;
+const DAILY_LIMIT = parseInt(Deno.env.get("AI_ASSIST_DAILY_LIMIT") || "10", 10);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -71,6 +71,7 @@ Deno.serve(async (req) => {
     }
 
     // Check rate limit only for non-admin users
+    let rateLimitInfo: Record<string, unknown> | null = null;
     if (!isAdmin) {
       try {
         const { data: rateLimitData, error: rateLimitError } = await supabase.rpc("check_user_rate_limit", {
@@ -82,20 +83,39 @@ Deno.serve(async (req) => {
         if (rateLimitError) {
           console.error("Error checking rate limit:", rateLimitError);
           // Continue without rate limiting if check fails
-        } else if (rateLimitData && !rateLimitData.allowed) {
-          const errorMessage = rateLimitData.rate_limited
-            ? "Please wait a minute before making another AI request."
-            : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at 11:59 PM IST.`;
+        } else if (rateLimitData) {
+          rateLimitInfo = rateLimitData;
 
-          return new Response(
-            JSON.stringify({
-              data: null,
-              error: errorMessage,
-              rate_limit: rateLimitData,
-              success: false,
-            }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          if (!rateLimitData.allowed) {
+            const isMinuteLimited = rateLimitData.rate_limited === true;
+            const errorMessage = isMinuteLimited
+              ? "Please wait a minute before making another AI request."
+              : `Daily limit of ${DAILY_LIMIT} AI requests reached. Resets at midnight IST.`;
+
+            const retryAfterSeconds = isMinuteLimited ? 60 : Math.ceil(
+              (new Date(rateLimitData.resets_at as string).getTime() - Date.now()) / 1000
+            );
+
+            return new Response(
+              JSON.stringify({
+                data: null,
+                error: errorMessage,
+                rate_limit: rateLimitData,
+                success: false,
+              }),
+              {
+                status: 429,
+                headers: {
+                  ...corsHeaders,
+                  "Content-Type": "application/json",
+                  "Retry-After": String(Math.max(retryAfterSeconds, 1)),
+                  "X-RateLimit-Limit": String(DAILY_LIMIT),
+                  "X-RateLimit-Remaining": String(Math.max(0, DAILY_LIMIT - (rateLimitData.used as number))),
+                  "X-RateLimit-Reset": String(Math.floor(new Date(rateLimitData.resets_at as string).getTime() / 1000)),
+                },
+              }
+            );
+          }
         }
       } catch (rateLimitCheckError) {
         console.error("Exception checking rate limit:", rateLimitCheckError);
@@ -281,11 +301,33 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
       });
       aiContent = rotationResult.content;
     } catch (rotationError) {
-      console.error("All keys failed:", rotationError);
-      return new Response(
-        JSON.stringify({ data: null, error: (rotationError as Error).message || "AI service temporarily unavailable", success: false }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // If Google Search was requested and all keys failed, retry once without it.
+      // Some key tiers don't support grounding; this surfaces results rather than failing entirely.
+      if (useGoogleSearch) {
+        console.warn("All keys failed with Google Search enabled, retrying without grounding:", (rotationError as Error).message);
+        try {
+          const fallbackResult = await callWithRotation(supabase, apiKeys, {
+            systemPrompt,
+            userPrompt: dateAwarePrompt,
+            temperature: 0.3,
+            maxTokens: 4096,
+            useGoogleSearch: false,
+          });
+          aiContent = fallbackResult.content;
+        } catch (fallbackError) {
+          console.error("All keys failed (with and without Google Search):", fallbackError);
+          return new Response(
+            JSON.stringify({ data: null, error: "AI service temporarily unavailable. Please try again later.", success: false }),
+            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+          );
+        }
+      } else {
+        console.error("All keys failed:", rotationError);
+        return new Response(
+          JSON.stringify({ data: null, error: "AI service temporarily unavailable. Please try again later.", success: false }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+        );
+      }
     }
 
     console.log("AI raw response:", aiContent);
@@ -420,9 +462,19 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
       // Continue without crashing - logging is non-critical
     }
 
+    const rateLimitHeaders: Record<string, string> = {};
+    if (!isAdmin && rateLimitInfo) {
+      const used = (rateLimitInfo.used as number) + 1; // +1 for the current request
+      rateLimitHeaders["X-RateLimit-Limit"] = String(DAILY_LIMIT);
+      rateLimitHeaders["X-RateLimit-Remaining"] = String(Math.max(0, DAILY_LIMIT - used));
+      rateLimitHeaders["X-RateLimit-Reset"] = String(
+        Math.floor(new Date(rateLimitInfo.resets_at as string).getTime() / 1000)
+      );
+    }
+
     return new Response(
       JSON.stringify({ data: result, error: null, success: true }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json", ...rateLimitHeaders } }
     );
   } catch (error) {
     console.error("Error in ai-assist function:", error);

@@ -25,6 +25,25 @@ function toJson(v: unknown, fallback: unknown): unknown {
   try { return JSON.parse(String(v)); } catch { return fallback; }
 }
 
+// A date cell in the Google Sheet (Asia/Kolkata) that Apps Script serialized as a
+// UTC ISO timestamp arrives here as e.g. "2026-06-29T18:30:00.000Z" — midnight IST
+// of 2026-06-30 expressed in UTC. Collapse any such full datetime back to the plain
+// calendar date *in IST* so last_date stays a clean "YYYY-MM-DD". This is a backstop:
+// the Apps Script feed now sends "yyyy-MM-dd" directly (apps-script/Sheets.gs
+// serializeCell_), but an un-redeployed feed — or any stray ISO value — is repaired
+// here too. Non-datetime strings ("2026-06-30", "TBD", "30 Jun 2026", "") pass
+// through untouched so we never mangle a human-typed value.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+function toDateText(v: unknown): string | null {
+  if (v === "" || v === null || v === undefined) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return s; // only rewrite full ISO datetimes
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return new Date(d.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+}
+
 // Deterministic title → slug. Mirrors the `generate_job_slug` Postgres trigger
 // (supabase/migrations/20260218_add_slug_column.sql) byte-for-byte so the sync can
 // compute a job's slug — and therefore its deep-link — before inserting, and the
@@ -57,14 +76,23 @@ function dedupeKey(r: any): string {
 }
 
 function mapJobRow(r: any, slug: string) {
+  // Normalize the date fields (strip any UTC-ISO artifact down to a calendar date)
+  // and cross-fill so a value present in either column populates both — this is what
+  // stops last_date from arriving "missing". Fall back to "TBD" (the scraper's
+  // NA_DATE marker) only when neither column carries a real value, never fabricating.
+  const lastDate = toDateText(r.last_date);
+  const lastDateDisplay = toDateText(r.last_date_display);
   const rec: Record<string, unknown> = {
     title: r.title, department: r.department, location: r.location, qualification: r.qualification,
-    vacancies_display: r.vacancies_display, last_date: r.last_date, last_date_display: r.last_date_display,
+    vacancies_display: r.vacancies_display,
+    last_date: lastDate ?? lastDateDisplay ?? "TBD",
+    last_date_display: lastDateDisplay ?? lastDate ?? null,
     is_featured: false, auto_discovered: true, slug,
     job_metadata: toJson(r.job_metadata, null),
   };
   for (const f of NUMERIC_JOB_FIELDS) rec[f] = toNum(r[f]);
   for (const f of NULLABLE_JOB_TEXT) rec[f] = r[f] === "" || r[f] == null ? null : r[f];
+  rec.application_start_date = toDateText(r.application_start_date); // same UTC-ISO repair
   return rec;
 }
 

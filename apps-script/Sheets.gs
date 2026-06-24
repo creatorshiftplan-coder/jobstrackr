@@ -61,6 +61,28 @@ function existingValues_(tabName, columns, colName) {
   return set;
 }
 
+// Columns that hold a true timestamp (date + time). These must serialize as a full
+// ISO instant so the sync cursor and oldest-first ordering keep working.
+const TIMESTAMP_COLUMNS_ = { scraped_at: true, posted_at: true, discovered_at: true };
+
+/**
+ * Serialize one cell value for the JSON feed.
+ *
+ * Google Sheets silently coerces any date-looking text (e.g. "2026-06-30") into a
+ * real Date cell. Blanket-stringifying those with toISOString() yields a
+ * UTC-shifted "2026-06-29T18:30:00.000Z" — IST midnight expressed in UTC, i.e. the
+ * WRONG calendar day and an ugly value to store/display. So:
+ *   • timestamp columns  → full ISO (UTC); the cursor needs the exact instant
+ *   • every other column → plain "yyyy-MM-dd" in the spreadsheet's own timezone,
+ *     which is the calendar date the poster actually typed
+ * Non-Date values pass through unchanged.
+ */
+function serializeCell_(colName, v) {
+  if (!(v instanceof Date)) return v;
+  if (TIMESTAMP_COLUMNS_[colName]) return v.toISOString();
+  return Utilities.formatDate(v, ss_().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+}
+
 /** Read a whole data tab as objects, each tagged with its 1-based sheet row in `_row`. */
 function readObjects_(tabName, columns) {
   const sh = getTab_(tabName, columns);
@@ -70,8 +92,7 @@ function readObjects_(tabName, columns) {
   return data.map(function (rowVals, i) {
     const obj = { _row: i + 2 };
     columns.forEach(function (c, ci) {
-      const v = rowVals[ci];
-      obj[c] = v instanceof Date ? v.toISOString() : v;
+      obj[c] = serializeCell_(c, rowVals[ci]);
     });
     return obj;
   });
@@ -192,8 +213,7 @@ function readSince(tabName, columns, sinceIso, limit) {
     if (sinceMs != null && scrapedMs != null && scrapedMs <= sinceMs) continue;
     const obj = {};
     columns.forEach(function (c, ci) {
-      const v = data[i][ci];
-      obj[c] = v instanceof Date ? v.toISOString() : v;
+      obj[c] = serializeCell_(c, data[i][ci]);
     });
     obj.scraped_at = scrapedAt;
     obj._ms = scrapedMs; // sort/tie key; stripped before returning
