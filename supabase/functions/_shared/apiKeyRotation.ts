@@ -12,6 +12,7 @@ export interface ApiKeyConfig {
   last_error: string | null;
   total_calls: number;
   total_errors: number;
+  updated_at: string | null;
 }
 
 export interface ProviderRequest {
@@ -32,6 +33,8 @@ export interface ProviderResponse {
  * Load active API keys from the api_keys_config table, falling back to
  * GEMINI_API_KEY* env vars if no DB keys exist.
  */
+const RATE_LIMIT_COOLDOWN_MS = 65_000; // 65 seconds — slightly longer than Gemini's 1-min window
+
 export async function loadApiKeys(supabase: SupabaseClient): Promise<ApiKeyConfig[]> {
   try {
     const { data, error } = await supabase
@@ -42,9 +45,29 @@ export async function loadApiKeys(supabase: SupabaseClient): Promise<ApiKeyConfi
       .order("total_errors", { ascending: true });
 
     if (!error && data && data.length > 0) {
-      console.log(`Loaded ${data.length} API keys from DB`);
-      return data as ApiKeyConfig[];
+      const now = Date.now();
+      // Sort cooled-down keys (429'd within the last 65s) to the end so fresh keys are tried first.
+      // They remain in the list as a last-resort fallback — don't discard them entirely.
+      const sorted = (data as ApiKeyConfig[]).sort((a, b) => {
+        const aOnCooldown = a.last_error?.startsWith("429:") &&
+          a.updated_at != null &&
+          now - new Date(a.updated_at).getTime() < RATE_LIMIT_COOLDOWN_MS;
+        const bOnCooldown = b.last_error?.startsWith("429:") &&
+          b.updated_at != null &&
+          now - new Date(b.updated_at).getTime() < RATE_LIMIT_COOLDOWN_MS;
+        if (aOnCooldown && !bOnCooldown) return 1;
+        if (!aOnCooldown && bOnCooldown) return -1;
+        return 0;
+      });
+      const onCooldown = sorted.filter(k =>
+        k.last_error?.startsWith("429:") &&
+        k.updated_at != null &&
+        now - new Date(k.updated_at).getTime() < RATE_LIMIT_COOLDOWN_MS
+      ).length;
+      console.log(`Loaded ${sorted.length} API keys from DB (${onCooldown} on cooldown)`);
+      return sorted;
     }
+    if (error) console.warn("DB key load error:", error.message);
   } catch (e) {
     console.warn("Could not load API keys from DB, falling back to env vars:", e);
   }
@@ -277,15 +300,16 @@ export async function callWithRotation(
         console.log(`Key ${i + 1} exhausted (${statusCode}), rotating...`);
         lastError = `Key ${key.label || key.provider} exhausted (${statusCode})`;
 
-        // Update error stats
+        // Update error stats — write updated_at explicitly (no DB trigger does it automatically)
         if (!key.id.startsWith("env-")) {
           (async () => {
             try {
               await supabase
                 .from("api_keys_config")
                 .update({
-                  last_error: `${statusCode}: rate limited / exhausted`,
+                  last_error: `429: rate limited / exhausted`,
                   total_errors: (key.total_errors || 0) + 1,
+                  updated_at: new Date().toISOString(),
                 })
                 .eq("id", key.id);
             } catch {
