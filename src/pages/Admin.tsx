@@ -5731,16 +5731,6 @@ ${hashtagsStr}`;
                       size="sm"
                       variant="outline"
                       className="w-full sm:w-auto"
-                      onClick={handleBackfillEligibilityProfiles}
-                      disabled={jobsLoading || backfillingEligibility}
-                    >
-                      {backfillingEligibility ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                      Backfill Eligibility
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full sm:w-auto"
                       onClick={handleCheckVacancies}
                       disabled={jobsLoading || updatingVacancies}
                     >
