@@ -279,10 +279,10 @@ interface ExtractedLastDate {
 const buildLastDateFromParts = (y: number, m: number, d: number): ExtractedLastDate | null => {
   if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
   if (m < 1 || m > 12 || d < 1 || d > 31) return null;
-  // Guard against junk years. Allow a small window into the past so recently
-  // closed listings still resolve, plus a few years ahead for future drives.
+  // Guard against junk years. Allow a wide window into the past so older
+  // archived listings still resolve, plus a few years ahead for future drives.
   const thisYear = new Date().getFullYear();
-  if (y < thisYear - 2 || y > thisYear + 4) return null;
+  if (y < thisYear - 8 || y > thisYear + 4) return null;
   const date = new Date(y, m - 1, d);
   // Reject impossible calendar dates (e.g. 31 Feb rolls over to March).
   if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
@@ -372,6 +372,55 @@ const extractLastDateFromSlug = (slug: string | null | undefined): ExtractedLast
   const numeric = /\d{1,2}[/.-]\d{1,2}[/.-]\d{4}/;
   if (numeric.test(slug)) {
     return findDateInWindow(slug);
+  }
+  return null;
+};
+
+// True when a date-row label / overview key refers to the application *closing*
+// date, not its start, the exam date, results, etc. Used to mine job_metadata.
+const labelLooksLikeLastDate = (label: string): boolean => {
+  const l = label.toLowerCase();
+  // Reject opening/other-event rows so we never grab the start date by mistake.
+  if (/\b(begin|start|opening|open|from|advertis|notif|publish|release|exam|admit|result|interview|joining|hall\s*ticket|answer\s*key)\b/.test(l)) {
+    return false;
+  }
+  return /last\s*date|last\s*day|closing|close\s*date|dead\s*line|end\s*date|apply.*(end|last|before|by|upto|up\s*to)|submission.*(last|end|close)|last.*submission|registration.*(last|end|close)/.test(l);
+};
+
+// Mines the structured job_metadata for an application closing date. Handles the
+// two shapes seen in the data: an important_dates object ({ apply_end, ... }) and
+// a scraped important_dates array ([{ event, date, status }]), plus the overview
+// map. Returns the first row/field whose label reads as a "last date".
+const extractLastDateFromMetadata = (meta: JobMetadata | null | undefined): ExtractedLastDate | null => {
+  if (!meta || typeof meta !== "object") return null;
+  const candidates: string[] = [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dates: any = (meta as any).important_dates;
+  if (Array.isArray(dates)) {
+    for (const row of dates) {
+      if (!row || typeof row !== "object") continue;
+      const label = String(row.event ?? row.label ?? row.name ?? "");
+      const value = row.date ?? row.value ?? row.text ?? "";
+      if (value && labelLooksLikeLastDate(label)) candidates.push(String(value));
+    }
+  } else if (dates && typeof dates === "object") {
+    if (dates.apply_end) candidates.push(String(dates.apply_end));
+    for (const [k, v] of Object.entries(dates)) {
+      if (v && k !== "apply_end" && labelLooksLikeLastDate(k)) candidates.push(String(v));
+    }
+  }
+
+  const overview = meta.overview;
+  if (overview && typeof overview === "object" && !Array.isArray(overview)) {
+    for (const [k, v] of Object.entries(overview)) {
+      if (v && labelLooksLikeLastDate(k)) candidates.push(String(v));
+    }
+  }
+
+  for (const c of candidates) {
+    const found = findDateInWindow(c);
+    if (found) return found;
   }
   return null;
 };
@@ -1594,7 +1643,7 @@ export default function Admin() {
   const [checkingVacancies, setCheckingVacancies] = useState(false);
 
   // "Find last dates" — scans jobs with no saved deadline and extracts one from
-  // the description (or slug) for admin review before applying.
+  // the saved dates metadata, slug, or description for admin review before applying.
   const [showLastDateChecker, setShowLastDateChecker] = useState(false);
   const [lastDateMatches, setLastDateMatches] = useState<{
     jobId: string;
@@ -1602,10 +1651,11 @@ export default function Admin() {
     currentDisplay: string;
     extractedIso: string;
     extractedDisplay: string;
-    source: "description" | "slug";
+    source: "metadata" | "description" | "slug";
   }[]>([]);
   const [selectedLastDateUpdates, setSelectedLastDateUpdates] = useState<Set<string>>(new Set());
   const [updatingLastDates, setUpdatingLastDates] = useState(false);
+  const [scanningLastDates, setScanningLastDates] = useState(false);
 
   const handleCheckVacancies = useCallback(() => {
     if (!Array.isArray(jobs) || jobs.length === 0) {
@@ -1716,7 +1766,7 @@ export default function Admin() {
     return parseJobDeadline(ld) === null;
   }, []);
 
-  const handleCheckLastDates = useCallback(() => {
+  const handleCheckLastDates = useCallback(async () => {
     if (!Array.isArray(jobs) || jobs.length === 0) {
       toast({
         title: "No jobs loaded",
@@ -1726,49 +1776,98 @@ export default function Admin() {
       return;
     }
 
-    const matches: typeof lastDateMatches = [];
-    let missingCount = 0;
-    for (const job of jobs) {
-      if (!lastDateIsMissing(job)) continue;
-      missingCount += 1;
+    setScanningLastDates(true);
+    try {
+      const matches: typeof lastDateMatches = [];
+      const missing = jobs.filter(lastDateIsMissing);
 
-      let found = extractLastDateFromDescription(job.description);
-      let source: "description" | "slug" = "description";
-      if (!found) {
-        found = extractLastDateFromSlug(job.slug);
-        source = "slug";
+      if (missing.length === 0) {
+        toast({
+          title: "No jobs missing a last date",
+          description: "Every job already has a deadline saved.",
+        });
+        return;
       }
-      if (!found) continue;
 
-      matches.push({
-        jobId: job.id,
-        jobTitle: job.title,
-        currentDisplay: (job.last_date_display || job.last_date || "—").toString(),
-        extractedIso: found.iso,
-        extractedDisplay: found.display,
-        source,
-      });
-    }
+      // Pass 1 — resolve from data already in memory: the structured dates saved
+      // in job_metadata first, then the slug. No network needed for these.
+      const unresolved: typeof missing = [];
+      for (const job of missing) {
+        const found =
+          extractLastDateFromMetadata(job.job_metadata) || extractLastDateFromSlug(job.slug);
+        if (!found) {
+          unresolved.push(job);
+          continue;
+        }
+        const source: "metadata" | "slug" = extractLastDateFromMetadata(job.job_metadata)
+          ? "metadata"
+          : "slug";
+        matches.push({
+          jobId: job.id,
+          jobTitle: job.title,
+          currentDisplay: (job.last_date_display || job.last_date || "—").toString(),
+          extractedIso: found.iso,
+          extractedDisplay: found.display,
+          source,
+        });
+      }
 
-    if (missingCount === 0) {
+      // Pass 2 — for anything still unresolved, pull the description column (which
+      // the admin list query doesn't load) and parse a labelled date out of it.
+      if (unresolved.length > 0) {
+        const descById = new Map<string, string>();
+        const ids = unresolved.map((j) => j.id);
+        const chunkSize = 400;
+        for (let i = 0; i < ids.length; i += chunkSize) {
+          const slice = ids.slice(i, i + chunkSize);
+          const { data, error } = await supabase
+            .from("jobs")
+            .select("id, description")
+            .in("id", slice);
+          if (error) throw error;
+          for (const row of data || []) {
+            if (row?.description) descById.set(row.id as string, row.description as string);
+          }
+        }
+
+        for (const job of unresolved) {
+          const found = extractLastDateFromDescription(descById.get(job.id));
+          if (!found) continue;
+          matches.push({
+            jobId: job.id,
+            jobTitle: job.title,
+            currentDisplay: (job.last_date_display || job.last_date || "—").toString(),
+            extractedIso: found.iso,
+            extractedDisplay: found.display,
+            source: "description",
+          });
+        }
+      }
+
+      if (matches.length === 0) {
+        toast({
+          title: "No last dates found",
+          description: `${missing.length} job${missing.length === 1 ? "" : "s"} missing a deadline, but none had a recoverable date in their saved dates, slug, or description.`,
+        });
+        return;
+      }
+
+      // Sort matches so the riskier text-derived ones surface first for review.
+      const sourceRank: Record<string, number> = { description: 0, slug: 1, metadata: 2 };
+      matches.sort((a, b) => sourceRank[a.source] - sourceRank[b.source]);
+
+      setLastDateMatches(matches);
+      setSelectedLastDateUpdates(new Set(matches.map((m) => m.jobId)));
+      setShowLastDateChecker(true);
       toast({
-        title: "No jobs missing a last date",
-        description: "Every job already has a deadline saved.",
+        title: `Found ${matches.length} last date${matches.length === 1 ? "" : "s"}`,
+        description: `Recovered a date for ${matches.length} of ${missing.length} job${missing.length === 1 ? "" : "s"} missing one. Review before applying.`,
       });
-      return;
+    } catch (error: any) {
+      toast({ title: "Scan failed", description: error.message, variant: "destructive" });
+    } finally {
+      setScanningLastDates(false);
     }
-
-    if (matches.length === 0) {
-      toast({
-        title: "No last dates found",
-        description: `${missingCount} job${missingCount === 1 ? "" : "s"} missing a deadline, but none had a date in the description or slug.`,
-      });
-      return;
-    }
-
-    setLastDateMatches(matches);
-    setSelectedLastDateUpdates(new Set(matches.map((m) => m.jobId)));
-    setShowLastDateChecker(true);
   }, [jobs, toast, lastDateIsMissing]);
 
   const handleApproveLastDateChanges = async () => {
@@ -5742,9 +5841,9 @@ ${hashtagsStr}`;
                       variant="outline"
                       className="w-full sm:w-auto"
                       onClick={handleCheckLastDates}
-                      disabled={jobsLoading || updatingLastDates}
+                      disabled={jobsLoading || updatingLastDates || scanningLastDates}
                     >
-                      <CalendarClock className="h-4 w-4 mr-2" />
+                      {scanningLastDates ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CalendarClock className="h-4 w-4 mr-2" />}
                       Find Last Dates
                     </Button>
                     <Button size="sm" className="w-full sm:w-auto" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
@@ -12345,7 +12444,7 @@ ${hashtagsStr}`;
               Last Date Finder
             </DialogTitle>
             <DialogDescription>
-              These jobs have no deadline saved. A last date was detected in their description or slug — review and apply the ones you want.
+              These jobs have no deadline saved. A last date was recovered from their saved dates, slug, or description — review and apply the ones you want.
             </DialogDescription>
           </DialogHeader>
 
@@ -12403,7 +12502,9 @@ ${hashtagsStr}`;
                       {item.extractedDisplay}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="outline" className="text-[10px] capitalize">{item.source}</Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        {item.source === "metadata" ? "Saved dates" : item.source === "slug" ? "Slug" : "Description"}
+                      </Badge>
                     </TableCell>
                   </TableRow>
                 ))}
