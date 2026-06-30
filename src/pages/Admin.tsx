@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square, ChevronLeft, ChevronRight, Send, Terminal, Facebook, MessageSquare } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit, Loader2, AlertCircle, Check, X, Users, Activity, FileJson, Briefcase, Filter, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Replace, BarChart3, Eye, MousePointerClick, TrendingUp, Image, Upload, CheckCircle, Sparkles, Play, Clock, Globe, Copy, FileText, ExternalLink, ChevronDown, ChevronUp, Search, AlertTriangle, XCircle, Key, ToggleLeft, ToggleRight, Square, ChevronLeft, ChevronRight, Send, Terminal, Facebook, MessageSquare, CalendarClock } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAllExamUpdates } from "@/hooks/useExamUpdates";
 import { inferCategory, isJobActive } from "@/lib/jobUtils";
@@ -223,6 +223,157 @@ const parseDateValue = (value: string | null | undefined): string => {
   const futureDate = new Date();
   futureDate.setFullYear(futureDate.getFullYear() + 1);
   return futureDate.toISOString().split('T')[0];
+};
+
+// ---------------------------------------------------------------------------
+// "Last date to apply" extraction (from a job's description text or its slug)
+// Used by the admin Jobs tab to backfill jobs that have no real deadline saved.
+// ---------------------------------------------------------------------------
+
+const MONTH_TO_NUM: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Month-name alternation used inside the date matchers below.
+const MONTH_NAMES = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+
+// Phrases that introduce the closing date for applications. Ordered most- to
+// least-specific so the more precise label is preferred when several appear.
+const LAST_DATE_LABELS = [
+  "last date to apply online",
+  "last date for online application",
+  "last date to apply",
+  "last date for submission of application",
+  "last date for submission of online application",
+  "last date for submission",
+  "last date of submission",
+  "last date for receipt of application",
+  "last date of application",
+  "last date for registration",
+  "last date of registration",
+  "last date for apply",
+  "last date of online application",
+  "last date",
+  "closing date",
+  "apply before",
+  "apply on or before",
+  "apply by",
+  "last day to apply",
+  "application deadline",
+  "application end date",
+  "registration end date",
+  "registration last date",
+  "online application closes",
+  "submission deadline",
+  "deadline to apply",
+];
+
+interface ExtractedLastDate {
+  iso: string;       // YYYY-MM-DD, for the last_date column
+  display: string;   // e.g. "15 Mar 2026", for last_date_display
+}
+
+const buildLastDateFromParts = (y: number, m: number, d: number): ExtractedLastDate | null => {
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  // Guard against junk years. Allow a small window into the past so recently
+  // closed listings still resolve, plus a few years ahead for future drives.
+  const thisYear = new Date().getFullYear();
+  if (y < thisYear - 2 || y > thisYear + 4) return null;
+  const date = new Date(y, m - 1, d);
+  // Reject impossible calendar dates (e.g. 31 Feb rolls over to March).
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+  const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const display = `${String(d).padStart(2, "0")} ${SHORT_MONTHS[m - 1]} ${y}`;
+  return { iso, display };
+};
+
+const monthIndexFromName = (name: string): number =>
+  MONTH_TO_NUM[name.toLowerCase().slice(0, 3)] ?? NaN;
+
+// Date matchers, each returning a {y,m,d} from its capture groups.
+const LAST_DATE_MATCHERS: { re: RegExp; pick: (m: RegExpMatchArray) => ExtractedLastDate | null }[] = [
+  {
+    // 15th March 2026 / 15 March, 2026 / 1st Jan 2026
+    re: new RegExp(`(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTH_NAMES})\\.?,?\\s+(\\d{4})`, "i"),
+    pick: (m) => buildLastDateFromParts(Number(m[3]), monthIndexFromName(m[2]), Number(m[1])),
+  },
+  {
+    // March 15, 2026 / Mar 15 2026
+    re: new RegExp(`(${MONTH_NAMES})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})`, "i"),
+    pick: (m) => buildLastDateFromParts(Number(m[3]), monthIndexFromName(m[1]), Number(m[2])),
+  },
+  {
+    // 15/03/2026 , 15-03-2026 , 15.03.2026
+    re: /(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/,
+    pick: (m) => buildLastDateFromParts(Number(m[3]), Number(m[2]), Number(m[1])),
+  },
+  {
+    // 2026-03-15 (ISO)
+    re: /(\d{4})-(\d{1,2})-(\d{1,2})/,
+    pick: (m) => buildLastDateFromParts(Number(m[1]), Number(m[2]), Number(m[3])),
+  },
+];
+
+// Finds the earliest date token inside a (short) text window.
+const findDateInWindow = (window: string): ExtractedLastDate | null => {
+  let best: ExtractedLastDate | null = null;
+  let bestIndex = Infinity;
+  for (const matcher of LAST_DATE_MATCHERS) {
+    const m = window.match(matcher.re);
+    if (m && m.index !== undefined && m.index < bestIndex) {
+      const parsed = matcher.pick(m);
+      if (parsed) {
+        best = parsed;
+        bestIndex = m.index;
+      }
+    }
+  }
+  return best;
+};
+
+// Scans free text for a labelled "last date" and returns the date that follows it.
+const extractLastDateFromDescription = (text: string | null | undefined): ExtractedLastDate | null => {
+  if (!text) return null;
+  const normalized = text.replace(/\s+/g, " ");
+  const lower = normalized.toLowerCase();
+  for (const label of LAST_DATE_LABELS) {
+    let idx = lower.indexOf(label);
+    while (idx !== -1) {
+      // Look only just after the label so we grab its date, not an unrelated one.
+      const window = normalized.slice(idx + label.length, idx + label.length + 45);
+      const found = findDateInWindow(window);
+      if (found) return found;
+      idx = lower.indexOf(label, idx + 1);
+    }
+  }
+  return null;
+};
+
+// Slug fallback: treat hyphens/underscores as spaces, then try a labelled match
+// first and, failing that, accept a single unambiguous full date in the slug.
+const extractLastDateFromSlug = (slug: string | null | undefined): ExtractedLastDate | null => {
+  if (!slug) return null;
+  const spaced = slug.replace(/[-_]+/g, " ");
+  const labelled = extractLastDateFromDescription(spaced);
+  if (labelled) return labelled;
+  // Only accept a bare date from the slug when it carries a month name or a
+  // delimiter-separated numeric date — a lone 4-digit year is not enough.
+  // Month-name forms read from the spaced slug; numeric forms read from the raw
+  // slug, where the hyphens double as date delimiters (e.g. "...-31-03-2026").
+  const monthish = new RegExp(`\\d{1,2}\\s+(?:${MONTH_NAMES})\\s+\\d{4}|(?:${MONTH_NAMES})\\s+\\d{1,2}\\s+\\d{4}`, "i");
+  if (monthish.test(spaced)) {
+    const found = findDateInWindow(spaced);
+    if (found) return found;
+  }
+  const numeric = /\d{1,2}[/.-]\d{1,2}[/.-]\d{4}/;
+  if (numeric.test(slug)) {
+    return findDateInWindow(slug);
+  }
+  return null;
 };
 
 const buildEligibilityAwareMetadata = (
@@ -1442,6 +1593,20 @@ export default function Admin() {
   const [updatingVacancies, setUpdatingVacancies] = useState(false);
   const [checkingVacancies, setCheckingVacancies] = useState(false);
 
+  // "Find last dates" — scans jobs with no saved deadline and extracts one from
+  // the description (or slug) for admin review before applying.
+  const [showLastDateChecker, setShowLastDateChecker] = useState(false);
+  const [lastDateMatches, setLastDateMatches] = useState<{
+    jobId: string;
+    jobTitle: string;
+    currentDisplay: string;
+    extractedIso: string;
+    extractedDisplay: string;
+    source: "description" | "slug";
+  }[]>([]);
+  const [selectedLastDateUpdates, setSelectedLastDateUpdates] = useState<Set<string>>(new Set());
+  const [updatingLastDates, setUpdatingLastDates] = useState(false);
+
   const handleCheckVacancies = useCallback(() => {
     if (!Array.isArray(jobs) || jobs.length === 0) {
       toast({
@@ -1534,6 +1699,131 @@ export default function Admin() {
       });
     } finally {
       setUpdatingVacancies(false);
+    }
+  };
+
+  // A job's deadline counts as "saved" only when a real, specific calendar date
+  // can be resolved from the human-facing fields. Placeholders (TBD, "Check
+  // Website", etc.) and synthetic far-future dates from TBD inserts don't count.
+  const lastDateIsMissing = useCallback((job: Job): boolean => {
+    const display = (job.last_date_display ?? "").toString().trim();
+    if (display) {
+      if (isTBDValue(display) || /check\s*website/i.test(display)) return true;
+      return parseJobDeadline(display) === null;
+    }
+    const ld = (job.last_date ?? "").toString().trim();
+    if (!ld || isTBDValue(ld)) return true;
+    return parseJobDeadline(ld) === null;
+  }, []);
+
+  const handleCheckLastDates = useCallback(() => {
+    if (!Array.isArray(jobs) || jobs.length === 0) {
+      toast({
+        title: "No jobs loaded",
+        description: "Please wait for jobs to finish loading or check your connection.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const matches: typeof lastDateMatches = [];
+    let missingCount = 0;
+    for (const job of jobs) {
+      if (!lastDateIsMissing(job)) continue;
+      missingCount += 1;
+
+      let found = extractLastDateFromDescription(job.description);
+      let source: "description" | "slug" = "description";
+      if (!found) {
+        found = extractLastDateFromSlug(job.slug);
+        source = "slug";
+      }
+      if (!found) continue;
+
+      matches.push({
+        jobId: job.id,
+        jobTitle: job.title,
+        currentDisplay: (job.last_date_display || job.last_date || "—").toString(),
+        extractedIso: found.iso,
+        extractedDisplay: found.display,
+        source,
+      });
+    }
+
+    if (missingCount === 0) {
+      toast({
+        title: "No jobs missing a last date",
+        description: "Every job already has a deadline saved.",
+      });
+      return;
+    }
+
+    if (matches.length === 0) {
+      toast({
+        title: "No last dates found",
+        description: `${missingCount} job${missingCount === 1 ? "" : "s"} missing a deadline, but none had a date in the description or slug.`,
+      });
+      return;
+    }
+
+    setLastDateMatches(matches);
+    setSelectedLastDateUpdates(new Set(matches.map((m) => m.jobId)));
+    setShowLastDateChecker(true);
+  }, [jobs, toast, lastDateIsMissing]);
+
+  const handleApproveLastDateChanges = async () => {
+    if (selectedLastDateUpdates.size === 0) {
+      toast({
+        title: "No selection",
+        description: "Please select at least one job to update.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUpdatingLastDates(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      const selected = lastDateMatches.filter((m) => selectedLastDateUpdates.has(m.jobId));
+
+      for (const item of selected) {
+        const { error } = await supabase
+          .from("jobs")
+          .update({
+            last_date: item.extractedIso,
+            last_date_display: item.extractedDisplay,
+          })
+          .eq("id", item.jobId);
+
+        if (error) {
+          console.error(`Error updating last date for job ${item.jobId}:`, error);
+          failCount++;
+        } else {
+          successCount++;
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+
+      toast({
+        title: "Last dates updated",
+        description: `Successfully updated ${successCount} job(s).${failCount > 0 ? ` Failed to update ${failCount} job(s).` : ""}`,
+      });
+
+      setShowLastDateChecker(false);
+      setLastDateMatches([]);
+      setSelectedLastDateUpdates(new Set());
+    } catch (err: any) {
+      toast({
+        title: "Update failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingLastDates(false);
     }
   };
 
@@ -5456,6 +5746,16 @@ ${hashtagsStr}`;
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Check Vacancies
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      onClick={handleCheckLastDates}
+                      disabled={jobsLoading || updatingLastDates}
+                    >
+                      <CalendarClock className="h-4 w-4 mr-2" />
+                      Find Last Dates
                     </Button>
                     <Button size="sm" className="w-full sm:w-auto" onClick={() => { setEditingJob(null); setFormData(emptyFormData); setShowAddDialog(true); }}>
                       <Plus className="h-4 w-4 mr-2" />
@@ -12039,6 +12339,107 @@ ${hashtagsStr}`;
                   </>
                 ) : (
                   "Approve Selected Changes"
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Last Date Finder */}
+      <Dialog open={showLastDateChecker} onOpenChange={(open) => { if (!open) setShowLastDateChecker(false); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-blue-500" />
+              Last Date Finder
+            </DialogTitle>
+            <DialogDescription>
+              These jobs have no deadline saved. A last date was detected in their description or slug — review and apply the ones you want.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto my-4 border rounded-md">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background z-10">
+                <TableRow>
+                  <TableHead className="w-[50px] p-4">
+                    <Checkbox
+                      checked={
+                        lastDateMatches.length > 0 &&
+                        selectedLastDateUpdates.size === lastDateMatches.length
+                      }
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedLastDateUpdates(new Set(lastDateMatches.map((m) => m.jobId)));
+                        } else {
+                          setSelectedLastDateUpdates(new Set());
+                        }
+                      }}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead>Job Title</TableHead>
+                  <TableHead className="text-center w-[120px]">Current</TableHead>
+                  <TableHead className="text-center w-[140px]">Detected Date</TableHead>
+                  <TableHead className="text-center w-[100px]">Source</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lastDateMatches.map((item) => (
+                  <TableRow key={item.jobId} className="hover:bg-muted/50">
+                    <TableCell className="p-4">
+                      <Checkbox
+                        checked={selectedLastDateUpdates.has(item.jobId)}
+                        onCheckedChange={(checked) => {
+                          const next = new Set(selectedLastDateUpdates);
+                          if (checked) {
+                            next.add(item.jobId);
+                          } else {
+                            next.delete(item.jobId);
+                          }
+                          setSelectedLastDateUpdates(next);
+                        }}
+                        aria-label={`Select job ${item.jobTitle}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium text-xs sm:text-sm max-w-[260px] truncate">
+                      {item.jobTitle}
+                    </TableCell>
+                    <TableCell className="text-center text-xs sm:text-sm text-muted-foreground">
+                      {item.currentDisplay}
+                    </TableCell>
+                    <TableCell className="text-center text-xs sm:text-sm font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20">
+                      {item.extractedDisplay}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className="text-[10px] capitalize">{item.source}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter className="flex items-center justify-between sm:justify-between border-t pt-4">
+            <div className="text-xs sm:text-sm text-muted-foreground">
+              {selectedLastDateUpdates.size} of {lastDateMatches.length} job(s) selected
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowLastDateChecker(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={selectedLastDateUpdates.size === 0 || updatingLastDates}
+                onClick={handleApproveLastDateChanges}
+              >
+                {updatingLastDates ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Updating...
+                  </>
+                ) : (
+                  "Apply Selected Dates"
                 )}
               </Button>
             </div>
