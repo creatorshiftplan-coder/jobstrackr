@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
     let updatesCursor = cursor["updates"] || "";
     sinceCursor = [jobsCursor, updatesCursor].filter(Boolean).sort()[0] || ""; // min, for the health log
 
-    let jobsReceived = 0, jobsInserted = 0;
+    let jobsReceived = 0, jobsInserted = 0, jobsRepaired = 0;
     let updatesReceived = 0, updatesUpserted = 0;
 
     // Advance one feed's cursor and persist it immediately (crash-safe progress).
@@ -289,6 +289,30 @@ Deno.serve(async (req) => {
           seenInBatch.add(key);
           return true;
         });
+
+        // Repair pass: a re-fed row (same dedupe_key — e.g. the Apps Script
+        // backfillDeficientJobs re-scrape, which bumps scraped_at) may now carry a
+        // real last_date/location that was missing at first import. Patch ONLY the
+        // still-deficient fields on the existing row — the .eq() guards make this a
+        // no-op for rows that already hold real values — and never re-broadcast.
+        for (const r of jobRows) {
+          const key = dedupeKey(r);
+          if (key === "||" || !existing.has(key)) continue;
+          const lastDate = toDateText(r.last_date);
+          if (lastDate && lastDate !== "TBD") {
+            const { data: patched } = await supabase.from("jobs")
+              .update({ last_date: lastDate, last_date_display: toDateText(r.last_date_display) ?? lastDate })
+              .eq("dedupe_key", key).eq("last_date", "TBD").select("id");
+            if (patched?.length) jobsRepaired += patched.length;
+          }
+          const loc = typeof r.location === "string" ? r.location.trim() : "";
+          if (loc && loc !== "Not Available") {
+            const { data: patched } = await supabase.from("jobs")
+              .update({ location: loc })
+              .eq("dedupe_key", key).eq("location", "Not Available").select("id");
+            if (patched?.length) jobsRepaired += patched.length;
+          }
+        }
 
         if (candidates.length) {
           // Reserve a unique slug per row. Prefer a slug the sheet already carries
@@ -368,7 +392,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      jobs_received: jobsReceived, jobs_inserted: jobsInserted,
+      jobs_received: jobsReceived, jobs_inserted: jobsInserted, jobs_repaired: jobsRepaired,
       updates_received: updatesReceived, updates_upserted: updatesUpserted,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {

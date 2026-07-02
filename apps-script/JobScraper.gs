@@ -365,6 +365,19 @@ function extractListingLinks(html, baseUrl) {
     } else if (cls.indexOf('lattrbord') !== -1 && cells.length >= 7) {
       const a = cells[6].match(/<a\b[^>]*href\s*=\s*["']([^"']+)["']/i);
       if (a) add(stripTags(cells[0]), stripTags(cells[2]), a[1]);
+    } else if (cells.length >= 2) {
+      // FORMAT 4 (June 2026 redesign of /admit-card/, /exam-results/, /answer-key/,
+      // /syllabus/): plain class-less rows — [date, org, post..., <a>Get Details</a>].
+      // Anchor on "date in the first cell + article link in the last cell" so the
+      // page's quick-link widgets (link-only cells) don't match.
+      const dateTxt = stripTags(cells[0]);
+      if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(dateTxt)) {
+        const a = cells[cells.length - 1].match(/<a\b[^>]*href\s*=\s*["']([^"']*\/articles\/[^"']+)["']/i);
+        if (a) {
+          const title = cells.slice(1, cells.length - 1).map(stripTags).filter(Boolean).join(' ');
+          add(dateTxt, title, a[1]);
+        }
+      }
     }
   }
 
@@ -424,9 +437,45 @@ function paginationUrls_(html, baseUrl) {
   return urls;
 }
 
+/**
+ * Extract the schema.org JobPosting JSON-LD block FreeJobAlert embeds on every
+ * article page. This is machine-written structured data — far more reliable than
+ * the visible HTML, which keeps changing layout (e.g. Important Dates became a
+ * bullet list inside a table cell in June 2026 and broke the table parser).
+ * Returns the JobPosting node or null.
+ */
+function parseJobPostingLd_(html) {
+  const re = /<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    try {
+      const data = JSON.parse(m[1].trim());
+      const nodes = Array.isArray(data) ? data : (data && data['@graph']) ? data['@graph'] : [data];
+      for (let i = 0; i < nodes.length; i++) {
+        const t = nodes[i] && nodes[i]['@type'];
+        if (t === 'JobPosting' || (Array.isArray(t) && t.indexOf('JobPosting') !== -1)) return nodes[i];
+      }
+    } catch (e) { /* malformed JSON-LD block — try the next one */ }
+  }
+  return null;
+}
+
+/** "Locality, Region" (or whichever exists) from a JobPosting jobLocation. */
+function ldLocation_(ld) {
+  let place = ld && ld.jobLocation;
+  if (Array.isArray(place)) place = place[0];
+  const addr = place && place.address;
+  if (!addr) return '';
+  const locality = cleanText(addr.addressLocality || '');
+  const region = cleanText(addr.addressRegion || '');
+  if (locality && region && locality.toLowerCase() !== region.toLowerCase()) return locality + ', ' + region;
+  return locality || region || '';
+}
+
 /** Port of api/scraper_v5.py parse_page → scraped job dict. */
 function parseJobPage(url, html) {
   const body = articleBodyHtml(html);
+  const ld = parseJobPostingLd_(html); // structured-data backstop for the fields below
 
   // Title
   let examName = '';
@@ -468,6 +517,9 @@ function parseJobPage(url, html) {
   if (!agency) {
     const m = examName.match(/^([\w\s]+?)(?:Recruitment|Jobs|Vacancy|Notification)/);
     if (m) agency = cleanText(m[1]);
+  }
+  if (!agency && ld && ld.hiringOrganization && ld.hiringOrganization.name) {
+    agency = cleanText(ld.hiringOrganization.name);
   }
 
   // Vacancies (raw table)
@@ -573,6 +625,11 @@ function parseJobPage(url, html) {
     }
   }
 
+  // Source 7: schema.org JobPosting jobLocation (JSON-LD). Last because the
+  // heuristics above encode editorial intent ("All India" for central bodies);
+  // the LD address is the org's postal address, right for district/local posts.
+  if (!locationRaw) locationRaw = ldLocation_(ld);
+
   const location = cleanLocation(locationRaw); // may be '' — build step marks Not Available
 
   // Employment type
@@ -596,6 +653,11 @@ function parseJobPage(url, html) {
   let salRaw = ovGet('Salary', 'Pay Scale', 'Stipend', 'Remuneration', 'Pay', 'CTC', 'salary') || '';
   if (!salRaw) salRaw = stripTags(sectionHtmlByH2(body, ['salary']));
   const sal = parseSalary(salRaw);
+  if (sal.min == null && ld && ld.baseSalary && ld.baseSalary.value) {
+    const lv = ld.baseSalary.value;
+    const lmin = Number(lv.minValue), lmax = Number(lv.maxValue);
+    if (isFinite(lmin) && lmin > 0) { sal.min = Math.round(lmin); sal.max = isFinite(lmax) && lmax >= lmin ? Math.round(lmax) : Math.round(lmin); }
+  }
 
   // Age
   const ageOv = ovGet('Age Limit', 'Age Criteria', 'Age') || '';
@@ -606,9 +668,17 @@ function parseJobPage(url, html) {
   const applicationFees = parseFeesFromSection(sectionHtmlByH2(body, ['application', 'fee']));
 
   // Important dates
-  const datesRows = tableRows(sectionHtmlByH2(body, ['important', 'date']));
+  const datesSection = sectionHtmlByH2(body, ['important', 'date']);
+  const datesRows = tableRows(datesSection);
   const datesDict = {};
   datesRows.forEach(function (r) { datesDict[r[0]] = parseDate(r[1]); });
+  // Newer pages render the dates as a <ul> of "Label: value" bullets inside a
+  // single table cell — invisible to tableRows (it needs >= 2 cells per row).
+  // Merge bullet entries in without overwriting anything the table gave us.
+  bulletList(datesSection).forEach(function (t) {
+    const mm = t.match(/^([^:]{3,80}?)\s*:\s*(.+)$/) || t.match(/^(.{3,80}?)\s+[–—-]\s+(.+)$/);
+    if (mm && !(mm[1] in datesDict)) datesDict[mm[1]] = parseDate(mm[2]);
+  });
   const findDate = function () {
     for (let i = 0; i < arguments.length; i++) {
       const hint = String(arguments[i]).toLowerCase();
@@ -625,6 +695,10 @@ function parseJobPage(url, html) {
   if (!applyEnd && lastDateOv) applyEnd = parseDate(lastDateOv);
   const walkin = findDate('walk-in', 'walk in', 'walkin', 'interview date', 'date of walk');
   if (walkin && !applyEnd) applyEnd = walkin;
+  // JSON-LD backstop: validThrough is the application deadline, datePosted the
+  // notification date. Only fill gaps — never override what the page yielded.
+  if (!applyEnd && ld && ld.validThrough) applyEnd = parseDate(String(ld.validThrough).slice(0, 10));
+  const ldPosted = (ld && ld.datePosted) ? parseDate(String(ld.datePosted).slice(0, 10)) : null;
 
   // Selection process
   const selBullets = bulletList(sectionHtmlByH2(body, ['selection', 'process']));
@@ -709,7 +783,7 @@ function parseJobPage(url, html) {
     employment_type: employmentType,
     description: description || null,
     selection_process: selectionProcess,
-    important_dates: { advertised_on: advertisedOn, apply_start: applyStart, apply_end: applyEnd, exam_date: examDateStr },
+    important_dates: { advertised_on: advertisedOn || ldPosted, apply_start: applyStart, apply_end: applyEnd, exam_date: examDateStr },
     overview: overviewObj,
     official_apply_link: applyLink,
     official_website: officialWebsite,

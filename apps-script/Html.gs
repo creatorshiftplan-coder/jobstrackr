@@ -92,8 +92,22 @@ function textWithNewlines(html) {
 
 /** Extract the article body HTML (entry-content/post-content/article). */
 function articleBodyHtml(html) {
-  const div = html.match(/<div[^>]*class\s*=\s*["'][^"']*(?:entry-content|post-content|article-content|article__body)[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*(?:<\/div>|<footer|<aside|$)/i);
-  if (div) return div[1];
+  // Balanced-div extraction: find the content <div>, then walk nested
+  // <div>/</div> tokens to its TRUE closing tag. The old single-regex version
+  // stopped at the first "</div></div>" it saw, which truncates the June-2026
+  // redesigned pages ~9KB in — losing Important Dates and every later section.
+  const open = html.match(/<div[^>]*class\s*=\s*["'][^"']*(?:entry-content|post-content|article-content|article__body)[^"']*["'][^>]*>/i);
+  if (open) {
+    const start = open.index + open[0].length;
+    const tokRe = /<\/?div\b[^>]*>/gi;
+    tokRe.lastIndex = start;
+    let depth = 1, m;
+    while ((m = tokRe.exec(html)) !== null) {
+      depth += m[0].charAt(1) === '/' ? -1 : 1;
+      if (depth === 0) return html.slice(start, m.index);
+    }
+    return html.slice(start);
+  }
   const art = html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
   if (art) return art[1];
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);

@@ -184,3 +184,55 @@ function processUpdatesQueue() {
 
 /** Manual helper: run discovery for both feeds now (for testing). */
 function discoverAllNow() { discoverJobs(); discoverUpdates(); }
+
+// ─────────────────────────── backfill ───────────────────────────────────────
+
+/**
+ * Repair pass for Jobs rows scraped before the JSON-LD backstop existed: rows
+ * whose last_date is TBD/blank or whose location is missing get their source
+ * page re-fetched and re-parsed. Fixed fields are written back to the sheet and
+ * scraped_at is bumped so the hourly sync re-feeds the row; the sync's repair
+ * path then patches ONLY the still-deficient fields on the existing DB row (it
+ * never re-broadcasts to Telegram).
+ *
+ * Run manually from the editor — repeatedly, until the Logs tab reports
+ * "0 deficient left". Each run stays inside the Apps Script time budget.
+ */
+function backfillDeficientJobs() {
+  ensureSheets();
+  const deadline = Date.now() + CONFIG.MAX_RUNTIME_MS;
+  const rows = readObjects_(CONFIG.TAB_JOBS, JOB_COLUMNS);
+  let fixed = 0, examined = 0, left = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const badDate = !r.last_date || r.last_date === CONFIG.NA_DATE;
+    const badLoc = !r.location || r.location === CONFIG.NA_TEXT;
+    if ((!badDate && !badLoc) || !r.source_url) continue;
+    if (Date.now() >= deadline) { left++; continue; }
+    examined++;
+    try {
+      const html = fetchHtml(r.source_url, 1);
+      if (html) {
+        const scraped = parseJobPage(r.source_url, html);
+        let changed = false;
+        if (badDate && scraped.last_date) {
+          setCell_(CONFIG.TAB_JOBS, JOB_COLUMNS, r._row, 'last_date', scraped.last_date);
+          setCell_(CONFIG.TAB_JOBS, JOB_COLUMNS, r._row, 'last_date_display', scraped.last_date);
+          changed = true;
+        }
+        if (badLoc && scraped.location) {
+          setCell_(CONFIG.TAB_JOBS, JOB_COLUMNS, r._row, 'location', scraped.location);
+          changed = true;
+        }
+        if (changed) {
+          setCell_(CONFIG.TAB_JOBS, JOB_COLUMNS, r._row, 'scraped_at', new Date().toISOString());
+          fixed++;
+        }
+      }
+    } catch (err) {
+      log_('backfillDeficientJobs error ' + r.source_url + ': ' + err);
+    }
+    Utilities.sleep(CONFIG.FETCH_DELAY_MS);
+  }
+  log_('backfillDeficientJobs: examined ' + examined + ', fixed ' + fixed + ', deficient left ' + left);
+}
