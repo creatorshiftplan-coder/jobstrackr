@@ -212,6 +212,8 @@ const BACKFILL_FIELDS_ = [
   { c: 'job_metadata', na: [] },
 ];
 
+const BACKFILL_CURSOR_KEY_ = 'BACKFILL_JOBS_CURSOR'; // Script Property: resume row index
+
 /**
  * Repair pass for Jobs rows scraped before the balanced-div body fix + JSON-LD
  * backstop existed: rows missing last_date, location, vacancies, description,
@@ -221,24 +223,39 @@ const BACKFILL_FIELDS_ = [
  * re-feeds the row; the sync's repair path patches the matching still-deficient
  * DB columns (it never re-broadcasts to Telegram).
  *
+ * IMPORTANT — forward-only cursor. A row stays "deficient" whenever ANY tracked
+ * field is blank, but many fields are legitimately absent (a walk-in job has no
+ * apply_link / salary / fee), so a fully-repaired row would keep tripping the
+ * test and get re-fetched every run. To avoid re-fetching the same head of the
+ * sheet forever, we persist the row index we reached and resume PAST it next
+ * run — so each run visits a fresh slice and one linear pass drains the backlog.
+ *
  * Run manually from the editor — repeatedly, until the Logs tab reports
- * "0 deficient left". Each run stays inside the Apps Script time budget.
+ * "pass complete". The Jobs tab is append-only, so the row-index cursor is
+ * stable across runs. To start another pass later, run resetBackfillCursor().
  */
 function backfillDeficientJobs() {
   ensureSheets();
   const deadline = Date.now() + CONFIG.MAX_RUNTIME_MS;
   const rows = readObjects_(CONFIG.TAB_JOBS, JOB_COLUMNS);
+  const props = PropertiesService.getScriptProperties();
+  let start = parseInt(props.getProperty(BACKFILL_CURSOR_KEY_) || '0', 10);
+  if (!(start >= 0) || start >= rows.length) {
+    log_('backfillDeficientJobs: pass complete (cursor at ' + start + '/' + rows.length +
+      ') — run resetBackfillCursor() to start another pass');
+    return;
+  }
+
   const missing = function (field, val) {
     const s = String(val == null ? '' : val).trim();
     return s === '' || field.na.indexOf(s) !== -1;
   };
-  let fixed = 0, examined = 0, left = 0;
-  for (let i = 0; i < rows.length; i++) {
+  let fixed = 0, examined = 0, i = start;
+  for (; i < rows.length; i++) {
+    if (Date.now() >= deadline) break; // stop; cursor persists at i (row i not yet processed)
     const r = rows[i];
     if (!r.source_url) continue;
-    const deficient = BACKFILL_FIELDS_.some(function (f) { return missing(f, r[f.c]); });
-    if (!deficient) continue;
-    if (Date.now() >= deadline) { left++; continue; }
+    if (!BACKFILL_FIELDS_.some(function (f) { return missing(f, r[f.c]); })) continue;
     examined++;
     try {
       const html = fetchHtml(r.source_url, 1);
@@ -261,5 +278,16 @@ function backfillDeficientJobs() {
     }
     Utilities.sleep(CONFIG.FETCH_DELAY_MS);
   }
-  log_('backfillDeficientJobs: examined ' + examined + ', fixed ' + fixed + ', deficient left ' + left);
+
+  const done = i >= rows.length;
+  props.setProperty(BACKFILL_CURSOR_KEY_, String(i));
+  log_('backfillDeficientJobs: examined ' + examined + ', fixed ' + fixed +
+    ', cursor ' + start + '→' + i + '/' + rows.length +
+    (done ? ' — pass complete' : ''));
+}
+
+/** Rewind the backfill cursor so backfillDeficientJobs() starts a fresh pass. */
+function resetBackfillCursor() {
+  PropertiesService.getScriptProperties().deleteProperty(BACKFILL_CURSOR_KEY_);
+  log_('backfillDeficientJobs: cursor reset — next run starts from the top');
 }
