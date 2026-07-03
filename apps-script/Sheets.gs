@@ -143,6 +143,43 @@ function setQueueStatus(queueTab, row, status, retry) {
 }
 
 /**
+ * Trim finished work out of a queue tab so it can't grow without bound — every
+ * trigger run re-reads the whole tab, so an ever-growing queue slowly taxes all
+ * of them. Deletes 'done'/'duplicate' rows older than 3 days and 'failed' rows
+ * older than 14 days (kept a while for visibility); 'pending'/'processing' rows
+ * are never touched. Rows are removed bottom-up in contiguous runs so sheet row
+ * indices stay valid during the pass.
+ * Returns { purged, failed, pending } — failed/pending are current counts, for
+ * the caller's log line.
+ */
+function purgeQueue_(queueTab) {
+  const DONE_KEEP_MS = 3 * 864e5, FAILED_KEEP_MS = 14 * 864e5;
+  const sh = getTab_(queueTab, QUEUE_COLUMNS);
+  const last = sh.getLastRow();
+  const out = { purged: 0, failed: 0, pending: 0 };
+  if (last < 2) return out;
+  const data = sh.getRange(2, 1, last - 1, QUEUE_COLUMNS.length).getValues();
+  const del = [];
+  for (let i = 0; i < data.length; i++) {
+    const status = String(data[i][1]);
+    const ts = tsMs_(data[i][3]) || 0; // discovered_at
+    if (status === 'failed') out.failed++;
+    else if (status === 'pending') out.pending++;
+    if ((status === 'done' || status === 'duplicate') && Date.now() - ts > DONE_KEEP_MS) del.push(i + 2);
+    else if (status === 'failed' && Date.now() - ts > FAILED_KEEP_MS) { del.push(i + 2); out.failed--; }
+  }
+  let i = del.length - 1;
+  while (i >= 0) {
+    let end = del[i], start = del[i];
+    while (i > 0 && del[i - 1] === start - 1) { i--; start = del[i]; }
+    sh.deleteRows(start, end - start + 1);
+    out.purged += end - start + 1;
+    i--;
+  }
+  return out;
+}
+
+/**
  * Self-heal: reset any rows left on 'processing' back to 'pending'.
  * If a run is hard-killed by Apps Script's 6-min limit mid-item, that item
  * stays 'processing'; calling this at the start of every processor run requeues

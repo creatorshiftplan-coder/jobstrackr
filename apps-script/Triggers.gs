@@ -85,6 +85,8 @@ function discoverJobs() {
 
 function processJobsQueue() {
   ensureSheets();
+  const q = purgeQueue_(CONFIG.TAB_JOBS_QUEUE); // trim finished rows; runs before any row indices are taken
+  if (q.purged || q.failed) log_('processJobsQueue queue: purged ' + q.purged + ', failed awaiting review ' + q.failed);
   requeueStuck(CONFIG.TAB_JOBS_QUEUE); // self-heal items stranded by a prior hard-kill
   const deadline = Date.now() + CONFIG.MAX_RUNTIME_MS;
   const knownTitles = existingValues_(CONFIG.TAB_JOBS, JOB_COLUMNS, 'title');
@@ -127,15 +129,35 @@ function processJobsQueue() {
 
 // ─────────────────────────── updates ────────────────────────────────────────
 
+/** dd/mm/yyyy or dd-mm-yyyy listing date → sortable number (0 when absent). */
+function listingDateKey_(d) {
+  const m = String(d || '').match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  return m ? (Number(m[3]) * 10000 + Number(m[2]) * 100 + Number(m[1])) : 0;
+}
+
 function discoverUpdates() {
   ensureSheets();
+  // One known-set for the whole run — the same article often appears on several
+  // feeds, and re-reading the ExamUpdates tab per feed was 5x the work.
+  const known = existingValues_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS, 'url');
   let total = 0;
   CONFIG.UPDATE_FEEDS.forEach(function (feed) {
     const html = fetchHtml(feed, 2);
     if (!html) { log_('discoverUpdates: could not fetch ' + feed); return; }
-    const links = extractListingLinks(html, feed).slice(0, CONFIG.UPDATES_MAX_LINKS_PER_FEED);
-    const known = existingValues_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS, 'url');
-    const fresh = links.map(function (l) { return l.url; }).filter(function (u) { return !known[u.toLowerCase()]; });
+    // The redesigned feed pages open with featured/section tables, so document
+    // order is NOT newest-first — today's articles can sit hundreds of links in.
+    // Capping the first 30 by position silently missed them. Sort by the listing
+    // date (newest first), drop already-scraped urls, THEN apply the cap.
+    const links = extractListingLinks(html, feed).sort(function (a, b) {
+      return listingDateKey_(b.update_date) - listingDateKey_(a.update_date);
+    });
+    const fresh = [];
+    for (let i = 0; i < links.length && fresh.length < CONFIG.UPDATES_MAX_LINKS_PER_FEED; i++) {
+      const k = links[i].url.toLowerCase();
+      if (known[k]) continue;
+      known[k] = true; // also blocks the same url enqueuing twice across feeds this run
+      fresh.push(links[i].url);
+    }
     total += enqueueUrls(CONFIG.TAB_UPDATES_QUEUE, fresh);
     Utilities.sleep(CONFIG.FETCH_DELAY_MS);
   });
@@ -144,6 +166,8 @@ function discoverUpdates() {
 
 function processUpdatesQueue() {
   ensureSheets();
+  const q = purgeQueue_(CONFIG.TAB_UPDATES_QUEUE); // trim finished rows; runs before any row indices are taken
+  if (q.purged || q.failed) log_('processUpdatesQueue queue: purged ' + q.purged + ', failed awaiting review ' + q.failed);
   requeueStuck(CONFIG.TAB_UPDATES_QUEUE); // self-heal items stranded by a prior hard-kill
   const deadline = Date.now() + CONFIG.MAX_RUNTIME_MS;
   const knownUrls = existingValues_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS, 'url');
