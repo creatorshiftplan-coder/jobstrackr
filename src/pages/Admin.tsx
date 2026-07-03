@@ -847,50 +847,69 @@ export default function Admin() {
         .in("id", targetIds);
       const descriptionMap = new Map((fullJobs || []).map(j => [j.id, j.description]));
 
-      const { summariseEligibility } = await import("@/lib/eligibilitySummariser");
+      const { summariseEligibilityBatch } = await import("@/lib/eligibilitySummariser");
 
-      for (const job of targetJobs) {
-        try {
-          const ageDetails: string[] = [];
-          if (job.job_metadata?.age_limit_text) {
-            ageDetails.push(`Age Limit: ${job.job_metadata.age_limit_text}`);
-          } else if (job.age_min || job.age_max) {
-            const minText = job.age_min ? `Minimum ${job.age_min} years` : "";
-            const maxText = job.age_max ? `Maximum ${job.age_max} years` : "";
-            ageDetails.push(`Age Limit: ${minText} ${maxText}`.trim());
-          } else {
-            const description = descriptionMap.get(job.id);
-            if (description) {
-              const descSnippet = description.split(/\s+/).slice(0, 250).join(" ");
-              ageDetails.push(`Job Details: ${descSnippet}`);
-            }
+      const buildRawText = (job: CustomJob) => {
+        const ageDetails: string[] = [];
+        if (job.job_metadata?.age_limit_text) {
+          ageDetails.push(`Age Limit: ${job.job_metadata.age_limit_text}`);
+        } else if (job.age_min || job.age_max) {
+          const minText = job.age_min ? `Minimum ${job.age_min} years` : "";
+          const maxText = job.age_max ? `Maximum ${job.age_max} years` : "";
+          ageDetails.push(`Age Limit: ${minText} ${maxText}`.trim());
+        } else {
+          const description = descriptionMap.get(job.id);
+          if (description) {
+            const descSnippet = description.split(/\s+/).slice(0, 250).join(" ");
+            ageDetails.push(`Job Details: ${descSnippet}`);
           }
-
-          const rawText = [
-            job.eligibility,
-            job.qualification,
-            ...ageDetails
-          ].filter(Boolean).join("\n");
-
-          const result = await summariseEligibility(rawText);
-          if (result && result.summary) {
-            await supabase
-              .from("jobs")
-              .update({
-                eligibility_summary: result.summary,
-                required_skills: result.required_skills
-              })
-              .eq("id", job.id);
-          } else {
-            throw new Error("No summary returned");
-          }
-          setProcessProgress(p => ({ ...p, current: p.current + 1 }));
-          // Pace requests to avoid triggering API rate limits
-          await new Promise((resolve) => setTimeout(resolve, 1500));
-        } catch (err) {
-          console.error(`Error summarizing job ${job.title}:`, err);
-          setProcessProgress(p => ({ ...p, current: p.current + 1, errors: p.errors + 1 }));
         }
+
+        return [
+          job.eligibility,
+          job.qualification,
+          ...ageDetails
+        ].filter(Boolean).join("\n");
+      };
+
+      // Chunk into small batches: each chunk is a single edge-function call
+      // that does auth + admin-role check + key loading once for the whole
+      // chunk instead of once per job, while staying short enough to avoid
+      // the edge function's own execution timeout.
+      const BATCH_SIZE = 5;
+      for (let start = 0; start < targetJobs.length; start += BATCH_SIZE) {
+        const chunk = targetJobs.slice(start, start + BATCH_SIZE);
+        try {
+          const rawTexts = chunk.map(buildRawText);
+          const results = await summariseEligibilityBatch(rawTexts);
+
+          await Promise.all(chunk.map(async (job, i) => {
+            const result = results[i];
+            try {
+              if (result && result.summary) {
+                await supabase
+                  .from("jobs")
+                  .update({
+                    eligibility_summary: result.summary,
+                    required_skills: result.required_skills
+                  })
+                  .eq("id", job.id);
+              } else {
+                throw new Error("No summary returned");
+              }
+              setProcessProgress(p => ({ ...p, current: p.current + 1 }));
+            } catch (err) {
+              console.error(`Error summarizing job ${job.title}:`, err);
+              setProcessProgress(p => ({ ...p, current: p.current + 1, errors: p.errors + 1 }));
+            }
+          }));
+        } catch (err) {
+          console.error(`Error summarizing batch starting at ${start}:`, err);
+          setProcessProgress(p => ({ ...p, current: p.current + chunk.length, errors: p.errors + chunk.length }));
+        }
+
+        // Pace batches to avoid triggering API rate limits
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });

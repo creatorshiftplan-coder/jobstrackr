@@ -4,8 +4,13 @@
  * Server-side replacement for src/lib/groqClient.ts + eligibility summariser
  * Groq calls. Keeps Groq API keys off the browser.
  *
- * Request body: { rawEligibilityText: string }
- * Response:     { summary: string | null, required_skills: SkillObject[] }
+ * Request body: { rawEligibilityText: string } for a single item, or
+ *               { rawEligibilityTexts: string[] } to summarise many items
+ *               in one invocation (auth, role check, and key loading happen
+ *               once for the whole batch instead of once per item).
+ * Response:     { summary, required_skills } for the single-item shape, or
+ *               { results: Array<{ summary, required_skills, error? }> }
+ *               for the batch shape (one entry per input, same order).
  *
  * Auth: requires a valid Supabase JWT with the "admin" role.
  *
@@ -74,6 +79,100 @@ function validateSummary(summary: string, rawText: string): boolean {
   return true;
 }
 
+interface SummariseOneResult {
+  summary: string | null;
+  required_skills: unknown[];
+  model_used?: string;
+  key_used?: string;
+  error?: string;
+}
+
+/**
+ * Runs the model-fallback / key-rotation loop for a single piece of text.
+ * Does not touch auth or key loading — callers load `groqKeys` once and
+ * reuse it across every item in a batch, so a 50-item batch still makes
+ * exactly one auth check and one key-table read instead of 50.
+ */
+async function summariseOne(
+  supabase: ReturnType<typeof createClient>,
+  groqKeys: ApiKeyConfig[],
+  rawEligibilityText: string,
+): Promise<SummariseOneResult> {
+  const userPrompt = `Summarise this eligibility section:\n${rawEligibilityText}`;
+
+  let lastError = "All Groq models / keys failed";
+  for (const model of MODEL_FALLBACK_CHAIN) {
+    // Re-tag every key with this model so callWithRotation hits the right model.
+    const keysForModel: ApiKeyConfig[] = groqKeys.map((k) => ({
+      ...k,
+      model_name: model,
+    }));
+
+    for (let retry = 0; retry < 2; retry++) {
+      try {
+        const result = await callWithRotation(supabase, keysForModel, {
+          systemPrompt: SYSTEM_PROMPT,
+          userPrompt,
+          temperature: retry === 0 ? 0.1 : 0.3,
+          maxTokens: 1024,
+        });
+
+        const content = result.content?.trim() || "";
+        if (!content) {
+          lastError = `Empty content from ${model}`;
+          continue;
+        }
+
+        let parsed: { summary?: string; required_skills?: any[] };
+        try {
+          parsed = JSON.parse(content);
+        } catch {
+          // Some models wrap in ```json fences despite instructions.
+          const fenced = content.match(/```(?:json)?\s*([\s\S]+?)\s*```/);
+          if (!fenced) {
+            lastError = `Non-JSON response from ${model}`;
+            continue;
+          }
+          try {
+            parsed = JSON.parse(fenced[1]);
+          } catch {
+            lastError = `Failed to parse JSON from ${model}`;
+            continue;
+          }
+        }
+
+        const summary = parsed.summary || "";
+        const skills = Array.isArray(parsed.required_skills)
+          ? parsed.required_skills
+          : [];
+
+        if (validateSummary(summary, rawEligibilityText)) {
+          return {
+            summary,
+            required_skills: skills,
+            model_used: model,
+            key_used: result.keyUsed.label || result.keyUsed.id,
+          };
+        }
+
+        lastError = `Validation failed for ${model} (retry ${retry + 1})`;
+        console.warn(`[groq-summarize] ${lastError}`);
+      } catch (err) {
+        lastError = (err as Error).message || String(err);
+        console.error(
+          `[groq-summarize] ${model} retry ${retry + 1} failed:`,
+          lastError,
+        );
+        // If callWithRotation threw, all keys were exhausted for this model.
+        // No point retrying the same model — break to fall back.
+        break;
+      }
+    }
+  }
+
+  return { summary: null, required_skills: [], error: lastError };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -116,94 +215,42 @@ Deno.serve(async (req) => {
     // ── Input ──────────────────────────────────────────────────────────
     const body = await req.json().catch(() => ({} as any));
     const rawEligibilityText: string | undefined = body?.rawEligibilityText;
-    if (!rawEligibilityText || rawEligibilityText.trim().length === 0) {
+    const rawEligibilityTexts: unknown = body?.rawEligibilityTexts;
+    const isBatch = Array.isArray(rawEligibilityTexts);
+
+    if (!isBatch && (!rawEligibilityText || rawEligibilityText.trim().length === 0)) {
       return jsonResponse({ summary: null, required_skills: [] });
     }
 
     // ── Keys: groq only ────────────────────────────────────────────────
+    // Loaded once per request (not once per item) — auth, role check, and
+    // key loading above already happen a single time for the whole batch.
     const allKeys = await loadApiKeys(supabase);
     const groqKeys = allKeys.filter((k) => k.provider === "groq");
     if (groqKeys.length === 0) {
       return jsonResponse({ error: "No Groq API keys configured" }, 500);
     }
 
-    const userPrompt = `Summarise this eligibility section:\n${rawEligibilityText}`;
-
-    // ── Model fallback loop ────────────────────────────────────────────
-    let lastError = "All Groq models / keys failed";
-    for (const model of MODEL_FALLBACK_CHAIN) {
-      // Re-tag every key with this model so callWithRotation hits the right model.
-      const keysForModel: ApiKeyConfig[] = groqKeys.map((k) => ({
-        ...k,
-        model_name: model,
-      }));
-
-      for (let retry = 0; retry < 2; retry++) {
-        try {
-          const result = await callWithRotation(supabase, keysForModel, {
-            systemPrompt: SYSTEM_PROMPT,
-            userPrompt,
-            temperature: retry === 0 ? 0.1 : 0.3,
-            maxTokens: 1024,
-          });
-
-          const content = result.content?.trim() || "";
-          if (!content) {
-            lastError = `Empty content from ${model}`;
-            continue;
-          }
-
-          let parsed: { summary?: string; required_skills?: any[] };
-          try {
-            parsed = JSON.parse(content);
-          } catch {
-            // Some models wrap in ```json fences despite instructions.
-            const fenced = content.match(/```(?:json)?\s*([\s\S]+?)\s*```/);
-            if (!fenced) {
-              lastError = `Non-JSON response from ${model}`;
-              continue;
-            }
-            try {
-              parsed = JSON.parse(fenced[1]);
-            } catch {
-              lastError = `Failed to parse JSON from ${model}`;
-              continue;
-            }
-          }
-
-          const summary = parsed.summary || "";
-          const skills = Array.isArray(parsed.required_skills)
-            ? parsed.required_skills
-            : [];
-
-          if (validateSummary(summary, rawEligibilityText)) {
-            return jsonResponse({
-              summary,
-              required_skills: skills,
-              model_used: model,
-              key_used: result.keyUsed.label || result.keyUsed.id,
-            });
-          }
-
-          lastError = `Validation failed for ${model} (retry ${retry + 1})`;
-          console.warn(`[groq-summarize] ${lastError}`);
-        } catch (err) {
-          lastError = (err as Error).message || String(err);
-          console.error(
-            `[groq-summarize] ${model} retry ${retry + 1} failed:`,
-            lastError,
-          );
-          // If callWithRotation threw, all keys were exhausted for this model.
-          // No point retrying the same model — break to fall back.
-          break;
+    if (isBatch) {
+      const texts = (rawEligibilityTexts as unknown[]).map((t) =>
+        typeof t === "string" ? t : "",
+      );
+      const results: SummariseOneResult[] = [];
+      for (const text of texts) {
+        if (!text || text.trim().length === 0) {
+          results.push({ summary: null, required_skills: [] });
+          continue;
         }
+        results.push(await summariseOne(supabase, groqKeys, text));
       }
+      return jsonResponse({ results });
     }
 
-    return jsonResponse(
-      { summary: null, required_skills: [], error: lastError },
-      502,
-    );
+    const single = await summariseOne(supabase, groqKeys, rawEligibilityText!);
+    if (!single.summary) {
+      return jsonResponse(single, 502);
+    }
+    return jsonResponse(single);
   } catch (err) {
     console.error("[groq-summarize] Unhandled error:", err);
     return jsonResponse(
