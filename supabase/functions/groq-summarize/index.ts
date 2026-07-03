@@ -63,6 +63,11 @@ const MODEL_FALLBACK_CHAIN = [
   "llama-3.1-8b-instant",
 ];
 
+// Conservative ceiling for a whole batch request, well under typical edge
+// function wall-clock limits, so we always have time to send a partial
+// response instead of being killed mid-request.
+const BATCH_TIME_BUDGET_MS = 45_000;
+
 function validateSummary(summary: string, rawText: string): boolean {
   if (!summary) return false;
 
@@ -236,12 +241,40 @@ Deno.serve(async (req) => {
         typeof t === "string" ? t : "",
       );
       const results: SummariseOneResult[] = [];
+      const batchDeadline = Date.now() + BATCH_TIME_BUDGET_MS;
+      // A single item can, in the worst case (every Groq key down/hanging),
+      // burn keys.length * models * retries * 20s inside summariseOne. Racing
+      // each item against the remaining batch budget means one stuck item
+      // can't block the rest — we move on and return partial results instead
+      // of risking the platform killing the whole invocation before it can
+      // respond, which would lose every result computed so far.
       for (const text of texts) {
+        const remaining = batchDeadline - Date.now();
+        if (remaining <= 0) {
+          results.push({
+            summary: null,
+            required_skills: [],
+            error: "Skipped: batch time budget exceeded",
+          });
+          continue;
+        }
         if (!text || text.trim().length === 0) {
           results.push({ summary: null, required_skills: [] });
           continue;
         }
-        results.push(await summariseOne(supabase, groqKeys, text));
+        const timeout = new Promise<SummariseOneResult>((resolve) => {
+          setTimeout(
+            () => resolve({
+              summary: null,
+              required_skills: [],
+              error: "Skipped: item exceeded batch time budget",
+            }),
+            remaining,
+          );
+        });
+        results.push(
+          await Promise.race([summariseOne(supabase, groqKeys, text), timeout]),
+        );
       }
       return jsonResponse({ results });
     }
