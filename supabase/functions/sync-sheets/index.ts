@@ -291,26 +291,60 @@ Deno.serve(async (req) => {
         });
 
         // Repair pass: a re-fed row (same dedupe_key — e.g. the Apps Script
-        // backfillDeficientJobs re-scrape, which bumps scraped_at) may now carry a
-        // real last_date/location that was missing at first import. Patch ONLY the
-        // still-deficient fields on the existing row — the .eq() guards make this a
-        // no-op for rows that already hold real values — and never re-broadcast.
-        for (const r of jobRows) {
-          const key = dedupeKey(r);
-          if (key === "||" || !existing.has(key)) continue;
-          const lastDate = toDateText(r.last_date);
-          if (lastDate && lastDate !== "TBD") {
-            const { data: patched } = await supabase.from("jobs")
-              .update({ last_date: lastDate, last_date_display: toDateText(r.last_date_display) ?? lastDate })
-              .eq("dedupe_key", key).eq("last_date", "TBD").select("id");
-            if (patched?.length) jobsRepaired += patched.length;
+        // backfillDeficientJobs re-scrape, which bumps scraped_at) may now carry
+        // fields that were missing at first import (the old scraper truncated the
+        // page body, dropping the vacancy table, description, apply links, etc.).
+        // Fetch each re-fed row once, then patch ONLY the columns that are still
+        // deficient in the DB *and* now have a real value — filling gaps, never
+        // overwriting good data, and never re-broadcasting to Telegram.
+        const refedKeys = [...new Set(
+          jobRows.map(dedupeKey).filter((k) => k !== "||" && existing.has(k)),
+        )];
+        if (refedKeys.length) {
+          const REPAIR_COLS =
+            "id, dedupe_key, last_date, location, vacancies, vacancies_display, " +
+            "description, qualification, apply_link, official_website, salary_min, salary_max, job_metadata";
+          const dbByKey = new Map<string, any>();
+          for (let i = 0; i < refedKeys.length; i += 200) {
+            const { data } = await supabase.from("jobs")
+              .select(REPAIR_COLS).in("dedupe_key", refedKeys.slice(i, i + 200));
+            (data || []).forEach((d: any) => { if (d.dedupe_key) dbByKey.set(String(d.dedupe_key), d); });
           }
-          const loc = typeof r.location === "string" ? r.location.trim() : "";
-          if (loc && loc !== "Not Available") {
-            const { data: patched } = await supabase.from("jobs")
-              .update({ location: loc })
-              .eq("dedupe_key", key).eq("location", "Not Available").select("id");
-            if (patched?.length) jobsRepaired += patched.length;
+          const isBlank = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
+          const isNA = (v: unknown) => isBlank(v) || String(v).trim() === "Not Available";
+          const realStr = (v: unknown) => typeof v === "string" && v.trim() !== "" && v.trim() !== "Not Available";
+          for (const r of jobRows) {
+            const key = dedupeKey(r);
+            const cur = key !== "||" ? dbByKey.get(key) : null;
+            if (!cur) continue;
+            const patch: Record<string, unknown> = {};
+
+            const ld = toDateText(r.last_date);
+            if ((cur.last_date == null || cur.last_date === "TBD") && ld && ld !== "TBD") {
+              patch.last_date = ld;
+              patch.last_date_display = toDateText(r.last_date_display) ?? ld;
+            }
+            if (isNA(cur.location) && realStr(r.location)) patch.location = (r.location as string).trim();
+            const vac = toNum(r.vacancies);
+            if (cur.vacancies == null && vac != null) patch.vacancies = vac;
+            if (isNA(cur.vacancies_display) && realStr(r.vacancies_display)) patch.vacancies_display = (r.vacancies_display as string).trim();
+            if (isBlank(cur.description) && realStr(r.description)) patch.description = r.description;
+            if (isNA(cur.qualification) && realStr(r.qualification)) patch.qualification = (r.qualification as string).trim();
+            if (isBlank(cur.apply_link) && realStr(r.apply_link)) patch.apply_link = r.apply_link;
+            if (isBlank(cur.official_website) && realStr(r.official_website)) patch.official_website = r.official_website;
+            const sMin = toNum(r.salary_min);
+            if (cur.salary_min == null && sMin != null) { patch.salary_min = sMin; patch.salary_max = toNum(r.salary_max) ?? sMin; }
+            // Metadata drives the detail page (vacancy breakdown, notification PDF,
+            // fees…). Refresh it only when the DB row has none, so a richer re-scrape
+            // fills it without clobbering an already-populated object.
+            const md = toJson(r.job_metadata, null);
+            if ((cur.job_metadata == null || (typeof cur.job_metadata === "object" && Object.keys(cur.job_metadata).length === 0)) && md) patch.job_metadata = md;
+
+            if (Object.keys(patch).length) {
+              const { data: patched } = await supabase.from("jobs")
+                .update(patch).eq("dedupe_key", key).select("id");
+              if (patched?.length) jobsRepaired += patched.length;
+            }
           }
         }
 

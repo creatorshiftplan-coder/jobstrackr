@@ -187,13 +187,39 @@ function discoverAllNow() { discoverJobs(); discoverUpdates(); }
 
 // ─────────────────────────── backfill ───────────────────────────────────────
 
+// Columns the backfill can repair, each with the value(s) that count as "missing"
+// for that column. '' always counts as missing. A fresh re-scrape only overwrites
+// a cell that is currently missing AND now has a real value — gaps are filled,
+// good data is never clobbered. (Most of these were lost because the old
+// articleBodyHtml truncated the page before the vacancy / description / links
+// sections; the balanced-div fix + JSON-LD backstop now recover them.)
+const BACKFILL_FIELDS_ = [
+  { c: 'last_date', na: ['TBD'], mirror: 'last_date_display' },
+  { c: 'location', na: ['Not Available'] },
+  { c: 'vacancies', na: [] },
+  { c: 'vacancies_display', na: ['Not Available'] },
+  { c: 'description', na: [] },
+  { c: 'qualification', na: ['Not Available'] },
+  { c: 'eligibility', na: [] },
+  { c: 'salary_min', na: [] },
+  { c: 'salary_max', na: [] },
+  { c: 'age_min', na: [] },
+  { c: 'age_max', na: [] },
+  { c: 'application_fee', na: [] },
+  { c: 'application_start_date', na: [] },
+  { c: 'apply_link', na: [] },
+  { c: 'official_website', na: [] },
+  { c: 'job_metadata', na: [] },
+];
+
 /**
- * Repair pass for Jobs rows scraped before the JSON-LD backstop existed: rows
- * whose last_date is TBD/blank or whose location is missing get their source
- * page re-fetched and re-parsed. Fixed fields are written back to the sheet and
- * scraped_at is bumped so the hourly sync re-feeds the row; the sync's repair
- * path then patches ONLY the still-deficient fields on the existing DB row (it
- * never re-broadcasts to Telegram).
+ * Repair pass for Jobs rows scraped before the balanced-div body fix + JSON-LD
+ * backstop existed: rows missing last_date, location, vacancies, description,
+ * apply/official links, salary, fees, or metadata get their source page
+ * re-fetched and re-parsed. Only currently-missing cells that now resolve to a
+ * real value are written back, then scraped_at is bumped so the hourly sync
+ * re-feeds the row; the sync's repair path patches the matching still-deficient
+ * DB columns (it never re-broadcasts to Telegram).
  *
  * Run manually from the editor — repeatedly, until the Logs tab reports
  * "0 deficient left". Each run stays inside the Apps Script time budget.
@@ -202,28 +228,29 @@ function backfillDeficientJobs() {
   ensureSheets();
   const deadline = Date.now() + CONFIG.MAX_RUNTIME_MS;
   const rows = readObjects_(CONFIG.TAB_JOBS, JOB_COLUMNS);
+  const missing = function (field, val) {
+    const s = String(val == null ? '' : val).trim();
+    return s === '' || field.na.indexOf(s) !== -1;
+  };
   let fixed = 0, examined = 0, left = 0;
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    const badDate = !r.last_date || r.last_date === CONFIG.NA_DATE;
-    const badLoc = !r.location || r.location === CONFIG.NA_TEXT;
-    if ((!badDate && !badLoc) || !r.source_url) continue;
+    if (!r.source_url) continue;
+    const deficient = BACKFILL_FIELDS_.some(function (f) { return missing(f, r[f.c]); });
+    if (!deficient) continue;
     if (Date.now() >= deadline) { left++; continue; }
     examined++;
     try {
       const html = fetchHtml(r.source_url, 1);
       if (html) {
-        const scraped = parseJobPage(r.source_url, html);
+        const fresh = buildJobRow(parseJobPage(r.source_url, html), r.source_url);
         let changed = false;
-        if (badDate && scraped.last_date) {
-          setCell_(CONFIG.TAB_JOBS, JOB_COLUMNS, r._row, 'last_date', scraped.last_date);
-          setCell_(CONFIG.TAB_JOBS, JOB_COLUMNS, r._row, 'last_date_display', scraped.last_date);
+        BACKFILL_FIELDS_.forEach(function (f) {
+          if (!missing(f, r[f.c]) || missing(f, fresh[f.c])) return; // only fill a gap with a real value
+          setCell_(CONFIG.TAB_JOBS, JOB_COLUMNS, r._row, f.c, fresh[f.c]);
+          if (f.mirror) setCell_(CONFIG.TAB_JOBS, JOB_COLUMNS, r._row, f.mirror, fresh[f.c]);
           changed = true;
-        }
-        if (badLoc && scraped.location) {
-          setCell_(CONFIG.TAB_JOBS, JOB_COLUMNS, r._row, 'location', scraped.location);
-          changed = true;
-        }
+        });
         if (changed) {
           setCell_(CONFIG.TAB_JOBS, JOB_COLUMNS, r._row, 'scraped_at', new Date().toISOString());
           fixed++;

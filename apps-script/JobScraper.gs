@@ -832,6 +832,36 @@ function buildJobRow(scraped, sourceUrl) {
     const tv = String(r.overview.total_vacancies).replace(/[^0-9]/g, '');
     if (/^\d+$/.test(tv)) totalVacancies = parseInt(tv, 10);
   }
+  // Sum the per-post counts when a vacancy table exists but carries no explicit
+  // "Total" row — take the last all-numeric column and add it up across posts.
+  if (!totalVacancies && r.vacancies && r.vacancies.length > 1) {
+    const cols = {};
+    r.vacancies.forEach(function (v) {
+      Object.keys(v).forEach(function (k) {
+        const n = String(v[k]).replace(/,/g, '');
+        if (/^\d{1,6}$/.test(n)) { (cols[k] = cols[k] || []).push(parseInt(n, 10)); }
+      });
+    });
+    const numericCols = Object.keys(cols).filter(function (k) { return cols[k].length === r.vacancies.length; });
+    // Prefer a column whose header names posts/vacancies (avoids summing an
+    // age / serial-no / fee column); fall back to the rightmost numeric one.
+    const named = numericCols.filter(function (k) { return /post|vacan|seat|total/i.test(k); });
+    const pick = named.length ? named[named.length - 1] : (numericCols.length ? numericCols[numericCols.length - 1] : null);
+    if (pick) {
+      const sum = cols[pick].reduce(function (a, b) { return a + b; }, 0);
+      if (sum > 0) totalVacancies = sum;
+    }
+  }
+  // Title almost always states the count ("... for 75 Assistant Engineer ...",
+  // "... Apply Online for 54 Posts"). Require a trailing word so the year in
+  // "Recruitment 2026" is never mistaken for a post count.
+  if (!totalVacancies && r.exam_name) {
+    const tm = r.exam_name.match(/\bfor\s+(\d{1,6})\s+[A-Za-z]/i);
+    if (tm) {
+      const n = parseInt(tm[1], 10);
+      if (n > 0 && n < 100000) totalVacancies = n;
+    }
+  }
   if (totalVacancies) vacanciesDisplay = totalVacancies + ' Posts';
 
   // Application fee (max)
