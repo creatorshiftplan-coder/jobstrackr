@@ -847,7 +847,7 @@ export default function Admin() {
         .in("id", targetIds);
       const descriptionMap = new Map((fullJobs || []).map(j => [j.id, j.description]));
 
-      const { summariseEligibilityBatch } = await import("@/lib/eligibilitySummariser");
+      const { summariseEligibilityBatch, summariseEligibility } = await import("@/lib/eligibilitySummariser");
 
       const buildRawText = (job: CustomJob) => {
         const ageDetails: string[] = [];
@@ -872,41 +872,54 @@ export default function Admin() {
         ].filter(Boolean).join("\n");
       };
 
+      // Persist one job's summary, retrying once as a standalone call if the
+      // batch came back empty for it (catches transient Groq validation
+      // misses without failing the whole job).
+      type Summarised = Awaited<ReturnType<typeof summariseEligibility>>;
+      const persistJob = async (job: CustomJob, batched: Summarised | undefined) => {
+        let result = batched;
+        if (!result || !result.summary) {
+          result = await summariseEligibility(buildRawText(job));
+        }
+        if (!result || !result.summary) {
+          throw new Error("No summary returned");
+        }
+        await supabase
+          .from("jobs")
+          .update({
+            eligibility_summary: result.summary,
+            required_skills: result.required_skills
+          })
+          .eq("id", job.id);
+      };
+
       // Chunk into small batches: each chunk is a single edge-function call
       // that does auth + admin-role check + key loading once for the whole
-      // chunk instead of once per job, while staying short enough to avoid
-      // the edge function's own execution timeout.
-      const BATCH_SIZE = 5;
+      // chunk instead of once per job. Kept small (3) so one invocation stays
+      // well under the Supabase gateway / client request timeout even when
+      // Groq is slow — the "don't time out" half of the fix.
+      const BATCH_SIZE = 3;
       for (let start = 0; start < targetJobs.length; start += BATCH_SIZE) {
         const chunk = targetJobs.slice(start, start + BATCH_SIZE);
+        let results: Awaited<ReturnType<typeof summariseEligibilityBatch>> = [];
         try {
-          const rawTexts = chunk.map(buildRawText);
-          const results = await summariseEligibilityBatch(rawTexts);
-
-          await Promise.all(chunk.map(async (job, i) => {
-            const result = results[i];
-            try {
-              if (result && result.summary) {
-                await supabase
-                  .from("jobs")
-                  .update({
-                    eligibility_summary: result.summary,
-                    required_skills: result.required_skills
-                  })
-                  .eq("id", job.id);
-              } else {
-                throw new Error("No summary returned");
-              }
-              setProcessProgress(p => ({ ...p, current: p.current + 1 }));
-            } catch (err) {
-              console.error(`Error summarizing job ${job.title}:`, err);
-              setProcessProgress(p => ({ ...p, current: p.current + 1, errors: p.errors + 1 }));
-            }
-          }));
+          results = await summariseEligibilityBatch(chunk.map(buildRawText));
         } catch (err) {
-          console.error(`Error summarizing batch starting at ${start}:`, err);
-          setProcessProgress(p => ({ ...p, current: p.current + chunk.length, errors: p.errors + chunk.length }));
+          // summariseEligibilityBatch already self-heals to per-item calls,
+          // so reaching here is unusual — treat as no batch results and let
+          // the per-job retry below take over rather than failing the chunk.
+          console.error(`Batch summarize call threw at ${start}:`, err);
         }
+
+        await Promise.all(chunk.map(async (job, i) => {
+          try {
+            await persistJob(job, results[i]);
+            setProcessProgress(p => ({ ...p, current: p.current + 1 }));
+          } catch (err) {
+            console.error(`Error summarizing job ${job.title}:`, err);
+            setProcessProgress(p => ({ ...p, current: p.current + 1, errors: p.errors + 1 }));
+          }
+        }));
 
         // Pace batches to avoid triggering API rate limits
         await new Promise((resolve) => setTimeout(resolve, 1500));

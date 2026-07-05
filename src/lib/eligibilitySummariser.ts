@@ -45,13 +45,20 @@ export async function summariseEligibility(
 }
 
 /**
- * Summarise many eligibility texts in one `groq-summarize` invocation.
+ * Summarise several eligibility texts in a single `groq-summarize`
+ * invocation (auth + admin-role check + API-key loading happen once for
+ * the whole batch instead of once per item).
  *
- * Calling `summariseEligibility` once per job re-runs auth + admin-role
- * check + API-key loading against Supabase for every single job, which
- * multiplies Supabase round trips for a batch and can trip rate limits /
- * timeouts. This does auth, the role check, and key loading once for the
- * whole batch — the edge function only loops over the actual Groq calls.
+ * Resilience: the batch response shape (`{ results: [...] }`) is only
+ * understood by the *new* deployed edge function. The frontend (Vercel)
+ * and the edge function (manual `supabase functions deploy`) ship on
+ * separate tracks, so they can be out of sync — an old deployed function
+ * ignores `rawEligibilityTexts` and returns `{ summary: null }`, with no
+ * `results` array. Rather than fail every item in that case, we detect the
+ * missing/short `results` array (or a transport error) and transparently
+ * fall back to per-item `summariseEligibility` calls — the proven path
+ * that every deployed version understands. So the batch is a fast path
+ * when available and a graceful degrade, never an all-or-nothing bet.
  */
 export async function summariseEligibilityBatch(
   rawEligibilityTexts: (string | null | undefined)[]
@@ -65,12 +72,25 @@ export async function summariseEligibilityBatch(
     body: { rawEligibilityTexts: texts },
   });
 
-  if (error) {
-    console.error("[Summariser] Edge function batch error:", error.message || error);
-    return texts.map(() => ({ summary: null, required_skills: [] }));
+  // Transport error, or a response that doesn't carry a usable per-item
+  // results array (old function / unexpected shape) → fall back to the
+  // per-item path instead of reporting the whole batch as failed.
+  const results = Array.isArray(data?.results) ? data.results : null;
+  if (error || !results || results.length < texts.length) {
+    if (error) {
+      console.warn(
+        "[Summariser] Batch call failed, falling back to per-item:",
+        error.message || error
+      );
+    } else {
+      console.warn(
+        "[Summariser] Batch response not understood (likely an older " +
+          "deployed groq-summarize), falling back to per-item summarisation."
+      );
+    }
+    return summariseSequentially(texts);
   }
 
-  const results = Array.isArray(data?.results) ? data.results : [];
   return texts.map((_, i) => {
     const r = results[i];
     if (!r || typeof r !== "object") {
@@ -81,4 +101,23 @@ export async function summariseEligibilityBatch(
       required_skills: Array.isArray(r.required_skills) ? r.required_skills : [],
     };
   });
+}
+
+/**
+ * Fallback: summarise each text with its own `summariseEligibility` call,
+ * one after another (kept sequential to avoid hammering Groq rate limits).
+ * Empty texts short-circuit to null without a network round trip.
+ */
+async function summariseSequentially(
+  texts: string[]
+): Promise<SummariserResult[]> {
+  const out: SummariserResult[] = [];
+  for (const text of texts) {
+    if (!text || text.trim().length === 0) {
+      out.push({ summary: null, required_skills: [] });
+      continue;
+    }
+    out.push(await summariseEligibility(text));
+  }
+  return out;
 }
