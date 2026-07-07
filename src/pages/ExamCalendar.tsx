@@ -314,9 +314,13 @@ export default function ExamCalendar() {
   const nextEvent = upcoming[0] ?? null;
   const urgentCount = upcoming.filter((event) => event.daysLeft !== null && event.daysLeft <= 7).length;
 
+  // Count only upcoming (non-past) events so the chip numbers match what the
+  // Timeline list and calendar grid actually show. Counting `allEvents` here
+  // advertised historical dates the views never render (e.g. "Deadlines 6" but
+  // one row), because most tracked dates are already in the past.
   const counts = useMemo(() => {
     const result: Record<FilterKey, number> = {
-      all: allEvents.length,
+      all: 0,
       apply_start: 0,
       apply_end: 0,
       exam_date: 0,
@@ -324,7 +328,11 @@ export default function ExamCalendar() {
       result: 0,
       answer_key: 0,
     };
-    for (const event of allEvents) result[event.type] += 1;
+    for (const event of allEvents) {
+      if (event.isPast) continue;
+      result.all += 1;
+      result[event.type] += 1;
+    }
     return result;
   }, [allEvents]);
 

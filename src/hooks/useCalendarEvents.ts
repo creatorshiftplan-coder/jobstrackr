@@ -82,17 +82,20 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
   const upcoming = useMemo(() => filtered.filter((e) => !e.isPast), [filtered]);
   const past = useMemo(() => filtered.filter((e) => e.isPast), [filtered]);
 
-  // Map of 'YYYY-MM-DD' → events[] for calendar grid dots (respects active filter)
+  // Map of 'YYYY-MM-DD' → events[] for calendar grid dots (respects active filter).
+  // Built from `upcoming`, not `filtered`, so the grid dots and the chip counts
+  // both reflect only future events — otherwise a user whose tracked dates are
+  // mostly in the past sees marker dots the "upcoming" counts don't explain.
   const byDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
-    for (const e of filtered) {
+    for (const e of upcoming) {
       const key = dateKey(e.date);
       const list = map.get(key);
       if (list) list.push(e);
       else map.set(key, [e]);
     }
     return map;
-  }, [filtered]);
+  }, [upcoming]);
 
   return {
     allEvents,
