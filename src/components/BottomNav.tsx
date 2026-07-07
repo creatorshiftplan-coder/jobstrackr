@@ -71,7 +71,7 @@ export function BottomNav() {
                     strokeWidth={isActive ? 2.5 : 2}
                   />
                   <span
-                    className="text-[10px] leading-none whitespace-nowrap transition-colors duration-300"
+                    className="text-[9px] leading-none whitespace-nowrap transition-colors duration-300"
                     style={{
                       color: isActive ? color : "currentColor",
                       fontWeight: isActive ? 500 : 400,
