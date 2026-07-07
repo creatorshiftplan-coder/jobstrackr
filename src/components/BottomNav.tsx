@@ -46,7 +46,7 @@ export function BottomNav() {
 
       {/* Navigation Links */}
       <ul className="flex w-[290px] h-full items-center relative z-10 p-0 m-0">
-        {navItems.map(({ icon: Icon, path, color }, index) => {
+        {navItems.map(({ icon: Icon, label, path, color }, index) => {
           const isActive = activeIndex === index;
           return (
             <li
@@ -58,19 +58,27 @@ export function BottomNav() {
                 className="flex items-center justify-center w-full h-full text-muted-foreground/60 no-underline"
               >
                 <span
-                  className="relative flex items-center justify-center w-[42px] h-[42px] rounded-full transition-all duration-300 ease-out cursor-pointer"
+                  className="relative flex flex-col items-center justify-center gap-0.5 transition-all duration-300 ease-out cursor-pointer"
                   style={{
-                    transform: isActive ? "scale(1.12)" : "scale(1)",
                     opacity: isActive ? 1 : 0.7,
                   }}
                 >
                   <Icon
-                    className="h-[22px] w-[22px] transition-colors duration-300"
+                    className="h-5 w-5 transition-colors duration-300"
                     style={{
                       color: isActive ? color : "currentColor",
                     }}
                     strokeWidth={isActive ? 2.5 : 2}
                   />
+                  <span
+                    className="text-[10px] leading-none whitespace-nowrap transition-colors duration-300"
+                    style={{
+                      color: isActive ? color : "currentColor",
+                      fontWeight: isActive ? 500 : 400,
+                    }}
+                  >
+                    {label}
+                  </span>
                 </span>
               </Link>
             </li>
