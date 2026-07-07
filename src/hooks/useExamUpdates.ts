@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { sortByTitleMatch, tokenizeTitle } from "@/lib/titleMatcher";
+import { sortByTitleMatch, tokenizeTitle, hasExamIdentityConflict } from "@/lib/titleMatcher";
 import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 
 /**
@@ -158,12 +158,14 @@ export function useExamUpdatesForJob(jobId: string | undefined, jobTitle: string
 }
 
 /**
- * Fetch exam_updates linked to a tracked exam (by exam_id or exam name keyword fallback)
+ * Fetch exam_updates linked to a tracked exam (by exam_id or exam name keyword fallback).
+ * Exported so other hooks (e.g. the exam calendar) can share the same query
+ * cache — always pair it with the ["exam-updates-for-exam", examId, examName] key.
  */
-export function useExamUpdatesForExam(examId: string | undefined, examName: string | undefined) {
-  return useQuery({
-    queryKey: ["exam-updates-for-exam", examId, examName],
-    queryFn: async (): Promise<ExamUpdateItem[]> => {
+export async function fetchExamUpdatesForExam(
+  examId: string | undefined,
+  examName: string | undefined
+): Promise<ExamUpdateItem[]> {
       // First try direct exam_id link
       if (examId) {
         const { data: byExamId, error: err1 } = await (supabase.from as any)("exam_updates")
@@ -177,7 +179,11 @@ export function useExamUpdatesForExam(examId: string | undefined, examName: stri
         }
       }
 
-      // Fallback: fuzzy keyword search on exam name
+      // Fallback: fuzzy keyword search on exam name.
+      // Precision matters more than recall here — these results render as the
+      // exam's own Important Dates / Quick Links / Latest Updates, so a wrong
+      // match pollutes the whole card. Candidates that name a different exam
+      // identity (org, tier, state, force) are rejected before scoring.
       if (examName) {
         const keywords = tokenizeTitle(examName)
           .filter((w) => w.length > 2)
@@ -192,31 +198,25 @@ export function useExamUpdatesForExam(examId: string | undefined, examName: stri
             .limit(50);
 
           if (!err2 && byName && byName.length > 0) {
-            const matched = sortByTitleMatch(examName, byName as ExamUpdateItem[], (update) => update.title, 30).slice(0, 20);
+            const sameExam = (byName as ExamUpdateItem[]).filter(
+              (update) => !hasExamIdentityConflict(examName, update.title)
+            );
+            const matched = sortByTitleMatch(examName, sameExam, (update) => update.title).slice(0, 20);
             if (matched.length > 0) return filterFreeJobAlertFromUpdates(matched);
-          }
-
-          // Secondary fallback: use only first 3 core tokens for broader matching
-          const coreKeywords = keywords.slice(0, 3);
-          if (coreKeywords.length > 0) {
-            const coreOrQuery = coreKeywords.map((keyword) => `title.ilike.%${keyword}%`).join(",");
-            const { data: byCore, error: err3 } = await (supabase.from as any)("exam_updates")
-              .select(LIGHT_UPDATE_COLS)
-              .or(coreOrQuery)
-              .order("scraped_at", { ascending: false })
-              .limit(50);
-
-            if (!err3 && byCore && byCore.length > 0) {
-              return filterFreeJobAlertFromUpdates(
-                sortByTitleMatch(examName, byCore as ExamUpdateItem[], (update) => update.title, 25).slice(0, 20)
-              );
-            }
           }
         }
       }
 
       return [];
-    },
+}
+
+/**
+ * Fetch exam_updates linked to a tracked exam (by exam_id or exam name keyword fallback)
+ */
+export function useExamUpdatesForExam(examId: string | undefined, examName: string | undefined) {
+  return useQuery({
+    queryKey: ["exam-updates-for-exam", examId, examName],
+    queryFn: () => fetchExamUpdatesForExam(examId, examName),
     enabled: !!(examId || examName),
     staleTime: 5 * 60 * 1000,
   });

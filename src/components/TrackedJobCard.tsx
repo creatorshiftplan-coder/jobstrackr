@@ -318,12 +318,23 @@ function hasDatePassed(dateStr: string): boolean {
   }
 }
 
+/** True when an event/link is a social-channel promo (WhatsApp/Telegram join) */
+function isSocialChannelDate(event: string, link: string): boolean {
+  const text = `${event || ""} ${link || ""}`.toLowerCase();
+  return (
+    text.includes("whatsapp") ||
+    text.includes("telegram") ||
+    text.includes("t.me/")
+  );
+}
+
 /** Merge + deduplicate important_dates from multiple ExamUpdateItems */
 function mergeImportantDates(updates: ExamUpdateItem[]): MergedDate[] {
   const seen = new Map<string, MergedDate>();
 
   for (const update of updates.slice(0, 5)) {
     for (const d of (update.important_dates || [])) {
+      if (isSocialChannelDate(d.event, d.link)) continue;
       const key = normalizeEventName(d.event);
       if (!key || seen.has(key)) continue;
       seen.set(key, {
@@ -730,6 +741,14 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
             </button>
           </div>
 
+          {/* Refresh prompt */}
+          <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2">
+            <RefreshCw className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
+            <p className="text-xs text-muted-foreground">
+              Tap <span className="font-medium text-primary">Refresh Status</span> below for the latest updates.
+            </p>
+          </div>
+
           {/* Phase 2 Content */}
           {activePhase === 2 && (
             isPhase2Available(statusData) ? (
@@ -1044,14 +1063,20 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
                           )} />
                           {/* Event name */}
                           <span className={cn(
-                            "flex-1 truncate",
-                            d.isPassed ? "text-muted-foreground line-through" : "text-foreground"
+                            "flex-1 min-w-0 truncate",
+                            d.isPassed ? "text-muted-foreground" : "text-foreground"
                           )}>
                             {d.event}
                           </span>
+                          {/* Passed indicator */}
+                          {d.isPassed && (
+                            <span className="flex-shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                              Passed
+                            </span>
+                          )}
                           {/* Date value */}
                           <span className={cn(
-                            "font-semibold whitespace-nowrap",
+                            "font-semibold min-w-0 text-right",
                             d.isPassed ? "text-muted-foreground" : "text-foreground"
                           )}>
                             {d.date}

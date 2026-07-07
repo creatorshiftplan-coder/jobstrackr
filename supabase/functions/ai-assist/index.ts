@@ -387,6 +387,65 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
       result = { raw_response: aiContent };
     }
 
+    // Normalize the response into the canonical shape (predicted_events +
+    // phases.phaseN) so new cache rows never require readers to shape-sniff
+    // the legacy variants (phase_1/phase_2, flat exam_dates/last_date_to_apply,
+    // event_type aliases). Flat fields are kept for old readers; readers keep
+    // their fallbacks for rows cached before this change.
+    const normalizeStatusResponse = (res: Record<string, any>): Record<string, any> => {
+      // 1) Fold legacy phase_1/phase_2 objects into phases.phaseN (never overwrite)
+      const phases = res.phases && typeof res.phases === "object" ? res.phases : {};
+      for (const [legacyKey, canonKey] of [["phase_1", "phase1"], ["phase_2", "phase2"]] as const) {
+        const legacy = res[legacyKey];
+        if (legacy && typeof legacy === "object") {
+          phases[canonKey] = { ...legacy, ...(phases[canonKey] ?? {}) };
+          delete res[legacyKey];
+        }
+      }
+      if (Object.keys(phases).length > 0) res.phases = phases;
+
+      // 2) Canonicalize predicted_events: alias event types, unify the date
+      // field, drop entries with no usable date
+      const isDate = (d: unknown): d is string =>
+        typeof d === "string" && !!d.trim() && d.trim().toLowerCase() !== "null";
+      const aliases: Record<string, string> = { exam: "exam_date", examination: "exam_date" };
+      const events = (Array.isArray(res.predicted_events) ? res.predicted_events : [])
+        .filter((e: any) => e && typeof e === "object")
+        .map((e: any) => {
+          const type = String(e.event_type ?? "").toLowerCase();
+          return { ...e, event_type: aliases[type] ?? type, predicted_date: e.predicted_date ?? e.date };
+        })
+        .filter((e: any) => isDate(e.predicted_date));
+
+      // 3) Synthesize events for types the AI expressed only in structured or
+      // flat fields, so predicted_events is the complete canonical source
+      const hasType = (t: string) => events.some((e: any) => e.event_type === t);
+      const addEvent = (event_type: string, date: unknown, phase?: number) => {
+        if (!isDate(date)) return;
+        events.push(phase ? { event_type, predicted_date: date, phase } : { event_type, predicted_date: date });
+      };
+      if (!hasType("exam_date")) {
+        addEvent("exam_date", phases.phase1?.exam_date, 1);
+        addEvent("exam_date", phases.phase2?.exam_date, 2);
+        if (!hasType("exam_date")) addEvent("exam_date", res.exam_dates ?? res.exam_date);
+      }
+      if (!hasType("result")) {
+        addEvent("result", phases.phase1?.result_date, 1);
+        addEvent("result", phases.phase2?.result_date, 2);
+        if (!hasType("result")) addEvent("result", res.expected_result_date);
+      }
+      if (!hasType("application_close")) addEvent("application_close", res.last_date_to_apply);
+
+      // Assign the cleaned list whenever we have events or the raw key existed —
+      // otherwise junk-only input would survive untouched on res
+      if (events.length > 0 || Array.isArray(res.predicted_events)) res.predicted_events = events;
+      return res;
+    };
+
+    if (!("raw_response" in result)) {
+      result = normalizeStatusResponse(result as Record<string, any>);
+    }
+
     // Helper function to validate AI response before caching
     const isValidStatusResponse = (res: Record<string, unknown>): boolean => {
       // Must be an object

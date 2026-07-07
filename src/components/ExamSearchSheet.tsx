@@ -27,7 +27,7 @@ export function ExamSearchSheet({ trigger }: ExamSearchSheetProps) {
   const [isAddingAIResult, setIsAddingAIResult] = useState(false);
   const [isAddingJob, setIsAddingJob] = useState(false);
 
-  const { exams, addExamAttempt } = useExams();
+  const { exams, addExamAttempt } = useExams({ includeExamCatalog: true });
   const { data: jobs = [] } = useJobs();
   const { isSearching, aiResults, searchWithAI, clearAIResults } = useAIJobSearch();
   const { trackExamTracked, trackAISearchUsed } = useAnalytics();

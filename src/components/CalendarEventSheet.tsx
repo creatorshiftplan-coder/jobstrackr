@@ -48,6 +48,11 @@ export function CalendarEventSheet({ event, onClose }: CalendarEventSheetProps) 
                 <Clock className="h-3 w-3" />
                 {statusText(event)}
               </span>
+              {event.isTentative && (
+                <span className="rounded-full border border-amber-300/60 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-700/60 dark:text-amber-300">
+                  Tentative — exact day not announced
+                </span>
+              )}
             </div>
             <SheetTitle className="pt-2 text-xl leading-snug text-foreground">{event.title}</SheetTitle>
           </SheetHeader>

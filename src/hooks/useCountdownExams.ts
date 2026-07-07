@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ExamUpdateItem } from "@/hooks/useExamUpdates";
 import { useJobs } from "@/hooks/useJobs";
 import { Job } from "@/types/job";
-import { dateKey } from "@/lib/calendarEvents";
+import { dateKey, trimTitleToYear } from "@/lib/calendarEvents";
 
 export type CountdownSource = "exam_update" | "job";
 
@@ -46,6 +46,20 @@ const UNCERTAIN_DATE_RE =
   /\b(tbd|to\s*be\s*(announced|declared|notified)|tentative|expected|awaited|soon|likely|provisional|monitor|communicated|click\s*here|login|relevant|official\s*website)\b/i;
 // A bare 4-digit year ("2026") parses to Jan 1 — too coarse for a countdown.
 const YEAR_ONLY_RE = /^\s*\d{4}\s*$/;
+
+// Article categories that summarise a *past* or non-schedulable event. A
+// countdown built from one of these shows the article's own title — e.g.
+// "RRB NTPC CBT 1 Result 2026" — over an exam date scraped from its body (often
+// a tentative next-phase date), which reads as a mismatch. Upcoming exams always
+// have their own notification / admit-card / news article carrying the date with
+// a correct title, so dropping these categories loses no genuine countdown.
+const NON_COUNTDOWN_CATEGORIES = new Set([
+  "result",
+  "cutoff",
+  "answer_key",
+  "answerkey",
+  "syllabus",
+]);
 
 const MONTHS: Record<string, number> = {
   jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
@@ -124,21 +138,17 @@ function parseExamDate(raw: string | null | undefined): Date | null {
 function isExamEvent(eventLabel: string | undefined): boolean {
   if (!eventLabel) return false;
   if (EXCLUDE_EVENT_RE.test(eventLabel)) return false;
+  // A label like "CBT 2 Tentative Date" names an exam but isn't a firm date —
+  // never count down to a tentative / expected / provisional sitting.
+  if (UNCERTAIN_DATE_RE.test(eventLabel)) return false;
   return EXAM_EVENT_RE.test(eventLabel);
 }
 
-/**
- * Trim a title to end at its first 4-digit year, dropping trailing noise like
- * ": register Online" or "Notification Out". "AIIMS CRE-5 Recruitment 2026:
- * register Online" → "AIIMS CRE-5 Recruitment 2026". Used everywhere the
- * countdown title is shown — card, share image, share caption.
- */
-export function trimTitleToYear(title: string | null | undefined): string {
-  const t = (title || "").trim();
-  const m = t.match(/\b(20\d{2})\b/);
-  if (!m) return t;
-  return t.slice(0, (m.index ?? 0) + m[1].length).trim();
-}
+// Trim a title to end at its first 4-digit year (drops ": register Online",
+// "Notification Out", etc.). Defined in calendarEvents so both the countdown
+// wall and the calendar share one implementation; re-exported here to preserve
+// the existing `@/hooks/useCountdownExams` import path used across the app.
+export { trimTitleToYear };
 
 function startOfToday(): Date {
   const d = new Date();
@@ -158,6 +168,12 @@ function daysBetween(from: Date, to: Date): number {
 export function examUpdateToCountdownItems(update: ExamUpdateItem): CountdownItem[] {
   const today = startOfToday();
   const out: CountdownItem[] = [];
+
+  // Result / cutoff / answer-key / syllabus articles are about exams already
+  // sat — skip them wholesale so their titles never head an "upcoming" card.
+  if (NON_COUNTDOWN_CATEGORIES.has((update.category || "").trim().toLowerCase())) {
+    return out;
+  }
 
   for (const d of update.important_dates ?? []) {
     if (!isExamEvent(d?.event)) continue;

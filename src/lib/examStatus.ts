@@ -71,7 +71,7 @@ function isUncertainDateText(text?: string): boolean {
     return /tbd|to be announced|to be declared|tentative|expected|awaited|soon|likely|provisional/.test(t);
 }
 
-function hasDayPrecision(dateStr?: string): boolean {
+export function hasDayPrecision(dateStr?: string): boolean {
     if (!dateStr) return false;
     const t = dateStr.toLowerCase();
     if (isUncertainDateText(t)) return false;

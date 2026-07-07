@@ -47,16 +47,32 @@ export function useJobForExam(examName: string | undefined) {
 
             if (keywords.length === 0) return null;
 
+            // Two-step to keep egress down: score candidates on id+title only
+            // (sortByTitleMatch reads nothing else), then fetch the single
+            // winning row in full. Previously this pulled 50 complete job rows
+            // (descriptions included) to keep one.
             const orQuery = keywords.map((keyword) => `title.ilike.%${keyword}%`).join(",");
             const { data: keywordMatches } = await supabase
                 .from("jobs")
-                .select("*")
+                .select("id, title")
                 .or(orQuery)
                 .order("created_at", { ascending: false })
                 .limit(50);
 
             if (keywordMatches && keywordMatches.length > 0) {
-                return sortByTitleMatch(normalizedName, keywordMatches as Job[], (job) => job.title)[0] || null;
+                const best = sortByTitleMatch(
+                    normalizedName,
+                    keywordMatches as { id: string; title: string }[],
+                    (job) => job.title
+                )[0];
+                if (!best) return null;
+
+                const { data: fullJob } = await supabase
+                    .from("jobs")
+                    .select("*")
+                    .eq("id", best.id)
+                    .maybeSingle();
+                return (fullJob as Job) || null;
             }
 
             return null;

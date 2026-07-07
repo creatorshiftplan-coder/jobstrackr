@@ -18,9 +18,14 @@ export function useSavedJobs() {
     queryFn: async (): Promise<SavedJob[]> => {
       if (!user) return [];
       
+      // Light job columns — the same set the useJobs list views render from,
+      // plus application_start_date for the calendar. Deliberately omits the
+      // heavy `description` (detail pages fetch the full row by slug/id).
       const { data, error } = await supabase
         .from("saved_jobs")
-        .select("job_id, created_at, jobs(*)")
+        .select(
+          "job_id, created_at, jobs(id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, eligibility, experience, salary_min, salary_max, age_min, age_max, application_fee, job_metadata, is_featured, admin_refreshed_at, created_at, updated_at, tags, eligibility_summary, required_skills, application_start_date, apply_link)"
+        )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 

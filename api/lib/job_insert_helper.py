@@ -5,7 +5,7 @@ Handles duplicate checks, date parsing, and record building.
 
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Optional
 
 from supabase import create_client
@@ -46,18 +46,29 @@ def _strip_time_text(value: str) -> str:
     return cleaned.strip() or value
 
 
-def parse_date_safe(raw: str | None) -> str:
+def parse_date_safe(raw: str | None) -> Optional[str]:
     """
-    Parse a scraped date string into ISO YYYY-MM-DD.
-    Falls back to 1 year from today for unparseable/TBD values.
+    Parse a scraped date string into ISO YYYY-MM-DD, or return None when the
+    value is missing, a TBD-like marker, or unparseable.
+
+    IMPORTANT: this must NOT invent a date. It previously fell back to
+    `today + 365 days` "so the job stays active", but that fabricated deadline
+    was stored in `last_date` and then rendered as a real application deadline —
+    corrupting ~63% of jobs on the Exam Calendar (all showing a date exactly one
+    year after they were scraped). "Active vs expired" is handled without a real
+    date: the frontend treats an unparseable/TBD last_date as active
+    (isJobActive → parseJobDeadline returns null → active) and the
+    recommendations RPC skips the expiry cast for non-ISO values. So the caller
+    substitutes the right sentinel — "TBD" for the TEXT last_date column, NULL
+    for the DATE application_start_date column.
     """
     if not raw or str(raw).lower() in ("n/a", "not mentioned", "-", "na", "nil"):
-        return (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
+        return None
 
     tbd = ["tbd", "to be announced", "walk in", "walk-in", "walkin",
            "not available", "not applicable", "various", "multiple", "as per rules"]
     if any(p in str(raw).lower() for p in tbd):
-        return (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
+        return None
 
     # Try scraper_v5 parse_date first (handles DD/MM/YYYY, named months, etc.)
     parsed = parse_date(raw)
@@ -87,8 +98,8 @@ def parse_date_safe(raw: str | None) -> str:
     except ValueError:
         pass
 
-    # Unparseable — future date so job stays active
-    return (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
+    # Unparseable — leave it to the caller's sentinel (do NOT fabricate a date).
+    return None
 
 
 def is_duplicate_by_title(supabase, title: str) -> bool:
@@ -152,15 +163,18 @@ def build_job_record(scraped: dict) -> dict[str, Any]:
         if fees:
             app_fee = max(fees)
 
-    # Dates
+    # Dates. last_date is a NOT NULL TEXT column, so an unknown deadline becomes
+    # the "TBD" sentinel (matches the Apps Script feed's CONFIG.NA_DATE and the
+    # frontend's isTBDDate handling) — never a fabricated future date.
+    # application_start_date is a nullable DATE column, so unknown stays NULL.
     last_date_raw = r.get("last_date")
-    last_date = parse_date_safe(last_date_raw)
+    last_date = parse_date_safe(last_date_raw) or "TBD"
     last_date_display = last_date_raw or None
 
     apply_start_raw = None
     if r.get("important_dates") and isinstance(r["important_dates"], dict):
         apply_start_raw = r["important_dates"].get("apply_start")
-    application_start_date = parse_date_safe(apply_start_raw) if apply_start_raw else None
+    application_start_date = parse_date_safe(apply_start_raw)
 
     # Location cleanup
     def clean_loc(loc: str | None) -> str:

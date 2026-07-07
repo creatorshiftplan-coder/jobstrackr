@@ -24,6 +24,11 @@ function eventUrl(event: CalendarEvent): string {
     : "https://jobstrackr.in/calendar";
 }
 
+/** Exported titles must carry the tentative marker — a synced calendar can't show our badge */
+function exportTitle(event: CalendarEvent): string {
+  return event.isTentative ? `${event.title} (Tentative)` : event.title;
+}
+
 export function generateICS(events: CalendarEvent[]): string {
   const now = formatICSTimestamp(new Date());
   const lines = [
@@ -46,13 +51,13 @@ export function generateICS(events: CalendarEvent[]): string {
       `DTSTAMP:${now}`,
       `DTSTART;VALUE=DATE:${dtStart}`,
       `DTEND;VALUE=DATE:${dtEnd}`,
-      `SUMMARY:${escapeICS(event.title)}`,
+      `SUMMARY:${escapeICS(exportTitle(event))}`,
       `DESCRIPTION:${escapeICS(`${event.org}\nJobsTrackr.in`)}`,
       `URL:${eventUrl(event)}`,
       "BEGIN:VALARM",
       "TRIGGER:-P1D", // 1 day reminder
       "ACTION:DISPLAY",
-      `DESCRIPTION:${escapeICS(`Tomorrow: ${event.title}`)}`,
+      `DESCRIPTION:${escapeICS(`Tomorrow: ${exportTitle(event)}`)}`,
       "END:VALARM",
       "END:VEVENT"
     );
@@ -78,7 +83,7 @@ export function generateGoogleCalendarUrl(event: CalendarEvent): string {
 
   const params = new URLSearchParams({
     action: "TEMPLATE",
-    text: event.title,
+    text: exportTitle(event),
     dates: `${start}/${end}`,
     details: `${event.org}\n\nView on JobsTrackr: ${eventUrl(event)}`,
     sf: "true",

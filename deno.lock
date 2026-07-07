@@ -63,6 +63,7 @@
         "npm:eslint@^9.32.0",
         "npm:framer-motion@^12.23.26",
         "npm:globals@^15.15.0",
+        "npm:html-to-image@^1.11.13",
         "npm:idb-keyval@^6.2.5",
         "npm:input-otp@^1.4.2",
         "npm:lottie-react@^2.4.1",
@@ -84,6 +85,7 @@
         "npm:typescript@^5.8.3",
         "npm:vaul@~0.9.9",
         "npm:vite@^5.4.19",
+        "npm:vitest@^2.1.9",
         "npm:zod@^3.25.76"
       ]
     }

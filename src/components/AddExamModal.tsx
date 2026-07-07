@@ -29,7 +29,7 @@ export function AddExamModal({ trigger }: AddExamModalProps) {
   const [newExamName, setNewExamName] = useState("");
   const [newExamBody, setNewExamBody] = useState("");
 
-  const { exams, isLoading, addExamAttempt, createExam } = useExams();
+  const { exams, isLoading, addExamAttempt, createExam } = useExams({ includeExamCatalog: true });
 
   const filteredExams = exams.filter(
     (exam) =>

@@ -107,6 +107,11 @@ function EventRow({
             <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold", config.badgeClass)}>
               {config.label}
             </span>
+            {event.isTentative && (
+              <span className="shrink-0 rounded-full border border-amber-300/60 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-700/60 dark:text-amber-300">
+                Tentative
+              </span>
+            )}
           </div>
           <p className="truncate text-sm font-semibold text-foreground">{event.title}</p>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">

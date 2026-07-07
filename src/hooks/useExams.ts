@@ -48,7 +48,10 @@ export interface ExamCredentials {
 export function useExams(options: UseExamsOptions = {}) {
   const {
     enabled = true,
-    includeExamCatalog = true,
+    // Opt-in: only the Add-Exam pickers (ExamSearchSheet, AddExamModal) read the
+    // catalog. Defaulting to true made every useExams() caller (TrackedJobCard,
+    // JobDetails, Profile…) download the whole exams table — a top egress cost.
+    includeExamCatalog = false,
     includeUserExams = true,
   } = options;
   const { user } = useAuth();
@@ -57,14 +60,16 @@ export function useExams(options: UseExamsOptions = {}) {
   const examsQuery = useQuery({
     queryKey: ["exams"],
     queryFn: async (): Promise<Exam[]> => {
+      // Light columns only — the pickers show name/body; ai_cached_response
+      // (the heavy AI JSON) is fetched via exam_attempts joins where needed.
       const { data, error } = await supabase
         .from("exams")
-        .select("*")
+        .select("id, name, conducting_body, category, official_website")
         .eq("is_active", true)
         .order("name");
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as Exam[];
     },
     enabled: enabled && includeExamCatalog,
     staleTime: 1000 * 60 * 10, // 10 minutes — exam catalog changes infrequently

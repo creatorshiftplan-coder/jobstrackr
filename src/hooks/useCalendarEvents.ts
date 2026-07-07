@@ -1,13 +1,16 @@
 import { useMemo } from "react";
+import { useQueries } from "@tanstack/react-query";
 import { useExams } from "@/hooks/useExams";
 import { useSavedJobs } from "@/hooks/useSavedJobs";
 import { useUserCalendarEvents } from "@/hooks/useUserCalendarEvents";
+import { fetchExamUpdatesForExam, ExamUpdateItem } from "@/hooks/useExamUpdates";
 import { Job } from "@/types/job";
 import {
   buildCalendarEvents,
   dateKey,
   CalendarEvent,
   CalendarEventType,
+  ScrapedExamDates,
 } from "@/lib/calendarEvents";
 
 interface UseCalendarEventsOptions {
@@ -23,6 +26,40 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
   const { data: savedJobsData, isLoading: savedLoading } = useSavedJobs();
   const { userEvents, isLoading: customLoading } = useUserCalendarEvents();
 
+  // Scraped, exam-matched important_dates for each tracked exam. Same query
+  // keys as useExamUpdatesForExam (TrackedJobCard), so the cache is shared and
+  // visiting My Exams or the calendar warms the other for free.
+  const scrapedDates = useQueries({
+    queries: userExams.map((attempt) => ({
+      queryKey: ["exam-updates-for-exam", attempt.exams?.id, attempt.exams?.name],
+      queryFn: () => fetchExamUpdatesForExam(attempt.exams?.id, attempt.exams?.name),
+      enabled: !!(attempt.exams?.id || attempt.exams?.name),
+      staleTime: 5 * 60 * 1000,
+    })),
+    combine: (results) => {
+      const out: ScrapedExamDates[] = [];
+      results.forEach((result, i) => {
+        const attempt = userExams[i];
+        if (!attempt) return;
+        const updates = (result.data ?? []) as ExamUpdateItem[];
+        const dates = updates
+          .slice(0, 5)
+          .flatMap((u) => u.important_dates || [])
+          .filter((d) => d?.event && d?.date);
+        if (dates.length > 0) {
+          out.push({
+            attemptId: attempt.id,
+            examName: attempt.exams?.name ?? "Exam",
+            org: attempt.exams?.conducting_body ?? "",
+            dates,
+          });
+        }
+      });
+      // Stable identity between renders: recompute only when payload changes
+      return out;
+    },
+  });
+
   // De-dupe saved jobs by id so a job saved more than once is processed once.
   const jobs = useMemo(() => {
     const byId = new Map<string, Job>();
@@ -33,8 +70,8 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
   }, [savedJobsData]);
 
   const allEvents = useMemo(
-    () => buildCalendarEvents(jobs, userExams, userEvents),
-    [jobs, userExams, userEvents]
+    () => buildCalendarEvents(jobs, userExams, userEvents, scrapedDates),
+    [jobs, userExams, userEvents, scrapedDates]
   );
 
   const filtered = useMemo(() => {

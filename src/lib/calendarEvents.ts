@@ -1,4 +1,4 @@
-import { parseFlexibleDate, getExamDateText } from "@/lib/examStatus";
+import { parseFlexibleDate, getExamDateText, hasDayPrecision } from "@/lib/examStatus";
 import { Job } from "@/types/job";
 import { ExamAttempt } from "@/hooks/useExams";
 import { UserCalendarEvent } from "@/hooks/useUserCalendarEvents";
@@ -22,6 +22,40 @@ export interface CalendarEvent {
   sourceSlug: string | null; // job.slug for navigation
   isPast: boolean; // date < today (start of day)
   daysLeft: number | null; // null if past
+  // True when the raw date had no exact day ("August 2026", "expected July") —
+  // Date parsing lands those on the 1st of the month, so the plotted day is a guess.
+  isTentative: boolean;
+}
+
+/** Scraped important_dates for one tracked exam attempt (from exam_updates) */
+export interface ScrapedExamDates {
+  attemptId: string;
+  examName: string;
+  org: string;
+  dates: { event: string; date: string }[];
+}
+
+/**
+ * Map a scraped important_dates event label to a calendar event type.
+ * Returns null for labels that don't correspond to a calendar type
+ * (notification, fee, city slip …) — those are skipped rather than guessed.
+ * Order matters: "Last Date to Apply" contains both "apply" and "date".
+ */
+export function classifyImportantDate(event: string): CalendarEventType | null {
+  const t = (event || "").toLowerCase();
+  if (!t) return null;
+  if (t.includes("admit") || t.includes("hall ticket") || t.includes("call letter")) return "admit_card";
+  if (t.includes("answer key") || t.includes("answer")) return "answer_key";
+  if (t.includes("result") || t.includes("merit") || t.includes("score")) return "result";
+  if (t.includes("apply") || t.includes("application") || t.includes("registration") || t.includes("online form")) {
+    if (t.includes("start") || t.includes("begin") || t.includes("open") || t.includes("from")) return "apply_start";
+    if (t.includes("last") || t.includes("end") || t.includes("clos") || t.includes("till") || t.includes("final") || t.includes("reopen")) return "apply_end";
+    return null; // correction windows, fee payment, etc.
+  }
+  if (t.includes("last date")) return "apply_end";
+  if (t.includes("city") || t.includes("slip")) return null; // city-intimation slips aren't exam days
+  if (t.includes("exam") || t.includes("cbt") || t.includes("written") || t.includes("interview") || t.includes("pet") || t.includes("pst") || t.includes(" dv")) return "exam_date";
+  return null;
 }
 
 export const EVENT_TYPE_CONFIG: Record<
@@ -66,6 +100,21 @@ export const EVENT_TYPE_CONFIG: Record<
   },
 };
 
+/**
+ * Trim a scraped title to end at its first 4-digit year, dropping trailing
+ * action/marketing tails like ": Apply Online 25 May to 23 June" or
+ * "Notification Out – get Link Here". Without this a job's exam-date row reads
+ * "RSSB … Recruitment 2026 - Apply Online by 23 June — Exam Date", which looks
+ * like an application deadline sitting under the Exams filter. Returns the input
+ * unchanged when no year is present. (Also re-exported from useCountdownExams.)
+ */
+export function trimTitleToYear(title: string | null | undefined): string {
+  const t = (title || "").trim();
+  const m = t.match(/\b(20\d{2})\b/);
+  if (!m) return t;
+  return t.slice(0, (m.index ?? 0) + m[1].length).trim();
+}
+
 /** Local-timezone YYYY-MM-DD key — toISOString() would shift dates for IST users */
 export function dateKey(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -76,7 +125,8 @@ export function dateKey(d: Date): string {
 export function buildCalendarEvents(
   jobs: Job[],
   examAttempts: ExamAttempt[],
-  customEvents: UserCalendarEvent[] = []
+  customEvents: UserCalendarEvent[] = [],
+  scrapedExamDates: ScrapedExamDates[] = []
 ): CalendarEvent[] {
   const events: CalendarEvent[] = [];
   const seen = new Set<string>();
@@ -125,7 +175,9 @@ export function buildCalendarEvents(
       daysLeft: isPast
         ? null
         : Math.round((date.getTime() - startOfToday.getTime()) / 86400000),
+      isTentative: !hasDayPrecision(rawDate),
     });
+    return true;
   };
 
   // ── From profile-matched jobs ──────────────────────────
@@ -135,7 +187,7 @@ export function buildCalendarEvents(
       sourceType: "job" as const,
       sourceId: job.id,
       sourceSlug: job.slug ?? null,
-      label: job.title,
+      label: trimTitleToYear(job.title),
       org: job.department,
     };
 
@@ -174,6 +226,29 @@ export function buildCalendarEvents(
       }));
   };
 
+  // Scraped important_dates (exam-matched exam_updates) are the freshest source,
+  // so they're processed first; any type they cover is skipped in the AI cache
+  // below to avoid showing two contradictory dates for the same thing.
+  const scrapedTypes = new Map<string, Set<CalendarEventType>>();
+  for (const scraped of scrapedExamDates) {
+    const source = {
+      sourceType: "exam" as const,
+      sourceId: scraped.attemptId,
+      sourceSlug: null,
+      label: scraped.examName,
+      org: scraped.org,
+    };
+    for (const d of scraped.dates) {
+      const type = classifyImportantDate(d.event);
+      if (!type) continue;
+      if (push(d.date, type, d.event.trim(), source)) {
+        let covered = scrapedTypes.get(scraped.attemptId);
+        if (!covered) scrapedTypes.set(scraped.attemptId, (covered = new Set()));
+        covered.add(type);
+      }
+    }
+  }
+
   for (const attempt of examAttempts) {
     const ai = attempt.exams?.ai_cached_response as any;
     if (!ai) continue;
@@ -184,33 +259,59 @@ export function buildCalendarEvents(
       label: attempt.exams?.name ?? "Exam",
       org: attempt.exams?.conducting_body ?? "",
     };
+    const covered = scrapedTypes.get(attempt.id);
+    const skip = (type: CalendarEventType) => covered?.has(type) ?? false;
 
-    // Application window
-    for (const { date, phase } of predicted(ai, "application_open"))
-      push(date, "apply_start", phaseSuffix("Applications Open", phase), source);
-    for (const { date, phase } of predicted(ai, "application_close"))
-      push(date, "apply_end", phaseSuffix("Last Date to Apply", phase), source);
-    push(ai?.last_date_to_apply, "apply_end", "Last Date to Apply", source); // legacy flat field
+    // Application window — predicted events, else legacy flat field
+    if (!skip("apply_start")) {
+      for (const { date, phase } of predicted(ai, "application_open"))
+        push(date, "apply_start", phaseSuffix("Applications Open", phase), source);
+    }
+    if (!skip("apply_end")) {
+      const closes = predicted(ai, "application_close");
+      for (const { date, phase } of closes)
+        push(date, "apply_end", phaseSuffix("Last Date to Apply", phase), source);
+      if (closes.length === 0)
+        push(ai?.last_date_to_apply, "apply_end", "Last Date to Apply", source); // legacy flat field
+    }
 
     // Admit cards
-    for (const { date, phase } of predicted(ai, "admit_card"))
-      push(date, "admit_card", phaseSuffix("Admit Card", phase), source);
+    if (!skip("admit_card")) {
+      for (const { date, phase } of predicted(ai, "admit_card"))
+        push(date, "admit_card", phaseSuffix("Admit Card", phase), source);
+    }
 
-    // Exam dates — predicted events, structured phases, then resolved text
-    for (const { date, phase } of predicted(ai, "exam_date"))
-      push(date, "exam_date", phaseSuffix("Exam Date", phase), source);
-    push(ai?.phases?.phase1?.exam_date, "exam_date", "Exam Date (Phase 1)", source);
-    push(ai?.phases?.phase2?.exam_date, "exam_date", "Exam Date (Phase 2)", source);
-    push(getExamDateText(ai), "exam_date", "Exam Date", source);
+    // Exam dates — predicted events, ELSE structured phases, ELSE resolved text.
+    // These are fallbacks, not additions: the cache's shape variants often hold
+    // stale copies of the same date, and pushing all of them shows contradictory
+    // "Exam Date (Phase 1)" entries side by side.
+    if (!skip("exam_date")) {
+      const examDates = predicted(ai, "exam_date");
+      for (const { date, phase } of examDates)
+        push(date, "exam_date", phaseSuffix("Exam Date", phase), source);
+      if (examDates.length === 0) {
+        const p1 = push(ai?.phases?.phase1?.exam_date, "exam_date", "Exam Date (Phase 1)", source);
+        const p2 = push(ai?.phases?.phase2?.exam_date, "exam_date", "Exam Date (Phase 2)", source);
+        if (!p1 && !p2) push(getExamDateText(ai), "exam_date", "Exam Date", source);
+      }
+    }
 
-    // Results — predicted events, structured phases, legacy fields, expected date
-    for (const { date, phase } of predicted(ai, "result"))
-      push(date, "result", phaseSuffix("Result", phase), source);
-    push(ai?.phases?.phase1?.result_date, "result", "Result (Phase 1)", source);
-    push(ai?.phases?.phase2?.result_date, "result", "Result (Phase 2)", source);
-    push(ai?.phase_1?.result_date, "result", "Result (Phase 1)", source);
-    push(ai?.phase_2?.result_date, "result", "Result (Phase 2)", source);
-    push(ai?.expected_result_date, "result", "Expected Result", source);
+    // Results — predicted events, ELSE structured/legacy phases, ELSE expected date
+    if (!skip("result")) {
+      const results = predicted(ai, "result");
+      for (const { date, phase } of results)
+        push(date, "result", phaseSuffix("Result", phase), source);
+      if (results.length === 0) {
+        const anyPhase =
+          [
+            push(ai?.phases?.phase1?.result_date, "result", "Result (Phase 1)", source),
+            push(ai?.phases?.phase2?.result_date, "result", "Result (Phase 2)", source),
+            push(ai?.phase_1?.result_date, "result", "Result (Phase 1)", source),
+            push(ai?.phase_2?.result_date, "result", "Result (Phase 2)", source),
+          ].some(Boolean);
+        if (!anyPhase) push(ai?.expected_result_date, "result", "Expected Result", source);
+      }
+    }
   }
 
   // ── User-added personal dates ──────────────────────────

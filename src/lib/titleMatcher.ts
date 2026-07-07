@@ -75,6 +75,15 @@ const SYNONYMS: Record<string, string> = {
   preliminary: "prelims",
   mains: "mains",
   main: "mains",
+  railway: "rrb",
+  railways: "rrb",
+  uttar: "up",
+  madhya: "mp",
+  himachal: "hp",
+  tn: "tamil",
+  nadu: "tamil",
+  wb: "bengal",
+  orissa: "odisha",
   combined: "combined",
   graduate: "graduate",
   level: "level",
@@ -155,4 +164,43 @@ export function sortByTitleMatch<T>(sourceTitle: string, candidates: T[], getTit
     .filter(({ score }) => score >= minScore)
     .sort((a, b) => b.score - a.score)
     .map(({ candidate }) => candidate);
+}
+
+// Tokens that identify WHICH exam a title refers to: conducting body, exam
+// tier, state, or armed-force branch (post-SYNONYMS forms). Role words like
+// "constable"/"clerk" are deliberately excluded — they are shared across
+// unrelated recruitments and are what makes overlap scoring match the wrong
+// exam (e.g. "UP Police Constable" vs "Bihar Police Constable").
+const EXAM_IDENTITY_TOKENS = new Set([
+  // Conducting bodies / organisations
+  "ssc", "upsc", "ibps", "rrb", "rbi", "sbi", "lic", "nabard", "dsssb",
+  "kvs", "nvs", "esic", "fci", "ongc", "drdo", "isro", "nhpc", "sail",
+  "hpcl", "bpcl", "iocl", "rpf", "crpf", "bsf", "cisf", "capf", "osssc",
+  "bpsc", "uppsc", "mppsc", "rpsc", "tnpsc", "afcat", "nda", "cds",
+  "neet", "jee", "ctet", "gate", "cuet", "clat",
+  // Exam tiers / streams under one conducting body
+  "cgl", "chsl", "mts", "ntpc", "alp", "ug", "pg",
+  // States and union territories
+  "bihar", "up", "mp", "hp", "delhi", "punjab", "haryana", "rajasthan",
+  "gujarat", "maharashtra", "goa", "karnataka", "kerala", "tamil",
+  "telangana", "andhra", "odisha", "bengal", "assam", "jharkhand",
+  "chhattisgarh", "uttarakhand", "sikkim", "tripura", "manipur",
+  "meghalaya", "mizoram", "nagaland", "jammu", "kashmir", "ladakh",
+  "puducherry", "chandigarh",
+  // Armed-force branches
+  "army", "navy", "iaf",
+]);
+
+/**
+ * True when the candidate title names a different exam identity than the
+ * source — e.g. "SSC CGL" vs "SSC MTS", or "UP Police" vs "Bihar Police".
+ * A candidate may omit identity tokens (generic updates are fine), but must
+ * not introduce identity tokens the source exam doesn't have.
+ */
+export function hasExamIdentityConflict(sourceTitle: string | null | undefined, candidateTitle: string | null | undefined): boolean {
+  const sourceIds = new Set(tokenizeTitle(sourceTitle).filter((t) => EXAM_IDENTITY_TOKENS.has(t)));
+  if (sourceIds.size === 0) return false;
+  const candidateIds = tokenizeTitle(candidateTitle).filter((t) => EXAM_IDENTITY_TOKENS.has(t));
+  if (candidateIds.length === 0) return false;
+  return candidateIds.some((t) => !sourceIds.has(t));
 }

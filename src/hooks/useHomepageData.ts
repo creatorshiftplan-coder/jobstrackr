@@ -67,16 +67,12 @@ async function fallbackFetch(): Promise<HomepageBundle> {
       .range(0, 9999);
   }
 
-  const { data: exams } = await supabase
-    .from("exams")
-    .select("*")
-    .eq("is_active", true)
-    .order("name");
-
   const jobsList = (jobsResult.data || []) as any;
   return {
     recentJobs: jobsList.slice(0, 50),
     allJobs: jobsList,
-    exams: exams || [],
+    // No consumer reads exams from this bundle (Index uses allJobs/recentJobs
+    // only) — fetching the whole exams table here was pure wasted egress.
+    exams: [],
   };
 }
