@@ -66,10 +66,13 @@ export default function JobDetails() {
     }
   }, [job, trackJobViewed]);
 
-  // Update document title with job name
+  // Update document title with job name — mirrors the SEO title format the
+  // edge SSR page (api/jobs/[slug].ts) serves, so client-side SPA navigation
+  // doesn't regress to a weaker, less keyword-rich title than a fresh load.
   useEffect(() => {
     if (job) {
-      document.title = `${job.title} | JobsTrackr`;
+      const year = new Date().getFullYear();
+      document.title = `${job.title} Recruitment ${year} – Vacancy, Eligibility & Apply | JobsTrackr`;
     }
     // Restore default title on unmount
     return () => {
@@ -278,7 +281,7 @@ export default function JobDetails() {
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground hover:text-foreground" />
           </button>
-          <h1 className="flex-1 font-semibold text-sm text-foreground truncate">{job.title}</h1>
+          <p className="flex-1 font-semibold text-sm text-foreground truncate">{job.title}</p>
           <SaveJobButton jobId={job.id} />
         </div>
       </header>
