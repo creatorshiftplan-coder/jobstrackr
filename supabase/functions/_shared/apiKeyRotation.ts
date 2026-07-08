@@ -86,7 +86,7 @@ export async function loadApiKeys(supabase: SupabaseClient): Promise<ApiKeyConfi
   const geminiConfigs = geminiEnvKeys.map((key, i) => ({
     id: `env-gemini-${i}`,
     provider: "gemini",
-    model_name: "gemini-2.5-flash",
+    model_name: "gemini-3.5-flash",
     api_key: key,
     is_active: true,
     priority: i,

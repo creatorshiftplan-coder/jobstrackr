@@ -1200,7 +1200,7 @@ export default function Admin() {
   const apiKeysHook = useApiKeys();
   const [showAddKeyDialog, setShowAddKeyDialog] = useState(false);
   const [editingKey, setEditingKey] = useState<ApiKeyEntry | null>(null);
-  const [keyForm, setKeyForm] = useState<NewApiKeyEntry>({ provider: "gemini", model_name: "gemini-2.5-flash", api_key: "", label: "" });
+  const [keyForm, setKeyForm] = useState<NewApiKeyEntry>({ provider: "gemini", model_name: "gemini-3.5-flash", api_key: "", label: "" });
   const [keyFormPriority, setKeyFormPriority] = useState(0);
   const [deleteKeyId, setDeleteKeyId] = useState<string | null>(null);
   const [showKeyValues, setShowKeyValues] = useState<Set<string>>(new Set());
@@ -10397,7 +10397,7 @@ ${hashtagsStr}`;
                       </Button>
                       <Button size="sm" onClick={() => {
                         setEditingKey(null);
-                        setKeyForm({ provider: "gemini", model_name: "gemini-2.5-flash", api_key: "", label: "" });
+                        setKeyForm({ provider: "gemini", model_name: "gemini-3.5-flash", api_key: "", label: "" });
                         setKeyFormPriority(apiKeysHook.keys.length);
                         setShowAddKeyDialog(true);
                       }}>

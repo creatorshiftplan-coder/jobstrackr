@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.api_keys_config (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   provider text NOT NULL DEFAULT 'gemini',
-  model_name text NOT NULL DEFAULT 'gemini-2.5-flash',
+  model_name text NOT NULL DEFAULT 'gemini-3.5-flash',
   api_key text NOT NULL,
   is_active boolean NOT NULL DEFAULT true,
   priority integer NOT NULL DEFAULT 0,
