@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { loadApiKeys, callWithRotation } from "../_shared/apiKeyRotation.ts";
+import { notifyGoogleIndexing } from "../_shared/google-indexing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -484,17 +485,24 @@ Return ONLY a JSON object with fields like: full_name, date_of_birth, gender, fa
           if (attemptError) {
             console.error("Error fetching exam attempt for cache:", attemptError);
           } else if (attemptData?.exam_id) {
-            const { error: updateError } = await supabase
+            const { data: updatedExam, error: updateError } = await supabase
               .from("exams")
               .update({
                 ai_cached_response: result,
                 ai_last_updated_at: new Date().toISOString(),
                 ai_updated_by: "gemini",
               })
-              .eq("id", attemptData.exam_id);
+              .eq("id", attemptData.exam_id)
+              .select("update_slug")
+              .single();
 
             if (updateError) {
               console.error("Error updating exam cache:", updateError);
+            } else if (updatedExam?.update_slug) {
+              // Fresh content on /updates/:slug — tell Google promptly instead
+              // of waiting for the next sitemap crawl. Best-effort, non-blocking.
+              notifyGoogleIndexing(`https://jobstrackr.in/updates/${updatedExam.update_slug}`, "URL_UPDATED")
+                .catch((e) => console.warn("Indexing notify failed:", e));
             }
           }
         } catch (cacheError) {
