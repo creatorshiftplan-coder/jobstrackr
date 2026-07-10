@@ -125,7 +125,7 @@ export const JobCard = memo(function JobCard({ job }: JobCardProps) {
 
   return (
     <Link to={`/jobs/${job.slug || job.id}`}>
-      <Card className="group shadow-md hover:shadow-xl transition-all duration-300 border border-border/50 rounded-2xl overflow-hidden hover:-translate-y-0.5 bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-card/90 backdrop-blur-sm">
+      <Card className={`group shadow-md hover:shadow-xl transition-all duration-300 border border-border/50 rounded-2xl overflow-hidden hover:-translate-y-0.5 bg-white dark:bg-card hover:bg-gray-50 dark:hover:bg-card/90 backdrop-blur-sm ${isExpired && !isTBDDate ? "opacity-75" : ""}`}>
         <CardContent className="p-4">
           {/* Header Row: Logo + Title + Save Button */}
           <div className="flex gap-3">
@@ -161,7 +161,8 @@ export const JobCard = memo(function JobCard({ job }: JobCardProps) {
                   </Badge>
                 )}
                 {!isTBDDate && isExpired && (
-                  <Badge variant="secondary" className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full">
+                  <Badge className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
                     Expired
                   </Badge>
                 )}
