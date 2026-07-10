@@ -10,7 +10,7 @@ import { isFreeJobAlertUrl } from "@/lib/urlUtils";
  * Fetching only these columns is the main lever for cutting Supabase PostgREST egress.
  */
 const LIGHT_UPDATE_COLS =
-  "id, slug, url, title, category, status, published_date, summary, important_dates, download_links, tags, scraped_at, created_at, updated_at, job_id, exam_id";
+  "id, slug, url, title, category, status, published_date, summary, important_dates, download_links, official_links, related_links, tags, scraped_at, created_at, updated_at, job_id, exam_id";
 
 /** Clean freejobalert URLs from nested links inside updates (but keep the updates themselves) */
 function filterFreeJobAlertFromUpdates(updates: ExamUpdateItem[]): ExamUpdateItem[] {
@@ -37,6 +37,8 @@ export interface ExamUpdateItem {
   important_dates: { event: string; date: string; status: string; link: string }[];
   overview: { field: string; value: string }[];
   download_links: { text: string; url: string }[];
+  official_links?: { text: string; url: string }[];
+  related_links?: { text: string; url: string }[];
   tags: string[];
   sections: { heading: string; level: string; content: string[] }[];
   related_articles: { title: string; url: string }[];

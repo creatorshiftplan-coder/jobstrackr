@@ -168,6 +168,8 @@ const scoreTermInField = (term: string, field: SearchField): number => {
       best = Math.max(best, field.weight * 2); // exact word
     } else if (word.startsWith(term) && term.length >= 2) {
       best = Math.max(best, field.weight * 1.5); // prefix / word-start
+    } else if (term.length >= 2 && word.includes(term)) {
+      best = Math.max(best, field.weight * 1.2); // substring inside a word ("spector" → "inspector")
     } else if (
       term.length >= 4 &&
       Math.abs(word.length - term.length) <= 1 &&
@@ -178,8 +180,8 @@ const scoreTermInField = (term: string, field: SearchField): number => {
   }
   if (best > 0) return best;
 
-  // Substring anywhere in the field (multi-word terms / partials)
-  if (term.length >= 3 && field.text.includes(term)) {
+  // Substring anywhere in the field (multi-word terms / partials spanning words)
+  if (term.length >= 2 && field.text.includes(term)) {
     return field.weight * 1;
   }
   return 0;

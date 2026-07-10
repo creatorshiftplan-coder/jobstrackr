@@ -6,6 +6,8 @@ import { FeaturedJobCard } from "@/components/FeaturedJobCard";
 import { RecommendedJobCard } from "@/components/RecommendedJobCard";
 import { FeedShelf } from "@/components/FeedShelf";
 import { ActiveExamCard } from "@/components/ActiveExamCard";
+import { PopularExamCard } from "@/components/PopularExamCard";
+import { JobsForYouPrompt } from "@/components/JobsForYouPrompt";
 import { BottomNav } from "@/components/BottomNav";
 import { SectorPreferenceCard } from "@/components/SectorPreferenceCard";
 import { QuickActions } from "@/components/QuickActions";
@@ -15,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useExams } from "@/hooks/useExams";
 import { useProfile } from "@/hooks/useProfile";
 import { useFeed } from "@/hooks/useFeed";
+import { useTrendingExams } from "@/hooks/useTrendingExams";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Briefcase, ChevronLeft, ChevronRight } from "lucide-react";
@@ -62,23 +65,6 @@ const Index = () => {
   // if the bundle errors, the feed falls back to fetching jobs itself.
   const { shelves, isLoading: feedLoading } = useFeed(true, jobs, homepageLoading);
 
-  // Homepage shelves: drop "Almost There - 1 Skill Away" and surface the
-  // highest-vacancy jobs followed by the "Expiring Soon" deadline row, then the
-  // "Because You Saved" rows. Other shelves fill any remaining slots.
-  const homeShelves = useMemo(() => {
-    const homeRank = (key: string) => {
-      if (key === "eligible_for_you") return 0;
-      if (key === "high_vacancies") return 1;
-      if (key === "expiring_soon") return 2;
-      if (key.startsWith("because_liked")) return 3;
-      return 4;
-    };
-    return shelves
-      .filter((shelf) => shelf.key !== "almost_there")
-      .sort((a, b) => homeRank(a.key) - homeRank(b.key))
-      .slice(0, 4);
-  }, [shelves]);
-
   // Jobs-scoped readiness — sections render independently, no global gate
   const jobsReady = !homepageLoading && !homepageError;
 
@@ -93,6 +79,57 @@ const Index = () => {
   // ── Shared user data: fetched once ──
   const { userExams, isLoading: examsLoading } = useExams({ includeExamCatalog: false });
   const { profile, isLoading: profileLoading } = useProfile();
+
+  // Popular exams (trending list ranked by tracking count) — used for the
+  // new-user homepage. Already prefetched on idle, so this is a cache hit.
+  const { data: trendingExams } = useTrendingExams("All");
+
+  // A "new user" has given us nothing to personalise on: no sector preferences
+  // and no tracked exams (guests always qualify). For them the eligibility-based
+  // "Worth Checking" row is noise, so we swap in Highest Vacancy + Popular Exams.
+  const isNewUser =
+    isGuestMode ||
+    (!profileLoading &&
+      !examsLoading &&
+      (!profile?.preferred_sectors || profile.preferred_sectors.length === 0) &&
+      (userExams?.length ?? 0) === 0);
+
+  // Highest-vacancy active jobs, drawn from the full pool (not eligibility-gated)
+  // so it works even when we know nothing about the user.
+  const highestVacancyJobs = useMemo(() => {
+    if (!jobs) return [];
+    return jobs
+      .filter(
+        (j) => isJobActive(j.last_date) && typeof j.vacancies === "number" && j.vacancies > 0
+      )
+      .sort((a, b) => (b.vacancies || 0) - (a.vacancies || 0))
+      .slice(0, 12);
+  }, [jobs]);
+
+  // Most-tracked exams first.
+  const popularExams = useMemo(() => {
+    if (!trendingExams) return [];
+    return [...trendingExams]
+      .sort((a, b) => (b.tracking_count || 0) - (a.tracking_count || 0))
+      .slice(0, 12);
+  }, [trendingExams]);
+
+  // Homepage shelves: drop "Almost There - 1 Skill Away" and (for new users) the
+  // "Worth Checking — Verify Eligibility" row, then order by relevance.
+  const homeShelves = useMemo(() => {
+    const homeRank = (key: string) => {
+      if (key === "eligible_for_you") return 0;
+      if (key === "high_vacancies") return 1;
+      if (key === "expiring_soon") return 2;
+      if (key.startsWith("because_liked")) return 3;
+      return 4;
+    };
+    return shelves
+      .filter((shelf) => shelf.key !== "almost_there")
+      .filter((shelf) => !isNewUser || shelf.key !== "review_eligibility")
+      .sort((a, b) => homeRank(a.key) - homeRank(b.key))
+      .slice(0, 4);
+  }, [shelves, isNewUser]);
 
   // Prefetch explore page data when idle (P7: cross-page prefetching)
   useEffect(() => {
@@ -318,6 +355,40 @@ const Index = () => {
                         index === activeExamIndex ? "bg-primary" : "bg-primary/30"
                       )}
                     />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* No tracked exams yet — nudge toward the Jobs For You page in the
+                slot the "My Active Exams" cards would occupy */}
+            {!examsLoading && activeExams.length === 0 && (
+              <section className="mb-8 md:mb-0 md:animate-fade-in-up" style={{ animationDelay: "160ms" }}>
+                <JobsForYouPrompt />
+              </section>
+            )}
+
+            {/* New-user rows — Highest Vacancy + Popular Exams instead of the
+                eligibility-based "Worth Checking" shelf */}
+            {isNewUser && jobsReady && highestVacancyJobs.length > 0 && (
+              <section className="mb-8 md:mb-0 md:animate-fade-in-up" style={{ animationDelay: "200ms" }}>
+                <SectionHeader title="Highest Vacancy" variant="dark" />
+                <div className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide snap-x snap-mandatory md:px-0">
+                  {highestVacancyJobs.map((job) => (
+                    <div key={job.id} className="flex-shrink-0 w-[290px] sm:w-[320px] snap-start">
+                      <RecommendedJobCard job={job} />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {isNewUser && popularExams.length > 0 && (
+              <section className="mb-8 md:mb-0 md:animate-fade-in-up" style={{ animationDelay: "240ms" }}>
+                <SectionHeader title="Popular Exams" variant="dark" linkTo="/trending" />
+                <div className="flex gap-3 sm:gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide snap-x snap-mandatory md:px-0">
+                  {popularExams.map((exam) => (
+                    <PopularExamCard key={exam.id} exam={exam} />
                   ))}
                 </div>
               </section>

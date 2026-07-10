@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { toast } from "sonner";
+import { isPdfOrWebsiteLink, getExamPdfWebsiteLinks } from "@/lib/urlUtils";
 
 // ── Category config (same as card) ───────────────────────────────────
 function getCategoryConfig(category: string) {
@@ -94,6 +95,9 @@ export default function ExamUpdateDetail() {
 
     const catConfig = getCategoryConfig(update.category);
     const CatIcon = catConfig.icon;
+    // Only surface real PDF / official-website links — never WhatsApp or Telegram share links.
+    const pdfLinks = getExamPdfWebsiteLinks(update);
+    const websiteArticles = (update.related_articles || []).filter((ra) => isPdfOrWebsiteLink(ra.url));
     const isNew = update.created_at
         ? Date.now() - new Date(update.created_at).getTime() < 24 * 60 * 60 * 1000
         : false;
@@ -216,7 +220,7 @@ export default function ExamUpdateDetail() {
                                     <div key={i} className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-xs", i % 2 === 0 ? "bg-secondary/30" : "")}>
                                         <span className="flex-1 text-muted-foreground">{d.event}</span>
                                         <span className="font-semibold text-foreground whitespace-nowrap">{d.date}</span>
-                                        {d.link && (
+                                        {d.link && isPdfOrWebsiteLink(d.link) && (
                                             <a href={d.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                                 <ExternalLink className="h-3 w-3" />
                                             </a>
@@ -246,14 +250,14 @@ export default function ExamUpdateDetail() {
                 )}
 
                 {/* ── Download Links ────────────────────────────── */}
-                {update.download_links && update.download_links.length > 0 && (
+                {pdfLinks.length > 0 && (
                     <Section delay={0.14}>
                         <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                                 <Download className="h-4 w-4 text-blue-500" /> Quick Links
                             </h2>
                             <div className="flex flex-wrap gap-2">
-                                {update.download_links.map((dl, i) => (
+                                {pdfLinks.map((dl, i) => (
                                     <a
                                         key={i}
                                         href={dl.url}
@@ -301,12 +305,12 @@ export default function ExamUpdateDetail() {
                 )}
 
                 {/* ── Related Articles ─────────────────────────── */}
-                {update.related_articles && update.related_articles.length > 0 && (
+                {websiteArticles.length > 0 && (
                     <Section delay={0.18}>
                         <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-sm font-bold text-foreground">Related Articles</h2>
                             <div className="space-y-1.5">
-                                {update.related_articles.map((ra, i) => (
+                                {websiteArticles.map((ra, i) => (
                                     <a
                                         key={i}
                                         href={ra.url}

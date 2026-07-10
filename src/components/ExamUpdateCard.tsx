@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { FileText, Award, BarChart3, Newspaper, Calendar, Download, Key, Sparkles, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { getExamPdfWebsiteLinks } from "@/lib/urlUtils";
 
 interface ExamUpdateCardProps {
     update: ExamUpdateItem;
@@ -54,7 +55,9 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
 
     const topDate = update.important_dates?.[0];
     const secondDate = update.important_dates?.[1];
-    const topLink = update.download_links?.[0];
+    // Real exam PDF / official-website links only — WhatsApp/Telegram/source links dropped.
+    const examLinks = getExamPdfWebsiteLinks(update);
+    const topLinks = examLinks.slice(0, 2);
 
     return (
         <motion.div
@@ -118,18 +121,25 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
                             </div>
                         )}
 
-                        {/* Top download link chip */}
-                        {topLink && (
-                            <div className="pl-[34px]" onClick={(e) => e.stopPropagation()}>
-                                <a
-                                    href={topLink.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
-                                >
-                                    <Download className="h-3 w-3" />
-                                    {topLink.text.length > 32 ? topLink.text.slice(0, 32) + "…" : topLink.text}
-                                </a>
+                        {/* PDF / official-website link chips */}
+                        {topLinks.length > 0 && (
+                            <div className="pl-[34px] flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                {topLinks.map((link, i) => {
+                                    const isPdf = /\.pdf($|\?)/i.test(link.url);
+                                    const label = link.text.length > 32 ? link.text.slice(0, 32) + "…" : link.text;
+                                    return (
+                                        <a
+                                            key={i}
+                                            href={link.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
+                                        >
+                                            {isPdf ? <FileText className="h-3 w-3" /> : <Download className="h-3 w-3" />}
+                                            {label}
+                                        </a>
+                                    );
+                                })}
                             </div>
                         )}
 

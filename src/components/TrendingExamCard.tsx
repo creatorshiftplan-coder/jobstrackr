@@ -15,7 +15,7 @@ import { useSaveJob, useUnsaveJob, useIsJobSaved } from "@/hooks/useSavedJobs";
 import { useAuth } from "@/hooks/useAuth";
 import { useJobForExam } from "@/hooks/useJobForExam";
 import { useExamUpdatesForExam } from "@/hooks/useExamUpdates";
-import { isWhatsAppUrl, isWhatsAppContent } from "@/lib/urlUtils";
+import { isWhatsAppUrl, isWhatsAppContent, isTelegramUrl, isTelegramContent, getExamPdfWebsiteLinks } from "@/lib/urlUtils";
 
 interface TrendingExamCardProps {
     exam: TrendingExam;
@@ -99,8 +99,12 @@ function getUpdateCategoryConfig(category: string): { bg: string; text: string; 
 
 // Inline updates strip - shared between card types
 function InlineUpdatesStrip({ updates, variant = "light" }: { updates: ExamUpdateItem[]; variant?: "light" | "dark" }) {
-    // Filter out WhatsApp-related updates
-    const filtered = updates.filter((u) => !isWhatsAppUrl(u.url) && !isWhatsAppContent(u.title));
+    // Filter out WhatsApp / Telegram share updates — keep only PDF / website links
+    const filtered = updates.filter(
+        (u) =>
+            !isWhatsAppUrl(u.url) && !isWhatsAppContent(u.title) &&
+            !isTelegramUrl(u.url) && !isTelegramContent(u.title)
+    );
     if (filtered.length === 0) return null;
     const topUpdates = filtered.slice(0, 3);
     const isDark = variant === "dark";
@@ -110,6 +114,7 @@ function InlineUpdatesStrip({ updates, variant = "light" }: { updates: ExamUpdat
             {topUpdates.map((update) => {
                 const catConfig = getUpdateCategoryConfig(update.category);
                 const CatIcon = catConfig.icon;
+                const pdfLinkCount = getExamPdfWebsiteLinks(update).length;
                 return (
                     <a
                         key={update.id}
@@ -135,12 +140,12 @@ function InlineUpdatesStrip({ updates, variant = "light" }: { updates: ExamUpdat
                                 )}>
                                     {catConfig.label}
                                 </span>
-                                {update.download_links?.length > 0 && (
+                                {pdfLinkCount > 0 && (
                                     <span className={cn(
                                         "text-[10px]",
                                         isDark ? "text-white/50" : "text-primary"
                                     )}>
-                                        {update.download_links.length} link{update.download_links.length !== 1 ? "s" : ""}
+                                        {pdfLinkCount} link{pdfLinkCount !== 1 ? "s" : ""}
                                     </span>
                                 )}
                             </div>
@@ -201,7 +206,7 @@ function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCard
     const { data: matchingJob, isLoading: isLoadingJob } = useJobForExam(exam.name);
     const jobId = matchingJob?.id;
     const { data: examUpdates } = useExamUpdatesForExam(exam.id, exam.name);
-    const latestScrapedUpdates = (examUpdates || []).filter((update) => !isWhatsAppUrl(update.url) && !isWhatsAppContent(update.title) && (update.summary || update.status || update.download_links?.length)).slice(0, 3);
+    const latestScrapedUpdates = (examUpdates || []).filter((update) => !isWhatsAppUrl(update.url) && !isWhatsAppContent(update.title) && !isTelegramUrl(update.url) && !isTelegramContent(update.title) && (update.summary || update.status || update.download_links?.length)).slice(0, 3);
 
     // Save job functionality - use matching job ID if found
     const { mutate: saveJob, isPending: isSaving } = useSaveJob();
@@ -391,7 +396,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
     const { data: matchingJob } = useJobForExam(exam.name);
     const jobId = matchingJob?.id;
     const { data: examUpdates } = useExamUpdatesForExam(exam.id, exam.name);
-    const latestScrapedUpdates = (examUpdates || []).filter((update) => !isWhatsAppUrl(update.url) && !isWhatsAppContent(update.title) && (update.summary || update.status || update.download_links?.length)).slice(0, 3);
+    const latestScrapedUpdates = (examUpdates || []).filter((update) => !isWhatsAppUrl(update.url) && !isWhatsAppContent(update.title) && !isTelegramUrl(update.url) && !isTelegramContent(update.title) && (update.summary || update.status || update.download_links?.length)).slice(0, 3);
 
     // Sync expanded state when initialExpanded changes (e.g., from URL param)
     useEffect(() => {
@@ -619,9 +624,12 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
                                             {update.summary && (
                                                 <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{update.summary}</p>
                                             )}
-                                            {update.download_links?.length > 0 && (
-                                                <p className="text-xs text-primary mt-1">{update.download_links.length} quick link{update.download_links.length !== 1 ? "s" : ""} available</p>
-                                            )}
+                                            {(() => {
+                                                const pdfLinkCount = getExamPdfWebsiteLinks(update).length;
+                                                return pdfLinkCount > 0 ? (
+                                                    <p className="text-xs text-primary mt-1">{pdfLinkCount} quick link{pdfLinkCount !== 1 ? "s" : ""} available</p>
+                                                ) : null;
+                                            })()}
                                         </a>
                                     ))}
                                 </div>
