@@ -6,7 +6,7 @@ import { ExamCardErrorBoundary } from "@/components/ExamCardErrorBoundary";
 import { ExamSearchSheet } from "@/components/ExamSearchSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Bookmark, Plus, Sparkles, ShieldCheck } from "lucide-react";
+import { GraduationCap, Bookmark, Plus, Sparkles, ShieldCheck, RefreshCw } from "lucide-react";
 import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
@@ -135,15 +135,6 @@ export default function ExamTracker() {
         </h2>
       </div>
 
-      {/* Disclaimer */}
-      <div className="px-4 pb-4 md:hidden">
-        <div className="bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800 rounded-xl p-3">
-          <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
-            ⚠️ We help you stay informed — but for the most accurate and final updates, always check the official website. JobsTrackr is not responsible for any update delays or changes.
-          </p>
-        </div>
-      </div>
-
       <section className="hidden md:block border-b border-border/60 bg-[linear-gradient(135deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.5)_48%,hsl(var(--primary)/0.12)_100%)]">
         <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
           <div className="flex items-start justify-between gap-8">
@@ -211,15 +202,70 @@ export default function ExamTracker() {
               <Skeleton className="h-32 w-full rounded-lg" />
             </div>
           ) : userExams.length === 0 ? (
-            <div className="text-center py-12 space-y-4 px-4">
-              <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mx-auto">
-                <GraduationCap className="h-10 w-10 text-primary" />
+            <div className="py-10 md:py-12 px-4 max-w-md mx-auto">
+              <div className="text-center space-y-3">
+                <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mx-auto">
+                  <GraduationCap className="h-10 w-10 text-primary" />
+                </div>
+                <h2 className="text-lg font-semibold text-foreground">No Exams Tracked Yet</h2>
+                <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+                  Track exams you're preparing for and get AI-powered updates on admit cards, results, and dates.
+                </p>
               </div>
-              <h2 className="text-lg font-semibold text-foreground">No Exams Tracked</h2>
-              <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-                Add exams you're preparing for and get AI-powered updates on admit cards, results, and more
-              </p>
-              <ExamSearchSheet />
+
+              {/* How to track */}
+              <div className="mt-6 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">
+                  How to track an exam
+                </p>
+
+                <div className="flex items-start gap-3 rounded-2xl border border-border/60 bg-card p-3.5 shadow-sm">
+                  <div className="h-9 w-9 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Plus className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Add from here</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Tap <span className="font-medium text-foreground">Add Exam</span> to search and start tracking any exam.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 rounded-2xl border border-border/60 bg-card p-3.5 shadow-sm">
+                  <div className="h-9 w-9 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Bookmark className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Track from a job</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Open any job and tap <span className="font-medium text-foreground">Track</span> to add it to My Exams.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 rounded-2xl border border-border/60 bg-card p-3.5 shadow-sm">
+                  <div className="h-9 w-9 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <RefreshCw className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Refresh for latest status</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Hit <span className="font-medium text-foreground">Refresh Status</span> on a tracked exam to pull the newest admit card, result, and dates.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-center">
+                <ExamSearchSheet
+                  trigger={
+                    <Button className="gap-2 rounded-full px-5">
+                      <Plus className="h-4 w-4" />
+                      Add Exam
+                    </Button>
+                  }
+                />
+              </div>
             </div>
           ) : (
             <div className="space-y-4 pb-4">
@@ -232,6 +278,15 @@ export default function ExamTracker() {
           )}
         </div>
       </main>
+
+      {/* Disclaimer — bottom of page (mobile) */}
+      <div className="px-4 pt-4 pb-2 md:hidden">
+        <div className="bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800 rounded-xl p-3">
+          <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+            ⚠️ We help you stay informed — but for the most accurate and final updates, always check the official website. JobsTrackr is not responsible for any update delays or changes.
+          </p>
+        </div>
+      </div>
 
       {/* Floating Action Button - Bottom Left */}
       {user && userExams.length > 0 && <ExamSearchSheet />}

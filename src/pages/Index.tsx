@@ -8,6 +8,7 @@ import { FeedShelf } from "@/components/FeedShelf";
 import { ActiveExamCard } from "@/components/ActiveExamCard";
 import { PopularExamCard } from "@/components/PopularExamCard";
 import { JobsForYouPrompt } from "@/components/JobsForYouPrompt";
+import { SlimPromptCard } from "@/components/SlimPromptCard";
 import { BottomNav } from "@/components/BottomNav";
 import { SectorPreferenceCard } from "@/components/SectorPreferenceCard";
 import { QuickActions } from "@/components/QuickActions";
@@ -380,6 +381,18 @@ const Index = () => {
                     </div>
                   ))}
                 </div>
+              </section>
+            )}
+
+            {/* Track-exams nudge below Highest Vacancy */}
+            {isNewUser && (
+              <section className="mb-8 md:mb-0 md:animate-fade-in-up" style={{ animationDelay: "220ms" }}>
+                <SlimPromptCard
+                  to="/tracker"
+                  title="Track & monitor all your exams in one place"
+                  subtitle="Save exams and get the latest status, dates & updates"
+                  cta="Track"
+                />
               </section>
             )}
 
