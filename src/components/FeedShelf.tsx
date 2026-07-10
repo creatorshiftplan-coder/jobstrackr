@@ -26,6 +26,10 @@ interface FeedShelfProps {
 
 function getShelfLink(shelfKey: string): string {
   if (shelfKey === "saved") return "/saved";
+  // High-vacancy / expiring-soon shelves route to the explore page pre-sorted,
+  // so "See all" shows the full list in the same order as the shelf.
+  if (shelfKey === "high_vacancies") return "/search?sort=vacancy";
+  if (shelfKey === "expiring_soon") return "/search?sort=expiring";
   if (shelfKey.startsWith("org:")) {
     const org = shelfKey.split(":")[1];
     return `/search?q=${encodeURIComponent(org)}`;

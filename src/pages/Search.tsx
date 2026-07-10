@@ -9,9 +9,8 @@ import { useAIJobSearch } from "@/hooks/useAIJobSearch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AISearchResult } from "@/components/AISearchResult";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search as SearchIcon, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, GraduationCap, Check } from "lucide-react";
+import { Search as SearchIcon, X, Sparkles, Loader2, SearchX, MapPin, Building, Bookmark, GraduationCap, Check, ArrowUpDown } from "lucide-react";
 import { MenuBarsIcon } from "@/components/icons/MenuBarsIcon";
 import { Link, useSearchParams } from "react-router-dom";
 import logoColor from "@/assets/logo-color.png";
@@ -20,17 +19,19 @@ import { INDIAN_STATES, EXAM_SECTORS, EDUCATION_QUALIFICATIONS } from "@/constan
 import { useDebouncedValue } from "@/hooks/useDebounce";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
-import { inferCategory, isJobActive, matchesSectorPreference } from "@/lib/jobUtils";
+import { inferCategory, isJobActive, matchesSectorPreference, parseJobDeadline } from "@/lib/jobUtils";
 import { parseSearchQuery, scoreJobForQuery } from "@/lib/jobSearch";
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q") ?? "";
+  const sortMode = searchParams.get("sort") ?? "";
   const debouncedQuery = useDebouncedValue(query, 300);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [selectedQualifications, setSelectedQualifications] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [activeFilterTab, setActiveFilterTab] = useState<"sort" | "location" | "sector" | "qualification">("sort");
   const { data: jobs, isLoading } = useJobs();
   const { isSearching, aiResults, searchStatus, searchWithAI, getSavedJobId, clearAIResults, dismissJob } = useAIJobSearch();
   const { user } = useAuth();
@@ -103,6 +104,28 @@ export default function Search() {
       return scored.map((entry) => entry.job);
     }
 
+    // ── Explicit sort mode (from homepage "See all" shelves) ────────────────
+    // Active jobs always rank above expired ones; the sort mode decides the
+    // ordering within the active group.
+    if (sortMode === "vacancy" || sortMode === "expiring") {
+      return [...filtered].sort((a, b) => {
+        const aActive = isJobActive(a.last_date);
+        const bActive = isJobActive(b.last_date);
+        if (aActive !== bActive) return bActive ? 1 : -1;
+
+        if (sortMode === "vacancy") {
+          // Highest vacancy count first.
+          return (b.vacancies || 0) - (a.vacancies || 0);
+        }
+
+        // Expiring soonest first (jobs without a parseable deadline sink to the
+        // bottom of the active group).
+        const aDeadline = parseJobDeadline(a.last_date)?.getTime() ?? Infinity;
+        const bDeadline = parseJobDeadline(b.last_date)?.getTime() ?? Infinity;
+        return aDeadline - bDeadline;
+      });
+    }
+
     return [...filtered].sort((a, b) => {
       const aActive = isJobActive(a.last_date);
       const bActive = isJobActive(b.last_date);
@@ -111,7 +134,7 @@ export default function Search() {
       // Then sort by created_at descending (newest first)
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [jobs, debouncedQuery, selectedLocations, selectedSectors, selectedQualifications]);
+  }, [jobs, debouncedQuery, selectedLocations, selectedSectors, selectedQualifications, sortMode]);
 
   const deferredFilteredJobs = useDeferredValue(filteredJobs);
 
@@ -273,10 +296,25 @@ export default function Search() {
     );
   };
 
+  const updateSort = (value: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (value && value !== "relevance") {
+      nextParams.set("sort", value);
+    } else {
+      nextParams.delete("sort");
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
+
   const clearAllFilters = () => {
     setSelectedLocations([]);
     setSelectedSectors([]);
     setSelectedQualifications([]);
+  };
+
+  const resetFiltersAndSort = () => {
+    clearAllFilters();
+    updateSort("relevance");
   };
 
   const handleSearch = () => {
@@ -290,8 +328,45 @@ export default function Search() {
   };
 
   const totalFilters = selectedLocations.length + selectedSectors.length + selectedQualifications.length;
+  const sortActive = sortMode === "vacancy" || sortMode === "expiring";
   const visibleJobs = deferredFilteredJobs.slice(0, visibleJobsCount);
   const hasMoreJobs = deferredFilteredJobs.length > visibleJobs.length;
+
+  const SORT_OPTIONS = [
+    { value: "relevance", label: "Newest first", desc: "Latest postings on top" },
+    { value: "vacancy", label: "Highest vacancy", desc: "Most posts available" },
+    { value: "expiring", label: "Expiring soon", desc: "Closing date nearest" },
+  ];
+
+  const FILTER_TABS = [
+    { key: "sort" as const, label: "Sort by", icon: ArrowUpDown, count: sortActive ? 1 : 0 },
+    { key: "location" as const, label: "Location", icon: MapPin, count: selectedLocations.length },
+    { key: "sector" as const, label: "Sector", icon: Building, count: selectedSectors.length },
+    { key: "qualification" as const, label: "Education", icon: GraduationCap, count: selectedQualifications.length },
+  ];
+
+  // Amazon/Flipkart-style checkbox row used for every multi-select filter panel.
+  const renderCheckRow = (label: string, isSelected: boolean, onToggle: () => void) => (
+    <button
+      key={label}
+      type="button"
+      onClick={onToggle}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
+        isSelected
+          ? "border-primary bg-primary/5"
+          : "border-border hover:border-primary/40 hover:bg-secondary/30"
+      }`}
+    >
+      <span
+        className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+          isSelected ? "bg-primary border-primary" : "border-muted-foreground/40"
+        }`}
+      >
+        {isSelected && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
+      </span>
+      <span className="font-medium text-sm text-foreground">{label}</span>
+    </button>
+  );
 
   // Show AI button when query has 3+ chars and no AI results yet
   const showAISearchButton = query.length >= 3 && !isSearching && searchStatus !== "not_found" && aiResults.length === 0;
@@ -357,133 +432,110 @@ export default function Search() {
         </div>
       </header>
 
-      {/* Filter Sheet */}
+      {/* Filter & Sort Sheet — two-pane layout (category rail + options panel) */}
       <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl h-[75vh]">
-          <SheetHeader>
-            <SheetTitle className="text-lg font-display">Filter Jobs</SheetTitle>
+        <SheetContent side="bottom" className="rounded-t-3xl h-[85vh] p-0 gap-0 flex flex-col md:mx-auto md:max-w-2xl">
+          <SheetHeader className="px-5 py-4 border-b border-border/60 space-y-0 text-left">
+            <SheetTitle className="text-base font-display font-bold">Filters &amp; Sort</SheetTitle>
           </SheetHeader>
-          <Tabs defaultValue="location" className="mt-4">
-            <TabsList className="grid w-full grid-cols-3 h-12 p-1 bg-secondary/50 rounded-xl">
-              <TabsTrigger value="location" className="gap-1 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">
-                <MapPin className="h-4 w-4" />
-                <span className="hidden sm:inline">Location</span>
-                {selectedLocations.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center text-xs">
-                    {selectedLocations.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="sector" className="gap-1 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">
-                <Building className="h-4 w-4" />
-                <span className="hidden sm:inline">Sector</span>
-                {selectedSectors.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center text-xs">
-                    {selectedSectors.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="qualification" className="gap-1 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">
-                <GraduationCap className="h-4 w-4" />
-                <span className="hidden sm:inline">Education</span>
-                {selectedQualifications.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center text-xs">
-                    {selectedQualifications.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
 
-            <TabsContent value="location" className="mt-4">
-              <ScrollArea className="h-[45vh]">
-                <div className="flex flex-col gap-2 pr-4">
-                  {INDIAN_STATES.map((state) => {
-                    const isSelected = selectedLocations.includes(state);
+          <div className="flex flex-1 min-h-0">
+            {/* Left rail — filter categories */}
+            <div className="w-[38%] max-w-[168px] flex-shrink-0 bg-secondary/40 overflow-y-auto scrollbar-hide border-r border-border/50">
+              {FILTER_TABS.map((tab) => {
+                const isActive = activeFilterTab === tab.key;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveFilterTab(tab.key)}
+                    className={`relative w-full flex items-center gap-2 px-4 py-4 text-left text-sm transition-colors ${
+                      isActive
+                        ? "bg-background font-semibold text-foreground"
+                        : "text-muted-foreground hover:bg-background/50"
+                    }`}
+                  >
+                    {isActive && <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />}
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{tab.label}</span>
+                    {tab.count > 0 && (
+                      <span className="ml-auto h-5 min-w-[20px] px-1 rounded-full bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center">
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Right panel — options for the active category */}
+            <ScrollArea className="flex-1">
+              <div className="p-4 flex flex-col gap-2">
+                {activeFilterTab === "sort" &&
+                  SORT_OPTIONS.map((opt) => {
+                    const isSelected = (sortMode || "relevance") === opt.value;
                     return (
-                      <div
-                        key={state}
-                        onClick={() => toggleLocation(state)}
-                        className={`flex items-center gap-3 px-4 py-3.5 rounded-xl cursor-pointer transition-all border ${isSelected
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-card border-border hover:border-primary/50 hover:bg-secondary/30"
-                          }`}
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => updateSort(opt.value)}
+                        className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border text-left transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/40 hover:bg-secondary/30"
+                        }`}
                       >
-                        <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${isSelected
-                          ? "bg-primary-foreground border-primary-foreground"
-                          : "border-muted-foreground/40"
-                          }`}>
-                          {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}
-                        </div>
-                        <span className="font-medium">{state}</span>
-                      </div>
+                        <span
+                          className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                            isSelected ? "border-primary" : "border-muted-foreground/40"
+                          }`}
+                        >
+                          {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-primary" />}
+                        </span>
+                        <span className="flex flex-col">
+                          <span className="font-medium text-sm text-foreground">{opt.label}</span>
+                          <span className="text-xs text-muted-foreground">{opt.desc}</span>
+                        </span>
+                      </button>
                     );
                   })}
-                </div>
-              </ScrollArea>
-            </TabsContent>
 
-            <TabsContent value="sector" className="mt-4">
-              <ScrollArea className="h-[45vh]">
-                <div className="flex flex-col gap-2 pr-4">
-                  {EXAM_SECTORS.map((sector) => {
-                    const isSelected = selectedSectors.includes(sector);
-                    return (
-                      <div
-                        key={sector}
-                        onClick={() => toggleSector(sector)}
-                        className={`flex items-center gap-3 px-4 py-3.5 rounded-xl cursor-pointer transition-all border ${isSelected
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-card border-border hover:border-primary/50 hover:bg-secondary/30"
-                          }`}
-                      >
-                        <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${isSelected
-                          ? "bg-primary-foreground border-primary-foreground"
-                          : "border-muted-foreground/40"
-                          }`}>
-                          {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}
-                        </div>
-                        <span className="font-medium">{sector}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            </TabsContent>
+                {activeFilterTab === "location" &&
+                  INDIAN_STATES.map((state) =>
+                    renderCheckRow(state, selectedLocations.includes(state), () => toggleLocation(state))
+                  )}
 
-            <TabsContent value="qualification" className="mt-4">
-              <ScrollArea className="h-[45vh]">
-                <div className="flex flex-col gap-2 pr-4">
-                  {EDUCATION_QUALIFICATIONS.map((qual) => {
-                    const isSelected = selectedQualifications.includes(qual);
-                    return (
-                      <div
-                        key={qual}
-                        onClick={() => toggleQualification(qual)}
-                        className={`flex items-center gap-3 px-4 py-3.5 rounded-xl cursor-pointer transition-all border ${isSelected
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-card border-border hover:border-primary/50 hover:bg-secondary/30"
-                          }`}
-                      >
-                        <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${isSelected
-                          ? "bg-primary-foreground border-primary-foreground"
-                          : "border-muted-foreground/40"
-                          }`}>
-                          {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}
-                        </div>
-                        <span className="font-medium">{qual}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
+                {activeFilterTab === "sector" &&
+                  EXAM_SECTORS.map((sector) =>
+                    renderCheckRow(sector, selectedSectors.includes(sector), () => toggleSector(sector))
+                  )}
 
-          {totalFilters > 0 && (
-            <Button variant="ghost" size="sm" className="mt-4 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={clearAllFilters}>
-              Clear all filters ({totalFilters})
+                {activeFilterTab === "qualification" &&
+                  EDUCATION_QUALIFICATIONS.map((qual) =>
+                    renderCheckRow(qual, selectedQualifications.includes(qual), () => toggleQualification(qual))
+                  )}
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* Footer action bar */}
+          <div className="flex items-center gap-3 px-4 py-3 border-t border-border/60 bg-background">
+            <Button
+              variant="outline"
+              className="flex-1 rounded-xl h-12 font-semibold"
+              onClick={resetFiltersAndSort}
+              disabled={totalFilters === 0 && !sortActive}
+            >
+              Clear all
             </Button>
-          )}
+            <Button
+              className="flex-1 rounded-xl h-12 font-semibold"
+              onClick={() => setIsFilterOpen(false)}
+            >
+              Show {deferredFilteredJobs.length} results
+            </Button>
+          </div>
         </SheetContent>
       </Sheet>
 

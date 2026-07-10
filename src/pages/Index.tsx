@@ -373,7 +373,7 @@ const Index = () => {
                 eligibility-based "Worth Checking" shelf */}
             {isNewUser && jobsReady && highestVacancyJobs.length > 0 && (
               <section className="mb-8 md:mb-0 md:animate-fade-in-up" style={{ animationDelay: "200ms" }}>
-                <SectionHeader title="Highest Vacancy" variant="dark" />
+                <SectionHeader title="Highest Vacancy" variant="dark" linkTo="/search?sort=vacancy" />
                 <div className="flex gap-4 overflow-x-auto px-5 pb-2 scrollbar-hide snap-x snap-mandatory md:px-0">
                   {highestVacancyJobs.map((job) => (
                     <div key={job.id} className="flex-shrink-0 w-[290px] sm:w-[320px] snap-start">
