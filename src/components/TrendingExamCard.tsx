@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingExam, CATEGORY_GRADIENTS } from "@/hooks/useTrendingExams";
@@ -116,11 +116,9 @@ function InlineUpdatesStrip({ updates, variant = "light" }: { updates: ExamUpdat
                 const CatIcon = catConfig.icon;
                 const pdfLinkCount = getExamPdfWebsiteLinks(update).length;
                 return (
-                    <a
+                    <Link
                         key={update.id}
-                        href={update.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        to={`/exam-update/${update.slug || update.id}`}
                         className={cn(
                             "flex items-start gap-2.5 rounded-lg px-3 py-2 transition-colors",
                             isDark
@@ -168,7 +166,7 @@ function InlineUpdatesStrip({ updates, variant = "light" }: { updates: ExamUpdat
                             "h-3.5 w-3.5 flex-shrink-0 mt-1",
                             isDark ? "text-white/40" : "text-muted-foreground"
                         )} />
-                    </a>
+                    </Link>
                 );
             })}
         </div>
@@ -604,11 +602,9 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
                                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Related News</h4>
                                 <div className="space-y-2">
                                     {latestScrapedUpdates.map((update) => (
-                                        <a
+                                        <Link
                                             key={update.id}
-                                            href={update.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
+                                            to={`/exam-update/${update.slug || update.id}`}
                                             className="block rounded-lg border border-border/60 bg-secondary/25 p-3 hover:bg-secondary/45 transition-colors"
                                             onClick={(e) => e.stopPropagation()}
                                         >
@@ -630,7 +626,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
                                                     <p className="text-xs text-primary mt-1">{pdfLinkCount} quick link{pdfLinkCount !== 1 ? "s" : ""} available</p>
                                                 ) : null;
                                             })()}
-                                        </a>
+                                        </Link>
                                     ))}
                                 </div>
                             </div>

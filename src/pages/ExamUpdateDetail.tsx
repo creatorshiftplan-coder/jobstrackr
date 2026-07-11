@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { toast } from "sonner";
-import { isPdfOrWebsiteLink, getExamPdfWebsiteLinks } from "@/lib/urlUtils";
+import { isPdfOrWebsiteLink, getExamPdfWebsiteLinks, isFreeJobAlertUrl } from "@/lib/urlUtils";
 
 // ── Category config (same as card) ───────────────────────────────────
 function getCategoryConfig(category: string) {
@@ -97,7 +97,7 @@ export default function ExamUpdateDetail() {
     const CatIcon = catConfig.icon;
     // Only surface real PDF / official-website links — never WhatsApp or Telegram share links.
     const pdfLinks = getExamPdfWebsiteLinks(update);
-    const websiteArticles = (update.related_articles || []).filter((ra) => isPdfOrWebsiteLink(ra.url));
+    const websiteArticles = (update.related_articles || []).filter((ra) => isPdfOrWebsiteLink(ra.url) && !isFreeJobAlertUrl(ra.url));
     const isNew = update.created_at
         ? Date.now() - new Date(update.created_at).getTime() < 24 * 60 * 60 * 1000
         : false;
@@ -220,7 +220,7 @@ export default function ExamUpdateDetail() {
                                     <div key={i} className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-xs", i % 2 === 0 ? "bg-secondary/30" : "")}>
                                         <span className="flex-1 text-muted-foreground">{d.event}</span>
                                         <span className="font-semibold text-foreground whitespace-nowrap">{d.date}</span>
-                                        {d.link && isPdfOrWebsiteLink(d.link) && (
+                                        {d.link && isPdfOrWebsiteLink(d.link) && !isFreeJobAlertUrl(d.link) && (
                                             <a href={d.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                                 <ExternalLink className="h-3 w-3" />
                                             </a>
