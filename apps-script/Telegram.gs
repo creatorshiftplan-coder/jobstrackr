@@ -104,21 +104,51 @@ function sendTelegram_(ch, text) {
 
 // ─────────────────────────── sector matching ────────────────────────────────
 
-/** Sector labels a piece of text belongs to (mirrors telegram-auto-post). */
+/**
+ * Whole-word regex from a list of terms/phrases. Matching on word boundaries
+ * (BOTH sides) is what stops short acronyms from leaking into unrelated words —
+ * the old indexOf() substring test mis-routed items, e.g. 'nda' matched
+ * "secondary"/"boundary"/"mandate" → UPSC, 'hal' matched "hall ticket" → PSU,
+ * 'bel' matched "below" → PSU, 'sail' matched "sailor" → PSU, 'ips' matched
+ * "fellowships" → UPSC. Plurals/suffixes are covered by listing them explicitly
+ * (e.g. 'railways', 'banking') so precision improves without losing recall.
+ */
+function wordRe_(terms) {
+  var esc = terms.map(function (t) {
+    return String(t).trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  });
+  return new RegExp('\\b(?:' + esc.join('|') + ')\\b', 'i');
+}
+
+// Compiled once per execution. Emits the SAME sector labels as before — only the
+// matching got stricter — so no Channels-tab `sector` values need to change.
+var SECTOR_RES_ = {
+  ssc:       wordRe_(['ssc', 'staff selection commission']),
+  railway:   wordRe_(['railway', 'railways', 'rrb', 'ntpc', 'group d', 'alp', 'assistant loco pilot', 'loco pilot', 'rpf', 'railway recruitment']),
+  bank:      wordRe_(['bank', 'banks', 'banking', 'ibps', 'sbi', 'rbi', 'nabard', 'sidbi']),
+  upsc:      wordRe_(['upsc', 'civil services', 'ias', 'ips', 'nda', 'cds']),
+  defence:   wordRe_(['army', 'navy', 'air force', 'defence', 'defense', 'agniveer', 'agnipath', 'police', 'constable', 'sub inspector', 'cisf', 'crpf', 'bsf', 'itbp', 'afcat', 'coast guard']),
+  psu:       wordRe_(['psu', 'ongc', 'ntpc', 'bhel', 'sail', 'iocl', 'bpcl', 'hpcl', 'gail', 'bel', 'hal', 'drdo', 'isro', 'powergrid', 'npcil', 'coal india']),
+  psc:       wordRe_(['psc', 'public service commission', 'bpsc', 'uppsc', 'mpsc', 'rpsc', 'wbpsc', 'opsc', 'mppsc', 'ukpsc', 'hpsc']),
+  teaching:  wordRe_(['teacher', 'teachers', 'teaching', 'tgt', 'pgt', 'professor', 'lecturer', 'kvs', 'nvs', 'ctet', 'tet', 'ugc net', 'prt']),
+  judiciary: wordRe_(['supreme court', 'high court', 'district court', 'judiciary', 'judicial']),
+  steno:     wordRe_(['stenographer', 'steno']),
+};
+
+/** Sector labels a piece of text belongs to (whole-word matched). */
 function matchSectors_(text) {
   text = String(text || '').toLowerCase();
-  function has() { for (var i = 0; i < arguments.length; i++) if (text.indexOf(arguments[i]) >= 0) return true; return false; }
   var m = ['All Jobs', 'Government Jobs', 'Sarkari Naukri'];
-  if (has('ssc', 'staff selection commission')) m.push('SSC');
-  if (has('railway', 'rrb', 'ntpc', 'group d', 'alp', 'rpf', 'assistant loco pilot')) { m.push('RRB'); m.push('Railway Jobs'); }
-  if (has('bank', 'ibps', 'sbi', 'rbi', 'nabard')) { m.push('Banking Jobs'); m.push('Banking'); }
-  if (has('upsc', 'civil services', 'ias', 'ips', 'nda', 'cds')) m.push('UPSC');
-  if (has('army', 'navy', 'air force', 'defence', 'defense', 'agniveer', 'police', 'constable', 'cisf', 'crpf', 'bsf', 'itbp', 'afcat')) { m.push('Defence Jobs'); m.push('Police Jobs'); }
-  if (has('psu', 'ongc', 'ntpc', 'bhel', 'sail', 'iocl', 'bpcl', 'hpcl', 'gail', 'bel', 'hal', 'drdo', 'isro')) m.push('PSU Jobs');
-  if (has('psc', 'public service commission', 'bpsc', 'uppsc', 'mpsc', 'rpsc', 'wbpsc')) { m.push('PSC'); m.push('State PSC'); m.push('State Government Jobs'); }
-  if (has('teacher', 'teaching', 'tgt', 'pgt', 'professor', 'lecturer', 'kvs', 'nvs', 'ctet', 'tet', 'ugc net')) { m.push('Teaching Jobs'); m.push('Teaching'); }
-  if (has('supreme court', 'high court', 'district court', 'judiciary', 'judicial')) { m.push('Judiciary'); m.push('High Court'); }
-  if (has('stenographer', 'steno')) m.push('Stenographer');
+  if (SECTOR_RES_.ssc.test(text)) m.push('SSC');
+  if (SECTOR_RES_.railway.test(text)) { m.push('RRB'); m.push('Railway Jobs'); }
+  if (SECTOR_RES_.bank.test(text)) { m.push('Banking Jobs'); m.push('Banking'); }
+  if (SECTOR_RES_.upsc.test(text)) m.push('UPSC');
+  if (SECTOR_RES_.defence.test(text)) { m.push('Defence Jobs'); m.push('Police Jobs'); }
+  if (SECTOR_RES_.psu.test(text)) m.push('PSU Jobs');
+  if (SECTOR_RES_.psc.test(text)) { m.push('PSC'); m.push('State PSC'); m.push('State Government Jobs'); }
+  if (SECTOR_RES_.teaching.test(text)) { m.push('Teaching Jobs'); m.push('Teaching'); }
+  if (SECTOR_RES_.judiciary.test(text)) { m.push('Judiciary'); m.push('High Court'); }
+  if (SECTOR_RES_.steno.test(text)) m.push('Stenographer');
   return m;
 }
 
