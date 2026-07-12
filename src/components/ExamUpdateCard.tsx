@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { FileText, Award, BarChart3, Newspaper, Calendar, Download, Key, Sparkles, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getExamPdfWebsiteLinks } from "@/lib/urlUtils";
 
 interface ExamUpdateCardProps {
@@ -48,6 +48,8 @@ function isNew(createdAt?: string | null): boolean {
 }
 
 export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
+    const navigate = useNavigate();
+    const detailPath = `/exam-update/${update.id}`;
     const catConfig = getCategoryConfig(update.category);
     const CatIcon = catConfig.icon;
     const timeAgo = getTimeAgo(update.scraped_at);
@@ -65,8 +67,12 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, delay: Math.min(index * 0.04, 0.3) }}
         >
-            <Link to={`/exam-update/${update.id}`} className="block">
-                <Card className={cn("overflow-hidden border hover:shadow-md hover:scale-[1.005] hover:bg-muted/10 transition-all duration-200 cursor-pointer", newBadge && "ring-1 ring-green-500/30")}>
+            {/* Card navigates via onClick (not a wrapping <Link>) so the external
+                PDF/website <a> chips inside don't create invalid nested anchors. */}
+            <Card
+                onClick={() => navigate(detailPath)}
+                className={cn("overflow-hidden border hover:shadow-md hover:scale-[1.005] hover:bg-muted/10 transition-all duration-200 cursor-pointer", newBadge && "ring-1 ring-green-500/30")}
+            >
                     {/* Gradient accent bar */}
                     <div className={cn("h-0.5 bg-gradient-to-r", catConfig.gradient)} />
 
@@ -145,13 +151,16 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
 
                         {/* Footer — internal detail link only */}
                         <div className="pl-[34px] pt-1.5 border-t border-border/30">
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+                            <Link
+                                to={detailPath}
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                            >
                                 View Details <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-                            </span>
+                            </Link>
                         </div>
                     </div>
                 </Card>
-            </Link>
         </motion.div>
     );
 }

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useTrendingExams, CATEGORY_GRADIENTS } from "@/hooks/useTrendingExams";
+import { useTrendingExams } from "@/hooks/useTrendingExams";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { TrendingExamCard } from "@/components/TrendingExamCard";
 import { ExamUpdateCard } from "@/components/ExamUpdateCard";
@@ -9,14 +9,19 @@ import { AppHeader } from "@/components/AppHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, X, Check, ChevronDown, MapPin, Grid3X3, Clock, Newspaper, Search as SearchIcon } from "lucide-react";
+import {
+    TrendingUp, X, ChevronDown, MapPin, Grid3X3, Clock, Newspaper,
+    Search as SearchIcon, LayoutGrid, Bell, Ticket, Trophy, KeyRound,
+    BarChart3, BookOpen, RefreshCw, Sparkles, FilterX, SearchX,
+    type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getExamStatusType, getBadgeConfig } from "@/lib/examStatus";
 import { useAllExamUpdates } from "@/hooks/useExamUpdates";
 import { searchUpdates, scoreUpdateForQuery, tokenizeQuery } from "@/lib/updateSearch";
 import { useDebouncedValue } from "@/hooks/useDebounce";
 import { useQueryClient } from "@tanstack/react-query";
-import { motion, useScroll, AnimatePresence } from "framer-motion";
+import { motion, useScroll } from "framer-motion";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -29,15 +34,15 @@ import {
 
 
 // Tab options
-const TABS = [
-    { id: "all", label: "📋 All" },
-    { id: "notification", label: "🔔 Notification" },
-    { id: "admit_card", label: "🎫 Admit Card" },
-    { id: "result", label: "🏆 Result" },
-    { id: "answer_key", label: "🔑 Answer Key" },
-    { id: "cutoff", label: "📊 Cutoff" },
-    { id: "syllabus", label: "📖 Syllabus" },
-    { id: "news", label: "📰 News" },
+const TABS: { id: string; label: string; icon: LucideIcon }[] = [
+    { id: "all", label: "All", icon: LayoutGrid },
+    { id: "notification", label: "Notifications", icon: Bell },
+    { id: "admit_card", label: "Admit Cards", icon: Ticket },
+    { id: "result", label: "Results", icon: Trophy },
+    { id: "answer_key", label: "Answer Keys", icon: KeyRound },
+    { id: "cutoff", label: "Cutoffs", icon: BarChart3 },
+    { id: "syllabus", label: "Syllabus", icon: BookOpen },
+    { id: "news", label: "News", icon: Newspaper },
 ];
 
 // Map tab IDs to exam_updates category values for filtering
@@ -84,6 +89,98 @@ const STATE_ABBREVIATIONS: Record<string, string[]> = {
     "Rajasthan": ["RJ", "Rajasthan"],
     "Karnataka": ["KA", "Karnataka"],
 };
+
+// Consistent section heading used above every feed group
+function SectionHeading({
+    icon: Icon,
+    title,
+    count,
+    accent = false,
+}: {
+    icon: LucideIcon;
+    title: string;
+    count?: number;
+    accent?: boolean;
+}) {
+    return (
+        <div className="flex items-center gap-2">
+            <span
+                className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded-md",
+                    accent ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-primary/10 text-primary"
+                )}
+            >
+                <Icon className="h-3.5 w-3.5" />
+            </span>
+            <h2
+                className={cn(
+                    "text-[13px] font-semibold uppercase tracking-[0.14em]",
+                    accent ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                )}
+            >
+                {title}
+            </h2>
+            {typeof count === "number" && (
+                <Badge variant="secondary" className="h-5 min-w-5 justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums">
+                    {count}
+                </Badge>
+            )}
+        </div>
+    );
+}
+
+// Structured skeleton that mirrors the real update card layout
+function UpdateCardSkeleton() {
+    return (
+        <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
+            <Skeleton className="h-0.5 w-full rounded-none" />
+            <div className="space-y-3 p-4">
+                <div className="flex items-start gap-3">
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                    <div className="flex-1 space-y-2">
+                        <div className="flex gap-2">
+                            <Skeleton className="h-4 w-16 rounded-full" />
+                            <Skeleton className="h-4 w-12 rounded-full" />
+                        </div>
+                        <Skeleton className="h-4 w-4/5" />
+                        <Skeleton className="h-3 w-3/5" />
+                    </div>
+                </div>
+                <div className="flex gap-2 pl-11">
+                    <Skeleton className="h-6 w-32 rounded-md" />
+                    <Skeleton className="h-6 w-24 rounded-md" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Shared empty / error state
+function EmptyState({
+    icon: Icon,
+    title,
+    description,
+    action,
+}: {
+    icon: LucideIcon;
+    title: string;
+    description: string;
+    action?: React.ReactNode;
+}) {
+    return (
+        <div className="flex flex-col items-center px-6 py-20 text-center">
+            <div className="relative mb-5">
+                <div className="absolute inset-0 scale-150 rounded-full bg-primary/5" />
+                <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-border/60 bg-card shadow-sm">
+                    <Icon className="h-7 w-7 text-muted-foreground" />
+                </div>
+            </div>
+            <h2 className="mb-1.5 text-base font-semibold text-foreground">{title}</h2>
+            <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">{description}</p>
+            {action && <div className="mt-5">{action}</div>}
+        </div>
+    );
+}
 
 export default function Trending() {
     const [searchParams] = useSearchParams();
@@ -285,12 +382,20 @@ export default function Trending() {
         return examUpdates.filter((u) => new Date(u.scraped_at).getTime() > cutoff);
     }, [examUpdates, debouncedSearch]);
 
+    const activeFilterCount = selectedCategories.length + selectedLocations.length;
+    const hasActiveFilters = activeFilterCount > 0;
+
+    const clearAllFilters = useCallback(() => {
+        setSelectedCategories([]);
+        setSelectedLocations([]);
+    }, []);
+
     return (
         <div className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/20 flex flex-col">
             {/* App Header */}
             <div className="md:hidden">
                 <AppHeader
-                    title="Trending"
+                    title="Updates"
                     variant="primary"
                     showMenu={true}
                     showRefresh={true}
@@ -301,46 +406,72 @@ export default function Trending() {
                 />
             </div>
 
+            {/* Desktop hero */}
             <section className="hidden md:block border-b border-border/60 bg-[linear-gradient(135deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.55)_52%,hsl(var(--primary)/0.12)_100%)]">
-                <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
-                    <div className="flex items-end justify-between gap-8">
-                        <div className="max-w-3xl">
+                <div className="mx-auto max-w-6xl px-6 py-9 lg:px-8">
+                    <div className="flex items-start justify-between gap-10">
+                        <div className="max-w-2xl">
                             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                                <TrendingUp className="h-3.5 w-3.5" />
+                                <span className="relative flex h-2 w-2">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                                </span>
                                 Live Update Feed
                             </div>
                             <h1 className="font-display text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
-                                Latest government exam updates in a clearer, more professional desktop view.
+                                Every exam update, the moment it drops.
                             </h1>
-                            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground lg:text-base">
-                                Follow notifications, admit cards, and results in one refined workspace built for fast scanning and better filtering.
+                            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground lg:text-base">
+                                Notifications, admit cards, answer keys, results and cutoffs from every
+                                major recruiting body — collected from official sources into one clean,
+                                searchable feed.
                             </p>
+
+                            <div className="mt-6 flex flex-wrap gap-2">
+                                {TABS.slice(1, 5).map((tab) => {
+                                    const TabIcon = tab.icon;
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => { setSelectedTab(tab.id); setShowAllUpdates(false); }}
+                                            className={cn(
+                                                "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-all",
+                                                selectedTab === tab.id
+                                                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                                                    : "border-border bg-background/70 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                            )}
+                                        >
+                                            <TabIcon className="h-3.5 w-3.5" />
+                                            {tab.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
 
-                        <div className="grid min-w-[320px] grid-cols-2 gap-4">
-                            <div className="rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
-                                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Visible Updates</p>
-                                <p className="mt-2 text-3xl font-bold text-foreground">{filteredExams.length + filteredUpdates.length}</p>
-                                <p className="mt-1 text-sm text-muted-foreground">matching current filters</p>
+                        <div className="flex shrink-0 flex-col items-end gap-4">
+                            <div className="grid min-w-[320px] grid-cols-2 gap-4">
+                                <div className="rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
+                                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">In Feed Now</p>
+                                    <p className="mt-2 text-3xl font-bold tabular-nums text-foreground">{filteredExams.length + filteredUpdates.length}</p>
+                                    <p className="mt-1 text-sm text-muted-foreground">updates &amp; tracked exams</p>
+                                </div>
+                                <div className="rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
+                                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">New in 24h</p>
+                                    <div className="mt-2 flex items-baseline gap-2">
+                                        <p className="text-3xl font-bold tabular-nums text-foreground">{recentUpdates.length}</p>
+                                        {recentUpdates.length > 0 && (
+                                            <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                                        )}
+                                    </div>
+                                    <p className="mt-1 text-sm text-muted-foreground">fresh from sources</p>
+                                </div>
                             </div>
-                            <div className="rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
-                                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Filter State</p>
-                                <p className="mt-2 text-3xl font-bold text-foreground">{selectedCategories.length + selectedLocations.length + (latestFilter ? 1 : 0)}</p>
-                                <p className="mt-1 text-sm text-muted-foreground">active refinements</p>
-                            </div>
+                            <Button onClick={() => refetch()} variant="outline" className="rounded-xl" disabled={isRefetching}>
+                                <RefreshCw className={cn("mr-2 h-4 w-4", isRefetching && "animate-spin")} />
+                                {isRefetching ? "Refreshing…" : "Refresh Feed"}
+                            </Button>
                         </div>
-                    </div>
-
-                    <div className="mt-6 flex items-center justify-between gap-4">
-                        <div className="flex flex-wrap gap-2">
-                            <span className="rounded-full border border-border bg-background/70 px-3 py-1 text-sm text-muted-foreground">Notifications</span>
-                            <span className="rounded-full border border-border bg-background/70 px-3 py-1 text-sm text-muted-foreground">Admit Cards</span>
-                            <span className="rounded-full border border-border bg-background/70 px-3 py-1 text-sm text-muted-foreground">Results</span>
-                        </div>
-                        <Button onClick={() => refetch()} variant="outline" className="rounded-xl" disabled={isRefetching}>
-                            <TrendingUp className="mr-2 h-4 w-4" />
-                            {isRefetching ? "Refreshing..." : "Refresh Feed"}
-                        </Button>
                     </div>
                 </div>
             </section>
@@ -355,23 +486,23 @@ export default function Trending() {
                 {/* Search Bar */}
                 <div className="mx-auto px-4 pt-3 md:max-w-6xl md:px-6 lg:px-8">
                     <div className="relative">
-                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                         <input
                             type="text"
                             inputMode="search"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search updates — result, admit card, exam name…"
-                            className="w-full h-10 pl-10 pr-9 rounded-full bg-secondary/50 border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all"
+                            className="w-full h-10 pl-10 pr-9 rounded-full bg-card border border-border text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all"
                         />
                         {searchQuery && (
                             <button
                                 type="button"
                                 onClick={() => setSearchQuery("")}
                                 aria-label="Clear search"
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                             >
-                                <X className="h-4 w-4" />
+                                <X className="h-3 w-3" />
                             </button>
                         )}
                     </div>
@@ -385,8 +516,8 @@ export default function Trending() {
                         className={cn(
                             "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all border",
                             latestFilter
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
                         )}
                     >
                         <Clock className="h-3.5 w-3.5" />
@@ -400,12 +531,17 @@ export default function Trending() {
                                 className={cn(
                                     "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all border",
                                     selectedCategories.length > 0
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                        : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
                                 )}
                             >
                                 <Grid3X3 className="h-3.5 w-3.5" />
-                                Category {selectedCategories.length > 0 && `(${selectedCategories.length})`}
+                                Category
+                                {selectedCategories.length > 0 && (
+                                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-foreground/20 px-1 text-[10px] font-bold tabular-nums">
+                                        {selectedCategories.length}
+                                    </span>
+                                )}
                                 <ChevronDown className="h-3 w-3" />
                             </button>
                         </DropdownMenuTrigger>
@@ -442,12 +578,17 @@ export default function Trending() {
                                 className={cn(
                                     "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all border",
                                     selectedLocations.length > 0
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                        : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
                                 )}
                             >
                                 <MapPin className="h-3.5 w-3.5" />
-                                Location {selectedLocations.length > 0 && `(${selectedLocations.length})`}
+                                Location
+                                {selectedLocations.length > 0 && (
+                                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-foreground/20 px-1 text-[10px] font-bold tabular-nums">
+                                        {selectedLocations.length}
+                                    </span>
+                                )}
                                 <ChevronDown className="h-3 w-3" />
                             </button>
                         </DropdownMenuTrigger>
@@ -479,21 +620,26 @@ export default function Trending() {
                 </div>
 
                 {/* Tab Navigation */}
-                <div className="mx-auto flex gap-2 overflow-x-auto border-t border-border/50 px-4 pb-3 scrollbar-hide md:max-w-6xl md:px-6 lg:px-8">
-                    {TABS.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => { setSelectedTab(tab.id); setShowAllUpdates(false); }}
-                            className={cn(
-                                "px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all",
-                                selectedTab === tab.id
-                                    ? "bg-primary text-primary-foreground shadow-md"
-                                    : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
-                            )}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+                <div className="mx-auto flex gap-1.5 overflow-x-auto border-t border-border/50 px-4 py-2.5 scrollbar-hide md:max-w-6xl md:px-6 lg:px-8">
+                    {TABS.map((tab) => {
+                        const TabIcon = tab.icon;
+                        const isActive = selectedTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => { setSelectedTab(tab.id); setShowAllUpdates(false); }}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-medium whitespace-nowrap transition-all",
+                                    isActive
+                                        ? "bg-primary text-primary-foreground shadow-sm"
+                                        : "bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                )}
+                            >
+                                <TabIcon className="h-3.5 w-3.5" />
+                                {tab.label}
+                            </button>
+                        );
+                    })}
                 </div>
             </motion.div>
 
@@ -502,54 +648,88 @@ export default function Trending() {
                 ref={containerRef}
                 className="mx-auto flex-1 w-full max-w-6xl overflow-y-auto px-4 py-6 pb-24 md:px-6 lg:px-8"
             >
-                {error ? (
-                    <div className="text-center py-12">
-                        <p className="text-destructive">Failed to load trending exams</p>
+                {/* Active filter chips */}
+                {hasActiveFilters && (
+                    <div className="mb-5 flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Filters</span>
+                        {selectedCategories.map((category) => (
+                            <button
+                                key={`cat-${category}`}
+                                onClick={() => toggleCategory(category)}
+                                className="group inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 py-1 pl-3 pr-2 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
+                            >
+                                {category}
+                                <X className="h-3 w-3 opacity-60 transition-opacity group-hover:opacity-100" />
+                            </button>
+                        ))}
+                        {selectedLocations.map((location) => (
+                            <button
+                                key={`loc-${location}`}
+                                onClick={() => toggleLocation(location)}
+                                className="group inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 py-1 pl-3 pr-2 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
+                            >
+                                <MapPin className="h-3 w-3" />
+                                {location}
+                                <X className="h-3 w-3 opacity-60 transition-opacity group-hover:opacity-100" />
+                            </button>
+                        ))}
                         <button
-                            onClick={() => refetch()}
-                            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+                            onClick={clearAllFilters}
+                            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-destructive"
                         >
-                            Retry
+                            <FilterX className="h-3 w-3" />
+                            Clear all
                         </button>
                     </div>
+                )}
+
+                {error ? (
+                    <EmptyState
+                        icon={TrendingUp}
+                        title="Couldn't load updates"
+                        description="Something went wrong while fetching the feed. Check your connection and try again."
+                        action={
+                            <Button onClick={() => refetch()} className="rounded-xl">
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Retry
+                            </Button>
+                        }
+                    />
                 ) : isUpdatesOnlyTab ? (
                     /* Updates-only tabs (Answer Key, Cutoff, Syllabus, News) */
                     updatesLoading ? (
-                        <div className="space-y-4">
-                            {[1, 2, 3].map((i) => (
-                                <Skeleton key={i} className="h-32 w-full rounded-2xl" />
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            {[1, 2, 3, 4].map((i) => (
+                                <UpdateCardSkeleton key={i} />
                             ))}
                         </div>
                     ) : filteredUpdates.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
                             {filteredUpdates.map((update, index) => (
                                 <ExamUpdateCard key={update.id} update={update} index={index} />
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-16">
-                            <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
-                                <TrendingUp className="h-10 w-10 text-muted-foreground" />
-                            </div>
-                            <h2 className="text-lg font-semibold text-foreground mb-2">No Updates Found</h2>
-                            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                                No {selectedTab.replace(/_/g, " ")} updates available yet.
-                            </p>
-                        </div>
+                        <EmptyState
+                            icon={debouncedSearch.trim() ? SearchX : Newspaper}
+                            title={debouncedSearch.trim() ? "No matches found" : "No updates found"}
+                            description={
+                                debouncedSearch.trim()
+                                    ? `Nothing matched “${debouncedSearch.trim()}”. Try a different keyword.`
+                                    : `No ${selectedTab.replace(/_/g, " ")} updates available yet. New ones land here as soon as they're published.`
+                            }
+                        />
                     )
                 ) : (
                     /* Combined view: Exam updates + Exam cards */
-                    <div className="space-y-6">
+                    <div className="space-y-8">
                         {/* Exam Updates Section / Skeleton */}
                         {updatesLoading ? (
                             <div className="space-y-3">
-                                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                                    <Newspaper className="h-4 w-4" />
-                                    Loading Latest Updates...
-                                </h2>
-                                <div className="space-y-3">
-                                    {[1, 2].map((i) => (
-                                        <Skeleton key={i} className="h-32 w-full rounded-2xl animate-pulse" />
+                                <SectionHeading icon={Newspaper} title="Latest Updates" />
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    {[1, 2, 3, 4].map((i) => (
+                                        <UpdateCardSkeleton key={i} />
                                     ))}
                                 </div>
                             </div>
@@ -558,12 +738,8 @@ export default function Trending() {
                                 {/* Just Added — priority section for updates from last 24h */}
                                 {selectedTab === "all" && recentUpdates.length > 0 && (
                                     <div className="space-y-3">
-                                        <h2 className="text-sm font-semibold text-green-700 uppercase tracking-wider flex items-center gap-2">
-                                            <Newspaper className="h-4 w-4" />
-                                            Just Added
-                                            <Badge variant="secondary" className="text-[10px] ml-1">{recentUpdates.length}</Badge>
-                                        </h2>
-                                        <div className="space-y-3">
+                                        <SectionHeading icon={Sparkles} title="Just Added" count={recentUpdates.length} accent />
+                                        <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
                                             {recentUpdates.map((update, index) => (
                                                 <ExamUpdateCard key={update.id} update={update} index={index} />
                                             ))}
@@ -582,12 +758,12 @@ export default function Trending() {
 
                                     return (
                                         <div className="space-y-3">
-                                            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                                                <Newspaper className="h-4 w-4" />
-                                                {isSearching ? "Search Results" : isAllTab ? "Latest Updates" : `${selectedTab.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())} Updates`}
-                                                <Badge variant="secondary" className="text-[10px] ml-1">{filteredUpdates.length}</Badge>
-                                            </h2>
-                                            <div className="space-y-3">
+                                            <SectionHeading
+                                                icon={isSearching ? SearchIcon : Newspaper}
+                                                title={isSearching ? "Search Results" : isAllTab ? "Latest Updates" : `${selectedTab.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())} Updates`}
+                                                count={filteredUpdates.length}
+                                            />
+                                            <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
                                                 {visibleUpdates.map((update, index) => (
                                                     <ExamUpdateCard key={update.id} update={update} index={index} />
                                                 ))}
@@ -595,9 +771,10 @@ export default function Trending() {
                                             {hasMore && (
                                                 <button
                                                     onClick={() => setShowAllUpdates(true)}
-                                                    className="w-full py-2.5 text-sm font-medium text-primary hover:text-primary/80 bg-secondary/40 hover:bg-secondary/60 rounded-xl transition-colors"
+                                                    className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-card py-2.5 text-sm font-medium text-primary shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5"
                                                 >
                                                     Show all {filteredUpdates.length} updates
+                                                    <ChevronDown className="h-4 w-4" />
                                                 </button>
                                             )}
                                         </div>
@@ -609,23 +786,17 @@ export default function Trending() {
                         {/* Exam Cards Section / Skeleton */}
                         {isLoading ? (
                             <div className="space-y-3 pt-2">
-                                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                                    <TrendingUp className="h-4 w-4" />
-                                    Loading Tracked Exams...
-                                </h2>
+                                <SectionHeading icon={TrendingUp} title="Tracked Exams" />
                                 <div className="space-y-4">
                                     {[1, 2].map((i) => (
-                                        <Skeleton key={i} className="h-48 w-full rounded-2xl animate-pulse" />
+                                        <Skeleton key={i} className="h-48 w-full rounded-2xl" />
                                     ))}
                                 </div>
                             </div>
                         ) : filteredExams.length > 0 ? (
                             <div className="space-y-4">
                                 {(filteredUpdates.length > 0 || updatesLoading) && selectedTab !== "notification" && (
-                                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 pt-2">
-                                        <TrendingUp className="h-4 w-4" />
-                                        Tracked Exams
-                                    </h2>
+                                    <SectionHeading icon={TrendingUp} title="Tracked Exams" count={filteredExams.length} />
                                 )}
                                 {filteredExams.map((exam, index) => (
                                     <TrendingExamCard
@@ -640,38 +811,31 @@ export default function Trending() {
                                 ))}
                             </div>
                         ) : (!updatesLoading && filteredUpdates.length === 0) ? (
-                            <div className="text-center py-16">
-                                <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
-                                    <TrendingUp className="h-10 w-10 text-muted-foreground" />
-                                </div>
-                                <h2 className="text-lg font-semibold text-foreground mb-2">
-                                    {debouncedSearch.trim()
+                            <EmptyState
+                                icon={debouncedSearch.trim() ? SearchX : hasActiveFilters ? FilterX : TrendingUp}
+                                title={
+                                    debouncedSearch.trim()
                                         ? "No matches found"
-                                        : selectedCategories.length > 0 || selectedLocations.length > 0
-                                            ? "No Exams Found"
-                                            : "No Trending Exams Yet"
-                                    }
-                                </h2>
-                                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                                    {debouncedSearch.trim()
+                                        : hasActiveFilters
+                                            ? "Nothing matches these filters"
+                                            : "No updates yet"
+                                }
+                                description={
+                                    debouncedSearch.trim()
                                         ? `Nothing matched “${debouncedSearch.trim()}”. Try a different keyword.`
-                                        : selectedCategories.length > 0 || selectedLocations.length > 0
-                                            ? "No updates available. Try changing your filters."
+                                        : hasActiveFilters
+                                            ? "No updates match your current category or location filters. Try broadening them."
                                             : "Exams will appear here once users start tracking and refreshing status updates."
-                                    }
-                                </p>
-                                {(selectedCategories.length > 0 || selectedLocations.length > 0) && (
-                                    <button
-                                        onClick={() => {
-                                            setSelectedCategories([]);
-                                            setSelectedLocations([]);
-                                        }}
-                                        className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm"
-                                    >
-                                        Clear All Filters
-                                    </button>
-                                )}
-                            </div>
+                                }
+                                action={
+                                    hasActiveFilters ? (
+                                        <Button onClick={clearAllFilters} variant="outline" className="rounded-xl">
+                                            <FilterX className="mr-2 h-4 w-4" />
+                                            Clear All Filters
+                                        </Button>
+                                    ) : undefined
+                                }
+                            />
                         ) : null}
                     </div>
                 )}
