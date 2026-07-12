@@ -7,7 +7,7 @@ import { format, differenceInDays } from "date-fns";
 import { Link } from "react-router-dom";
 import { SaveJobButton } from "./SaveJobButton";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
-import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification } from "@/lib/jobUtils";
+import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification, getVacancyDisplay } from "@/lib/jobUtils";
 import { getBestJobLocation } from "@/lib/jobMatcher";
 import { OrganizationLogo } from "@/components/OrganizationLogo";
 
@@ -223,7 +223,7 @@ export const JobCard = memo(function JobCard({ job }: JobCardProps) {
                 <Users className="h-3.5 w-3.5 text-info" />
               </div>
               <span className="truncate">
-                {job.vacancies_display || (job.vacancies ? `${job.vacancies} vacancies` : "TBD")}
+                {getVacancyDisplay(job)}
               </span>
             </div>
           </div>

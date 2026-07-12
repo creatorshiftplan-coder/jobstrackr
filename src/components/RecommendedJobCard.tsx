@@ -6,7 +6,7 @@ import { format, differenceInDays } from "date-fns";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { SaveJobButton } from "@/components/SaveJobButton";
 import { Badge } from "@/components/ui/badge";
-import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification } from "@/lib/jobUtils";
+import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification, getVacancyDisplay } from "@/lib/jobUtils";
 import { OrganizationLogo } from "@/components/OrganizationLogo";
 import { cn } from "@/lib/utils";
 
@@ -17,12 +17,6 @@ interface RecommendedJobCardProps {
   /** Informational experience requirement (does not affect eligibility) */
   experienceNote?: string | null;
 }
-
-const formatVacancy = (vacancies: number | null, vacanciesDisplay: string | null) => {
-  if (vacanciesDisplay) return vacanciesDisplay;
-  if (vacancies) return `${vacancies} Vacancies`;
-  return "TBD";
-};
 
 export const RecommendedJobCard = memo(function RecommendedJobCard({
   job,
@@ -54,7 +48,7 @@ export const RecommendedJobCard = memo(function RecommendedJobCard({
       category: cat,
       shortQualification: shortQual,
       lastDateText: dateText,
-      vacancyText: formatVacancy(job.vacancies, job.vacancies_display),
+      vacancyText: getVacancyDisplay(job, "Vacancies"),
     };
   }, [job]);
 

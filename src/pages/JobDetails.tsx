@@ -31,7 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { BottomNav } from "@/components/BottomNav";
-import { formatAgeLimit, parseJobDeadline } from "@/lib/jobUtils";
+import { formatAgeLimit, parseJobDeadline, getVacancyDisplay } from "@/lib/jobUtils";
 import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { useSimilarJobs } from "@/hooks/useSimilarJobs";
@@ -170,9 +170,8 @@ export default function JobDetails() {
   const formatKey = (key: string) =>
     key.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-  // Filter out header-echo rows and total rows from vacancy breakdown;
-  // also extract the numeric total from the "Total" row.
-  let breakdownTotal = "";
+  // Filter out header-echo rows from the vacancy breakdown table (the Total row
+  // stays visible; the numeric total for the summary is derived in getVacancyDisplay).
   const vacancyRows: any[] = [];
   if (Array.isArray(meta?.vacancies_detail)) {
     for (const row of meta.vacancies_detail) {
@@ -184,16 +183,6 @@ export default function JobDetails() {
          'vacancy', 'vacancies', 'category', 'posts'].includes(v)
       );
       if (isHeaderEcho) continue;
-
-      // Extract total from the Total row (but keep the row visible in the table)
-      const isTotalRow = vals.some((v: string) => v === 'total' || v === 'grand total');
-      if (isTotalRow) {
-        const num = Object.values(row).find((v: any) => {
-          const s = String(v).trim().replace(/,/g, '');
-          return s !== '' && !isNaN(Number(s));
-        });
-        if (num) breakdownTotal = String(num).trim().replace(/,/g, '');
-      }
 
       vacancyRows.push(row);
     }
@@ -416,16 +405,7 @@ export default function JobDetails() {
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Vacancies</p>
                 <p className="font-medium text-sm truncate">
-                  {(() => {
-                    // Prioritize breakdownTotal from vacancy table over unhelpful display values
-                    if (breakdownTotal) return `${breakdownTotal} Posts`;
-                    const display = job.vacancies_display?.trim().toLowerCase();
-                    if (display && display !== 'not found' && display !== 'tbd' && display !== 'n/a') {
-                      return job.vacancies_display;
-                    }
-                    if (job.vacancies) return `${job.vacancies} Posts`;
-                    return "TBD";
-                  })()}
+                  {getVacancyDisplay(job)}
                 </p>
               </div>
             </CardContent>

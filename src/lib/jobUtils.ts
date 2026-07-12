@@ -592,3 +592,44 @@ export const formatAgeLimit = (
     if (normalizedMax !== null) return `Upto ${normalizedMax} ${unit}`;
     return "Not Available";
 };
+
+// Extract the total vacancy count from the "Total" row of a vacancies_detail breakdown table.
+const extractVacancyBreakdownTotal = (
+    vacanciesDetail?: Record<string, string>[] | null
+): string => {
+    if (!Array.isArray(vacanciesDetail)) return "";
+    for (const row of vacanciesDetail) {
+        const vals = Object.values(row).map((v: any) => String(v).toLowerCase().trim());
+        const isTotalRow = vals.some((v: string) => v === "total" || v === "grand total");
+        if (!isTotalRow) continue;
+        const num = Object.values(row).find((v: any) => {
+            const s = String(v).trim().replace(/,/g, "");
+            return s !== "" && !isNaN(Number(s));
+        });
+        if (num) return String(num).trim().replace(/,/g, "");
+    }
+    return "";
+};
+
+// Single source of truth for the vacancy summary shown on cards and the details page.
+// Prioritizes the total from the breakdown table over unhelpful display placeholders.
+export const getVacancyDisplay = (
+    job: {
+        vacancies_display?: string | null;
+        vacancies?: number | null;
+        job_metadata?: { vacancies_detail?: Record<string, string>[] } | null;
+    },
+    word: string = "Posts"
+): string => {
+    const breakdownTotal = extractVacancyBreakdownTotal(job.job_metadata?.vacancies_detail);
+    if (breakdownTotal) return `${breakdownTotal} ${word}`;
+
+    const display = job.vacancies_display?.trim();
+    const displayLower = display?.toLowerCase();
+    if (display && displayLower !== "not found" && displayLower !== "tbd" && displayLower !== "n/a") {
+        return display;
+    }
+
+    if (job.vacancies) return `${job.vacancies} ${word}`;
+    return "TBD";
+};
