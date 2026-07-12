@@ -122,6 +122,26 @@ def is_duplicate_by_title(supabase, title: str) -> bool:
         return False
 
 
+def _extract_first_number(raw: Any) -> int | None:
+    """Extract the first standalone number, ignoring parenthetical breakdowns.
+
+    e.g. '₹750 (₹500 + ₹250)' → 750, '2,500 Posts' → 2500, 'Nil' → None.
+    """
+    if raw is None:
+        return None
+    s = str(raw)
+    # Strip parenthetical content: "750 (500 + 250)" → "750 "
+    s = re.sub(r"\([^)]*\)", " ", s)
+    # Match the first sequence of digits (with optional commas)
+    m = re.search(r"\d[\d,]*", s)
+    if not m:
+        return None
+    try:
+        return int(m.group(0).replace(",", ""))
+    except ValueError:
+        return None
+
+
 def build_job_record(scraped: dict) -> dict[str, Any]:
     """Build a jobs table insert record from scraper_v5 output."""
     r = scraped
@@ -138,16 +158,18 @@ def build_job_record(scraped: dict) -> dict[str, Any]:
         )
         if total_row:
             nums = [
-                int(re.sub(r"[^0-9]", "", str(v)))
-                for v in total_row.values()
-                if str(v) and re.sub(r"[^0-9]", "", str(v)).isdigit()
+                n for n in (
+                    _extract_first_number(v)
+                    for v in total_row.values()
+                )
+                if n is not None and n > 0
             ]
             if nums:
                 total_vacancies = max(nums)
     if not total_vacancies and r.get("overview", {}).get("total_vacancies"):
-        tv = re.sub(r"[^0-9]", "", str(r["overview"]["total_vacancies"]))
-        if tv.isdigit():
-            total_vacancies = int(tv)
+        tv = _extract_first_number(r["overview"]["total_vacancies"])
+        if tv:
+            total_vacancies = tv
     if total_vacancies:
         vacancies_display = f"{total_vacancies} Posts"
 
@@ -157,9 +179,9 @@ def build_job_record(scraped: dict) -> dict[str, Any]:
         fees = []
         for f in r["application_fees"]:
             if isinstance(f, dict) and "fee" in f:
-                num = re.sub(r"[^0-9]", "", str(f["fee"]))
-                if num.isdigit():
-                    fees.append(int(num))
+                n = _extract_first_number(f["fee"])
+                if n is not None and n > 0:
+                    fees.append(n)
         if fees:
             app_fee = max(fees)
 

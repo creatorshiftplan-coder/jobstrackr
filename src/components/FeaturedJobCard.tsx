@@ -73,9 +73,9 @@ export const FeaturedJobCard = memo(function FeaturedJobCard({ job }: FeaturedJo
 
           {/* Tags */}
           <div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4 flex-nowrap overflow-hidden">
-            {job.vacancies && (
+            {(job.vacancies_display || job.vacancies) && (
               <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0 rounded-full text-[10px] sm:text-xs flex-shrink-0">
-                {job.vacancies} Vacancy
+                {job.vacancies_display || `${job.vacancies} Vacancies`}
               </Badge>
             )}
             <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0 rounded-full text-[10px] sm:text-xs flex-shrink-0">

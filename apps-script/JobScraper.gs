@@ -810,6 +810,23 @@ function parseFeesFromSection(sectionHtml) {
   return null;
 }
 
+/**
+ * Extract the first standalone number from a string, ignoring parenthetical
+ * breakdowns. e.g. "₹750 (₹500 + ₹250)" → 750, "2,500 Posts" → 2500,
+ * "Total 150" → 150, "Nil" → null.
+ */
+function extractFirstNumber(raw) {
+  if (!raw) return null;
+  var s = String(raw);
+  // Strip parenthetical content: "750 (500 + 250)" → "750 "
+  s = s.replace(/\([^)]*\)/g, ' ');
+  // Match the first sequence of digits (with optional commas): "₹2,500" → "2,500"
+  var m = s.match(/[\d][\d,]*/);     
+  if (!m) return null;
+  var n = parseInt(m[0].replace(/,/g, ''), 10);
+  return isNaN(n) ? null : n;
+}
+
 /** Port of build_job_record with NO fabricated fallbacks → Jobs sheet row object. */
 function buildJobRow(scraped, sourceUrl) {
   const r = scraped;
@@ -823,14 +840,14 @@ function buildJobRow(scraped, sourceUrl) {
       return Object.keys(v).some(function (k) { return typeof v[k] === 'string' && v[k].toLowerCase().indexOf('total') !== -1; });
     })[0];
     if (totalRow) {
-      const nums = Object.keys(totalRow).map(function (k) { return String(totalRow[k]).replace(/[^0-9]/g, ''); })
-        .filter(function (s) { return s && /^\d+$/.test(s); }).map(Number);
+      const nums = Object.keys(totalRow).map(function (k) { return extractFirstNumber(totalRow[k]); })
+        .filter(function (n) { return n !== null && n > 0; });
       if (nums.length) totalVacancies = Math.max.apply(null, nums);
     }
   }
   if (!totalVacancies && r.overview && r.overview.total_vacancies) {
-    const tv = String(r.overview.total_vacancies).replace(/[^0-9]/g, '');
-    if (/^\d+$/.test(tv)) totalVacancies = parseInt(tv, 10);
+    const tv = extractFirstNumber(r.overview.total_vacancies);
+    if (tv) totalVacancies = tv;
   }
   // Sum the per-post counts when a vacancy table exists but carries no explicit
   // "Total" row — take the last all-numeric column and add it up across posts.
@@ -838,8 +855,8 @@ function buildJobRow(scraped, sourceUrl) {
     const cols = {};
     r.vacancies.forEach(function (v) {
       Object.keys(v).forEach(function (k) {
-        const n = String(v[k]).replace(/,/g, '');
-        if (/^\d{1,6}$/.test(n)) { (cols[k] = cols[k] || []).push(parseInt(n, 10)); }
+        var n = extractFirstNumber(v[k]);
+        if (n !== null && n > 0 && n < 1000000) { (cols[k] = cols[k] || []).push(n); }
       });
     });
     const numericCols = Object.keys(cols).filter(function (k) { return cols[k].length === r.vacancies.length; });
@@ -867,8 +884,8 @@ function buildJobRow(scraped, sourceUrl) {
   // Application fee (max)
   let appFee = null;
   if (r.application_fees && r.application_fees.length) {
-    const fees = r.application_fees.map(function (f) { return String(f.fee || '').replace(/[^0-9]/g, ''); })
-      .filter(function (s) { return s && /^\d+$/.test(s); }).map(Number);
+    const fees = r.application_fees.map(function (f) { return extractFirstNumber(f.fee); })
+      .filter(function (n) { return n !== null && n > 0; });
     if (fees.length) appFee = Math.max.apply(null, fees);
   }
 

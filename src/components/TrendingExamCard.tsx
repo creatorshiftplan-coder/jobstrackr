@@ -352,7 +352,7 @@ function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCard
                 {matchingJob && (
                     <div className="px-4 py-3 border-t border-border/30 bg-card">
                         <div className="flex flex-wrap gap-3 text-xs">
-                            {matchingJob.vacancies && (
+                            {(matchingJob.vacancies_display || matchingJob.vacancies) && (
                                 <div className="flex items-center gap-1 text-muted-foreground">
                                     <Users className="h-3.5 w-3.5 text-primary" />
                                     <span className="font-medium text-foreground">{matchingJob.vacancies_display || `${matchingJob.vacancies} Posts`}</span>
@@ -494,7 +494,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
                         {/* Job Details from matched job */}
                         {matchingJob && (
                             <div className="flex flex-wrap gap-3 text-xs pt-2 border-t border-border/30">
-                                {matchingJob.vacancies && (
+                                {(matchingJob.vacancies_display || matchingJob.vacancies) && (
                                     <div className="flex items-center gap-1 text-muted-foreground">
                                         <Users className="h-3.5 w-3.5 text-primary" />
                                         <span className="font-medium text-foreground">{matchingJob.vacancies_display || `${matchingJob.vacancies} Posts`}</span>
