@@ -36,6 +36,10 @@
       "destination": "/api/updates/:slug"
     },
     {
+      "source": "/exam-update/:slug",
+      "destination": "/api/exam-updates/:slug"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap.xml"
     },

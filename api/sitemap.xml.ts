@@ -105,6 +105,31 @@ export default async function handler() {
 `;
         }
 
+        // Exam-update article pages (exam_updates table, served by
+        // api/exam-updates/[slug].ts and deep-linked from Telegram).
+        const updatesResponse = await fetch(
+            `${supabaseUrl}/rest/v1/exam_updates?select=slug,updated_at,scraped_at&slug=not.is.null&order=scraped_at.desc&limit=5000`,
+            {
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                },
+            }
+        );
+
+        const updates = updatesResponse.ok ? await updatesResponse.json() : [];
+        for (const upd of updates) {
+            if (!upd.slug) continue;
+            const lastmod = (upd.updated_at || upd.scraped_at || '').split('T')[0] || today;
+            xml += `  <url>
+    <loc>${SITE_URL}/exam-update/${encodeURIComponent(upd.slug)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+`;
+        }
+
         xml += '</urlset>\n';
 
         return new Response(xml, {

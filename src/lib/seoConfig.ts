@@ -146,9 +146,11 @@ const PREFIX_RULES: Array<{ prefix: string; seo: RouteSeo }> = [
   // Data-driven countdown pages set their own title.
   { prefix: '/countdown/live', seo: { skipTitle: true, skipDescription: true, robots: INDEX } },
   { prefix: '/countdown/', seo: { skipTitle: true, skipDescription: true, robots: INDEX } },
+  // SSR-managed exam-update articles (api/exam-updates/[slug].ts) — page owns its
+  // own title/description; keep index and let it self-canonical.
+  { prefix: '/exam-update/', seo: { skipTitle: true, skipDescription: true, robots: INDEX } },
   // Legacy id-based / personalised routes → noindex.
   { prefix: '/job/', seo: { skipTitle: true, skipDescription: true, robots: NOINDEX } },
-  { prefix: '/exam-update/', seo: { skipTitle: true, skipDescription: true, robots: NOINDEX } },
   { prefix: '/for-you/shelf/', seo: { title: 'Recommendations | JobsTrackr', robots: NOINDEX } },
 ];
 

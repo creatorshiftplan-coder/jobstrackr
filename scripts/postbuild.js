@@ -30,7 +30,8 @@ console.log(bodyTags);
 
 const filesToUpdate = [
   path.resolve(__dirname, '../api/jobs/[slug].ts'),
-  path.resolve(__dirname, '../api/updates/[slug].ts')
+  path.resolve(__dirname, '../api/updates/[slug].ts'),
+  path.resolve(__dirname, '../api/exam-updates/[slug].ts')
 ];
 
 for (const filePath of filesToUpdate) {
