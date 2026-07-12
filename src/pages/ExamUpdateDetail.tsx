@@ -217,9 +217,9 @@ export default function ExamUpdateDetail() {
                             </h2>
                             <div className="space-y-1.5">
                                 {update.important_dates.map((d, i) => (
-                                    <div key={i} className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-xs", i % 2 === 0 ? "bg-secondary/30" : "")}>
-                                        <span className="flex-1 text-muted-foreground">{d.event}</span>
-                                        <span className="font-semibold text-foreground whitespace-nowrap">{d.date}</span>
+                                    <div key={i} className={cn("flex items-start gap-2 px-3 py-2 rounded-md text-xs", i % 2 === 0 ? "bg-secondary/30" : "")}>
+                                        <span className="flex-1 min-w-0 break-words text-muted-foreground">{d.event}</span>
+                                        <span className="flex-shrink-0 font-semibold text-foreground whitespace-nowrap">{d.date}</span>
                                         {d.link && isPdfOrWebsiteLink(d.link) && !isFreeJobAlertUrl(d.link) && (
                                             <a href={d.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                                 <ExternalLink className="h-3 w-3" />
