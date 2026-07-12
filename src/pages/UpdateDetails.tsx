@@ -96,7 +96,7 @@ export default function UpdateDetails() {
                     <h2 className="text-xl font-bold">Update Not Found</h2>
                     <p className="text-muted-foreground">This update may have been removed or the link is incorrect.</p>
                     <button onClick={() => navigate('/trending')} className="px-4 py-2 bg-primary text-white rounded-lg">
-                        Back to Trending
+                        Back to Updates
                     </button>
                 </div>
             </div>

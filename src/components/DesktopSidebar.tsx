@@ -62,8 +62,8 @@ import {
 
 const navItems = [
   { title: "Home", url: "/", icon: Home },
-  { title: "Explore", url: "/search", icon: Search },
-  { title: "Trending", url: "/trending", icon: TrendingUp },
+  { title: "Jobs", url: "/search", icon: Search },
+  { title: "Updates", url: "/trending", icon: TrendingUp },
   { title: "My Exams", url: "/tracker", icon: FileText },
   { title: "Exam Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Saved Jobs", url: "/saved", icon: Bookmark },

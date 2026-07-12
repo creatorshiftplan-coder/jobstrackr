@@ -60,9 +60,9 @@ const STATIC: Record<string, RouteSeo> = {
       'Search the latest government job notifications and exams across India by department, qualification, and location on JobsTrackr.',
   },
   '/trending': {
-    title: 'Trending Government Jobs & Exams | JobsTrackr',
+    title: 'Latest Government Exam Updates | JobsTrackr',
     description:
-      'See the most popular government job notifications and exams aspirants are tracking right now on JobsTrackr.',
+      'Follow the latest government job notifications, admit cards, answer keys, and results as they are released — all in one live feed on JobsTrackr.',
   },
   '/calendar': {
     title: 'Government Exam Calendar | JobsTrackr',

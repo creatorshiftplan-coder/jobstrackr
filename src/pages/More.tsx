@@ -434,7 +434,7 @@ export default function More() {
                     <div className="h-9 w-9 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
                       <Flame className="h-4.5 w-4.5 text-primary" />
                     </div>
-                    <span className="text-[11px] sm:text-xs font-semibold text-foreground">Trending Exams</span>
+                    <span className="text-[11px] sm:text-xs font-semibold text-foreground">Updates</span>
                   </CardContent>
                 </Card>
 

@@ -387,7 +387,7 @@ export default function Search() {
           <div className="flex items-center gap-2 flex-1 justify-center">
             <img src={logoColor} alt="JobsTrackr" className="h-7 w-7 object-contain dark:hidden" />
             <img src={logoWhite} alt="JobsTrackr" className="h-7 w-7 object-contain hidden dark:block" />
-            <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground tracking-tight">Explore Jobs</h1>
+            <h1 className="font-display font-bold text-lg text-primary-foreground dark:text-foreground tracking-tight">Jobs</h1>
           </div>
           <Link to="/saved">
             <div className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-primary-foreground/10 dark:hover:bg-secondary/80 transition-colors">
@@ -542,7 +542,7 @@ export default function Search() {
       <main className="px-4 py-4 md:mx-auto md:max-w-6xl md:px-6 md:py-6">
         <div className="hidden md:flex md:items-center md:justify-between md:gap-6 md:pb-2">
           <div>
-            <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Explore Jobs</h1>
+            <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Jobs</h1>
             <p className="text-sm text-muted-foreground">Search by title, department, location, and qualification.</p>
           </div>
           <Button

@@ -3,8 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/", color: "#f43f5e" },
-  { icon: Search, label: "Explore", path: "/search", color: "#f59e0b" },
-  { icon: Flame, label: "Trending", path: "/trending", color: "#10b981" },
+  { icon: Search, label: "Jobs", path: "/search", color: "#f59e0b" },
+  { icon: Flame, label: "Updates", path: "/trending", color: "#10b981" },
   { icon: GraduationCap, label: "My Exams", path: "/tracker", color: "#3b82f6" },
   { icon: CalendarDays, label: "Calendar", path: "/calendar", color: "#8b5cf6" },
 ];

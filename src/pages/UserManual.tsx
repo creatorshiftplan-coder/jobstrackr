@@ -215,12 +215,12 @@ export default function UserManual() {
           </div>
         </Section>
 
-        {/* 4. Search, Explore & AI Search */}
-        <Section title="5. Search, Explore & AI Search" icon={Search}>
+        {/* 4. Search Jobs & AI Search */}
+        <Section title="5. Search Jobs & AI Search" icon={Search}>
           <div className="space-y-3 text-xs">
             <p>Our search interface enables you to look up any active recruitment posting on the platform:</p>
             <ol className="list-decimal list-inside space-y-2 ml-1">
-              <li>Navigate to the <span className="font-semibold text-foreground">Search</span> tab.</li>
+              <li>Navigate to the <span className="font-semibold text-foreground">Jobs</span> tab.</li>
               <li>Type keywords like department name, location (state/city), role title, or exam category.</li>
               <li>Use tags and filters to narrow down by category, location, or educational requirements.</li>
             </ol>
@@ -283,10 +283,10 @@ export default function UserManual() {
             </div>
             <div>
               <h4 className="font-semibold text-foreground flex items-center gap-1.5 mb-1">
-                <TrendingUp className="h-4 w-4 text-primary" /> Trending Exams
+                <TrendingUp className="h-4 w-4 text-primary" /> Updates
               </h4>
               <p className="text-muted-foreground">
-                Located on the Search and Dashboard view, this lists examinations currently seeing the highest search and tracking volume among all candidates. You can track them directly, see active vacancy statistics, and review body-wise recruitment counts.
+                Located on the Jobs and Dashboard view, this lists examinations currently seeing the highest search and tracking volume among all candidates. You can track them directly, see active vacancy statistics, and review body-wise recruitment counts.
               </p>
             </div>
           </div>
