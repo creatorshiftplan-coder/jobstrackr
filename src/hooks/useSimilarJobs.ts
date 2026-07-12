@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Job } from "@/types/job";
 
-interface SimilarJob {
+export interface SimilarJob {
   id: string;
   title: string;
   department: string;
