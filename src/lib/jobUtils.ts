@@ -492,14 +492,15 @@ export const parseJobDeadline = (lastDate: string | null | undefined): Date | nu
         return new Date(year, month - 1, day, 23, 59, 59, 999);
     }
 
-    // DD/MM/YYYY or DD-MM-YYYY
-    const dmy = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    // DD/MM/YYYY, DD-MM-YYYY or DD.MM.YYYY (dot is the dominant Indian format,
+    // e.g. "31.07.2026" — native Date() can't parse it, so match it explicitly).
+    const dmy = cleaned.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
     if (dmy) {
         return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]), 23, 59, 59, 999);
     }
 
     // DD-MM YYYY (space-separated year)
-    const dmySpace = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})\s+(\d{4})$/);
+    const dmySpace = cleaned.match(/^(\d{1,2})[\/\-.](\d{1,2})\s+(\d{4})$/);
     if (dmySpace) {
         return new Date(Number(dmySpace[3]), Number(dmySpace[2]) - 1, Number(dmySpace[1]), 23, 59, 59, 999);
     }
@@ -514,6 +515,29 @@ export const parseJobDeadline = (lastDate: string | null | undefined): Date | nu
         const mon = monthMap[named[2].toLowerCase().slice(0, 3)];
         if (mon !== undefined) {
             return new Date(Number(named[3]), mon, Number(named[1]), 23, 59, 59, 999);
+        }
+    }
+
+    // Robust fallback: pull the first recognizable date out of any leftover prose
+    // that the exact-match branches above rejected — e.g. "08.07.2026, up to 5:15 PM"
+    // or "10.07.2026 (09:00 AM to 10:00 AM)". Without this such rows parse to null
+    // and are wrongly treated as never-expiring.
+    const isoAnywhere = cleaned.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoAnywhere) {
+        return new Date(Number(isoAnywhere[1]), Number(isoAnywhere[2]) - 1, Number(isoAnywhere[3]), 23, 59, 59, 999);
+    }
+    const dmyAnywhere = cleaned.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+    if (dmyAnywhere) {
+        return new Date(Number(dmyAnywhere[3]), Number(dmyAnywhere[2]) - 1, Number(dmyAnywhere[1]), 23, 59, 59, 999);
+    }
+    // "DDth Month YYYY" with an ordinal suffix and/or a leading weekday/prose,
+    // e.g. "24th July 2026", "Friday, 10th July 2026 (09:00 AM…)". The month name
+    // guard keeps this from matching non-date phrases like "45 days … 2026".
+    const namedAnywhere = cleaned.match(/(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,})\s+(\d{4})/i);
+    if (namedAnywhere) {
+        const mon = monthMap[namedAnywhere[2].toLowerCase().slice(0, 3)];
+        if (mon !== undefined) {
+            return new Date(Number(namedAnywhere[3]), mon, Number(namedAnywhere[1]), 23, 59, 59, 999);
         }
     }
 
