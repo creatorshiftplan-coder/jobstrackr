@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jobstrackr-pwa-cache-v3';
+const CACHE_NAME = 'jobstrackr-pwa-cache-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -89,18 +89,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML Page Navigation - Network first, fallback to cached index.html shell, then offline.html
+  // HTML Page Navigation - Network first, fallback to cached index.html shell, then offline.html.
+  // The fresh shell is written back into the cache on every successful navigation; otherwise the
+  // install-time copy goes stale and offline fallbacks reference hashed chunks purged from the
+  // server, trapping users on the chunk-error ("App Updated!") screen.
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) return cachedResponse;
-          return caches.match('/index.html').then((indexResponse) => {
-            if (indexResponse) return indexResponse;
-            return caches.match('/offline.html');
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put('/index.html', responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) return cachedResponse;
+            return caches.match('/index.html').then((indexResponse) => {
+              if (indexResponse) return indexResponse;
+              return caches.match('/offline.html');
+            });
           });
-        });
-      })
+        })
     );
     return;
   }

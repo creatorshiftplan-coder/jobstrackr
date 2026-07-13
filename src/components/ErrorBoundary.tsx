@@ -127,15 +127,26 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
-  private handleClearCacheAndReload = () => {
+  private handleClearCacheAndReload = async () => {
     // Clear everything and do a hard reload
     sessionStorage.removeItem(CHUNK_RELOAD_KEY);
 
-    // Clear caches if available
-    if ('caches' in window) {
-      caches.keys().then(names => {
-        names.forEach(name => caches.delete(name));
-      });
+    try {
+      // Await cache deletion — navigating before it finishes lets the stale
+      // service worker serve the same broken shell again.
+      if ("caches" in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((name) => caches.delete(name)));
+      }
+
+      // Unregister service workers so the next load is served straight from
+      // the network instead of a stale worker's fallback.
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+    } catch {
+      // Recovery is best-effort; always fall through to the reload.
     }
 
     // Force hard reload bypassing cache
