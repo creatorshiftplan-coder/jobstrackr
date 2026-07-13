@@ -8,7 +8,7 @@ import { HybridMatchedJob, hybridRecommend, qualificationToTag } from "@/lib/hyb
 import { buildFeed, FeedShelf } from "@/lib/feedBuilder";
 import { isAlmostEligible, getJobGapSkills } from "@/hooks/useAlmostEligible";
 import { MatchedJob, canApply, needsReview } from "@/lib/jobMatcher";
-import { isJobActive } from "@/lib/jobUtils";
+import { isJobOpenForFeed } from "@/lib/jobUtils";
 import { Job } from "@/types/job";
 
 /**
@@ -115,10 +115,10 @@ export function useFeed(
   );
 
   // Expired postings never surface in the feed — including the "Saved Jobs"
-  // shelf and the "Because You Saved" seeds (isJobActive keeps "TBD"/unparseable dates).
+  // shelf and the "Because You Saved" seeds.
   const savedJobs = useMemo(() => {
     return ((savedJobsData || []).map((s) => s.jobs).filter(Boolean) as any[])
-      .filter((j) => isJobActive(j.last_date));
+      .filter((j) => isJobOpenForFeed(j));
   }, [savedJobsData]);
 
   const savedJobIds = useMemo(() => {
@@ -194,7 +194,7 @@ export function useFeed(
     const jobSimilarityMap = new Map<string, Job[]>();
     // Similarity shelves and "Expiring Soon" draw from the full pool, which
     // isn't deadline-filtered upstream like matchedJobs is.
-    const allJobs = (jobs || []).filter((j) => isJobActive(j.last_date));
+    const allJobs = (jobs || []).filter((j) => isJobOpenForFeed(j));
     for (const saved of savedJobs.slice(0, 2)) {
       const similar: Job[] = [];
       for (const j of allJobs) {

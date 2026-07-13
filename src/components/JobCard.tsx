@@ -7,7 +7,7 @@ import { format, differenceInDays } from "date-fns";
 import { Link } from "react-router-dom";
 import { SaveJobButton } from "./SaveJobButton";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
-import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification, getVacancyDisplay } from "@/lib/jobUtils";
+import { isTBDDateDisplay, inferCategory, getTrustedJobDeadline, shortenQualification, getVacancyDisplay } from "@/lib/jobUtils";
 import { getBestJobLocation } from "@/lib/jobMatcher";
 import { OrganizationLogo } from "@/components/OrganizationLogo";
 
@@ -54,7 +54,9 @@ export const JobCard = memo(function JobCard({ job }: JobCardProps) {
   const logoUrl = getLogoByName(job.department);
 
   const computed = useMemo(() => {
-    const deadlineDate = parseJobDeadline(job.last_date);
+    // Trusted deadline only — fabricated year-out dates render as TBD instead
+    // of a bogus "Last date".
+    const deadlineDate = getTrustedJobDeadline(job);
     const daysLeft = deadlineDate ? differenceInDays(deadlineDate, new Date()) : Number.POSITIVE_INFINITY;
     const isUrgent = daysLeft <= 7 && daysLeft >= 0;
     const isExpired = daysLeft < 0;

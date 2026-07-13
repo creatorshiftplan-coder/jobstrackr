@@ -6,7 +6,7 @@ import { format, differenceInDays } from "date-fns";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
 import { SaveJobButton } from "@/components/SaveJobButton";
 import { Badge } from "@/components/ui/badge";
-import { isTBDDateDisplay, inferCategory, parseJobDeadline, shortenQualification, getVacancyDisplay } from "@/lib/jobUtils";
+import { isTBDDateDisplay, inferCategory, getTrustedJobDeadline, shortenQualification, getVacancyDisplay } from "@/lib/jobUtils";
 import { OrganizationLogo } from "@/components/OrganizationLogo";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,7 @@ export const RecommendedJobCard = memo(function RecommendedJobCard({
   const logoUrl = getLogoByName(job.department);
 
   const { isExpired, isTBDDate, category, shortQualification, lastDateText, vacancyText } = useMemo(() => {
-    const deadlineDate = parseJobDeadline(job.last_date);
+    const deadlineDate = getTrustedJobDeadline(job);
     const daysLeft = deadlineDate ? differenceInDays(deadlineDate, new Date()) : null;
     const expired = daysLeft !== null && daysLeft < 0;
     const tbd = isTBDDateDisplay(job.last_date_display);

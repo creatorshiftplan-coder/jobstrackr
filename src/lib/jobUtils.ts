@@ -552,6 +552,61 @@ export const isJobActive = (lastDate: string | null | undefined): boolean => {
     return deadline.getTime() >= Date.now();
 };
 
+interface JobDeadlineFields {
+    last_date: string | null;
+    last_date_display?: string | null;
+    created_at?: string | null;
+}
+
+// Older ingestion paths stored `today + 1 year` in last_date when the scraped
+// deadline was missing or unparseable, so a large batch of rows carries a fake
+// deadline exactly one year after created_at (and no raw display text backing
+// it). Those rows pass isJobActive for a full year after the posting died.
+const FABRICATED_GAP_MIN_DAYS = 358;
+const FABRICATED_GAP_MAX_DAYS = 373;
+
+const looksFabricatedDeadline = (job: JobDeadlineFields, deadline: Date): boolean => {
+    if (!job.created_at) return false;
+    // A raw scraped string that parses to the same day vouches for the date.
+    if (job.last_date_display) {
+        const displayDate = parseJobDeadline(job.last_date_display);
+        if (displayDate && Math.abs(displayDate.getTime() - deadline.getTime()) < 48 * 60 * 60 * 1000) {
+            return false;
+        }
+    }
+    const created = new Date(job.created_at);
+    if (Number.isNaN(created.getTime())) return false;
+    const gapDays = (deadline.getTime() - created.getTime()) / (24 * 60 * 60 * 1000);
+    return gapDays >= FABRICATED_GAP_MIN_DAYS && gapDays <= FABRICATED_GAP_MAX_DAYS;
+};
+
+// Deadline we can actually trust: the stored last_date unless it looks
+// fabricated, in which case fall back to the raw scraped text (the frontend
+// parser handles formats the ingestion parser missed), else null (unknown).
+export const getTrustedJobDeadline = (job: JobDeadlineFields): Date | null => {
+    const stored = parseJobDeadline(job.last_date);
+    if (!stored) return null;
+    if (!looksFabricatedDeadline(job, stored)) return stored;
+    return job.last_date_display ? parseJobDeadline(job.last_date_display) : null;
+};
+
+// How long a job with no trustworthy deadline (TBD, walk-in, unparseable, or
+// fabricated) stays in recommendation feeds before it's presumed closed.
+export const UNKNOWN_DEADLINE_GRACE_DAYS = 60;
+
+// Feed-facing activity check. Unlike isJobActive (which keeps unknown-deadline
+// jobs forever), unknown-deadline jobs age out after a grace period so stale
+// postings — including rows with fabricated year-out deadlines — stop
+// surfacing as recommendations.
+export const isJobOpenForFeed = (job: JobDeadlineFields): boolean => {
+    const deadline = getTrustedJobDeadline(job);
+    if (deadline) return deadline.getTime() >= Date.now();
+    if (!job.created_at) return true;
+    const created = new Date(job.created_at);
+    if (Number.isNaN(created.getTime())) return true;
+    return Date.now() - created.getTime() <= UNKNOWN_DEADLINE_GRACE_DAYS * 24 * 60 * 60 * 1000;
+};
+
 // Shorten qualification for display
 export const shortenQualification = (qualification: string): string => {
     if (!qualification) return "Any";

@@ -165,14 +165,16 @@ const extractVacanciesFromTitle = (title: string): number | null => {
   return null;
 };
 
-// Helper to parse date - returns a far future date for TBD-like values so the job remains active
-const parseDateValue = (value: string | null | undefined): string => {
-  if (!value) return new Date().toISOString().split('T')[0]; // Default to today if empty
-  if (isTBDValue(value)) {
-    const futureDate = new Date();
-    futureDate.setFullYear(futureDate.getFullYear() + 1);
-    return futureDate.toISOString().split('T')[0];
-  }
+// Helper to parse a scraped date into ISO YYYY-MM-DD, or null when the value
+// is missing, TBD-like, or unparseable. MUST NOT invent a date: the old
+// "today + 1 year so the job stays active" fallback stored fabricated
+// deadlines that rendered as real ones and kept dead postings "active" for a
+// full year. Callers substitute the right sentinel — "TBD" for the TEXT
+// last_date column, null for the DATE application_start_date column; the
+// frontend treats a TBD/unparseable last_date as an unknown deadline.
+const parseDateValue = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  if (isTBDValue(value)) return null;
 
   // Pre-process: strip newlines, time info, parenthesized time text
   let cleaned = value.replace(/\n/g, " ").trim();
@@ -219,10 +221,8 @@ const parseDateValue = (value: string | null | undefined): string => {
     return date.toISOString().split('T')[0];
   }
 
-  // Unparseable — return 1 year from now
-  const futureDate = new Date();
-  futureDate.setFullYear(futureDate.getFullYear() + 1);
-  return futureDate.toISOString().split('T')[0];
+  // Unparseable — let the caller pick a sentinel; never fabricate a date.
+  return null;
 };
 
 // Strictly normalize a value to a real YYYY-MM-DD calendar date, or null if it isn't one.
@@ -561,7 +561,7 @@ const mapBulkInputToJobForm = (input: BulkUploadInput): JobFormData => {
     application_fee: applicationFee,
     vacancies: parseVacancies(input.vacancies),
     vacancies_display: vacanciesDisplay,
-    last_date: parseDateValue(input.last_date),
+    last_date: parseDateValue(input.last_date) ?? "TBD",
     last_date_display: lastDateDisplay,
     is_featured: false,
     description: fullDescription.trim(),
@@ -1618,6 +1618,10 @@ export default function Admin() {
           continue;
         }
         const clean = parseDateValue(raw);
+        if (!clean) {
+          skippedCount++;
+          continue;
+        }
         const { error } = await supabase
           .from("jobs")
           .update({ last_date: clean, last_date_display: null })
@@ -5014,7 +5018,7 @@ ${hashtagsStr}`;
         if (allFees.length > 0) appFee = Math.max(...allFees);
       }
 
-      const lastDate = parseDateValue(r.last_date);
+      const lastDate = parseDateValue(r.last_date) ?? "TBD";
       const lastDateDisplay = r.last_date || null;
 
       const cleanLoc = (loc: string) => {
@@ -5213,7 +5217,7 @@ ${hashtagsStr}`;
         if (allFees.length > 0) appFee = Math.max(...allFees);
       }
 
-      const lastDate = parseDateValue(r.last_date);
+      const lastDate = parseDateValue(r.last_date) ?? "TBD";
       const lastDateDisplay = r.last_date || null;
 
       // Clean location: strip trailing numbers/parens like "Hyderabad2812)"

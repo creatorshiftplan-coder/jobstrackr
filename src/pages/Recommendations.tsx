@@ -19,7 +19,7 @@ import { Job } from "@/types/job";
 import { INDIAN_STATES, EXAM_SECTORS } from "@/constants/filters";
 import { QualStream, matchAndSort, getEducationRank, getQualLabel, getQualStreamLabel, getSkillLabel, inferQualificationStream, MatchPreferences, MatchedJob, getBestJobLocation, canApply, needsReview } from "@/lib/jobMatcher";
 import { checkAllSkills } from "@/lib/skillMatcher";
-import { isAllIndiaLocationText, isJobActive, resolveStateFromLocationText } from "@/lib/jobUtils";
+import { isAllIndiaLocationText, isJobOpenForFeed, resolveStateFromLocationText } from "@/lib/jobUtils";
 import { hybridRecommend, qualificationToTag, HybridMatchedJob } from "@/lib/hybridScorer";
 import { cn } from "@/lib/utils";
 import { useSmartBack } from "@/hooks/useSmartBack";
@@ -597,10 +597,11 @@ export default function Recommendations() {
   }, [answers, profile, highestEducation, inferredEducationStream]);
 
   // Match & sort — drop jobs whose deadline has passed so expired postings never
-  // surface in the tiers/counts (isJobActive keeps "TBD"/unparseable dates).
+  // surface in the tiers/counts. Jobs with no trustworthy deadline (TBD /
+  // unparseable / fabricated year-out dates) age out after a grace period.
   const matchedJobs: MatchedJob[] = useMemo(() => {
     if (!jobs) return [];
-    const activeJobs = jobs.filter((job) => isJobActive(job.last_date));
+    const activeJobs = jobs.filter((job) => isJobOpenForFeed(job));
     return matchAndSort(activeJobs, preferences);
   }, [jobs, preferences]);
 

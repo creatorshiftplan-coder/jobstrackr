@@ -23,7 +23,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Briefcase, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isJobActive } from "@/lib/jobUtils";
+import { isJobOpenForFeed } from "@/lib/jobUtils";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -101,7 +101,7 @@ const Index = () => {
     if (!jobs) return [];
     return jobs
       .filter(
-        (j) => isJobActive(j.last_date) && typeof j.vacancies === "number" && j.vacancies > 0
+        (j) => isJobOpenForFeed(j) && typeof j.vacancies === "number" && j.vacancies > 0
       )
       .sort((a, b) => (b.vacancies || 0) - (a.vacancies || 0))
       .slice(0, 12);
@@ -176,7 +176,7 @@ const Index = () => {
   const newJobs = useMemo(() => {
     const list = homepageData?.recentJobs || filteredJobs;
     return list
-      .filter((job) => isJobActive(job.last_date))
+      .filter((job) => isJobOpenForFeed(job))
       .slice(0, 7);
   }, [homepageData?.recentJobs, filteredJobs]);
 

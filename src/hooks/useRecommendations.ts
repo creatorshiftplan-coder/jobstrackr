@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Job } from "@/types/job";
 import { hybridRecommend, qualificationToTag, HybridMatchedJob } from "@/lib/hybridScorer";
 import { matchAndSort, MatchPreferences } from "@/lib/jobMatcher";
-import { isJobActive } from "@/lib/jobUtils";
+import { isJobOpenForFeed } from "@/lib/jobUtils";
 
 interface UseRecommendationsOptions {
   /** Pre-fetched profile to avoid a redundant Supabase call */
@@ -74,7 +74,7 @@ export function useRecommendations(
     }
 
     // Step 1: Filter expired jobs (lightweight — no qualification filter without wizard)
-    const activeJobs = resolvedJobs.filter((job) => isJobActive(job.last_date));
+    const activeJobs = resolvedJobs.filter((job) => isJobOpenForFeed(job));
 
     // Step 2: Run matchAndSort with lightweight preferences
     // Since we don't have qualification type from wizard, this mainly filters by salary/grade/expiry
