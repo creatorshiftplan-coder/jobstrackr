@@ -13,6 +13,7 @@ import {
   MatchPreferences,
   canApply,
 } from "@/lib/jobMatcher";
+import { isJobActive } from "@/lib/jobUtils";
 import { hybridRecommend, qualificationToTag, HybridMatchedJob } from "@/lib/hybridScorer";
 
 const LOCALSTORAGE_KEY = "jfy_preferences";
@@ -163,7 +164,10 @@ export function useForYouJobs(
 
   const matchedJobs = useMemo(() => {
     if (!resolvedJobs || resolvedJobs.length === 0) return [];
-    return matchAndSort(resolvedJobs, preferences);
+    // Never recommend a job whose application deadline has already passed.
+    // isJobActive keeps jobs with no parseable/"TBD" date (walk-ins, etc.).
+    const activeJobs = resolvedJobs.filter((job) => isJobActive(job.last_date));
+    return matchAndSort(activeJobs, preferences);
   }, [resolvedJobs, preferences]);
 
   const forYouJobs = useMemo((): Job[] => {
