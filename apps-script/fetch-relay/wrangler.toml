@@ -1,0 +1,10 @@
+# Cloudflare Workers config for the FreeJobAlert fetch relay.
+# Deploy:  npx wrangler deploy   (from this directory)
+#
+# Optional shared secret so the relay isn't publicly callable. Set it once with:
+#   npx wrangler secret put RELAY_TOKEN
+# then include the same value as ?token=... in the Apps Script FETCH_PROXY_URL.
+
+name = "fja-fetch-relay"
+main = "worker.js"
+compatibility_date = "2024-11-01"
