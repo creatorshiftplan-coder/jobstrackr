@@ -16,6 +16,58 @@ function isAllowedUrl(url) {
   return host === CONFIG.ALLOWED_HOST || host.endsWith('.' + CONFIG.ALLOWED_HOST);
 }
 
+// A fuller browser header set. FreeJobAlert sits behind Cloudflare, which scores
+// each request on IP reputation AND fingerprint; a bare UA + Accept-Language is a
+// weak fingerprint. These extra headers (Accept, sec-*, Upgrade-Insecure-Requests)
+// make the request look like a real navigation, improving the odds a borderline
+// Apps Script egress IP is let through instead of challenged.
+function browserHeaders_() {
+  return {
+    'User-Agent': CONFIG.USER_AGENT,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Upgrade-Insecure-Requests': '1',
+    'sec-ch-ua': '"Chromium";v="123", "Not:A-Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+  };
+}
+
+/**
+ * Fetch through a configured relay when the direct fetch is Cloudflare-blocked.
+ * Set Script Property FETCH_PROXY_URL to a fetch-relay / scraping-API endpoint that
+ * has a clean (non-Google) egress IP — e.g.
+ *   ScraperAPI:  https://api.scraperapi.com/?api_key=KEY&url={url}
+ *   ScrapingBee: https://app.scrapingbee.com/api/v1/?api_key=KEY&url={url}
+ *   self-hosted: https://your-worker.example.com/fetch?target={url}
+ * "{url}" is replaced with the URL-encoded target (if absent it is appended). The
+ * relay does the actual freejobalert request from its own IP and returns the HTML,
+ * so the article pages that Cloudflare denies to Apps Script come back 200.
+ * Returns HTML or null; a missing/failing proxy is a silent no-op.
+ */
+function fetchViaProxy_(url) {
+  const tmpl = PropertiesService.getScriptProperties().getProperty('FETCH_PROXY_URL');
+  if (!tmpl) return null;
+  const proxied = tmpl.indexOf('{url}') !== -1
+    ? tmpl.replace('{url}', encodeURIComponent(url))
+    : tmpl + encodeURIComponent(url);
+  try {
+    const resp = UrlFetchApp.fetch(proxied, {
+      method: 'get', muteHttpExceptions: true, followRedirects: true, headers: browserHeaders_(),
+    });
+    const code = resp.getResponseCode();
+    if (code >= 200 && code < 300) return resp.getContentText();
+    log_('fetchViaProxy ' + code + ' for ' + url);
+  } catch (e) {
+    log_('fetchViaProxy failed for ' + url + ': ' + e);
+  }
+  return null;
+}
+
 /** Fetch a page with retries; returns HTML string or null. Enforces the allowlist. */
 function fetchHtml(url, retries) {
   if (!isAllowedUrl(url)) {
@@ -23,21 +75,31 @@ function fetchHtml(url, retries) {
     return null;
   }
   retries = retries == null ? 2 : retries;
+  let blocked = false;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const resp = UrlFetchApp.fetch(url, {
         method: 'get',
         muteHttpExceptions: true,
         followRedirects: true,
-        headers: { 'User-Agent': CONFIG.USER_AGENT, 'Accept-Language': 'en-US,en;q=0.9' },
+        headers: browserHeaders_(),
       });
       const code = resp.getResponseCode();
       if (code >= 200 && code < 300) return resp.getContentText();
+      // 403/429/503 are Cloudflare's block/challenge/rate-limit codes — flag so we
+      // fall back to the relay once the direct attempts are exhausted.
+      if (code === 403 || code === 429 || code === 503) blocked = true;
       log_('fetchHtml ' + code + ' for ' + url);
     } catch (e) {
       log_('fetchHtml attempt ' + (attempt + 1) + ' failed for ' + url + ': ' + e);
     }
     if (attempt < retries) Utilities.sleep(1500 * (attempt + 1));
+  }
+  // Direct fetch failed (likely a Cloudflare IP block) — try the relay if configured.
+  const viaProxy = fetchViaProxy_(url);
+  if (viaProxy) return viaProxy;
+  if (blocked && !PropertiesService.getScriptProperties().getProperty('FETCH_PROXY_URL')) {
+    log_('fetchHtml: ' + url + ' appears Cloudflare-blocked; set FETCH_PROXY_URL to a clean-IP relay to bypass.');
   }
   return null;
 }

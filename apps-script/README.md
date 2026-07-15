@@ -33,6 +33,13 @@ This is a faithful port of the Python scraper (`api/scraper_v5.py`, `api/scraper
 2. Create the 9 script files above and paste each file's contents.
 3. **Project Settings → Script Properties → Add**: `SHEETS_SYNC_SECRET` = a long random
    string (remember it; the Supabase side uses the same value).
+   - *Optional but recommended:* `FETCH_PROXY_URL` = a fetch-relay / scraping-API
+     endpoint with a **clean (non-Google) egress IP**, with `{url}` where the target
+     goes — e.g. `https://api.scraperapi.com/?api_key=KEY&url={url}`. FreeJobAlert is
+     behind Cloudflare, which frequently **blocks Google Apps Script's shared IPs**
+     (symptom: every `JobsQueue` row goes to `failed`, `Logs` shows `fetchHtml 403/503`).
+     When set, `fetchHtml` retries through this relay so the article pages come back
+     `200`. Leave unset if direct fetches are working.
 4. Back in the editor, run **`setup`** once and authorize. It creates the tabs
    (`JobsQueue`, `Jobs`, `UpdatesQueue`, `ExamUpdates`, `Channels`, `Logs`) and installs the triggers.
 5. Test now (don't wait for cron): run `discoverAllNow`, then `processJobsQueue` and
