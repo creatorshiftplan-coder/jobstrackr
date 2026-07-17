@@ -7,6 +7,19 @@ interface UseJobsOptions {
   bypassCache?: boolean;
 }
 
+/**
+ * Every column the SPA `Job` type consumes — used for single-job detail reads.
+ * Deliberately excludes the heavy `embedding` vector (and its bookkeeping
+ * columns), which the UI never renders; `select("*")` was pulling it on every
+ * job-detail view. Keeps `job_metadata` because the detail page renders it.
+ */
+const JOB_DETAIL_COLS =
+  "id, slug, title, department, location, salary_min, salary_max, age_min, age_max, " +
+  "application_fee, qualification, experience, vacancies, vacancies_display, " +
+  "application_start_date, last_date, last_date_display, description, eligibility, " +
+  "apply_link, official_website, is_featured, admin_refreshed_at, job_metadata, " +
+  "created_at, updated_at, tags, eligibility_summary, required_skills";
+
 export function useJobs(options: UseJobsOptions = {}) {
   const { enabled = true, bypassCache = false } = options;
 
@@ -67,7 +80,7 @@ export function useJob(id: string) {
     queryFn: async (): Promise<Job | null> => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("*")
+        .select(JOB_DETAIL_COLS)
         .eq("id", id)
         .single();
 
@@ -88,7 +101,7 @@ export function useJobBySlug(slugOrId: string) {
       // console with errors — the UUID fallback / null return handles it.
       const { data: bySlug } = await supabase
         .from("jobs")
-        .select("*")
+        .select(JOB_DETAIL_COLS)
         .eq("slug", slugOrId)
         .maybeSingle();
 
@@ -99,7 +112,7 @@ export function useJobBySlug(slugOrId: string) {
       if (UUID_REGEX.test(slugOrId)) {
         const { data: byId, error } = await supabase
           .from("jobs")
-          .select("*")
+          .select(JOB_DETAIL_COLS)
           .eq("id", slugOrId)
           .single();
         if (error) throw error;

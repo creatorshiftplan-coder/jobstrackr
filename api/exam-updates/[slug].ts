@@ -155,6 +155,53 @@ function getCategoryConfig(category: string): { label: string; color: string } {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Only the columns the SSR page actually renders. Deliberately excludes the
+// heavy `full_text` (entire scraped article body), `vacancy_table`, `fee_table`,
+// `eligibility_table`, `cutoff_table`, and `images` — none are used here, and
+// `select=*` was pulling all of them on every crawler hit (the main egress leak).
+const EXAM_UPDATE_SSR_COLS =
+  'id,slug,title,category,status,published_date,summary,important_dates,overview,' +
+  'official_links,download_links,related_links,related_articles,sections,tags,' +
+  'scraped_at,created_at,updated_at,job_id';
+
+// ── Minimal inlined Upstash Redis cache-aside (edge functions stay single-file) ──
+// Caches only the heavy primary-row read, and only when a row is found (so a
+// newly-published slug is never negatively cached / redirected away). Any Redis
+// failure falls through to a direct Supabase read — the page never blocks on cache.
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const EXAM_UPDATE_CACHE_TTL = 900; // 15 min — matches the exam-updates list cache
+
+async function redisGetJson<T>(key: string): Promise<T | null> {
+  if (!UPSTASH_URL || !UPSTASH_TOKEN) return null;
+  try {
+    const res = await fetch(`${UPSTASH_URL}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body?.result ? (JSON.parse(body.result) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function redisSetJson(key: string, value: unknown, ttl: number): Promise<void> {
+  if (!UPSTASH_URL || !UPSTASH_TOKEN) return;
+  try {
+    await fetch(UPSTASH_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${UPSTASH_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(['SET', key, JSON.stringify(value), 'EX', ttl]),
+    });
+  } catch {
+    /* fire-and-forget — never block the response on a cache write */
+  }
+}
+
 export default async function handler(request: Request) {
   const url = new URL(request.url);
   const pathParts = url.pathname.split('/');
@@ -171,22 +218,34 @@ export default async function handler(request: Request) {
 
     // Resolve by slug first; legacy UUID links fall back to id then 301 → slug.
     const isUuid = UUID_RE.test(slug);
-    let response = await fetch(
-      `${supabaseUrl}/rest/v1/exam_updates?${isUuid ? 'id' : 'slug'}=eq.${encodeURIComponent(slug)}&select=*`,
-      { headers }
-    );
-    let rows = await response.json();
-    let update = Array.isArray(rows) ? rows[0] : null;
+    const cacheKey = `ssr:exam-update:${slug}`;
 
-    // If someone passed a slug-shaped value that only matches by id (rare) or vice
-    // versa, try the other column before giving up.
+    // Cache-aside: the row read is the heavy one (sections + JSON blobs). Serve it
+    // from Redis when possible so repeat crawler hits don't re-read Supabase.
+    let update = await redisGetJson<any>(cacheKey);
+
     if (!update) {
-      response = await fetch(
-        `${supabaseUrl}/rest/v1/exam_updates?${isUuid ? 'slug' : 'id'}=eq.${encodeURIComponent(slug)}&select=*`,
+      let response = await fetch(
+        `${supabaseUrl}/rest/v1/exam_updates?${isUuid ? 'id' : 'slug'}=eq.${encodeURIComponent(slug)}&select=${EXAM_UPDATE_SSR_COLS}`,
         { headers }
       );
-      rows = await response.json();
+      let rows = await response.json();
       update = Array.isArray(rows) ? rows[0] : null;
+
+      // If someone passed a slug-shaped value that only matches by id (rare) or vice
+      // versa, try the other column before giving up.
+      if (!update) {
+        response = await fetch(
+          `${supabaseUrl}/rest/v1/exam_updates?${isUuid ? 'slug' : 'id'}=eq.${encodeURIComponent(slug)}&select=${EXAM_UPDATE_SSR_COLS}`,
+          { headers }
+        );
+        rows = await response.json();
+        update = Array.isArray(rows) ? rows[0] : null;
+      }
+
+      // Cache found rows only — never negatively cache a miss (a brand-new slug
+      // must resolve immediately, not get redirected to /trending for the TTL).
+      if (update) await redisSetJson(cacheKey, update, EXAM_UPDATE_CACHE_TTL);
     }
 
     // Canonicalise UUID → slug so Telegram/webapp/crawlers converge on one URL.

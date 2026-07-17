@@ -6,11 +6,22 @@ import { isFreeJobAlertUrl } from "@/lib/urlUtils";
 /**
  * Columns needed by list/card views. Deliberately omits the heavy `sections`
  * (full scraped article bodies), `overview`, and `related_articles` JSON — those
- * are only rendered on the detail page (useExamUpdateById, which keeps select("*")).
+ * are only rendered on the detail page (useExamUpdateById, which uses FULL_UPDATE_COLS).
  * Fetching only these columns is the main lever for cutting Supabase PostgREST egress.
  */
 const LIGHT_UPDATE_COLS =
   "id, slug, url, title, category, status, published_date, summary, important_dates, download_links, official_links, related_links, tags, scraped_at, created_at, updated_at, job_id, exam_id";
+
+/**
+ * Detail-page column set — everything in `ExamUpdateItem`, including the heavy
+ * `sections`, `overview`, and `related_articles` the detail view renders. Still
+ * excludes the truly unused columns (`full_text`, `vacancy_table`, `fee_table`,
+ * `eligibility_table`, `cutoff_table`, `images`) that `select("*")` was pulling.
+ */
+const FULL_UPDATE_COLS =
+  "id, slug, url, title, category, status, published_date, summary, important_dates, " +
+  "overview, download_links, official_links, related_links, tags, sections, " +
+  "related_articles, scraped_at, created_at, updated_at, job_id, exam_id";
 
 /** Clean freejobalert URLs from nested links inside updates (but keep the updates themselves) */
 function filterFreeJobAlertFromUpdates(updates: ExamUpdateItem[]): ExamUpdateItem[] {
@@ -97,7 +108,7 @@ export function useExamUpdateById(idOrSlug: string | undefined) {
       // (links the Sheets poster builds from the title). Resolve either.
       const column = UUID_RE.test(idOrSlug) ? "id" : "slug";
       const { data, error } = await (supabase.from as any)("exam_updates")
-        .select("*")
+        .select(FULL_UPDATE_COLS)
         .eq(column, idOrSlug)
         .single();
       if (error) throw error;

@@ -126,6 +126,52 @@ function formatDate(dateStr: string | null): string {
   }
 }
 
+// Only the columns the SSR page renders. Excludes the heavy `embedding` vector
+// (384 floats serialized as JSON on every row) and the large `job_metadata`
+// blob — neither is used here, and `select=*` was pulling both on every hit.
+const JOB_SSR_COLS =
+  'id,slug,title,department,location,last_date,last_date_display,vacancies,' +
+  'vacancies_display,qualification,eligibility,salary_min,salary_max,age_min,' +
+  'age_max,application_fee,is_featured,admin_refreshed_at,created_at,updated_at,' +
+  'description,apply_link,application_start_date';
+
+// ── Minimal inlined Upstash Redis cache-aside (edge functions stay single-file) ──
+// Caches only the heavy primary-row read, and only when a row is found. Any Redis
+// failure falls through to a direct Supabase read — the page never blocks on cache.
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const JOB_CACHE_TTL = 1800; // 30 min
+
+async function redisGetJson<T>(key: string): Promise<T | null> {
+  if (!UPSTASH_URL || !UPSTASH_TOKEN) return null;
+  try {
+    const res = await fetch(`${UPSTASH_URL}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body?.result ? (JSON.parse(body.result) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function redisSetJson(key: string, value: unknown, ttl: number): Promise<void> {
+  if (!UPSTASH_URL || !UPSTASH_TOKEN) return;
+  try {
+    await fetch(UPSTASH_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${UPSTASH_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(['SET', key, JSON.stringify(value), 'EX', ttl]),
+    });
+  } catch {
+    /* fire-and-forget — never block the response on a cache write */
+  }
+}
+
 export default async function handler(request: Request) {
   const url = new URL(request.url);
   const pathParts = url.pathname.split('/');
@@ -139,24 +185,15 @@ export default async function handler(request: Request) {
     const supabaseUrl = process.env.VITE_SUPABASE_URL!;
     const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY!;
 
-    // Try by slug first, then UUID fallback
-    let jobResponse = await fetch(
-      `${supabaseUrl}/rest/v1/jobs?slug=eq.${encodeURIComponent(slug)}&select=*`,
-      {
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-        },
-      }
-    );
+    // Cache-aside: serve the primary row from Redis when possible so repeat
+    // crawler hits don't re-read Supabase. Cache found rows only.
+    const cacheKey = `ssr:job:${slug}`;
+    let job = await redisGetJson<any>(cacheKey);
 
-    let jobs = await jobResponse.json();
-    let job = jobs[0];
-
-    // UUID fallback
-    if (!job && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slug)) {
-      jobResponse = await fetch(
-        `${supabaseUrl}/rest/v1/jobs?id=eq.${encodeURIComponent(slug)}&select=*`,
+    if (!job) {
+      // Try by slug first, then UUID fallback
+      let jobResponse = await fetch(
+        `${supabaseUrl}/rest/v1/jobs?slug=eq.${encodeURIComponent(slug)}&select=${JOB_SSR_COLS}`,
         {
           headers: {
             'apikey': supabaseKey,
@@ -164,13 +201,31 @@ export default async function handler(request: Request) {
           },
         }
       );
-      jobs = await jobResponse.json();
+
+      let jobs = await jobResponse.json();
       job = jobs[0];
 
-      // If found by UUID and has slug, redirect to canonical slug URL
-      if (job?.slug) {
-        return Response.redirect(new URL(`/jobs/${job.slug}`, url.origin).toString(), 301);
+      // UUID fallback
+      if (!job && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slug)) {
+        jobResponse = await fetch(
+          `${supabaseUrl}/rest/v1/jobs?id=eq.${encodeURIComponent(slug)}&select=${JOB_SSR_COLS}`,
+          {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+            },
+          }
+        );
+        jobs = await jobResponse.json();
+        job = jobs[0];
+
+        // If found by UUID and has slug, redirect to canonical slug URL
+        if (job?.slug) {
+          return Response.redirect(new URL(`/jobs/${job.slug}`, url.origin).toString(), 301);
+        }
       }
+
+      if (job) await redisSetJson(cacheKey, job, JOB_CACHE_TTL);
     }
 
     if (!job) {
