@@ -87,6 +87,67 @@ export function isBlockedUrl(url: string | null | undefined): boolean {
   return isFreeJobAlertUrl(url) || isWhatsAppUrl(url) || isTelegramUrl(url);
 }
 
+// Bare domain like "www.ukmssb.org" or "ukmssb.org/page". The final label must
+// be alphabetic so numeric strings such as dates ("05.08.2026") never match.
+const BARE_DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}([/?#]\S*)?$/i;
+
+/**
+ * Normalize a raw website value into a clickable URL.
+ * Scraped overview tables often store bare domains ("www.ukmssb.org") with no
+ * protocol; browsers treat those as relative paths, so prepend "https://".
+ * Returns null when the value is blocked (freejobalert) or doesn't look like
+ * a URL/domain at all (e.g. "Online only").
+ */
+export function normalizeWebsiteUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let value = raw.trim().replace(/[.,;)\]]+$/, "");
+  if (!value) return null;
+  if (/\s/.test(value)) {
+    // Not a bare URL — salvage a URL-looking token if one is embedded in text
+    const token = value
+      .split(/\s+/)
+      .find((t) => /^https?:\/\//i.test(t) || BARE_DOMAIN_RE.test(t));
+    if (!token) return null;
+    value = token.replace(/[.,;)\]]+$/, "");
+  }
+  if (!/^https?:\/\//i.test(value)) {
+    if (!BARE_DOMAIN_RE.test(value)) return null;
+    value = `https://${value}`;
+  }
+  try {
+    const parsed = new URL(value);
+    if (!parsed.hostname.includes(".")) return null;
+  } catch {
+    return null;
+  }
+  return isFreeJobAlertUrl(value) ? null : value;
+}
+
+/**
+ * Pull an official-website URL out of a job's Overview table (job_metadata.overview).
+ * Scrapers snake_case the row labels ("Official Website" → official_website), but
+ * older rows may keep other casings/spellings, so keys are matched loosely.
+ */
+export function getWebsiteFromOverview(overview: unknown): string | null {
+  if (!overview || typeof overview !== "object" || Array.isArray(overview)) return null;
+  const entries = Object.entries(overview as Record<string, unknown>);
+  const keyMatchers = [
+    /official\s*(website|web\s*site|web|site)/i,
+    /application\s*website/i,
+    /^(web\s*site|website)$/i,
+  ];
+  for (const matcher of keyMatchers) {
+    for (const [key, val] of entries) {
+      if (typeof val !== "string") continue;
+      const label = key.replace(/[_-]+/g, " ").trim();
+      if (!matcher.test(label)) continue;
+      const url = normalizeWebsiteUrl(val);
+      if (url) return url;
+    }
+  }
+  return null;
+}
+
 export interface LinkItem {
   text?: string | null;
   url: string;

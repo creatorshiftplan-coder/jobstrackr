@@ -32,7 +32,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { BottomNav } from "@/components/BottomNav";
 import { formatAgeLimit, parseJobDeadline, getVacancyDisplay } from "@/lib/jobUtils";
-import { isFreeJobAlertUrl } from "@/lib/urlUtils";
+import { isFreeJobAlertUrl, normalizeWebsiteUrl, getWebsiteFromOverview } from "@/lib/urlUtils";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { useSimilarJobs } from "@/hooks/useSimilarJobs";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -161,9 +161,11 @@ export default function JobDetails() {
   const isTBDDate = isTBDDateDisplay(job.last_date_display);
 
   const meta = job.job_metadata as any;
-  const rawOfficialWebsite = job.official_website?.trim() || meta?.official_website?.trim() || null;
+  const officialWebsite =
+    normalizeWebsiteUrl(job.official_website) ||
+    normalizeWebsiteUrl(meta?.official_website) ||
+    getWebsiteFromOverview(meta?.overview);
   const rawApplyLink = job.apply_link?.trim() || null;
-  const officialWebsite = isFreeJobAlertUrl(rawOfficialWebsite) ? null : rawOfficialWebsite;
   const applyLink = isFreeJobAlertUrl(rawApplyLink) ? null : rawApplyLink;
 
   // Format raw JSON keys into proper column headers: "post_name" → "Post Name"
@@ -620,12 +622,21 @@ export default function JobDetails() {
                   <CardContent className="p-4">
                     <h3 className="font-display font-semibold text-foreground mb-3">ℹ️ Overview</h3>
                     <div className="space-y-2">
-                      {Object.entries(meta.overview as Record<string, string>).map(([key, val]) => (
-                        <div key={key} className="flex items-start gap-2 bg-secondary/30 rounded-lg px-4 py-2.5">
-                          <span className="text-sm text-muted-foreground capitalize min-w-[120px] flex-shrink-0">{key.replace(/_/g, " ")}</span>
-                          <span className="text-sm font-medium">{val}</span>
-                        </div>
-                      ))}
+                      {Object.entries(meta.overview as Record<string, string>).map(([key, val]) => {
+                        const valUrl = typeof val === "string" && !/\s/.test(val.trim()) ? normalizeWebsiteUrl(val) : null;
+                        return (
+                          <div key={key} className="flex items-start gap-2 bg-secondary/30 rounded-lg px-4 py-2.5">
+                            <span className="text-sm text-muted-foreground capitalize min-w-[120px] flex-shrink-0">{key.replace(/_/g, " ")}</span>
+                            {valUrl ? (
+                              <a href={valUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary underline break-all">
+                                {val}
+                              </a>
+                            ) : (
+                              <span className="text-sm font-medium">{val}</span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </CardContent>
                 </Card>
