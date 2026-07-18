@@ -70,7 +70,7 @@ export function useJobs(options: UseJobsOptions = {}) {
       return res.json();
     },
     enabled,
-    staleTime: bypassCache ? 0 : 1000 * 60 * 15, // Bypass cache has 0 stale time for instant updates; cached path matches server TTL
+    staleTime: bypassCache ? 0 : 1000 * 60 * 120, // Bypass cache has 0 stale time for instant updates; cached path matches the 2h server TTL
   });
 }
 

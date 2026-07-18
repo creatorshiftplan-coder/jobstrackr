@@ -27,7 +27,7 @@ export function useHomepageData(enabled: boolean = true) {
       return res.json();
     },
     enabled,
-    staleTime: 1000 * 60 * 15, // 15 minutes — matches the lengthened server cache TTL
+    staleTime: 1000 * 60 * 120, // 2 hours — matches the lengthened server cache TTL
   });
 }
 
