@@ -672,6 +672,33 @@ export const formatAgeLimit = (
     return "Not Available";
 };
 
+// Scraped `salary_text` sometimes has a "related jobs"/promo block appended that
+// bled in from the source page's sidebar — it always starts at an "Also Read:" or
+// "DON'T MISS" marker (e.g. "…as per company rules. Also Read: … DON'T MISS TSLPRB
+// 7437 Constable … 7,437 posts"). Job cards hide this via CSS truncation so the
+// salary looks fine, but the details page renders the full string and exposes the
+// junk. Strip everything from the first marker onward. Only touches strings that
+// actually contain a marker, so clean salary text is returned unchanged.
+const SALARY_TEXT_JUNK_MARKERS = [/\bAlso\s+Read\s*:/i, /\bDON.?T\s+MISS\b/i];
+
+export const cleanSalaryText = (text: string | null | undefined): string | null => {
+    if (!text || typeof text !== "string") return null;
+
+    let cut = -1;
+    for (const marker of SALARY_TEXT_JUNK_MARKERS) {
+        const match = text.match(marker);
+        if (match && match.index !== undefined && (cut === -1 || match.index < cut)) {
+            cut = match.index;
+        }
+    }
+
+    if (cut === -1) return text;
+
+    // Drop the junk and any dangling connector punctuation left by the cut.
+    const cleaned = text.slice(0, cut).trim().replace(/[\s,;:–—-]+$/, "").trim();
+    return cleaned.length ? cleaned : null;
+};
+
 // Extract the total vacancy count from the "Total" row of a vacancies_detail breakdown table.
 const extractVacancyBreakdownTotal = (
     vacanciesDetail?: Record<string, string>[] | null

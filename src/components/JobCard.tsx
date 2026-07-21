@@ -7,7 +7,7 @@ import { format, differenceInDays } from "date-fns";
 import { Link } from "react-router-dom";
 import { SaveJobButton } from "./SaveJobButton";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
-import { isTBDDateDisplay, inferCategory, getTrustedJobDeadline, shortenQualification, getVacancyDisplay } from "@/lib/jobUtils";
+import { isTBDDateDisplay, inferCategory, getTrustedJobDeadline, shortenQualification, getVacancyDisplay, cleanSalaryText } from "@/lib/jobUtils";
 import { getBestJobLocation } from "@/lib/jobMatcher";
 import { OrganizationLogo } from "@/components/OrganizationLogo";
 
@@ -74,11 +74,12 @@ export const JobCard = memo(function JobCard({ job }: JobCardProps) {
     const showLowAgeFlag = [effectiveAgeMin, effectiveAgeMax].some((age) => typeof age === "number" && age > 0 && age < 14);
 
     // Salary display
+    const salaryText = cleanSalaryText(meta?.salary_text);
     let salaryDisplay: string;
     if (!job.salary_min && !job.salary_max) {
-      salaryDisplay = meta?.salary_text || "Not disclosed";
-    } else if (meta?.salary_text && ((job.salary_min && job.salary_min < 100) || (job.salary_max && job.salary_max < 100))) {
-      salaryDisplay = meta.salary_text;
+      salaryDisplay = salaryText || "Not disclosed";
+    } else if (salaryText && ((job.salary_min && job.salary_min < 100) || (job.salary_max && job.salary_max < 100))) {
+      salaryDisplay = salaryText;
     } else if (job.salary_min && job.salary_max) {
       salaryDisplay = job.salary_min === job.salary_max ? formatSalaryValue(job.salary_min) : `${formatSalaryValue(job.salary_min)} - ${formatSalaryValue(job.salary_max)}`;
     } else if (job.salary_min) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getTrustedJobDeadline, isJobOpenForFeed, UNKNOWN_DEADLINE_GRACE_DAYS } from "./jobUtils";
+import { getTrustedJobDeadline, isJobOpenForFeed, UNKNOWN_DEADLINE_GRACE_DAYS, cleanSalaryText } from "./jobUtils";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -108,5 +108,43 @@ describe("isJobOpenForFeed", () => {
         created_at: daysFromNow(-(UNKNOWN_DEADLINE_GRACE_DAYS + 10)).toISOString(),
       })
     ).toBe(false);
+  });
+});
+
+describe("cleanSalaryText", () => {
+  it("strips a 'DON'T MISS' related-jobs block", () => {
+    const raw =
+      "The official short notice does not mention the pay scale. This section will be updated as soon as the detailed notification is released. DON'T MISS TSLPRB 7437 Constable, Warder, SI Online Form 2026 7,437 Posts 7,437 posts NFR 6777 Act Apprentice 6,777 posts";
+    expect(cleanSalaryText(raw)).toBe(
+      "The official short notice does not mention the pay scale. This section will be updated as soon as the detailed notification is released."
+    );
+  });
+
+  it("strips an 'Also Read:' promo/related-article line", () => {
+    const raw =
+      "Fixed monthly pay of ₹26,000 for the first five years, then Level-4 scale. Also Read: NFR Act Apprentice Recruitment 2026: Apply Online for 6777 Posts";
+    expect(cleanSalaryText(raw)).toBe(
+      "Fixed monthly pay of ₹26,000 for the first five years, then Level-4 scale."
+    );
+  });
+
+  it("cuts at the earliest marker when both are present", () => {
+    const raw = "Basic pay ₹50,000 per month. Also Read: something DON'T MISS other jobs";
+    expect(cleanSalaryText(raw)).toBe("Basic pay ₹50,000 per month.");
+  });
+
+  it("leaves clean salary text untouched", () => {
+    const raw = "₹35,400 - ₹1,12,400 (Level 6)";
+    expect(cleanSalaryText(raw)).toBe(raw);
+  });
+
+  it("returns null for empty or nullish input", () => {
+    expect(cleanSalaryText(null)).toBeNull();
+    expect(cleanSalaryText(undefined)).toBeNull();
+    expect(cleanSalaryText("")).toBeNull();
+  });
+
+  it("returns null when only junk remains after cleaning", () => {
+    expect(cleanSalaryText("DON'T MISS TSLPRB 7437 Constable 7,437 posts")).toBeNull();
   });
 });

@@ -31,7 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { BottomNav } from "@/components/BottomNav";
-import { formatAgeLimit, parseJobDeadline, getVacancyDisplay } from "@/lib/jobUtils";
+import { formatAgeLimit, parseJobDeadline, getVacancyDisplay, cleanSalaryText } from "@/lib/jobUtils";
 import { isFreeJobAlertUrl, normalizeWebsiteUrl, getWebsiteFromOverview } from "@/lib/urlUtils";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { useSimilarJobs } from "@/hooks/useSimilarJobs";
@@ -221,14 +221,15 @@ export default function JobDetails() {
   }
 
   const formatSalary = (min: number | null, max: number | null) => {
+    const salaryText = cleanSalaryText(meta?.salary_text);
     if (!min && !max) {
       // Fallback: use salary_text from metadata if available
-      if (meta?.salary_text) return meta.salary_text;
+      if (salaryText) return salaryText;
       return "Not disclosed";
     }
     // If values look suspiciously low (e.g. 3 instead of 3,00,000), prefer salary_text
-    if (meta?.salary_text && ((min && min < 100) || (max && max < 100))) {
-      return meta.salary_text;
+    if (salaryText && ((min && min < 100) || (max && max < 100))) {
+      return salaryText;
     }
     if (min && max) {
       if (min === max) return `₹${min.toLocaleString('en-IN')}`;
@@ -507,14 +508,17 @@ export default function JobDetails() {
           return (
             <>
               {/* Salary Details */}
-              {meta.salary_text && (
-                <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.45s" }}>
-                  <CardContent className="p-4">
-                    <h3 className="font-display font-semibold text-foreground mb-2">💰 Salary Details</h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">{meta.salary_text}</p>
-                  </CardContent>
-                </Card>
-              )}
+              {(() => {
+                const salaryText = cleanSalaryText(meta.salary_text);
+                return salaryText && (
+                  <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl animate-slide-up" style={{ animationDelay: "0.45s" }}>
+                    <CardContent className="p-4">
+                      <h3 className="font-display font-semibold text-foreground mb-2">💰 Salary Details</h3>
+                      <p className="text-sm text-muted-foreground whitespace-pre-line">{salaryText}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
               {/* Age Limit Details */}
               {meta.age_limit_text && (
