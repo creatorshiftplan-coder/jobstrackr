@@ -169,10 +169,20 @@ export default async function handler(request: Request) {
     const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY!;
     const headers = { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` };
 
+    // Only the columns buildExamUpdatePage renders — never `*`, which drags
+    // full_text (entire article), images and the four table-JSON columns out
+    // of Supabase on every crawler hit (egress).
+    const UPDATE_COLUMNS = [
+      'id', 'slug', 'title', 'category', 'status', 'published_date',
+      'summary', 'important_dates', 'overview', 'download_links',
+      'official_links', 'related_links', 'sections', 'related_articles',
+      'tags', 'job_id', 'scraped_at', 'created_at', 'updated_at',
+    ].join(',');
+
     // Resolve by slug first; legacy UUID links fall back to id then 301 → slug.
     const isUuid = UUID_RE.test(slug);
     let response = await fetch(
-      `${supabaseUrl}/rest/v1/exam_updates?${isUuid ? 'id' : 'slug'}=eq.${encodeURIComponent(slug)}&select=*`,
+      `${supabaseUrl}/rest/v1/exam_updates?${isUuid ? 'id' : 'slug'}=eq.${encodeURIComponent(slug)}&select=${UPDATE_COLUMNS}`,
       { headers }
     );
     let rows = await response.json();
@@ -182,7 +192,7 @@ export default async function handler(request: Request) {
     // versa, try the other column before giving up.
     if (!update) {
       response = await fetch(
-        `${supabaseUrl}/rest/v1/exam_updates?${isUuid ? 'slug' : 'id'}=eq.${encodeURIComponent(slug)}&select=*`,
+        `${supabaseUrl}/rest/v1/exam_updates?${isUuid ? 'slug' : 'id'}=eq.${encodeURIComponent(slug)}&select=${UPDATE_COLUMNS}`,
         { headers }
       );
       rows = await response.json();
@@ -228,7 +238,7 @@ export default async function handler(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=86400',
+        'Cache-Control': 'public, s-maxage=7200, stale-while-revalidate=86400',
       },
     });
   } catch (error) {

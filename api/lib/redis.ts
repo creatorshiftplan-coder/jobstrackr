@@ -8,8 +8,17 @@
  *   3. On Redis error → fallback to fetcher (never block on cache failure)
  */
 
-const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL!;
-const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN!;
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+// Redis is an optional accelerator, not a hard dependency. When the Upstash
+// credentials aren't configured, skip the cache entirely and serve straight
+// from the source — otherwise every request would fetch `undefined/...` and
+// throw an Invalid URL error on each call.
+const REDIS_ENABLED = Boolean(UPSTASH_URL && UPSTASH_TOKEN);
+if (!REDIS_ENABLED) {
+  console.warn('[redis] Upstash credentials not configured — caching disabled, serving from source');
+}
 
 interface RedisResponse {
   result: string | null;
@@ -27,7 +36,7 @@ async function redisGet(key: string): Promise<string | null> {
 
 /** Low-level SET with EX (expiry in seconds) via Upstash REST API */
 async function redisSet(key: string, value: string, ttlSeconds: number): Promise<void> {
-  const res = await fetch(UPSTASH_URL, {
+  const res = await fetch(UPSTASH_URL!, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${UPSTASH_TOKEN}`,
@@ -54,6 +63,11 @@ export async function cachedFetch<T>(
   ttl: number,
   fetcher: () => Promise<T>,
 ): Promise<{ data: T; cacheHit: boolean }> {
+  // 0. Cache disabled (no credentials) — go straight to source
+  if (!REDIS_ENABLED) {
+    return { data: await fetcher(), cacheHit: false };
+  }
+
   // 1. Try cache
   try {
     const cached = await redisGet(key);

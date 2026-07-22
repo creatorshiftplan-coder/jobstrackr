@@ -10,7 +10,38 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
+# SEO/scraper bots that burn crawl bandwidth without sending users.
+# Every page they hit is a Vercel edge render backed by a Supabase query,
+# so heavy crawlers directly drain the Supabase egress quota.
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+User-agent: BLEXBot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: DataForSeoBot
+Disallow: /
+
+User-agent: serpstatbot
+Disallow: /
+
 User-agent: *
 Allow: /
+Crawl-delay: 10
 
 Sitemap: https://jobstrackr.in/sitemap.xml

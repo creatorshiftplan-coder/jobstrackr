@@ -15,69 +15,75 @@ async function supabaseFetch(path: string): Promise<any> {
   return response.json();
 }
 
-// ─── Jobs handler ────────────────────────────────────────────────
-async function handleJobs(req: VercelRequest, res: VercelResponse) {
-  const CACHE_KEY = 'cache:jobs:all';
-  const CACHE_TTL = 1800; // 30 min — balances freshness against Supabase egress
+// ─── Shared jobs fetch ───────────────────────────────────────────
+// The full jobs list is multi-MB, so it is the single biggest Supabase egress
+// item. `jobs` and `homepage` share ONE Redis key so the table is pulled from
+// Supabase at most once per TTL window, no matter which endpoint misses first.
+const JOBS_CACHE_KEY = 'cache:jobs:all';
+const JOBS_CACHE_TTL = 7200; // 2 h — long TTL keeps Supabase egress low
 
-  const { data, cacheHit } = await cachedFetch<any[]>(CACHE_KEY, CACHE_TTL, async () => {
-    const columns = [
+async function fetchAllJobs(): Promise<any[]> {
+  const columns = [
+    'id', 'slug', 'title', 'department', 'location',
+    'last_date', 'last_date_display', 'vacancies', 'vacancies_display',
+    'qualification', 'eligibility', 'experience',
+    'salary_min', 'salary_max', 'age_min', 'age_max',
+    'application_fee', 'job_metadata', 'is_featured',
+    'admin_refreshed_at', 'created_at', 'tags',
+    'eligibility_summary', 'required_skills',
+  ].join(',');
+
+  const url = `${SUPABASE_URL}/rest/v1/jobs?select=${columns}&order=created_at.desc&limit=10000`;
+  let response = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+    },
+  });
+
+  if (!response.ok) {
+    console.warn('[api/cache/jobs] Failed fetching with eligibility fields, retrying without them');
+    const fallbackColumns = [
       'id', 'slug', 'title', 'department', 'location',
       'last_date', 'last_date_display', 'vacancies', 'vacancies_display',
       'qualification', 'eligibility', 'experience',
       'salary_min', 'salary_max', 'age_min', 'age_max',
       'application_fee', 'job_metadata', 'is_featured',
       'admin_refreshed_at', 'created_at', 'tags',
-      'eligibility_summary', 'required_skills',
     ].join(',');
-
-    const url = `${SUPABASE_URL}/rest/v1/jobs?select=${columns}&order=created_at.desc&limit=10000`;
-    let response = await fetch(url, {
+    const fallbackUrl = `${SUPABASE_URL}/rest/v1/jobs?select=${fallbackColumns}&order=created_at.desc&limit=10000`;
+    response = await fetch(fallbackUrl, {
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
       },
     });
+  }
 
-    if (!response.ok) {
-      console.warn('[api/cache/jobs] Failed fetching with eligibility fields, retrying without them');
-      const fallbackColumns = [
-        'id', 'slug', 'title', 'department', 'location',
-        'last_date', 'last_date_display', 'vacancies', 'vacancies_display',
-        'qualification', 'eligibility', 'experience',
-        'salary_min', 'salary_max', 'age_min', 'age_max',
-        'application_fee', 'job_metadata', 'is_featured',
-        'admin_refreshed_at', 'created_at', 'tags',
-      ].join(',');
-      const fallbackUrl = `${SUPABASE_URL}/rest/v1/jobs?select=${fallbackColumns}&order=created_at.desc&limit=10000`;
-      response = await fetch(fallbackUrl, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-        },
-      });
+  if (!response.ok) {
+    throw new Error(`Supabase query failed with status ${response.status}`);
+  }
+
+  const rawJobs = await response.json();
+  return (rawJobs || []).map((job: any) => {
+    if (job.job_metadata) {
+      const {
+        eligibility_profile,
+        overview,
+        selection_process,
+        vacancies_detail,
+        important_dates,
+        ...rest
+      } = job.job_metadata;
+      job.job_metadata = rest;
     }
-
-    if (!response.ok) {
-      throw new Error(`Supabase query failed with status ${response.status}`);
-    }
-
-    const rawJobs = await response.json();
-    return (rawJobs || []).map((job: any) => {
-      if (job.job_metadata) {
-        const {
-          eligibility_profile,
-          overview,
-          selection_process,
-          vacancies_detail,
-          important_dates,
-          ...rest
-        } = job.job_metadata;
-        job.job_metadata = rest;
-      }
-      return job;
-    });
+    return job;
   });
+}
+
+// ─── Jobs handler ────────────────────────────────────────────────
+async function handleJobs(req: VercelRequest, res: VercelResponse) {
+  const { data, cacheHit } = await cachedFetch<any[]>(JOBS_CACHE_KEY, JOBS_CACHE_TTL, fetchAllJobs);
 
   setCacheHeaders(res, cacheHit, 600, 1800);
   return res.status(200).json(data);
@@ -91,62 +97,25 @@ interface HomepageBundle {
 }
 
 async function handleHomepage(req: VercelRequest, res: VercelResponse) {
-  const CACHE_KEY = 'cache:homepage:bundle';
-  const CACHE_TTL = 1800; // 30 min — balances freshness against Supabase egress
+  // Reuses the SAME jobs cache key as /api/cache/jobs — previously this
+  // handler re-pulled the entire multi-MB jobs table from Supabase into its
+  // own bundle key, doubling the biggest egress item. Exams are cached
+  // separately (small payload).
+  const [jobsResult, examsResult] = await Promise.all([
+    cachedFetch<any[]>(JOBS_CACHE_KEY, JOBS_CACHE_TTL, fetchAllJobs),
+    cachedFetch<any[]>('cache:exams:active', JOBS_CACHE_TTL, async () => {
+      const exams = await supabaseFetch('exams?select=*&is_active=eq.true&order=name');
+      return exams || [];
+    }),
+  ]);
 
-  const { data, cacheHit } = await cachedFetch<HomepageBundle>(CACHE_KEY, CACHE_TTL, async () => {
-    const jobColumns = [
-      'id', 'slug', 'title', 'department', 'location',
-      'last_date', 'last_date_display', 'vacancies', 'vacancies_display',
-      'qualification', 'eligibility', 'experience',
-      'salary_min', 'salary_max', 'age_min', 'age_max',
-      'application_fee', 'job_metadata', 'is_featured',
-      'admin_refreshed_at', 'created_at', 'tags',
-      'eligibility_summary', 'required_skills',
-    ].join(',');
-
-    const allJobsPromise = supabaseFetch(`jobs?select=${jobColumns}&order=created_at.desc&limit=10000`)
-      .catch((err) => {
-        console.warn('[api/cache/homepage] Failed fetching with eligibility fields, retrying without them:', err);
-        const fallbackColumns = [
-          'id', 'slug', 'title', 'department', 'location',
-          'last_date', 'last_date_display', 'vacancies', 'vacancies_display',
-          'qualification', 'eligibility', 'experience',
-          'salary_min', 'salary_max', 'age_min', 'age_max',
-          'application_fee', 'job_metadata', 'is_featured',
-          'admin_refreshed_at', 'created_at', 'tags',
-        ].join(',');
-        return supabaseFetch(`jobs?select=${fallbackColumns}&order=created_at.desc&limit=10000`);
-      });
-
-    const [allJobs, exams] = await Promise.all([
-      allJobsPromise,
-      supabaseFetch('exams?select=*&is_active=eq.true&order=name'),
-    ]);
-
-    const cleanAllJobs = (allJobs || []).map((job: any) => {
-      if (job.job_metadata) {
-        const {
-          eligibility_profile,
-          overview,
-          selection_process,
-          vacancies_detail,
-          important_dates,
-          ...rest
-        } = job.job_metadata;
-        job.job_metadata = rest;
-      }
-      return job;
-    });
-
-    const recentJobs = cleanAllJobs.slice(0, 50);
-
-    return {
-      recentJobs,
-      allJobs: cleanAllJobs,
-      exams: exams || [],
-    };
-  });
+  const allJobs = jobsResult.data || [];
+  const data: HomepageBundle = {
+    recentJobs: allJobs.slice(0, 50),
+    allJobs,
+    exams: examsResult.data || [],
+  };
+  const cacheHit = jobsResult.cacheHit && examsResult.cacheHit;
 
   setCacheHeaders(res, cacheHit, 600, 1800);
   return res.status(200).json(data);
@@ -285,7 +254,7 @@ function filterFreeJobAlertFromUpdates(updates: any[]): any[] {
 async function handleExamUpdates(req: VercelRequest, res: VercelResponse) {
   const category = (req.query.category as string) || '';
   const cacheKey = `cache:exam-updates:${category || 'all'}`;
-  const CACHE_TTL = 900; // 15 min — balances freshness against Supabase egress
+  const CACHE_TTL = 1800; // 30 min — balances freshness against Supabase egress
 
   const { data, cacheHit } = await cachedFetch<any[]>(cacheKey, CACHE_TTL, async () => {
     // Light column set — list/card views never render the heavy `sections`,
@@ -327,7 +296,7 @@ async function handleExamUpdates(req: VercelRequest, res: VercelResponse) {
 // exam-date notifications actually surface. Redis-cached, so egress stays low.
 async function handleExamCountdown(req: VercelRequest, res: VercelResponse) {
   const CACHE_KEY = 'cache:exam-countdown:all';
-  const CACHE_TTL = 900; // 15 min
+  const CACHE_TTL = 3600; // 1 h — 1000-row payload, keep Supabase pulls rare
 
   const { data, cacheHit } = await cachedFetch<any[]>(CACHE_KEY, CACHE_TTL, async () => {
     const updateColumns = [

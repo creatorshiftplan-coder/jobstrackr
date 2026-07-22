@@ -139,9 +139,20 @@ export default async function handler(request: Request) {
     const supabaseUrl = process.env.VITE_SUPABASE_URL!;
     const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY!;
 
+    // Only the columns buildSeoPage renders — never `*`, which drags the heavy
+    // job_metadata JSON out of Supabase on every crawler hit (egress).
+    const JOB_COLUMNS = [
+      'id', 'slug', 'title', 'department', 'location',
+      'vacancies', 'vacancies_display', 'salary_min', 'salary_max',
+      'age_min', 'age_max', 'qualification', 'eligibility',
+      'application_fee', 'apply_link', 'last_date', 'last_date_display',
+      'application_start_date', 'description', 'is_featured',
+      'created_at', 'updated_at', 'admin_refreshed_at',
+    ].join(',');
+
     // Try by slug first, then UUID fallback
     let jobResponse = await fetch(
-      `${supabaseUrl}/rest/v1/jobs?slug=eq.${encodeURIComponent(slug)}&select=*`,
+      `${supabaseUrl}/rest/v1/jobs?slug=eq.${encodeURIComponent(slug)}&select=${JOB_COLUMNS}`,
       {
         headers: {
           'apikey': supabaseKey,
@@ -156,7 +167,7 @@ export default async function handler(request: Request) {
     // UUID fallback
     if (!job && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slug)) {
       jobResponse = await fetch(
-        `${supabaseUrl}/rest/v1/jobs?id=eq.${encodeURIComponent(slug)}&select=*`,
+        `${supabaseUrl}/rest/v1/jobs?id=eq.${encodeURIComponent(slug)}&select=${JOB_COLUMNS}`,
         {
           headers: {
             'apikey': supabaseKey,
@@ -197,7 +208,7 @@ export default async function handler(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+        'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=86400',
       },
     });
   } catch (error) {
