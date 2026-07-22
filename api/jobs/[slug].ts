@@ -217,14 +217,28 @@ export default async function handler(request: Request) {
   }
 }
 
-function serveSpaFallback(url: URL): Response {
-  // Redirect to SPA — Vercel will serve index.html
-  return new Response(`<!DOCTYPE html>
-<html><head><meta http-equiv="refresh" content="0;url=${url.pathname}"></head>
-<body>Redirecting...</body></html>`, {
-    status: 200,
-    headers: { 'Content-Type': 'text/html' },
-  });
+async function serveSpaFallback(url: URL): Promise<Response> {
+  // Serve the SPA shell directly. NEVER meta-refresh back to url.pathname:
+  // /jobs/:slug rewrites to this function, so a self-refresh loops the browser
+  // against the edge function forever whenever Supabase is down (this burned
+  // ~750k edge requests in one day during the July 2026 Supabase 402 outage).
+  try {
+    const res = await fetch(new URL('/index.html', url.origin));
+    if (res.ok) {
+      return new Response(await res.text(), {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          // Short CDN cache so an upstream outage is absorbed by the CDN
+          // instead of re-invoking this function on every hit.
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      });
+    }
+  } catch {
+    // fall through to redirect
+  }
+  return Response.redirect(new URL('/', url.origin).toString(), 302);
 }
 
 function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {

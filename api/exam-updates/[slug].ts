@@ -206,7 +206,10 @@ export default async function handler(request: Request) {
 
     if (!update) {
       return new Response(`<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/trending"></head><body>Redirecting...</body></html>`, {
-        status: 200, headers: { 'Content-Type': 'text/html' },
+        status: 200,
+        // Cache the fallback briefly so an upstream outage is absorbed by the
+        // CDN instead of invoking this function on every hit.
+        headers: { 'Content-Type': 'text/html', 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
       });
     }
 
@@ -244,7 +247,9 @@ export default async function handler(request: Request) {
   } catch (error) {
     console.error('Exam-update page error:', error);
     return new Response(`<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/trending"></head><body>Redirecting...</body></html>`, {
-      status: 200, headers: { 'Content-Type': 'text/html' },
+      status: 200,
+      // Cache the outage fallback briefly so the CDN absorbs error storms.
+      headers: { 'Content-Type': 'text/html', 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     });
   }
 }
