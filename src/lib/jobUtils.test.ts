@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { getTrustedJobDeadline, isJobOpenForFeed, UNKNOWN_DEADLINE_GRACE_DAYS, cleanSalaryText } from "./jobUtils";
+import {
+  getTrustedJobDeadline,
+  isJobOpenForFeed,
+  UNKNOWN_DEADLINE_GRACE_DAYS,
+  cleanSalaryText,
+  isPlausibleSalary,
+  getVacancyDisplay,
+} from "./jobUtils";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -146,5 +153,72 @@ describe("cleanSalaryText", () => {
 
   it("returns null when only junk remains after cleaning", () => {
     expect(cleanSalaryText("DON'T MISS TSLPRB 7437 Constable 7,437 posts")).toBeNull();
+  });
+});
+
+describe("isPlausibleSalary", () => {
+  // Values taken from real rows the scraper stored before the July-2026 fix,
+  // where a pay-matrix level was read as the salary.
+  it.each([7, 6, 10, 14, 2, 4, 11, 15])("rejects pay-matrix level %i", (level) => {
+    expect(isPlausibleSalary(level)).toBe(false);
+  });
+
+  it("rejects null, undefined and non-finite values", () => {
+    expect(isPlausibleSalary(null)).toBe(false);
+    expect(isPlausibleSalary(undefined)).toBe(false);
+    expect(isPlausibleSalary(NaN)).toBe(false);
+  });
+
+  it("accepts real pay figures, including the lowest grade-pay values", () => {
+    expect(isPlausibleSalary(1800)).toBe(true);
+    expect(isPlausibleSalary(11040)).toBe(true);
+    expect(isPlausibleSalary(35400)).toBe(true);
+    expect(isPlausibleSalary(177500)).toBe(true);
+  });
+
+  it("treats the 1000 boundary as inclusive", () => {
+    expect(isPlausibleSalary(999)).toBe(false);
+    expect(isPlausibleSalary(1000)).toBe(true);
+  });
+});
+
+describe("getVacancyDisplay", () => {
+  it("prefers the title count when the stored number dwarfs it", () => {
+    // Real row: a ₹11,040 stipend column summed across 12 rows into "vacancies".
+    expect(
+      getVacancyDisplay({
+        title: "CSIR CECRI Apprentice Recruitment 2026 – Walk in for 27 Posts",
+        vacancies: 127280,
+        vacancies_display: "127280 Posts",
+      })
+    ).toBe("27 Posts");
+  });
+
+  it("leaves genuinely large counts alone when the title agrees", () => {
+    expect(
+      getVacancyDisplay({
+        title: "SSC GD Constable Recruitment 2026 - Apply Online for 25487 Posts",
+        vacancies: 25487,
+      })
+    ).toBe("25487 Posts");
+  });
+
+  it("keeps the stored count when the title states no number", () => {
+    expect(getVacancyDisplay({ title: "UP Home Guard Recruitment 2025", vacancies: 41424 })).toBe(
+      "41424 Posts"
+    );
+  });
+
+  it("still honours the breakdown total and the custom word", () => {
+    expect(
+      getVacancyDisplay(
+        { title: "Some Recruitment 2026", job_metadata: { vacancies_detail: [{ post: "Total", n: "120" }] } },
+        "Vacancies"
+      )
+    ).toBe("120 Vacancies");
+  });
+
+  it("falls back to TBD with no usable source", () => {
+    expect(getVacancyDisplay({ title: "Some Recruitment 2026", vacancies_display: "Not Found" })).toBe("TBD");
   });
 });

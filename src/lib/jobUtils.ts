@@ -681,6 +681,21 @@ export const formatAgeLimit = (
 // actually contain a marker, so clean salary text is returned unchanged.
 const SALARY_TEXT_JUNK_MARKERS = [/\bAlso\s+Read\s*:/i, /\bDON.?T\s+MISS\b/i];
 
+/**
+ * Lowest number treated as a real salary. Pay-matrix levels run 1–18 and pay
+ * bands 1–4, so anything under this is a scraped level/grade ordinal rather
+ * than money — "Pay Level 7 as per 7th CPC" was being stored as ₹7.
+ *
+ * The scraper stopped producing these in July 2026 (see PAY_STRUCTURE_RE in
+ * apps-script/Html.gs and parse_salary in api/lib/scraper_v5.py), but several
+ * hundred rows written before that fix still carry them, so every render path
+ * guards with this instead of trusting the column.
+ */
+export const MIN_PLAUSIBLE_SALARY = 1000;
+
+export const isPlausibleSalary = (value: number | null | undefined): boolean =>
+    typeof value === "number" && Number.isFinite(value) && value >= MIN_PLAUSIBLE_SALARY;
+
 export const cleanSalaryText = (text: string | null | undefined): string | null => {
     if (!text || typeof text !== "string") return null;
 
@@ -717,25 +732,62 @@ const extractVacancyBreakdownTotal = (
     return "";
 };
 
+/**
+ * Post count stated in the title ("... Apply Online for 27 Posts"). Requires a
+ * trailing word so the year in "Recruitment 2026" is never read as a count.
+ * Mirrors the title regex in apps-script/JobScraper.gs.
+ */
+const extractTitleVacancyCount = (title?: string | null): number | null => {
+    if (!title) return null;
+    const match = title.match(/\bfor\s+(\d{1,6})\s+[A-Za-z]/i);
+    if (!match) return null;
+    const n = parseInt(match[1], 10);
+    return n > 0 && n < 100000 ? n : null;
+};
+
+/**
+ * Rows scraped before the July-2026 fix can carry a money column summed into
+ * `vacancies` — one job stored 127,280 "posts" from a ₹11,040 stipend across 12
+ * rows, while its title said 27. When the title states a count and the stored
+ * number dwarfs it, the stored number came from the wrong column.
+ *
+ * The margin is deliberately wide so genuinely large recruitments are untouched
+ * (SSC GD's 25,487 agrees with its own title).
+ */
+const VACANCY_TITLE_MISMATCH_FACTOR = 20;
+
 // Single source of truth for the vacancy summary shown on cards and the details page.
 // Prioritizes the total from the breakdown table over unhelpful display placeholders.
 export const getVacancyDisplay = (
     job: {
+        title?: string | null;
         vacancies_display?: string | null;
         vacancies?: number | null;
         job_metadata?: { vacancies_detail?: Record<string, string>[] } | null;
     },
     word: string = "Posts"
 ): string => {
+    const titleCount = extractTitleVacancyCount(job.title);
+    const contradictsTitle = (value: number | null): boolean =>
+        titleCount !== null && value !== null && value > titleCount * VACANCY_TITLE_MISMATCH_FACTOR;
+
     const breakdownTotal = extractVacancyBreakdownTotal(job.job_metadata?.vacancies_detail);
-    if (breakdownTotal) return `${breakdownTotal} ${word}`;
+    if (breakdownTotal && !contradictsTitle(Number(breakdownTotal))) return `${breakdownTotal} ${word}`;
 
     const display = job.vacancies_display?.trim();
     const displayLower = display?.toLowerCase();
-    if (display && displayLower !== "not found" && displayLower !== "tbd" && displayLower !== "n/a") {
+    const displayNumber = display ? Number(display.replace(/,/g, "").match(/^\d+/)?.[0] ?? NaN) : NaN;
+    if (
+        display &&
+        displayLower !== "not found" &&
+        displayLower !== "tbd" &&
+        displayLower !== "n/a" &&
+        !contradictsTitle(Number.isNaN(displayNumber) ? null : displayNumber)
+    ) {
         return display;
     }
 
-    if (job.vacancies) return `${job.vacancies} ${word}`;
+    if (job.vacancies && !contradictsTitle(job.vacancies)) return `${job.vacancies} ${word}`;
+    if (titleCount !== null) return `${titleCount} ${word}`;
     return "TBD";
 };

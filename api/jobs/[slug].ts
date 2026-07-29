@@ -99,7 +99,23 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-function formatSalary(min: number | null, max: number | null): string {
+/**
+ * Lowest number treated as a real salary. Mirrors MIN_PLAUSIBLE_SALARY in
+ * src/lib/jobUtils.ts — duplicated because this serverless function is bundled
+ * separately from the app and cannot import from src/. Keep the two in step.
+ *
+ * Pay-matrix levels run 1–18, so rows scraped before the July-2026 parser fix
+ * carry values like 7. Emitting those as JobPosting.baseSalary published a
+ * ₹7/month salary to Google.
+ */
+const MIN_PLAUSIBLE_SALARY = 1000;
+
+const plausibleSalary = (v: number | null): number | null =>
+  typeof v === 'number' && Number.isFinite(v) && v >= MIN_PLAUSIBLE_SALARY ? v : null;
+
+function formatSalary(rawMin: number | null, rawMax: number | null): string {
+  const min = plausibleSalary(rawMin);
+  const max = plausibleSalary(rawMax);
   if (min && max) return `₹${min.toLocaleString('en-IN')} – ₹${max.toLocaleString('en-IN')} per month`;
   if (min) return `₹${min.toLocaleString('en-IN')}+ per month`;
   if (max) return `Up to ₹${max.toLocaleString('en-IN')} per month`;
@@ -253,7 +269,9 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
   descParts.push(`${job.title} by ${job.department}.`);
   if (job.vacancies_display) descParts.push(`${job.vacancies_display} vacancies.`);
   else if (job.vacancies) descParts.push(`${job.vacancies} vacancies.`);
-  if (job.salary_min || job.salary_max) descParts.push(`Salary: ${formatSalary(job.salary_min, job.salary_max)}.`);
+  if (plausibleSalary(job.salary_min) || plausibleSalary(job.salary_max)) {
+    descParts.push(`Salary: ${formatSalary(job.salary_min, job.salary_max)}.`);
+  }
   descParts.push(`Qualification: ${job.qualification}.`);
   if (job.last_date_display || job.last_date) descParts.push(`Last date: ${job.last_date_display || formatDate(job.last_date)}.`);
   descParts.push('Apply now on JobsTrackr.');
@@ -298,14 +316,18 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
     employmentType: 'FULL_TIME',
   };
 
-  if (job.salary_min || job.salary_max) {
+  // Omit baseSalary entirely rather than publishing a pay-matrix level as a
+  // wage — a wrong figure in structured data is worse than an absent one.
+  const ldSalaryMin = plausibleSalary(job.salary_min);
+  const ldSalaryMax = plausibleSalary(job.salary_max);
+  if (ldSalaryMin || ldSalaryMax) {
     jsonLd.baseSalary = {
       '@type': 'MonetaryAmount',
       currency: 'INR',
       value: {
         '@type': 'QuantitativeValue',
-        ...(job.salary_min && { minValue: job.salary_min }),
-        ...(job.salary_max && { maxValue: job.salary_max }),
+        ...(ldSalaryMin && { minValue: ldSalaryMin }),
+        ...(ldSalaryMax && { maxValue: ldSalaryMax }),
         unitText: 'MONTH',
       },
     };

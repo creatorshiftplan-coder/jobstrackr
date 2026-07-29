@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Calendar, GraduationCap, Banknote, Sparkles, Eye, X, Users, Clock, CheckCircle } from "lucide-react";
 import { AIJobResult } from "@/hooks/useAIJobSearch";
-import { parseJobDeadline } from "@/lib/jobUtils";
+import { parseJobDeadline, isPlausibleSalary } from "@/lib/jobUtils";
 
 interface AISearchResultProps {
   job: AIJobResult;
@@ -13,7 +13,11 @@ interface AISearchResultProps {
 }
 
 export function AISearchResult({ job, onDismiss, savedJobId }: AISearchResultProps) {
-  const formatSalary = (min: number | null, max: number | null) => {
+  const formatSalary = (rawMin: number | null, rawMax: number | null) => {
+    // Values under MIN_PLAUSIBLE_SALARY are scraped pay-matrix levels, not pay,
+    // and would render here as a nonsensical "₹0K/month".
+    const min = isPlausibleSalary(rawMin) ? rawMin : null;
+    const max = isPlausibleSalary(rawMax) ? rawMax : null;
     if (!min && !max) return "Not specified";
     if (min && max) {
       if (min === max) return `₹${(min / 1000).toFixed(0)}K/month`;

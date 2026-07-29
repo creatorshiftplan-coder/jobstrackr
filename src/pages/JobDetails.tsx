@@ -31,7 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { BottomNav } from "@/components/BottomNav";
-import { formatAgeLimit, parseJobDeadline, getVacancyDisplay, cleanSalaryText } from "@/lib/jobUtils";
+import { formatAgeLimit, parseJobDeadline, getVacancyDisplay, cleanSalaryText, isPlausibleSalary } from "@/lib/jobUtils";
 import { isFreeJobAlertUrl, normalizeWebsiteUrl, getWebsiteFromOverview } from "@/lib/urlUtils";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { useSimilarJobs } from "@/hooks/useSimilarJobs";
@@ -222,21 +222,22 @@ export default function JobDetails() {
 
   const formatSalary = (min: number | null, max: number | null) => {
     const salaryText = cleanSalaryText(meta?.salary_text);
-    if (!min && !max) {
+    // Anything below MIN_PLAUSIBLE_SALARY is a scraped pay-matrix level rather
+    // than money ("Pay Level 7" → 7). Discard each end on its own so a level in
+    // one column cannot poison a genuine figure in the other.
+    const lo = isPlausibleSalary(min) ? min : null;
+    const hi = isPlausibleSalary(max) ? max : null;
+    if (lo === null && hi === null) {
       // Fallback: use salary_text from metadata if available
       if (salaryText) return salaryText;
       return "Not disclosed";
     }
-    // If values look suspiciously low (e.g. 3 instead of 3,00,000), prefer salary_text
-    if (salaryText && ((min && min < 100) || (max && max < 100))) {
-      return salaryText;
+    if (lo !== null && hi !== null) {
+      if (lo === hi) return `₹${lo.toLocaleString('en-IN')}`;
+      return `₹${lo.toLocaleString('en-IN')} - ₹${hi.toLocaleString('en-IN')}`;
     }
-    if (min && max) {
-      if (min === max) return `₹${min.toLocaleString('en-IN')}`;
-      return `₹${min.toLocaleString('en-IN')} - ₹${max.toLocaleString('en-IN')}`;
-    }
-    if (min) return `₹${min.toLocaleString('en-IN')}+`;
-    return `Up to ₹${max!.toLocaleString('en-IN')}`;
+    if (lo !== null) return `₹${lo.toLocaleString('en-IN')}+`;
+    return `Up to ₹${hi!.toLocaleString('en-IN')}`;
   };
 
   const getAgeDisplay = () => {

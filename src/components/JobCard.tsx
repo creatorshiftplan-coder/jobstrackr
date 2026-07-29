@@ -7,7 +7,7 @@ import { format, differenceInDays } from "date-fns";
 import { Link } from "react-router-dom";
 import { SaveJobButton } from "./SaveJobButton";
 import { useConductingBodyLogos } from "@/hooks/useConductingBodyLogos";
-import { isTBDDateDisplay, inferCategory, getTrustedJobDeadline, shortenQualification, getVacancyDisplay, cleanSalaryText } from "@/lib/jobUtils";
+import { isTBDDateDisplay, inferCategory, getTrustedJobDeadline, shortenQualification, getVacancyDisplay, cleanSalaryText, isPlausibleSalary } from "@/lib/jobUtils";
 import { getBestJobLocation } from "@/lib/jobMatcher";
 import { OrganizationLogo } from "@/components/OrganizationLogo";
 
@@ -73,19 +73,23 @@ export const JobCard = memo(function JobCard({ job }: JobCardProps) {
     const effectiveAgeMax = hasSuspiciousLowAge && textAge.max !== null ? textAge.max : rawAgeMax;
     const showLowAgeFlag = [effectiveAgeMin, effectiveAgeMax].some((age) => typeof age === "number" && age > 0 && age < 14);
 
-    // Salary display
+    // Salary display. A stored value below MIN_PLAUSIBLE_SALARY is a scraped
+    // pay-matrix level, not money, so fall back to the raw text rather than
+    // rendering "₹7" (same shape as the suspicious-low-age handling above).
     const salaryText = cleanSalaryText(meta?.salary_text);
+    // Discard each end independently — a row can carry a level in salary_min
+    // and a real figure in salary_max, which would otherwise read "₹7 - ₹50k".
+    const salMin = isPlausibleSalary(job.salary_min) ? job.salary_min! : null;
+    const salMax = isPlausibleSalary(job.salary_max) ? job.salary_max! : null;
     let salaryDisplay: string;
-    if (!job.salary_min && !job.salary_max) {
+    if (salMin === null && salMax === null) {
       salaryDisplay = salaryText || "Not disclosed";
-    } else if (salaryText && ((job.salary_min && job.salary_min < 100) || (job.salary_max && job.salary_max < 100))) {
-      salaryDisplay = salaryText;
-    } else if (job.salary_min && job.salary_max) {
-      salaryDisplay = job.salary_min === job.salary_max ? formatSalaryValue(job.salary_min) : `${formatSalaryValue(job.salary_min)} - ${formatSalaryValue(job.salary_max)}`;
-    } else if (job.salary_min) {
-      salaryDisplay = `${formatSalaryValue(job.salary_min)}+`;
+    } else if (salMin !== null && salMax !== null) {
+      salaryDisplay = salMin === salMax ? formatSalaryValue(salMin) : `${formatSalaryValue(salMin)} - ${formatSalaryValue(salMax)}`;
+    } else if (salMin !== null) {
+      salaryDisplay = `${formatSalaryValue(salMin)}+`;
     } else {
-      salaryDisplay = `Up to ${formatSalaryValue(job.salary_max!)}`;
+      salaryDisplay = `Up to ${formatSalaryValue(salMax!)}`;
     }
 
     // Age display
