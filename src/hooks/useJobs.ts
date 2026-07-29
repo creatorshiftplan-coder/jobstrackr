@@ -57,7 +57,14 @@ export function useJobs(options: UseJobsOptions = {}) {
       return res.json();
     },
     enabled,
-    staleTime: bypassCache ? 0 : 1000 * 60 * 15, // Bypass cache has 0 stale time for instant updates; cached path matches server TTL
+    // The bypassCache path pulls the whole jobs table (~14 MB) straight from
+    // Supabase with no Redis in front, so a 0 stale time meant every Admin
+    // remount re-downloaded all of it — a single admin session burned ~250 MB
+    // of the 5 GB monthly egress budget. Freshness after an edit does not rely
+    // on staleTime: Admin.tsx invalidates ["jobs"] at every mutation site, and
+    // React Query matches keys by prefix, so those calls already invalidate
+    // ["jobs", "bypass-cache"] and force an immediate refetch.
+    staleTime: bypassCache ? 1000 * 60 * 5 : 1000 * 60 * 15,
   });
 }
 
@@ -78,6 +85,74 @@ export function useJob(id: string) {
   });
 }
 
+/**
+ * Columns the job detail page actually renders. Deliberately omits `embedding`
+ * (a vector(384) that will add ~5 KB per visitor once the embedding cron
+ * backfills it), the `embedding_attempts` / `embedding_error` / `dedupe_key` /
+ * `auto_discovered` bookkeeping columns, and `eligibility_summary` /
+ * `required_skills` (matcher-only). Scalar columns the page does not currently
+ * read are kept — they cost a few bytes and guard against a missed reference.
+ */
+const JOB_DETAIL_COLUMNS = [
+  "id", "slug", "title", "department", "location", "description",
+  "qualification", "eligibility", "experience",
+  "application_fee", "apply_link", "official_website",
+  "last_date", "last_date_display", "application_start_date",
+  "salary_min", "salary_max", "age_min", "age_max",
+  "vacancies", "vacancies_display", "is_featured",
+  "created_at", "updated_at", "admin_refreshed_at", "tags",
+];
+
+/**
+ * `job_metadata` sub-keys the detail page renders, mapped from their PostgREST
+ * alias. Selecting these individually instead of the whole JSONB column leaves
+ * `eligibility_profile` on the server — it is ~8 KB on enriched rows (about
+ * half the row) and is only used by the eligibility matcher and the admin
+ * editor, never by the detail page.
+ */
+const JOB_METADATA_ALIASES: Record<string, string> = {
+  jm_salary_text: "salary_text",
+  jm_age_limit_text: "age_limit_text",
+  jm_application_fees: "application_fees",
+  jm_important_dates: "important_dates",
+  jm_notification_pdf: "notification_pdf",
+  jm_overview: "overview",
+  jm_selection_process: "selection_process",
+  jm_vacancies_detail: "vacancies_detail",
+  jm_official_website: "official_website",
+};
+
+const JOB_DETAIL_SELECT = [
+  ...JOB_DETAIL_COLUMNS,
+  ...Object.entries(JOB_METADATA_ALIASES).map(([alias, key]) => `${alias}:job_metadata->${key}`),
+].join(",");
+
+/**
+ * Fold the flat `jm_*` aliases back into a `job_metadata` object so consumers
+ * see the same shape they did under `select("*")`. Returns a null
+ * `job_metadata` when every sub-key is empty, matching the previous behaviour
+ * for jobs that have no scraped metadata (the detail page renders the whole
+ * metadata block conditionally on it).
+ */
+function reshapeJobDetailRow(row: Record<string, any> | null): Job | null {
+  if (!row) return null;
+
+  const job: Record<string, any> = {};
+  const meta: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(row)) {
+    const metaKey = JOB_METADATA_ALIASES[key];
+    if (metaKey) {
+      if (value !== null && value !== undefined) meta[metaKey] = value;
+    } else {
+      job[key] = value;
+    }
+  }
+
+  job.job_metadata = Object.keys(meta).length > 0 ? meta : null;
+  return job as Job;
+}
+
 /** Fetch a job by slug, with UUID fallback for backward compatibility */
 export function useJobBySlug(slugOrId: string) {
   return useQuery({
@@ -86,24 +161,22 @@ export function useJobBySlug(slugOrId: string) {
       // First try finding by slug. maybeSingle() returns null for a missing slug
       // (HTTP 200) instead of single()'s 406, so a not-found job doesn't spam the
       // console with errors — the UUID fallback / null return handles it.
-      const { data: bySlug } = await supabase
-        .from("jobs")
-        .select("*")
+      const { data: bySlug } = await (supabase.from as any)("jobs")
+        .select(JOB_DETAIL_SELECT)
         .eq("slug", slugOrId)
         .maybeSingle();
 
-      if (bySlug) return bySlug as any;
+      if (bySlug) return reshapeJobDetailRow(bySlug);
 
       // Fallback: try by UUID (for transition period)
       const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (UUID_REGEX.test(slugOrId)) {
-        const { data: byId, error } = await supabase
-          .from("jobs")
-          .select("*")
+        const { data: byId, error } = await (supabase.from as any)("jobs")
+          .select(JOB_DETAIL_SELECT)
           .eq("id", slugOrId)
           .single();
         if (error) throw error;
-        return byId as any;
+        return reshapeJobDetailRow(byId);
       }
 
       return null;
