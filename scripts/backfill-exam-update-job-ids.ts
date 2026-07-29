@@ -25,14 +25,16 @@
  * identity guard cannot catch it because "upsssc" is not one of its known
  * conducting-body tokens).
  *
- * Usage:
- *   # dry run — writes nothing, prints a report (anon key is enough)
- *   SUPABASE_URL=https://xxx.supabase.co SUPABASE_KEY=eyJ... \
- *     npx tsx scripts/backfill-exam-update-job-ids.ts
+ * Credentials are read from the project's .env (resolved from this file, not
+ * the shell's cwd), falling back to VITE_SUPABASE_URL and
+ * VITE_SUPABASE_PUBLISHABLE_KEY. Real environment variables override the file.
  *
- *   # apply — requires the service key to satisfy RLS
- *   SUPABASE_URL=https://xxx.supabase.co SUPABASE_SERVICE_KEY=eyJ... \
- *     npx tsx scripts/backfill-exam-update-job-ids.ts --apply
+ * Usage:
+ *   # dry run — writes nothing, prints a report
+ *   npx tsx scripts/backfill-exam-update-job-ids.ts
+ *
+ *   # apply — needs SUPABASE_SERVICE_KEY (service_role) in .env to satisfy RLS
+ *   npx tsx scripts/backfill-exam-update-job-ids.ts --apply
  *
  * Flags:
  *   --apply              actually write job_id (default: dry run)
@@ -42,12 +44,39 @@
  *   --samples=<n>        how many sample matches to print (default 20)
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { getTitleMatchScore, hasExamIdentityConflict, tokenizeTitle } from "../src/lib/titleMatcher";
 
 // ── Config ────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 const APPLY = args.includes("--apply");
+
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Read the project's .env, resolved from this file's location rather than the
+ * shell's working directory, so the script behaves the same from anywhere.
+ * Real environment variables always take precedence over the file.
+ */
+function loadProjectEnv(): void {
+  let raw: string;
+  try {
+    raw = readFileSync(path.join(PROJECT_ROOT, ".env"), "utf8");
+  } catch {
+    return; // no .env is fine — values may come from the real environment
+  }
+  for (const line of raw.split("\n")) {
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    if (!match) continue;
+    const [, key, value] = match;
+    if (process.env[key] !== undefined) continue;
+    process.env[key] = value.trim().replace(/^(['"])(.*)\1$/, "$2");
+  }
+}
+loadProjectEnv();
 
 function numArg(name: string, fallback: number): number {
   const raw = args.find((a) => a.startsWith(`--${name}=`));
@@ -68,16 +97,36 @@ const MIN_MARGIN = numArg("min-margin", 10);
 const MIN_SHARED = numArg("min-shared", 3);
 const SAMPLE_COUNT = numArg("samples", 20);
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
+// Accept the script-specific names or the VITE_* ones already in .env.
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+
+/**
+ * A dry run only reads, so the publishable key is enough. --apply writes, which
+ * RLS blocks for that key, so it requires the service_role (secret) key.
+ */
 const SUPABASE_KEY = APPLY
   ? process.env.SUPABASE_SERVICE_KEY
-  : process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
+  : process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SUPABASE_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
+if (!SUPABASE_URL) {
+  console.error(
+    `Missing SUPABASE_URL (or VITE_SUPABASE_URL).\nChecked the environment and ${path.join(PROJECT_ROOT, ".env")}`
+  );
+  process.exit(1);
+}
+
+if (!SUPABASE_KEY) {
   console.error(
     APPLY
-      ? "Missing SUPABASE_URL or SUPABASE_SERVICE_KEY (--apply needs the service key for RLS)"
-      : "Missing SUPABASE_URL or SUPABASE_KEY"
+      ? "Missing SUPABASE_SERVICE_KEY.\n\n" +
+          "--apply writes through RLS, so it needs the service_role (secret) key —\n" +
+          "Supabase dashboard > Project Settings > API Keys > service_role.\n\n" +
+          `Add it to ${path.join(PROJECT_ROOT, ".env")} as:\n\n` +
+          "  SUPABASE_SERVICE_KEY=<key>\n\n" +
+          "Do NOT prefix it with VITE_ — Vite inlines VITE_* vars into the browser bundle."
+      : "Missing a Supabase key (SUPABASE_KEY or VITE_SUPABASE_PUBLISHABLE_KEY)."
   );
   process.exit(1);
 }
