@@ -185,6 +185,13 @@ def parse_salary(raw: str):
     Returns (salary_min, salary_max, salary_text).
     Tries to extract numeric min/max; salary_text keeps the full original.
     Handles multiplier words: lakh/lac, thousand/K, crore/Cr.
+
+    DEPRECATED — superseded by parse_salary in scraper_v5.py. Only fetch_html,
+    extract_links_from_master and get_pagination_urls are imported from this
+    module; parse_page (its sole caller) is dead for the job pipeline, so this
+    was deliberately left out of the July-2026 pay-level fix and still reads a
+    bare first number. If you revive parse_page, port the guards from v5 first,
+    or "Pay Level 7 as per 7th CPC" will be stored as a salary of 7 again.
     """
     text = clean(raw)
     if not text or text.lower() in ("n/a", "-", "–", "na"):

@@ -167,12 +167,61 @@ _MULTIPLIER_RE = re.compile(
     re.I,
 )
 
+# Lowest number accepted as a salary. Pay-matrix levels run 1–18 and pay bands
+# 1–4, so this rejects every one of them while keeping real grade-pay figures
+# (₹1,800 and up) and the smallest genuine stipends.
+MIN_PLAUSIBLE_SALARY = 1000
+
+# Pay-structure phrases whose numbers are ordinals rather than money:
+# "Level 7", "Pay Level 10", "Academic Level 13A", "Cell-1", "PB 4",
+# "E-2 Grade", "Group B", "7th CPC". These used to win because parse_salary
+# took the first number it saw — which is how "Pay Level 7 as per 7th CPC"
+# ended up stored as a salary of ₹7.
+#
+# "Pay Band: ₹35,400" is deliberately NOT matched: the colon and ₹ break the
+# pattern, so the genuine figure survives the strip.
+#
+# Mirror of PAY_STRUCTURE_RE in apps-script/Html.gs — keep the two in sync.
+_PAY_STRUCTURE_RE = re.compile(
+    r"\b(?:academic\s+|pay\s+)?level[\s-]*\d+\s*[A-Za-z]?\b"
+    r"|\bcell[\s-]*\d+\b"
+    r"|\bpb[\s-]*\d+\b"
+    r"|\bpay\s*band[\s-]*\d+\b"
+    r"|\b[ES][\s-]*\d+\s*grade\b"
+    r"|\bgroup\s*[A-D]\b"
+    r"|\b\d+\s*(?:st|nd|rd|th)\s*cpc\b",
+    re.I,
+)
+
+# A number carrying an explicit currency marker is almost certainly the pay.
+_CURRENCY_NUM_RE = re.compile(r"(?:₹|rs\.?|inr)\s*([\d][\d,]*(?:\.\d+)?)", re.I)
+
+# Currency markers only, used to normalise before range matching.
+_CURRENCY_MARK_RE = re.compile(r"(?:₹|rs\.?|inr)\s*", re.I)
+
+# A bare year is only stripped when it is not currency-prefixed, so a genuine
+# "₹2,017" survives while "as per ORSP Rules, 2017" does not.
+_BARE_YEAR_RE = re.compile(r"(.?)\b((?:19|20)\d{2})\b")
+
 
 def _to_int(s: str) -> Optional[int]:
     try:
         return int(s.replace(",", ""))
     except (ValueError, AttributeError):
         return None
+
+
+def _is_plausible_salary(v: Optional[int]) -> bool:
+    return v is not None and MIN_PLAUSIBLE_SALARY <= v < 10_000_000
+
+
+def _strip_non_salary_numbers(text: str) -> str:
+    """Drop pay-structure ordinals and bare years so neither reads as money."""
+    without_structure = _PAY_STRUCTURE_RE.sub(" ", text)
+    return _BARE_YEAR_RE.sub(
+        lambda m: m.group(0) if m.group(1) and m.group(1) in "₹0123456789.," else m.group(1) + " ",
+        without_structure,
+    )
 
 
 def _apply_multiplier(num_str: str, text: str) -> Optional[int]:
@@ -216,49 +265,51 @@ def parse_salary(raw: str):
     if has_multiplier:
         # Find all number+multiplier pairs
         matches = _MULTIPLIER_RE.findall(text)
-        if len(matches) >= 2:
-            vals = []
-            for num_s, mult_w in matches:
-                n = float(num_s.replace(",", ""))
-                mw = mult_w.lower()
-                if mw in ("lakh", "lac", "lakhs", "lacs", "l"):
-                    vals.append(int(n * 100_000))
-                elif mw in ("thousand", "k"):
-                    vals.append(int(n * 1_000))
-                elif mw in ("crore", "cr"):
-                    vals.append(int(n * 10_000_000))
-            if len(vals) >= 2:
-                return min(vals), max(vals), text
-            elif vals:
-                return vals[0], vals[0], text
-        elif len(matches) == 1:
-            num_s, mult_w = matches[0]
+        vals = []
+        for num_s, mult_w in matches:
             n = float(num_s.replace(",", ""))
             mw = mult_w.lower()
             if mw in ("lakh", "lac", "lakhs", "lacs", "l"):
-                val = int(n * 100_000)
+                vals.append(int(n * 100_000))
             elif mw in ("thousand", "k"):
-                val = int(n * 1_000)
+                vals.append(int(n * 1_000))
             elif mw in ("crore", "cr"):
-                val = int(n * 10_000_000)
+                vals.append(int(n * 10_000_000))
             else:
-                val = int(n)
-            return val, val, text
+                vals.append(int(n))
+        vals = [v for v in vals if _is_plausible_salary(v)]
+        if len(vals) >= 2:
+            return min(vals), max(vals), text
+        if len(vals) == 1:
+            return vals[0], vals[0], text
 
-    # Try "X - Y" range (no multiplier words)
-    m = _RANGE_RE.search(text)
+    # Everything below reads numbers positionally, so strip the ordinals first.
+    scan = _strip_non_salary_numbers(text)
+
+    # Range: "Rs.56100-177500", "PB 4, Rs.37400-67000". Currency markers are
+    # removed first because _RANGE_RE's [\d,.]+ would otherwise latch onto the
+    # dot in "Rs." and parse as None.
+    m = _RANGE_RE.search(_CURRENCY_MARK_RE.sub(" ", scan))
     if m:
         lo = _to_int(m.group(1))
         hi = _to_int(m.group(2))
-        # Sanity: ignore ranges that look like "48480-2000/7-..." bank scale notation
-        if lo and hi and hi > lo and hi < 10_000_000:
+        if _is_plausible_salary(lo) and _is_plausible_salary(hi) and hi > lo:
             return lo, hi, text
 
-    # Single value: e.g. "₹30,000 per month"
-    nums = _NUM_RE.findall(text)
-    if nums:
-        val = _to_int(nums[0])
-        if val and val < 10_000_000:
+    # Currency-anchored values: "₹35,400 (Minimum) – ₹1,12,400 (Maximum)" reads
+    # as two separate figures because the words between them defeat _RANGE_RE.
+    currency = [v for v in (_to_int(g) for g in _CURRENCY_NUM_RE.findall(scan))
+                if _is_plausible_salary(v)]
+    if len(currency) >= 2:
+        return min(currency), max(currency), text
+    if len(currency) == 1:
+        return currency[0], currency[0], text
+
+    # Fall back to the first plausible bare number — not simply the first
+    # number, which is what let level ordinals through.
+    for num_s in _NUM_RE.findall(scan):
+        val = _to_int(num_s)
+        if _is_plausible_salary(val):
             return val, val, text
 
     return None, None, text

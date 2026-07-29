@@ -333,9 +333,50 @@ const NUM_RE = /[\d,]+/g;
 const RANGE_RE = /([\d,.]+)\s*[-–to]+\s*([\d,.]+)/;
 const MULTIPLIER_RE = /([\d,.]+)\s*(lakh|lac|lakhs|lacs|l|thousand|k|crore|cr)\b/gi;
 
+/**
+ * Lowest number accepted as a salary. Pay-matrix levels run 1–18 and pay bands
+ * 1–4, so this rejects every one of them while keeping real grade-pay figures
+ * (₹1,800 and up) and the smallest genuine stipends.
+ */
+const MIN_PLAUSIBLE_SALARY = 1000;
+
+/**
+ * Pay-structure phrases whose numbers are ordinals rather than money:
+ * "Level 7", "Pay Level 10", "Academic Level 13A", "Cell-1", "PB 4",
+ * "E-2 Grade", "Group B", "7th CPC". These used to win because parseSalary
+ * took the first number it saw — which is how "Pay Level 7 as per 7th CPC"
+ * ended up stored as a salary of ₹7.
+ *
+ * "Pay Band: ₹35,400" is deliberately NOT matched: the colon and ₹ break the
+ * pattern, so the genuine figure survives the strip.
+ */
+const PAY_STRUCTURE_RE = /\b(?:academic\s+|pay\s+)?level[\s-]*\d+\s*[A-Za-z]?\b|\bcell[\s-]*\d+\b|\bpb[\s-]*\d+\b|\bpay\s*band[\s-]*\d+\b|\b[ES][\s-]*\d+\s*grade\b|\bgroup\s*[A-D]\b|\b\d+\s*(?:st|nd|rd|th)\s*cpc\b/gi;
+
+/** A number carrying an explicit currency marker is almost certainly the pay. */
+const CURRENCY_NUM_RE = /(?:₹|rs\.?|inr)\s*([\d][\d,]*(?:\.\d+)?)/gi;
+
+/** Currency markers only, used to normalise before range matching. */
+const CURRENCY_MARK_RE = /(?:₹|rs\.?|inr)\s*/gi;
+
 function toInt(s) {
   const n = parseInt(String(s).replace(/,/g, ''), 10);
   return isNaN(n) ? null : n;
+}
+
+function isPlausibleSalary(v) {
+  return v !== null && v !== undefined && v >= MIN_PLAUSIBLE_SALARY && v < 10000000;
+}
+
+/**
+ * Drop pay-structure ordinals and bare years so neither can be mistaken for
+ * money. A year is only dropped when it is not currency-prefixed, so a genuine
+ * "₹2,017" survives while "as per ORSP Rules, 2017" does not.
+ */
+function stripNonSalaryNumbers(text) {
+  const withoutStructure = text.replace(PAY_STRUCTURE_RE, ' ');
+  return withoutStructure.replace(/(.?)\b((?:19|20)\d{2})\b/g, function (m, prev) {
+    return /[₹\d.,]/.test(prev) ? m : prev + ' ';
+  });
 }
 
 /** api/scraper_v5.py parse_salary → { min, max, text }. */
@@ -356,23 +397,51 @@ function parseSalary(raw) {
       if (['crore', 'cr'].indexOf(w) !== -1) return Math.round(n * 10000000);
       return Math.round(n);
     };
-    if (matches.length >= 2) {
-      const vals = matches.map(function (p) { return conv(p[0], p[1]); });
+    const vals = matches.map(function (p) { return conv(p[0], p[1]); })
+      .filter(isPlausibleSalary);
+    if (vals.length >= 2) {
       return { min: Math.min.apply(null, vals), max: Math.max.apply(null, vals), text: text };
-    } else if (matches.length === 1) {
-      const v = conv(matches[0][0], matches[0][1]);
-      return { min: v, max: v, text: text };
+    } else if (vals.length === 1) {
+      return { min: vals[0], max: vals[0], text: text };
     }
   }
-  const rm = text.match(RANGE_RE);
+
+  // Everything below reads numbers positionally, so strip the ordinals first.
+  const scan = stripNonSalaryNumbers(text);
+
+  // Range: "Rs.56100-177500", "PB 4, Rs.37400-67000". Currency markers are
+  // removed first because RANGE_RE's [\d,.]+ would otherwise latch onto the
+  // dot in "Rs." and parse as NaN.
+  const rm = scan.replace(CURRENCY_MARK_RE, ' ').match(RANGE_RE);
   if (rm) {
     const lo = toInt(rm[1]), hi = toInt(rm[2]);
-    if (lo && hi && hi > lo && hi < 10000000) return { min: lo, max: hi, text: text };
+    if (isPlausibleSalary(lo) && isPlausibleSalary(hi) && hi > lo) {
+      return { min: lo, max: hi, text: text };
+    }
   }
-  const nums = text.match(NUM_RE);
+
+  // Currency-anchored values: "₹35,400 (Minimum) – ₹1,12,400 (Maximum)" reads
+  // as two separate figures because the words between them defeat RANGE_RE.
+  const currency = [];
+  let cm;
+  CURRENCY_NUM_RE.lastIndex = 0;
+  while ((cm = CURRENCY_NUM_RE.exec(scan)) !== null) {
+    const v = toInt(cm[1]);
+    if (isPlausibleSalary(v)) currency.push(v);
+  }
+  if (currency.length >= 2) {
+    return { min: Math.min.apply(null, currency), max: Math.max.apply(null, currency), text: text };
+  }
+  if (currency.length === 1) return { min: currency[0], max: currency[0], text: text };
+
+  // Fall back to the first plausible bare number — not simply the first number,
+  // which is what let level ordinals through.
+  const nums = scan.match(NUM_RE);
   if (nums) {
-    const v = toInt(nums[0]);
-    if (v && v < 10000000) return { min: v, max: v, text: text };
+    for (let i = 0; i < nums.length; i++) {
+      const v = toInt(nums[i]);
+      if (isPlausibleSalary(v)) return { min: v, max: v, text: text };
+    }
   }
   return { min: null, max: null, text: text };
 }
