@@ -862,8 +862,17 @@ function buildJobRow(scraped, sourceUrl) {
     const numericCols = Object.keys(cols).filter(function (k) { return cols[k].length === r.vacancies.length; });
     // Prefer a column whose header names posts/vacancies (avoids summing an
     // age / serial-no / fee column); fall back to the rightmost numeric one.
-    const named = numericCols.filter(function (k) { return /post|vacan|seat|total/i.test(k); });
-    const pick = named.length ? named[named.length - 1] : (numericCols.length ? numericCols[numericCols.length - 1] : null);
+    // "position" matters: a header of "No. of Positions" does NOT contain
+    // "post" ("Posi", not "Post"), so it used to miss here and drop through to
+    // the fallback below.
+    const named = numericCols.filter(function (k) { return /post|position|vacan|seat|total/i.test(k); });
+    // The rightmost-numeric fallback is blind — on a table with columns
+    // "Sl. No. / No. of Positions / Stipend (per month)" it picked the stipend
+    // and summed Rs. 11,040 across 12 rows into 127,280 "vacancies". Never let
+    // it land on a money or demographic column.
+    const FORBIDDEN_COL_RE = /salary|pay|stipend|emolument|remunerat|fee|age|scale|level|grade/i;
+    const fallbackCols = numericCols.filter(function (k) { return !FORBIDDEN_COL_RE.test(k); });
+    const pick = named.length ? named[named.length - 1] : (fallbackCols.length ? fallbackCols[fallbackCols.length - 1] : null);
     if (pick) {
       const sum = cols[pick].reduce(function (a, b) { return a + b; }, 0);
       if (sum > 0) totalVacancies = sum;
@@ -872,12 +881,21 @@ function buildJobRow(scraped, sourceUrl) {
   // Title almost always states the count ("... for 75 Assistant Engineer ...",
   // "... Apply Online for 54 Posts"). Require a trailing word so the year in
   // "Recruitment 2026" is never mistaken for a post count.
-  if (!totalVacancies && r.exam_name) {
+  let titleVacancies = null;
+  if (r.exam_name) {
     const tm = r.exam_name.match(/\bfor\s+(\d{1,6})\s+[A-Za-z]/i);
     if (tm) {
       const n = parseInt(tm[1], 10);
-      if (n > 0 && n < 100000) totalVacancies = n;
+      if (n > 0 && n < 100000) titleVacancies = n;
     }
+  }
+  if (!totalVacancies && titleVacancies) totalVacancies = titleVacancies;
+  // Final sanity net: the title is the most reliable source we have, so if the
+  // table-derived total dwarfs it, the table column was almost certainly money
+  // rather than posts. Only fires on a wide margin, which leaves genuinely
+  // large recruitments alone (SSC GD's 25,487 agrees with its title).
+  if (totalVacancies && titleVacancies && totalVacancies > titleVacancies * 20) {
+    totalVacancies = titleVacancies;
   }
   if (totalVacancies) vacanciesDisplay = totalVacancies + ' Posts';
 
