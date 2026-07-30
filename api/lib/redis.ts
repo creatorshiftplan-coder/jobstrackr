@@ -25,6 +25,10 @@
 
 import { gzipSync, gunzipSync } from 'node:zlib';
 
+// `regions: ["bom1"]` in vercel.json pins the Node functions to Mumbai so this
+// client sits beside the ap-south-1 Upstash database rather than a continent
+// away in iad1 — a miss writes ~2.2 MB, and that round trip is worth keeping
+// short. (vercel.json takes no comments; the reasoning lives here instead.)
 const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
