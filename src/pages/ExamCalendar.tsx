@@ -638,7 +638,7 @@ export default function ExamCalendar() {
                       classNames={{
                         months: "flex w-full flex-col",
                         month: "w-full space-y-2 sm:space-y-3",
-                        table: "w-full border-collapse",
+                        table: "w-full table-fixed border-collapse",
                         head_row: "grid grid-cols-7 w-full",
                         row: "grid grid-cols-7 w-full mt-1 sm:mt-1.5",
                         head_cell: "text-muted-foreground rounded-md text-center font-semibold text-[0.75rem]",
