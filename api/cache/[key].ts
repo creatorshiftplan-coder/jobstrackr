@@ -20,17 +20,74 @@ async function supabaseFetch(path: string): Promise<any> {
 // item. `jobs` and `homepage` share ONE Redis key so the table is pulled from
 // Supabase at most once per TTL window, no matter which endpoint misses first.
 const JOBS_CACHE_KEY = 'cache:jobs:all';
-const JOBS_CACHE_TTL = 7200; // 2 h — long TTL keeps Supabase egress low
+// Deliberately longer than the CDN TTL below. A CDN revalidation that lands on
+// a warm lambda is then answered from the memory tier instead of Supabase, so
+// the CDN can stay comparatively fresh without that freshness costing egress.
+const JOBS_CACHE_TTL = 7200; // 2 h
+
+/**
+ * `job_metadata` sub-keys the list and card views actually render:
+ *   age_limit_text  JobCard age display + its suspicious-low-age correction
+ *   salary_text     JobCard salary fallback when salary_min/max hold pay-matrix levels
+ *   exam_date       useCountdownExams
+ *
+ * This is an allowlist rather than a denylist so a newly scraped metadata key
+ * cannot silently re-inflate the largest payload the site serves. Everything
+ * else — notification_pdf, application_fees, official_website, employment_type,
+ * overview, selection_process, vacancies_detail, important_dates,
+ * eligibility_profile — is detail-page-only and already arrives per job via
+ * useJobBySlug.
+ */
+const LIST_METADATA_KEYS = ['age_limit_text', 'salary_text', 'exam_date'];
+
+// By far the most expensive read the site performs — ~8.8 MB of JSON, ~1.6 MB
+// gzipped and billed, per pull — and `jobs` and `homepage` are both backed by
+// it. One hour bounds a single edge region to 24 revalidations/day, and the 2 h
+// memory TTL above absorbs half of even those.
+const JOBS_CDN_TTL = 3600;
+
+/**
+ * Selecting `job_metadata` whole and discarding most of it in JS would trim the
+ * response to the browser but not the Supabase read that is actually billed —
+ * the bytes have already crossed the wire by then. PostgREST jsonb path
+ * selection pulls only the sub-keys in LIST_METADATA_KEYS out of the column, so
+ * the saving lands on the egress meter. Same technique as JOB_DETAIL_SELECT in
+ * src/hooks/useJobs.ts.
+ */
+const METADATA_SELECT = LIST_METADATA_KEYS.map((key) => `jm_${key}:job_metadata->${key}`).join(',');
+
+const JOB_LIST_COLUMNS = [
+  'id', 'slug', 'title', 'department', 'location',
+  'last_date', 'last_date_display', 'vacancies', 'vacancies_display',
+  'qualification', 'eligibility', 'experience',
+  'salary_min', 'salary_max', 'age_min', 'age_max',
+  'application_fee', 'is_featured',
+  'admin_refreshed_at', 'created_at', 'tags',
+];
+
+/**
+ * Fold the flat `jm_*` aliases back into the `job_metadata` shape consumers
+ * expect. Null when every sub-key is empty, matching both the previous
+ * behaviour for jobs with no scraped metadata and reshapeJobDetailRow() in
+ * src/hooks/useJobs.ts.
+ */
+function reshapeJobRow(job: Record<string, any>): Record<string, any> {
+  const meta: Record<string, any> = {};
+  for (const key of LIST_METADATA_KEYS) {
+    const alias = `jm_${key}`;
+    const value = job[alias];
+    delete job[alias];
+    if (value !== null && value !== undefined) meta[key] = value;
+  }
+  job.job_metadata = Object.keys(meta).length > 0 ? meta : null;
+  return job;
+}
 
 async function fetchAllJobs(): Promise<any[]> {
   const columns = [
-    'id', 'slug', 'title', 'department', 'location',
-    'last_date', 'last_date_display', 'vacancies', 'vacancies_display',
-    'qualification', 'eligibility', 'experience',
-    'salary_min', 'salary_max', 'age_min', 'age_max',
-    'application_fee', 'job_metadata', 'is_featured',
-    'admin_refreshed_at', 'created_at', 'tags',
+    ...JOB_LIST_COLUMNS,
     'eligibility_summary', 'required_skills',
+    METADATA_SELECT,
   ].join(',');
 
   const url = `${SUPABASE_URL}/rest/v1/jobs?select=${columns}&order=created_at.desc&limit=10000`;
@@ -43,14 +100,7 @@ async function fetchAllJobs(): Promise<any[]> {
 
   if (!response.ok) {
     console.warn('[api/cache/jobs] Failed fetching with eligibility fields, retrying without them');
-    const fallbackColumns = [
-      'id', 'slug', 'title', 'department', 'location',
-      'last_date', 'last_date_display', 'vacancies', 'vacancies_display',
-      'qualification', 'eligibility', 'experience',
-      'salary_min', 'salary_max', 'age_min', 'age_max',
-      'application_fee', 'job_metadata', 'is_featured',
-      'admin_refreshed_at', 'created_at', 'tags',
-    ].join(',');
+    const fallbackColumns = [...JOB_LIST_COLUMNS, METADATA_SELECT].join(',');
     const fallbackUrl = `${SUPABASE_URL}/rest/v1/jobs?select=${fallbackColumns}&order=created_at.desc&limit=10000`;
     response = await fetch(fallbackUrl, {
       headers: {
@@ -65,27 +115,14 @@ async function fetchAllJobs(): Promise<any[]> {
   }
 
   const rawJobs = await response.json();
-  return (rawJobs || []).map((job: any) => {
-    if (job.job_metadata) {
-      const {
-        eligibility_profile,
-        overview,
-        selection_process,
-        vacancies_detail,
-        important_dates,
-        ...rest
-      } = job.job_metadata;
-      job.job_metadata = rest;
-    }
-    return job;
-  });
+  return (rawJobs || []).map(reshapeJobRow);
 }
 
 // ─── Jobs handler ────────────────────────────────────────────────
 async function handleJobs(req: VercelRequest, res: VercelResponse) {
   const { data, cacheHit } = await cachedFetch<any[]>(JOBS_CACHE_KEY, JOBS_CACHE_TTL, fetchAllJobs);
 
-  setCacheHeaders(res, cacheHit, 600, 1800);
+  setCacheHeaders(res, cacheHit, JOBS_CDN_TTL);
   return res.status(200).json(data);
 }
 
@@ -117,7 +154,7 @@ async function handleHomepage(req: VercelRequest, res: VercelResponse) {
   };
   const cacheHit = jobsResult.cacheHit && examsResult.cacheHit;
 
-  setCacheHeaders(res, cacheHit, 600, 1800);
+  setCacheHeaders(res, cacheHit, JOBS_CDN_TTL);
   return res.status(200).json(data);
 }
 
@@ -220,7 +257,7 @@ async function handleTrendingExams(req: VercelRequest, res: VercelResponse) {
     return trendingExams;
   });
 
-  setCacheHeaders(res, cacheHit, 600, 1800);
+  setCacheHeaders(res, cacheHit, 1800);
   return res.status(200).json(data);
 }
 
@@ -286,7 +323,7 @@ async function handleExamUpdates(req: VercelRequest, res: VercelResponse) {
     return filterFreeJobAlertFromUpdates(raw || []);
   });
 
-  setCacheHeaders(res, cacheHit, 300, 900);
+  setCacheHeaders(res, cacheHit, 900);
   return res.status(200).json(data);
 }
 
@@ -321,7 +358,9 @@ async function handleExamCountdown(req: VercelRequest, res: VercelResponse) {
     return filterFreeJobAlertFromUpdates(raw || []);
   });
 
-  setCacheHeaders(res, cacheHit, 300, 900);
+  // 1000 rows (~1.3 MB) — the second-largest payload here, so keep it at the
+  // handler's own 1 h TTL rather than the old 15 min.
+  setCacheHeaders(res, cacheHit, 3600);
   return res.status(200).json(data);
 }
 
@@ -383,15 +422,30 @@ async function handleLogos(req: VercelRequest, res: VercelResponse) {
     return logos;
   });
 
-  setCacheHeaders(res, cacheHit, 600, 1800);
+  setCacheHeaders(res, cacheHit, 1800);
   return res.status(200).json(data);
 }
 
 // ─── Shared helpers ─────────────────────────────────────────────
-function setCacheHeaders(res: VercelResponse, cacheHit: boolean, sMaxAge: number, cdnMaxAge: number) {
+/**
+ * `cdnTtl` (seconds) is the one number that decides Supabase egress: the CDN
+ * revalidates at most once per TTL per edge region, and each revalidation that
+ * misses the memory tier is a full source fetch. It previously disagreed with
+ * itself — `s-maxage=600` against `CDN-Cache-Control: max-age=1800` — and since
+ * Vercel gives `CDN-Cache-Control` precedence, the shorter value was misleading.
+ * One argument now feeds both.
+ *
+ * `stale-while-revalidate` is long on purpose: serving a slightly stale list
+ * while it refreshes in the background is always preferable to an error page,
+ * and it costs nothing extra (revalidation is already bounded by the TTL).
+ */
+function setCacheHeaders(res: VercelResponse, cacheHit: boolean, cdnTtl: number) {
   res.setHeader('X-Cache-Hit', cacheHit ? '1' : '0');
-  res.setHeader('Cache-Control', `public, s-maxage=${sMaxAge}, stale-while-revalidate=600`);
-  res.setHeader('CDN-Cache-Control', `public, max-age=${cdnMaxAge}`);
+  res.setHeader(
+    'Cache-Control',
+    `public, max-age=300, s-maxage=${cdnTtl}, stale-while-revalidate=86400`,
+  );
+  res.setHeader('CDN-Cache-Control', `public, max-age=${cdnTtl}, stale-while-revalidate=86400`);
   res.setHeader('Access-Control-Allow-Origin', '*');
 }
 

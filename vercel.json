@@ -2,6 +2,8 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "$comment_regions": "Serverless (Node) functions run in Mumbai, next to the Upstash Redis (ap-south-1) and the Indian audience. api/cache/[key].ts caches a ~2.2 MB gzipped jobs payload on every miss; from the previous default region (iad1, US East) that round trip crossed a continent each way. The Edge routes (api/jobs|updates|exam-updates/[slug], api/sitemap.xml) are unaffected by this key and still run at the POP nearest each visitor.",
+  "regions": ["bom1"],
   "rewrites": [
     {
       "source": "/api/cache/:key",

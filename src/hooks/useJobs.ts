@@ -7,6 +7,70 @@ interface UseJobsOptions {
   bypassCache?: boolean;
 }
 
+/**
+ * Columns the list/card views render. Mirrors JOB_LIST_COLUMNS in
+ * api/cache/[key].ts — the two must agree, because this is the shape the client
+ * falls back to when that endpoint is unavailable.
+ */
+const JOB_LIST_COLUMNS = [
+  "id", "slug", "title", "department", "location",
+  "last_date", "last_date_display", "vacancies", "vacancies_display",
+  "qualification", "eligibility", "experience",
+  "salary_min", "salary_max", "age_min", "age_max",
+  "application_fee", "is_featured",
+  "admin_refreshed_at", "created_at", "tags",
+];
+
+/** `job_metadata` sub-keys the list views read — see LIST_METADATA_KEYS server-side. */
+const LIST_METADATA_KEYS = ["age_limit_text", "salary_text", "exam_date"];
+
+/**
+ * Selecting whole `job_metadata` here and discarding it in JS would still bill
+ * the full column: this fallback runs in the browser, straight against
+ * Supabase, once per visitor. During an `/api/cache/jobs` outage that is the
+ * single most expensive query the site can issue, so it pulls only the sub-keys
+ * the cards actually render — the same 46% saving the server-side query gets.
+ */
+const listSelect = (withEligibility: boolean) =>
+  [
+    ...JOB_LIST_COLUMNS,
+    ...(withEligibility ? ["eligibility_summary", "required_skills"] : []),
+    ...LIST_METADATA_KEYS.map((key) => `jm_${key}:job_metadata->${key}`),
+  ].join(",");
+
+/** Fold the flat `jm_*` aliases back into `job_metadata`, as the server does. */
+function reshapeJobListRow(job: Record<string, any>): Record<string, any> {
+  const meta: Record<string, any> = {};
+  for (const key of LIST_METADATA_KEYS) {
+    const alias = `jm_${key}`;
+    const value = job[alias];
+    delete job[alias];
+    if (value !== null && value !== undefined) meta[key] = value;
+  }
+  job.job_metadata = Object.keys(meta).length > 0 ? meta : null;
+  return job;
+}
+
+/**
+ * Shared by the `useJobs` and `useHomepageData` fallbacks. Retries without the
+ * eligibility columns first, matching the previous behaviour on databases that
+ * predate them.
+ */
+export async function fetchJobListFromSupabase(): Promise<Job[]> {
+  for (const withEligibility of [true, false]) {
+    const { data, error } = await supabase
+      .from("jobs")
+      .select(listSelect(withEligibility))
+      .order("created_at", { ascending: false })
+      .range(0, 9999);
+
+    if (!error) return ((data || []) as any[]).map(reshapeJobListRow) as any;
+    if (!withEligibility) throw error;
+    console.warn("[useJobs] Failed fetching with eligibility fields, retrying without them:", error);
+  }
+  return [];
+}
+
 export function useJobs(options: UseJobsOptions = {}) {
   const { enabled = true, bypassCache = false } = options;
 
@@ -33,27 +97,8 @@ export function useJobs(options: UseJobsOptions = {}) {
       }
 
       const res = await fetch("/api/cache/jobs");
-      if (!res.ok) {
-        // Fallback to direct Supabase if cache endpoint fails
-        try {
-          const { data, error } = await supabase
-            .from("jobs")
-            .select("id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, eligibility, experience, salary_min, salary_max, age_min, age_max, application_fee, job_metadata, is_featured, admin_refreshed_at, created_at, tags, eligibility_summary, required_skills")
-            .order("created_at", { ascending: false })
-            .range(0, 9999);
-          if (error) throw error;
-          return (data || []) as any;
-        } catch (err) {
-          console.warn("[useJobs] Failed fetching with eligibility fields, retrying without them:", err);
-          const { data, error } = await supabase
-            .from("jobs")
-            .select("id, slug, title, department, location, last_date, last_date_display, vacancies, vacancies_display, qualification, eligibility, experience, salary_min, salary_max, age_min, age_max, application_fee, job_metadata, is_featured, admin_refreshed_at, created_at, tags")
-            .order("created_at", { ascending: false })
-            .range(0, 9999);
-          if (error) throw error;
-          return (data || []) as any;
-        }
-      }
+      // Fallback to direct Supabase if the cache endpoint fails
+      if (!res.ok) return fetchJobListFromSupabase();
       return res.json();
     },
     enabled,

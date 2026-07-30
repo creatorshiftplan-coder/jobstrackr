@@ -434,12 +434,12 @@ function buildUpdatePage(exam: any, aiData: any, status: { type: string; label: 
   <!-- PROD_HEAD_ASSETS_START -->
   <link rel="modulepreload" crossorigin href="/assets/vendor-react-odAJResg.js">
   <link rel="modulepreload" crossorigin href="/assets/client-DdVvhE6k.js">
-  <link rel="modulepreload" crossorigin href="/assets/vendor-query-nUca_sEF.js">
-  <link rel="modulepreload" crossorigin href="/assets/vendor-ui--HBZjmSF.js">
-  <link rel="modulepreload" crossorigin href="/assets/vendor-icons-DWYma5Ru.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-query-DlAvtsrn.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-ui-BjuJkr6u.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-icons-pac45oDU.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-supabase-BvsnE-zR.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-lottie-8Z6zZkhm.js">
-  <link rel="stylesheet" crossorigin href="/assets/main-vJ8SOXTg.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-ZCSaDqyi.css">
   <!-- PROD_HEAD_ASSETS_END -->
 </head>
 <body>
@@ -495,7 +495,7 @@ function buildUpdatePage(exam: any, aiData: any, status: { type: string; label: 
   ${ssrBottomNav()}
   <div id="root"></div>
   <!-- PROD_BODY_ASSETS_START -->
-  <script type="module" crossorigin src="/assets/main-B9-TzLIP.js"></script>
+  <script type="module" crossorigin src="/assets/main-C6907xmQ.js"></script>
   <!-- PROD_BODY_ASSETS_END -->
   <script>
     const observer = new MutationObserver(() => {
