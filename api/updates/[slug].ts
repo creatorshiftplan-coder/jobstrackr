@@ -81,6 +81,16 @@ export const config = {
 };
 
 /**
+ * How long the Vercel CDN holds a rendered status-update page, in seconds.
+ *
+ * The old 30-minute TTL was the shortest of the three SEO routes and this is
+ * also the slowest renderer (the Aug-2026 logs caught a 5.9s execution), so it
+ * was the worst cost-per-request offender. A status update changes at most
+ * once a day, so a day-long CDN copy loses nothing.
+ */
+const UPDATE_CDN_TTL = 86400;
+
+/**
  * Universal Status Update Page SEO Renderer
  * ──────────────────────────────────────────
  * Serves pre-rendered, SEO-complete HTML for /updates/:slug
@@ -210,7 +220,8 @@ export default async function handler(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=86400',
+        'Cache-Control': 'public, max-age=600, stale-while-revalidate=2592000',
+        'CDN-Cache-Control': `public, max-age=${UPDATE_CDN_TTL}, stale-while-revalidate=2592000`,
       },
     });
   } catch (error) {

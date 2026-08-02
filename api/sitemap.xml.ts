@@ -31,6 +31,20 @@ const STATIC_PAGES = [
     { path: '/refund-policy', changefreq: 'yearly', priority: '0.3' },
 ];
 
+/**
+ * Emit a <lastmod> line only when the row carries a real timestamp.
+ *
+ * This used to fall back to today's date. That told every crawler that all
+ * ~8.6k pages had changed since its last visit, so each one re-fetched the
+ * whole catalogue daily — the single biggest driver of the Aug-2026 Vercel
+ * overage. An absent lastmod lets crawlers keep their own last-seen date and
+ * skip pages they already have.
+ */
+function lastmodLine(...candidates: (string | null | undefined)[]): string {
+    const stamp = candidates.find((c) => typeof c === 'string' && c.length > 0);
+    return stamp ? `    <lastmod>${stamp.split('T')[0]}</lastmod>\n` : '';
+}
+
 export default async function handler() {
     try {
         const supabaseUrl = process.env.VITE_SUPABASE_URL!;
@@ -70,12 +84,10 @@ export default async function handler() {
         // Job pages
         for (const job of jobs) {
             if (!job.slug) continue;
-            const lastmod = job.updated_at ? job.updated_at.split('T')[0] : today;
             const priority = job.is_featured ? '0.9' : '0.8';
             xml += `  <url>
     <loc>${SITE_URL}/jobs/${encodeURIComponent(job.slug)}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>weekly</changefreq>
+${lastmodLine(job.updated_at)}    <changefreq>weekly</changefreq>
     <priority>${priority}</priority>
   </url>
 `;
@@ -95,11 +107,9 @@ export default async function handler() {
         const exams = examsResponse.ok ? await examsResponse.json() : [];
         for (const exam of exams) {
             if (!exam.update_slug) continue;
-            const lastmod = exam.updated_at ? exam.updated_at.split('T')[0] : today;
             xml += `  <url>
     <loc>${SITE_URL}/updates/${encodeURIComponent(exam.update_slug)}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>daily</changefreq>
+${lastmodLine(exam.updated_at)}    <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 `;
@@ -120,11 +130,9 @@ export default async function handler() {
         const updates = updatesResponse.ok ? await updatesResponse.json() : [];
         for (const upd of updates) {
             if (!upd.slug) continue;
-            const lastmod = (upd.updated_at || upd.scraped_at || '').split('T')[0] || today;
             xml += `  <url>
     <loc>${SITE_URL}/exam-update/${encodeURIComponent(upd.slug)}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>daily</changefreq>
+${lastmodLine(upd.updated_at, upd.scraped_at)}    <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 `;

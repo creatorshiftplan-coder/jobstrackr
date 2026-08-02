@@ -81,6 +81,24 @@ export const config = {
 };
 
 /**
+ * How long the Vercel CDN holds a rendered job page, in seconds.
+ *
+ * Vercel's cache is per-PoP and this route serves ~5k long-tail URLs, so the
+ * old 6h TTL meant an AI crawler sweeping the catalogue (a full sweep takes
+ * it >1 day) re-executed this function on essentially every request — the
+ * Aug-2026 logs showed a 17% CDN hit rate and ~85% of traffic coming from
+ * meta-externalagent and ChatGPT-User.
+ *
+ * 24h is the ceiling that keeps deadlines honest without paying for a
+ * re-render per crawl. `stale-while-revalidate` then runs the refresh in the
+ * background, so a stale page is still served instantly.
+ *
+ * If the scraper ever starts editing live jobs mid-day, purge this route on
+ * write rather than shortening this value.
+ */
+const JOB_CDN_TTL = 86400;
+
+/**
  * Universal SEO Job Page Renderer
  * ─────────────────────────────────────────────
  * Serves pre-rendered, SEO-complete HTML for /jobs/:slug
@@ -224,7 +242,11 @@ export default async function handler(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=86400',
+        // Browser gets a short TTL (deadlines matter); the CDN gets a long one.
+        // Split via CDN-Cache-Control, which Vercel gives precedence over
+        // s-maxage — same pattern as api/cache/[key].ts.
+        'Cache-Control': 'public, max-age=600, stale-while-revalidate=2592000',
+        'CDN-Cache-Control': `public, max-age=${JOB_CDN_TTL}, stale-while-revalidate=2592000`,
       },
     });
   } catch (error) {

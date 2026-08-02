@@ -40,6 +40,29 @@ Disallow: /
 User-agent: serpstatbot
 Disallow: /
 
+# AI crawlers that index the whole catalogue but send few clicks back.
+# Deliberately NOT disallowed — staying in Meta AI / ChatGPT answers is worth
+# real traffic. They are throttled instead.
+#
+# In the Aug-2026 Vercel log window meta-externalagent was 43% of ALL requests
+# (114 of 263) and paced itself at ~15.6s between hits against the Crawl-delay
+# of 10 below, i.e. it honours the directive. Raising its delay to 60 cuts its
+# request volume ~4x while still letting it reach every page, just slower.
+#
+# NB: this is meta-externalagent (Meta's AI crawler), NOT facebookexternalhit
+# (link-preview unfurling), which stays fully allowed above so Facebook and
+# WhatsApp share cards keep working.
+User-agent: meta-externalagent
+Allow: /
+Crawl-delay: 60
+
+# ChatGPT-User is user-triggered — it fires when a real person clicks or asks
+# about a link, so it is a traffic source, not a scraper. Left unthrottled on
+# purpose. GPTBot (bulk training crawl) is a different agent and falls under
+# the wildcard delay below.
+User-agent: ChatGPT-User
+Allow: /
+
 User-agent: *
 Allow: /
 Crawl-delay: 10

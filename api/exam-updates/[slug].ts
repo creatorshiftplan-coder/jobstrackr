@@ -70,6 +70,26 @@ export const config = {
 };
 
 /**
+ * How long the Vercel CDN holds a rendered exam-update article, in seconds.
+ *
+ * NOT immutable: sync-sheets upserts this table with
+ * `{ onConflict: "url", ignoreDuplicates: false }`, so re-scraping a source URL
+ * overwrites the whole row in place. That is exactly how a page flips from
+ * "result expected" to "result out" — the slug, and therefore the URL, does not
+ * change. A long TTL would pin the stale headline at the moment it matters most.
+ *
+ * 6h is the ceiling that bounds that staleness to a quarter of a day while
+ * still cutting crawler-driven executions 3x versus the old 2h value. Vercel's
+ * cache is per-PoP over ~3.4k URLs and 7 regions, so the old value meant a
+ * near-guaranteed miss on every crawl.
+ *
+ * To go higher, purge this route from the sync-sheets function on write — it
+ * already has the affected rows in `insertedUpdates`. Do that before raising
+ * this number, not after.
+ */
+const EXAM_UPDATE_CDN_TTL = 21600; // 6 hours
+
+/**
  * Exam Update Article SEO Renderer
  * ──────────────────────────────────────────
  * Serves pre-rendered, SEO-complete HTML for /exam-update/:slug (the
@@ -241,7 +261,10 @@ export default async function handler(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, s-maxage=7200, stale-while-revalidate=86400',
+        // Bounded staleness — these rows are overwritten in place on re-scrape.
+        // See EXAM_UPDATE_CDN_TTL before changing either value.
+        'Cache-Control': 'public, max-age=600, stale-while-revalidate=2592000',
+        'CDN-Cache-Control': `public, max-age=${EXAM_UPDATE_CDN_TTL}, stale-while-revalidate=2592000`,
       },
     });
   } catch (error) {
