@@ -28,6 +28,16 @@ function installTriggers() {
   // Telegram poster — runs hourly, posts rows old enough to have synced to Supabase
   // (TELEGRAM_MIN_AGE_MS gate) so the deep-links resolve. Dedups via posted_at.
   ScriptApp.newTrigger('postPendingToTelegram').timeBased().everyHours(1).create();
+  // AI enrichment — eligibility summary + required_skills, computed in the Sheet
+  // so rows reach Supabase already enriched. Its own trigger (not inline in
+  // processJobsQueue) because the scrape loop already uses ~4 of the 6-min budget.
+  //
+  // Every 4 HOURS, not every 30 minutes: this handler blocks on a Groq call per
+  // row, and at 30-min intervals it consumed the project's ~90 min/day runtime
+  // quota by mid-afternoon, killing the scrapers with it (2026-08-06). See the
+  // budget note on AI.MAX_RUNTIME_MS in Config.gs before changing this.
+  ScriptApp.newTrigger('enrichPendingJobs').timeBased()
+    .everyHours(AI.TRIGGER_EVERY_HOURS).create();
 }
 
 // ─────────────────────────── jobs ───────────────────────────────────────────
@@ -91,7 +101,7 @@ function processJobsQueue() {
   const deadline = Date.now() + CONFIG.MAX_RUNTIME_MS;
   const knownTitles = existingValues_(CONFIG.TAB_JOBS, JOB_COLUMNS, 'title');
   const knownSlugs = existingValues_(CONFIG.TAB_JOBS, JOB_COLUMNS, 'slug'); // reserve unique deep-link slugs
-  let processed = 0;
+  let processed = 0, appended = 0;
   while (Date.now() < deadline) {
     const batch = takePending(CONFIG.TAB_JOBS_QUEUE, CONFIG.JOBS_BATCH);
     if (!batch.length) break; // queue drained
@@ -113,6 +123,7 @@ function processJobsQueue() {
           rowObj.slug = uniqueSlug_(makeJobSlug_(rowObj.title), knownSlugs);
           appendObject_(CONFIG.TAB_JOBS, JOB_COLUMNS, rowObj);
           knownTitles[titleKey] = true;
+          appended++;
           setQueueStatus(CONFIG.TAB_JOBS_QUEUE, item.row, 'done');
         }
         processed++;
@@ -124,7 +135,10 @@ function processJobsQueue() {
       Utilities.sleep(CONFIG.FETCH_DELAY_MS);
     }
   }
-  log_('processJobsQueue: processed ' + processed);
+  // Push a reel_source rebuild so a new job is video-eligible within seconds
+  // rather than waiting for the reel project's timer. No-op when nothing landed.
+  notifyReelSource_(appended);
+  log_('processJobsQueue: processed ' + processed + ', appended ' + appended);
 }
 
 // ─────────────────────────── updates ────────────────────────────────────────
@@ -172,7 +186,7 @@ function processUpdatesQueue() {
   const deadline = Date.now() + CONFIG.MAX_RUNTIME_MS;
   const knownUrls = existingValues_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS, 'url');
   const knownSlugs = existingValues_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS, 'slug'); // reserve unique deep-link slugs
-  let processed = 0;
+  let processed = 0, appended = 0;
   while (Date.now() < deadline) {
     const batch = takePending(CONFIG.TAB_UPDATES_QUEUE, CONFIG.UPDATES_BATCH);
     if (!batch.length) break; // queue drained
@@ -192,6 +206,7 @@ function processUpdatesQueue() {
           rowObj.slug = uniqueSlug_(makeUpdateSlug_(rowObj.title, rowObj.category), knownSlugs);
           appendObject_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS, rowObj);
           knownUrls[key] = true;
+          appended++;
           setQueueStatus(CONFIG.TAB_UPDATES_QUEUE, item.row, 'done');
           processed++;
         }
@@ -203,7 +218,10 @@ function processUpdatesQueue() {
       Utilities.sleep(CONFIG.FETCH_DELAY_MS);
     }
   }
-  log_('processUpdatesQueue: processed ' + processed);
+  // Exam updates (results / admit cards) are the most time-critical rows we
+  // scrape — the search spike is immediate — so push the rebuild straight away.
+  notifyReelSource_(appended);
+  log_('processUpdatesQueue: processed ' + processed + ', appended ' + appended);
 }
 
 /** Manual helper: run discovery for both feeds now (for testing). */

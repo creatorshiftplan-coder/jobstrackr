@@ -19,7 +19,48 @@ function getTab_(name, headers) {
   return sh;
 }
 
-/** Create all required tabs once. */
+/**
+ * Widen an EXISTING tab whose header row predates a column added to its column
+ * list (getTab_ only writes headers when it creates the tab, so a tab created
+ * before `eligibility_summary` etc. existed would still be the old width — and
+ * readObjects_/readSince, which read exactly columns.length columns, would throw
+ * "range exceeds grid limits" the moment the list grew).
+ *
+ * Safe by construction: column lists are append-only, so the sheet's existing
+ * headers must be a PREFIX of `columns`. If they aren't (a hand-edited or
+ * reordered tab), we log and leave the sheet alone rather than risk writing a
+ * header over a column of real data.
+ */
+function ensureColumns_(tabName, columns) {
+  const sh = getTab_(tabName, columns);
+  const width = sh.getLastColumn();
+  if (width >= columns.length) return;
+
+  if (width > 0) {
+    const have = sh.getRange(1, 1, 1, width).getValues()[0];
+    for (let i = 0; i < width; i++) {
+      const found = String(have[i] || '').trim();
+      // A blank trailing header cell is fine (Sheets pads); a MISMATCHED one is not.
+      if (found && found !== columns[i]) {
+        log_('ensureColumns_: ' + tabName + ' header mismatch at column ' + (i + 1) +
+          ' (found "' + found + '", expected "' + columns[i] + '") — not migrating. ' +
+          'Fix the header row by hand, then re-run setup().');
+        return;
+      }
+    }
+  }
+
+  // Grow the grid if the sheet has fewer physical columns than we need.
+  const maxCols = sh.getMaxColumns();
+  if (maxCols < columns.length) sh.insertColumnsAfter(maxCols, columns.length - maxCols);
+
+  const missing = columns.slice(width);
+  sh.getRange(1, width + 1, 1, missing.length).setValues([missing]);
+  log_('ensureColumns_: ' + tabName + ' widened by ' + missing.length +
+    ' column(s): ' + missing.join(', '));
+}
+
+/** Create all required tabs once, and widen any that predate a new column. */
 function ensureSheets() {
   getTab_(CONFIG.TAB_JOBS_QUEUE, QUEUE_COLUMNS);
   getTab_(CONFIG.TAB_JOBS, JOB_COLUMNS);
@@ -27,6 +68,10 @@ function ensureSheets() {
   getTab_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS);
   getTab_(CONFIG.TAB_CHANNELS, CHANNEL_COLUMNS);
   getTab_(CONFIG.TAB_LOGS, ['ts', 'message']);
+  // Existing tabs created before a column was appended need their header row
+  // extended — otherwise every read of that tab throws.
+  ensureColumns_(CONFIG.TAB_JOBS, JOB_COLUMNS);
+  ensureColumns_(CONFIG.TAB_UPDATES, UPDATE_COLUMNS);
 }
 
 /** Append a timestamped line to the Logs tab (also used by fetchHtml). */
@@ -98,11 +143,98 @@ function readObjects_(tabName, columns) {
   });
 }
 
+/**
+ * Read a WINDOW of a data tab as objects (same shape as readObjects_, including
+ * `_row`), walking the tab NEWEST-FIRST. `offset` is a distance back from the
+ * last row (0 = the newest `count` rows), and at most `count` rows are returned,
+ * ordered newest first. Returns { rows, startRow, endRow, nextOffset, total },
+ * where `nextOffset` wraps to 0 once the whole tab has been covered.
+ *
+ * Two reasons this reads a window instead of the whole tab, and backwards:
+ *
+ *  - Size: readObjects_ pulls every row and every column. A few thousand rows is
+ *    a lot of needless transfer when a run can only touch a few dozen inside its
+ *    runtime budget.
+ *  - Direction: the data tabs are APPEND-ONLY, so the newest rows — the ones
+ *    still open for applications, and the only ones worth spending the daily
+ *    Apps Script quota on — live at the END. A forward cursor starting at row 2
+ *    would grind through years of expired postings first; at 6 runs/day it would
+ *    take days to reach anything current. Newest-first reaches today's rows on
+ *    the very first run and keeps up with new ones automatically, because an
+ *    offset measured from the end shifts as rows are appended.
+ */
+function readRecentWindow_(tabName, columns, offset, count) {
+  const sh = getTab_(tabName, columns);
+  const last = sh.getLastRow();
+  const total = Math.max(0, last - 1);
+  if (total === 0) return { rows: [], startRow: 2, endRow: 1, nextOffset: 0, total: 0 };
+
+  let off = Math.max(0, Math.floor(offset) || 0);
+  if (off >= total) off = 0;                       // covered the tab — wrap to newest
+  const endRow = last - off;
+  const startRow = Math.max(2, endRow - count + 1);
+  const n = endRow - startRow + 1;
+  const data = sh.getRange(startRow, 1, n, columns.length).getValues();
+
+  const rows = data.map(function (rowVals, i) {
+    const obj = { _row: startRow + i };
+    columns.forEach(function (c, ci) { obj[c] = serializeCell_(c, rowVals[ci]); });
+    return obj;
+  });
+  rows.reverse();                                  // newest first within the window
+
+  const nextOffset = off + n;
+  return {
+    rows: rows, startRow: startRow, endRow: endRow,
+    nextOffset: nextOffset >= total ? 0 : nextOffset, total: total,
+  };
+}
+
 /** Write one cell by column name on a given 1-based row. */
 function setCell_(tabName, columns, row, colName, value) {
   const idx = columns.indexOf(colName);
   if (idx < 0) return;
   getTab_(tabName, columns).getRange(row, idx + 1).setValue(value);
+}
+
+// ─────────────────────── reel_source push notification ───────────────────────
+
+/**
+ * Tell the REEL Apps Script project to rebuild its `reel_source` tab now,
+ * because we just appended rows.
+ *
+ * Why a push and not a trigger on the other side: Apps Script's onEdit/onChange
+ * triggers do NOT fire for edits made by another script, and the reel project is
+ * a separate project (both define doGet, so they cannot share one). A watcher
+ * there would sit silent forever. The scraper knows exactly when new rows land,
+ * so it tells the reel project directly — reel_source is fresh seconds after a
+ * scrape instead of up to 15 minutes later.
+ *
+ * Configure once: Script Properties → REEL_WEBAPP_URL = the reel project's /exec
+ * URL. Unset → this is a no-op, and the reel project's own timer still covers it.
+ *
+ * Never throws: a failed ping must not fail a scrape. The reel project debounces
+ * and its timer is the backstop, so a lost ping costs freshness, never data.
+ */
+function notifyReelSource_(appended) {
+  if (!appended) return;                       // nothing new — nothing to rebuild
+  const url = PropertiesService.getScriptProperties().getProperty('REEL_WEBAPP_URL');
+  if (!url) return;                            // not configured — timer covers it
+  try {
+    const resp = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ action: 'rebuild_reel_source' }),
+      muteHttpExceptions: true,
+      followRedirects: true,
+    });
+    const code = resp.getResponseCode();
+    if (code !== 200) {
+      log_('notifyReelSource_: HTTP ' + code + ' — reel_source will refresh on its own timer');
+    }
+  } catch (err) {
+    log_('notifyReelSource_: ' + err + ' — reel_source will refresh on its own timer');
+  }
 }
 
 // ─────────────────────────── queue ──────────────────────────────────────────

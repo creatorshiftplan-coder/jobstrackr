@@ -9,8 +9,11 @@ nothing in the app changes, but Supabase only takes one batched import per hour 
 continuous per-item scraping load.
 
 This is a faithful port of the Python scraper (`api/scraper_v5.py`, `api/scraper_v3.py`,
-`api/article_scraper.py`, `api/rephraser.py`, `api/job_insert_helper.py`). It uses **no AI**
-— pure regex/HTML parsing — so no API keys are needed.
+`api/article_scraper.py`, `api/rephraser.py`, `api/job_insert_helper.py`). **Scraping**
+uses no AI — pure regex/HTML parsing. The optional **AI enrichment** pass
+(`AiEnrichment.gs`, section D) is the one part that does need API keys: it computes each
+job's eligibility summary, required skills and embedding in the Sheet, so rows reach
+Supabase already enriched. Leave it unconfigured and everything else still works.
 
 ## Files (paste into the Apps Script editor)
 
@@ -25,12 +28,13 @@ This is a faithful port of the Python scraper (`api/scraper_v5.py`, `api/scraper
 | `WebApp.gs` | Secret-protected `doGet` JSON endpoint the sync function pulls |
 | `Triggers.gs` | `setup()` + cron orchestration (discover daily, process every 30 min, Telegram hourly) |
 | `Telegram.gs` | Posts new jobs/updates to Telegram channels with in-app deep-links (slug, matcher, dedup) |
+| `AiEnrichment.gs` | Groq eligibility summary + `required_skills` + 384-dim embedding, computed in the Sheet (9-key rotation) |
 
 ## Setup
 
 ### A. Google Apps Script
 1. Create a Google Sheet → **Extensions → Apps Script**.
-2. Create the 9 script files above and paste each file's contents.
+2. Create the 10 script files above and paste each file's contents.
 3. **Project Settings → Script Properties → Add**: `SHEETS_SYNC_SECRET` = a long random
    string (remember it; the Supabase side uses the same value).
    - *Optional but recommended:* `FETCH_PROXY_URL` = a fetch-relay / scraping-API
@@ -109,6 +113,75 @@ time. The slug is written into the Sheet before the sync runs, so `jobs.slug` /
 >
 > **Don't double-post:** this replaces the edge-function broadcaster — leave the
 > `SHEETS_SYNC_TELEGRAM` function secret **unset** (or `false`) so both don't fire.
+
+### D. AI enrichment in the Sheet (eligibility summary)
+
+Computes `eligibility_summary` and `required_skills` **at scrape time**, so `sync-sheets`
+imports a row that is already summarised. Previously a job landed raw and was summarised
+afterwards *from the app*, only when an admin pressed "Summarise" in the Admin panel.
+
+> **Embeddings are NOT computed here** (`AI.EMBED_ENABLED: false`). Groq answers
+> `nomic-embed-text-v1.5` with `404 — model does not exist`: it serves chat completions but
+> no embedding model, so every call was guaranteed to fail while still costing a full 9-key
+> rotation (~7s of runtime) per row. `jobs.embedding` stays with the `process-embeddings`
+> edge function. The column and the code path remain so that enabling a provider that
+> actually serves embeddings is a one-flag change.
+
+1. In Apps Script, add the new **`AiEnrichment.gs`** and re-paste `Config.gs`, `Sheets.gs`,
+   `Triggers.gs` (they gain the new columns, the header-widening migration, and the trigger).
+2. **Project Settings → Script Properties**, add your Groq keys as either
+   `GROQ_API_KEY_1` … `GROQ_API_KEY_9`, or the `.env`-style `GROQ_API_KEY`,
+   `GROQ_API_KEY_2` … `GROQ_API_KEY_9`. Both spellings are read and merged, so paste
+   whichever you have. Keys are tried in rotation with the starting key advancing each run,
+   so no single key absorbs every request.
+3. Run **`setup()`** again. On an existing sheet this widens the `Jobs` header row with the
+   four new columns (`eligibility_summary`, `required_skills`, `embedding`, `ai_attempts`)
+   and installs the **4-hourly** `enrichPendingJobs` trigger.
+4. Run **`testGroqKeys()`** and check the `Logs` tab — it reports `N/9 keys healthy` and
+   names any key that is rejected.
+5. Run **`enrichPendingJobs()`** once by hand to watch a first batch fill in.
+
+> **Redeploy the Web App** after step 3 (Deploy → Manage deployments → New version).
+> The feed serves whatever is in `JOB_COLUMNS`, so an old deployment won't send the new
+> columns and the sync will keep importing rows without them.
+
+**How it behaves**
+- Runs on its **own trigger**, not inside `processJobsQueue` — the scrape loop already
+  budgets ~4 of Apps Script's 6 minutes for fetching.
+- **Active jobs only.** A row whose `last_date` has passed is skipped (`AI.SKIP_EXPIRED`) —
+  43% of the tab at the time of writing. A summary on a closed vacancy helps nobody apply,
+  and the runtime budget below is far too small to spend on one. A `last_date` that is
+  blank, `TBD` or unparseable counts as **active**: wrongly skipping a live job is worse
+  than wrongly enriching a dead one.
+- Scans **newest-first** — a 300-row window walking backwards from the last row, with the
+  cursor (`AI_ENRICH_CURSOR`) held as a distance from the end. The tab is append-only, so
+  open vacancies are at the end; a forward cursor ground through years of expired postings
+  first and took days to reach anything current. An offset from the end also shifts as rows
+  are appended, so new jobs are picked up without waiting for a wrap.
+- A row is "pending" only while its cells are blank, so enrichment self-terminates.
+  `ai_attempts` caps retries at 3 so a row the model genuinely can't summarise can't block
+  the queue. `ai_attempts` is local bookkeeping — it is never synced.
+- Enriching a row **bumps `scraped_at`**, so the hourly sync re-feeds it and patches the new
+  columns onto the already-imported job. That patch is gated on `IS NULL` server-side, so it
+  fills gaps and can never clobber a value `process-embeddings` already generated.
+- **The edge functions are not retired.** `groq-summarize` and `process-embeddings` still
+  serve jobs created outside the Sheet and backstop anything this pass couldn't fill.
+
+> **⚠ Runtime quota — read before changing `AI.MAX_RUNTIME_MS` or the trigger interval.**
+> A consumer Google account gets ~**90 minutes of script runtime per day**, shared by every
+> trigger in the project. This handler blocks on a network round-trip per row, so it burns
+> that budget far faster than the scrapers do. Shipped first as a 30-minute trigger with the
+> scrapers' 4-minute budget — ~192 min/day against a 90-min quota. On 2026-08-06 the quota
+> was exhausted by 16:20 and **every** trigger in the project (discovery, queue processing,
+> Telegram, the sync feed) went silent for the rest of the day. Now 60s × 6 runs/day ≈ 6
+> min/day. Enrichment being slow is a far better failure than enrichment starving the
+> scraper. For a bulk backfill use the `groq-summarize` batch in the Admin panel, which
+> costs no Apps Script quota.
+
+Helpers: **`resetAiEnrichment()`** clears all four columns and rewinds the cursor to the
+newest rows (use after changing the prompt); **`testGroqKeys()`** re-checks key health — it
+names any key rejected with `400 Organization has been restricted`, which is an account-level
+block on Groq's side that no code change can work around.
 
 ## Design notes / guarantees
 

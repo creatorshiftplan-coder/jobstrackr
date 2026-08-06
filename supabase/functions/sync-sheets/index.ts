@@ -25,6 +25,22 @@ function toJson(v: unknown, fallback: unknown): unknown {
   try { return JSON.parse(String(v)); } catch { return fallback; }
 }
 
+// `jobs.embedding` is vector(384). The Sheet carries it as a JSON array string
+// written by apps-script/AiEnrichment.gs. Reject anything that isn't exactly 384
+// finite numbers — a short/garbled vector would be silently accepted by PostgREST
+// only to break similarity search later, so a bad value must become NULL and let
+// the process-embeddings cron regenerate it.
+const EMBEDDING_DIMS = 384;
+function toVector(v: unknown): number[] | null {
+  if (v === "" || v === null || v === undefined) return null;
+  let arr: unknown;
+  if (Array.isArray(v)) arr = v;
+  else { try { arr = JSON.parse(String(v)); } catch { return null; } }
+  if (!Array.isArray(arr) || arr.length !== EMBEDDING_DIMS) return null;
+  const out = arr.map(Number);
+  return out.every((n) => Number.isFinite(n)) ? out : null;
+}
+
 // A date cell in the Google Sheet (Asia/Kolkata) that Apps Script serialized as a
 // UTC ISO timestamp arrives here as e.g. "2026-06-29T18:30:00.000Z" — midnight IST
 // of 2026-06-30 expressed in UTC. Collapse any such full datetime back to the plain
@@ -89,6 +105,14 @@ function mapJobRow(r: any, slug: string) {
     last_date_display: lastDateDisplay ?? lastDate ?? null,
     is_featured: false, auto_discovered: true, slug,
     job_metadata: toJson(r.job_metadata, null),
+    // AI enrichment computed in the Sheet (apps-script/AiEnrichment.gs) so the
+    // row lands already summarised + embedded. Null here just means the
+    // enrichment pass hasn't reached the row yet — groq-summarize and
+    // process-embeddings still backstop those.
+    eligibility_summary: r.eligibility_summary === "" || r.eligibility_summary == null
+      ? null : r.eligibility_summary,
+    required_skills: toJson(r.required_skills, null),
+    embedding: toVector(r.embedding),
   };
   for (const f of NUMERIC_JOB_FIELDS) rec[f] = toNum(r[f]);
   for (const f of NULLABLE_JOB_TEXT) rec[f] = r[f] === "" || r[f] == null ? null : r[f];
@@ -249,6 +273,7 @@ Deno.serve(async (req) => {
     sinceCursor = [jobsCursor, updatesCursor].filter(Boolean).sort()[0] || ""; // min, for the health log
 
     let jobsReceived = 0, jobsInserted = 0, jobsRepaired = 0;
+    let jobsEnriched = 0, jobsEmbedded = 0; // AI columns back-filled onto existing rows
     let updatesReceived = 0, updatesUpserted = 0;
 
     // Advance one feed's cursor and persist it immediately (crash-safe progress).
@@ -345,6 +370,31 @@ Deno.serve(async (req) => {
                 .update(patch).eq("dedupe_key", key).select("id");
               if (patched?.length) jobsRepaired += patched.length;
             }
+
+            // AI enrichment is patched separately, gated on IS NULL *server-side*
+            // rather than compared against fetched values: REPAIR_COLS deliberately
+            // does not select `embedding`, because pulling a 384-float vector back
+            // for every re-fed row purely to test it for null is exactly the kind of
+            // needless egress this sync is tuned to avoid. The `.is(col, null)`
+            // filter fills a gap without ever reading the column, and can't clobber
+            // an embedding the cron already generated.
+            const sheetSummary = realStr(r.eligibility_summary) ? String(r.eligibility_summary) : null;
+            if (sheetSummary) {
+              const enrich: Record<string, unknown> = { eligibility_summary: sheetSummary };
+              const skills = toJson(r.required_skills, null);
+              if (skills) enrich.required_skills = skills;
+              const { data: en } = await supabase.from("jobs")
+                .update(enrich).eq("dedupe_key", key)
+                .is("eligibility_summary", null).select("id");
+              if (en?.length) jobsEnriched += en.length;
+            }
+            const sheetVec = toVector(r.embedding);
+            if (sheetVec) {
+              const { data: em } = await supabase.from("jobs")
+                .update({ embedding: sheetVec }).eq("dedupe_key", key)
+                .is("embedding", null).select("id");
+              if (em?.length) jobsEmbedded += em.length;
+            }
           }
         }
 
@@ -427,6 +477,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       jobs_received: jobsReceived, jobs_inserted: jobsInserted, jobs_repaired: jobsRepaired,
+      jobs_enriched: jobsEnriched, jobs_embedded: jobsEmbedded,
       updates_received: updatesReceived, updates_upserted: updatesUpserted,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
