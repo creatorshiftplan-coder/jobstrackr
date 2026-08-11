@@ -3,10 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { ExamUpdateItem } from "@/hooks/useExamUpdates";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { FileText, Award, BarChart3, Newspaper, Calendar, Download, Key, Sparkles, ChevronRight } from "lucide-react";
+import { FileText, Award, BarChart3, Newspaper, Download, Key, Sparkles, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { getExamPdfWebsiteLinks } from "@/lib/urlUtils";
+import { ImportantDateChips } from "@/components/ImportantDatesList";
+import { linkLabel } from "@/lib/linkLabels";
 
 interface ExamUpdateCardProps {
     update: ExamUpdateItem;
@@ -55,8 +57,6 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
     const timeAgo = getTimeAgo(update.scraped_at);
     const newBadge = isNew(update.created_at);
 
-    const topDate = update.important_dates?.[0];
-    const secondDate = update.important_dates?.[1];
     // Real exam PDF / official-website links only — WhatsApp/Telegram/source links dropped.
     const examLinks = getExamPdfWebsiteLinks(update);
     const topLinks = examLinks.slice(0, 2);
@@ -114,25 +114,19 @@ export function ExamUpdateCard({ update, index }: ExamUpdateCardProps) {
                             </p>
                         )}
 
-                        {/* Top 2 important dates */}
-                        {(topDate || secondDate) && (
-                            <div className="pl-[34px] flex flex-wrap gap-1.5">
-                                {[topDate, secondDate].filter(Boolean).map((d, i) => (
-                                    <div key={i} className="inline-flex items-center gap-1.5 text-[11px] bg-secondary/40 rounded px-2 py-1">
-                                        <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                        <span className="text-muted-foreground line-clamp-1 max-w-[110px]">{d!.event}</span>
-                                        <span className="font-medium text-foreground whitespace-nowrap">{d!.date}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        {/* Top 2 important dates — normalized, so the scraped
+                            "Event — Date" header row never leads the card */}
+                        <ImportantDateChips dates={update.important_dates} limit={2} className="pl-[34px]" />
 
                         {/* PDF / official-website link chips */}
                         {topLinks.length > 0 && (
                             <div className="pl-[34px] flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
                                 {topLinks.map((link, i) => {
                                     const isPdf = /\.pdf($|\?)/i.test(link.url);
-                                    const label = link.text.length > 32 ? link.text.slice(0, 32) + "…" : link.text;
+                                    // Sources label nearly every link "Click here" — two of those
+                                    // side by side are indistinguishable, so name the destination.
+                                    const text = linkLabel(link.text, link.url, update.category);
+                                    const label = text.length > 32 ? text.slice(0, 32) + "…" : text;
                                     return (
                                         <a
                                             key={i}

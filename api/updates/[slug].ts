@@ -331,12 +331,13 @@ function buildUpdatePage(exam: any, aiData: any, status: { type: string; label: 
 
     const renderTable = (title: string, events: any[]) => {
       const rows = events.map((e: any) =>
-        `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:500">${escapeHtml(e.event_type || '')}</td>
-         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#4b5563">${escapeHtml(e.predicted_date || 'TBA')}</td></tr>`
+        `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:500;overflow-wrap:break-word">${escapeHtml(e.event_type || '')}</td>
+         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#4b5563;overflow-wrap:break-word">${escapeHtml(e.predicted_date || 'TBA')}</td></tr>`
       ).join('');
+      // Fixed layout so a long predicted date can never starve the event column.
       return `<h3 style="font-size:1rem;font-weight:600;margin:12px 0 4px;color:#1e3a5f">${title}</h3>
-      <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:8px">
-        <thead><tr style="background:#f8fafc"><th style="padding:8px 12px;text-align:left;font-size:0.8rem;color:#64748b;text-transform:uppercase">Event</th><th style="padding:8px 12px;text-align:left;font-size:0.8rem;color:#64748b;text-transform:uppercase">Date</th></tr></thead>
+      <table style="width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:8px">
+        <thead><tr style="background:#f8fafc"><th style="width:55%;padding:8px 12px;text-align:left;font-size:0.8rem;color:#64748b;text-transform:uppercase">Event</th><th style="width:45%;padding:8px 12px;text-align:left;font-size:0.8rem;color:#64748b;text-transform:uppercase">Date</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
     };

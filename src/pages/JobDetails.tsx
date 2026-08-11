@@ -32,7 +32,9 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuthRequired } from "@/components/AuthRequiredDialog";
 import { BottomNav } from "@/components/BottomNav";
 import { formatAgeLimit, parseJobDeadline, getVacancyDisplay, cleanSalaryText, isPlausibleSalary } from "@/lib/jobUtils";
-import { isFreeJobAlertUrl, normalizeWebsiteUrl, getWebsiteFromOverview } from "@/lib/urlUtils";
+import { isFreeJobAlertUrl, isBlockedUrl, normalizeWebsiteUrl, getWebsiteFromOverview } from "@/lib/urlUtils";
+import { ImportantDatesList } from "@/components/ImportantDatesList";
+import { normalizeImportantDates, partitionImportantDates } from "@/lib/importantDates";
 import { useSmartBack } from "@/hooks/useSmartBack";
 import { useSimilarJobs } from "@/hooks/useSimilarJobs";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -607,16 +609,14 @@ export default function JobDetails() {
                       <Calendar className="h-4 w-4" />
                       Important Dates
                     </h3>
-                    <div className="space-y-2">
-                      {Object.entries(meta.important_dates as Record<string, string | null>)
-                        .filter(([, v]) => v)
-                        .map(([key, val]) => (
-                          <div key={key} className="flex justify-between items-center bg-secondary/30 rounded-lg px-4 py-2.5">
-                            <span className="text-sm text-muted-foreground capitalize">{key.replace(/_/g, " ")}</span>
-                            <span className="text-sm font-medium">{val}</span>
-                          </div>
-                        ))}
-                    </div>
+                    <ImportantDatesList
+                      dates={Object.entries(meta.important_dates as Record<string, string | null>).map(
+                        ([key, val]) => ({
+                          event: key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+                          date: val,
+                        }),
+                      )}
+                    />
                   </CardContent>
                 </Card>
               )}
@@ -797,6 +797,7 @@ function ExamUpdatesSection({ updates }: { updates: ExamUpdateItem[] }) {
   const seenLinks = new Set<string>();
 
   for (const update of updates) {
+    const { links: dateRowLinks } = partitionImportantDates(update.important_dates);
     if (update.important_dates?.length) {
       for (const d of update.important_dates) {
         allDates.push({ ...d, source: update.category });
@@ -804,20 +805,34 @@ function ExamUpdatesSection({ updates }: { updates: ExamUpdateItem[] }) {
     }
     if (update.download_links?.length) {
       for (const dl of update.download_links) {
-        if (!seenLinks.has(dl.url) && !isFreeJobAlertUrl(dl.url)) {
+        // isBlockedUrl, not isFreeJobAlertUrl: source sites put their own
+        // WhatsApp/Telegram channel invites in download_links too.
+        if (!seenLinks.has(dl.url) && !isBlockedUrl(dl.url)) {
           seenLinks.add(dl.url);
           allDownloads.push({ ...dl, category: update.category });
         }
       }
     }
+    // Links that only ever existed on a "Click here" date row. This page fetches
+    // download_links but not official_links, so without this they'd be lost.
+    for (const l of dateRowLinks) {
+      if (!seenLinks.has(l.url) && !isBlockedUrl(l.url)) {
+        seenLinks.add(l.url);
+        allDownloads.push({ text: l.text, url: l.url, category: update.category });
+      }
+    }
   }
+
+  // Scraped date tables are mostly header rows / "Click here" link rows, so the
+  // section header must be gated on what actually survives normalization.
+  const datesShown = normalizeImportantDates(allDates).length;
 
   // Get summaries from updates
   const summaries = updates
     .filter((u) => u.summary)
     .map((u) => ({ title: u.title, summary: u.summary!, category: u.category, url: u.url }));
 
-  if (allDates.length === 0 && allDownloads.length === 0 && summaries.length === 0) {
+  if (datesShown === 0 && allDownloads.length === 0 && summaries.length === 0) {
     return null;
   }
 
@@ -876,39 +891,14 @@ function ExamUpdatesSection({ updates }: { updates: ExamUpdateItem[] }) {
       )}
 
       {/* Important Dates from scraped articles */}
-      {allDates.length > 0 && (
+      {datesShown > 0 && (
         <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl">
           <CardContent className="p-4">
             <h4 className="font-medium text-sm text-foreground mb-3 flex items-center gap-2">
               <Calendar className="h-4 w-4 text-primary" />
               Important Dates
             </h4>
-            <div className="space-y-2">
-              {allDates.slice(0, 15).map((d, i) => (
-                <div key={i} className="flex items-center justify-between bg-secondary/30 rounded-lg px-4 py-2.5">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-sm text-muted-foreground truncate">{d.event}</span>
-                    {d.status && (
-                      <Badge className={`text-[10px] border-0 flex-shrink-0 ${
-                        d.status.toLowerCase().includes("out") || d.status.toLowerCase().includes("released") || d.status.toLowerCase().includes("available")
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                      }`}>
-                        {d.status}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-sm font-medium">{d.date || "TBD"}</span>
-                    {d.link && !isFreeJobAlertUrl(d.link) && (
-                      <a href={d.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ImportantDatesList dates={allDates} limit={15} />
           </CardContent>
         </Card>
       )}

@@ -100,10 +100,17 @@ const withinEditDistance = (a: string, b: string, max: number): boolean => {
   return prev[b.length] <= max;
 };
 
-/** True if `token` matches anywhere in `haystack` (substring or 1-char typo). */
+/**
+ * True if `token` matches anywhere in `haystack` (substring or 1-char typo).
+ *
+ * Typo tolerance starts at 5 characters on purpose: most exam names users type
+ * are 3–4 character acronyms (NTPC, CGL, ALP, IBPS), and at that length a
+ * single edit reaches a different exam entirely, so "ntpc" would pull in
+ * unrelated recruitments.
+ */
 const tokenHits = (token: string, haystack: string, words: string[]): boolean => {
   if (haystack.includes(token)) return true; // substring — matches inside words too
-  if (token.length >= 4) {
+  if (token.length >= 5) {
     for (const w of words) {
       if (Math.abs(w.length - token.length) <= 1 && withinEditDistance(w, token, 1)) {
         return true;
@@ -144,21 +151,54 @@ export const scoreUpdateForQuery = (
 };
 
 /**
- * Filter + rank a list of exam updates by a free-text query.
- * Preserves the input order for equal-scoring items (callers pass an
- * already sorted list, e.g. newest-first).
+ * True when every query token appears in the title — the update is *about*
+ * what was searched for, rather than merely mentioning it somewhere in its
+ * summary or date table.
  */
-export const searchUpdates = <T extends Record<string, unknown>>(
-  updates: T[],
-  query: string
-): T[] => {
+export const matchesTitle = (
+  update: Record<string, unknown>,
+  tokens: string[]
+): boolean => {
+  if (tokens.length === 0) return false;
+  const title = normalize(String((update as { title?: string }).title ?? ""));
+  return tokens.every((t) => title.includes(t));
+};
+
+/** Newest-first ordering key: when the update was scraped (fall back to created). */
+const recencyOf = (update: Record<string, unknown>): number => {
+  const raw =
+    (update as { scraped_at?: string; created_at?: string }).scraped_at ??
+    (update as { created_at?: string }).created_at;
+  const t = raw ? new Date(raw).getTime() : NaN;
+  return isNaN(t) ? 0 : t;
+};
+
+/**
+ * Filter + rank a list of exam updates by a free-text query.
+ *
+ * Results are read as a news feed — a search for an exam should answer with
+ * that exam's *newest* post, not its highest-scoring one — so ordering is
+ * newest-first within two relevance tiers: updates whose title names the query
+ * come before updates that only mention it. Pure score ordering interleaved
+ * six-month-old posts with today's, which is what made the feed look stale.
+ */
+export const searchUpdates = <T extends object>(updates: T[], query: string): T[] => {
   const tokens = tokenizeQuery(query);
   if (tokens.length === 0) return updates;
-  const scored: { update: T; score: number; index: number }[] = [];
+  const scored: { update: T; titled: boolean; time: number; index: number }[] = [];
   updates.forEach((update, index) => {
-    const score = scoreUpdateForQuery(update, tokens);
-    if (score > 0) scored.push({ update, score, index });
+    // Interfaces have no implicit index signature, so callers would otherwise
+    // have to cast their well-typed rows at every call site.
+    const record = update as Record<string, unknown>;
+    const score = scoreUpdateForQuery(record, tokens);
+    if (score > 0) {
+      scored.push({ update, titled: matchesTitle(record, tokens), time: recencyOf(record), index });
+    }
   });
-  scored.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.index - b.index));
+  scored.sort((a, b) => {
+    if (a.titled !== b.titled) return a.titled ? -1 : 1;
+    if (b.time !== a.time) return b.time - a.time;
+    return a.index - b.index;
+  });
   return scored.map((s) => s.update);
 };

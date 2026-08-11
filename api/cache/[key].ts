@@ -327,6 +327,85 @@ async function handleExamUpdates(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json(data);
 }
 
+// ─── Exam update search handler ─────────────────────────────────
+// `exam-updates` returns the 100 most recent rows, which in practice is a ~6 h
+// window — searching it client-side means a query for any named exam ("NTPC")
+// matches nothing and the Updates page falls back to stale tracked-exam cards.
+// This searches the whole table instead: PostgREST does the filtering, so only
+// the matching rows cross the wire, and Redis absorbs repeat queries.
+const SEARCH_STOPWORDS = new Set([
+  'the', 'a', 'an', 'of', 'for', 'in', 'on', 'and', 'or', 'to',
+  'exam', 'exams', 'update', 'updates', 'latest', 'news',
+]);
+
+/**
+ * Tokens are stripped to [a-z0-9] so they can be dropped straight into a
+ * PostgREST filter — none of the reserved characters (`,` `.` `(` `)` `:`)
+ * can survive, so no quoting is needed.
+ */
+function searchTokens(raw: string): string[] {
+  const all = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length >= 3);
+  const meaningful = all.filter((t) => !SEARCH_STOPWORDS.has(t));
+  return (meaningful.length > 0 ? meaningful : all).slice(0, 4);
+}
+
+async function handleUpdateSearch(req: VercelRequest, res: VercelResponse) {
+  const raw = ((req.query.q as string) || '').trim().slice(0, 80);
+  const tokens = searchTokens(raw);
+  if (tokens.length === 0) {
+    setCacheHeaders(res, false, 300);
+    return res.status(200).json([]);
+  }
+
+  const cacheKey = `cache:update-search:${tokens.join('+')}`;
+  const CACHE_TTL = 900; // 15 min — searches repeat far more than they vary
+
+  const { data, cacheHit } = await cachedFetch<any[]>(cacheKey, CACHE_TTL, async () => {
+    const updateColumns = [
+      'id', 'slug', 'url', 'title', 'category', 'status', 'published_date',
+      'summary', 'important_dates', 'download_links', 'tags',
+      'scraped_at', 'created_at', 'updated_at', 'job_id', 'exam_id',
+    ].join(',');
+
+    // Every token must appear in the title, the summary, or the category (AND
+    // across tokens, OR across the three fields) — the same semantics as the
+    // client scorer, narrowed to the fields that carry the exam's identity.
+    // Category matters because titles are rephrased on the way in: an admit
+    // card post is titled "Entry pass"/"Hall Ticket", so a search for "admit
+    // card" only lands via category=admit_card.
+    const tokenClause = (t: string) =>
+      `title.ilike.*${t}*,summary.ilike.*${t}*,category.ilike.*${t}*`;
+    const filter =
+      tokens.length === 1
+        ? `or=(${tokenClause(tokens[0])})`
+        : `and=(${tokens.map((t) => `or(${tokenClause(t)})`).join(',')})`;
+    const url =
+      `${SUPABASE_URL}/rest/v1/exam_updates?select=${updateColumns}&${filter}` +
+      `&order=scraped_at.desc&limit=60`;
+
+    const response = await fetch(url, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Supabase search failed: ${response.status} ${response.statusText}`);
+    }
+
+    const rows = await response.json();
+    return filterFreeJobAlertFromUpdates(rows || []);
+  });
+
+  setCacheHeaders(res, cacheHit, CACHE_TTL);
+  return res.status(200).json(data);
+}
+
 // ─── Exam Countdown handler ─────────────────────────────────────
 // Powers the /countdown wall. Unlike `exam-updates` (100 most-recent rows,
 // dominated by results/admit cards), this returns a wide window so upcoming
@@ -455,6 +534,7 @@ const HANDLERS: Record<string, (req: VercelRequest, res: VercelResponse) => Prom
   homepage: handleHomepage,
   'trending-exams': handleTrendingExams,
   'exam-updates': handleExamUpdates,
+  'search-updates': handleUpdateSearch,
   'exam-countdown': handleExamCountdown,
   logos: handleLogos,
 };

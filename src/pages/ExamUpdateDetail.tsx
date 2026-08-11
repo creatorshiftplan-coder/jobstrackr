@@ -18,6 +18,9 @@ import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { toast } from "sonner";
 import { isPdfOrWebsiteLink, getExamPdfWebsiteLinks, isFreeJobAlertUrl } from "@/lib/urlUtils";
+import { ImportantDatesList } from "@/components/ImportantDatesList";
+import { normalizeImportantDates, normalizeOverviewRows } from "@/lib/importantDates";
+import { linkLabel } from "@/lib/linkLabels";
 import { ExamUpdateRelatedRails } from "@/components/ExamUpdateRelatedRails";
 import { SITE_URL } from "@/lib/seoConfig";
 
@@ -35,16 +38,6 @@ function getCategoryConfig(category: string) {
     if (cat.includes("syllabus") || cat.includes("pattern"))
         return { bg: "bg-indigo-500/10", text: "text-indigo-600 dark:text-indigo-400", border: "border-indigo-500/30", label: "Syllabus", icon: FileText, gradient: "from-indigo-500/20 to-blue-500/10", accent: "#4f46e5", cta: "View Syllabus" };
     return { bg: "bg-gray-500/10", text: "text-gray-600 dark:text-gray-400", border: "border-gray-500/30", label: "News", icon: Newspaper, gradient: "from-gray-500/10 to-slate-500/5", accent: "#6b7280", cta: "View Update" };
-}
-
-// Green for "live" statuses, red for closed ones, neutral otherwise.
-function getDateStatusClasses(status: string) {
-    const s = status.toLowerCase();
-    if (/declar|out|released|available|active|start|open|live/.test(s))
-        return "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30";
-    if (/clos|over|expir|end|last/.test(s))
-        return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30";
-    return "bg-secondary text-muted-foreground border-border/50";
 }
 
 function Section({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
@@ -157,6 +150,10 @@ export default function ExamUpdateDetail() {
     const CatIcon = catConfig.icon;
     // Only surface real PDF / official-website links — never WhatsApp or Telegram share links.
     const pdfLinks = getExamPdfWebsiteLinks(update);
+    // Scraped date tables carry header rows, "Click here" link rows and promos;
+    // the section is only worth a card once those are gone.
+    const cleanDates = normalizeImportantDates(update.important_dates);
+    const cleanOverview = normalizeOverviewRows(update.overview);
     const websiteArticles = (update.related_articles || []).filter((ra) => isPdfOrWebsiteLink(ra.url) && !isFreeJobAlertUrl(ra.url));
     const isNew = update.created_at
         ? Date.now() - new Date(update.created_at).getTime() < 24 * 60 * 60 * 1000
@@ -324,41 +321,24 @@ export default function ExamUpdateDetail() {
 
 
                 {/* ── Important Dates ───────────────────────────── */}
-                {update.important_dates && update.important_dates.length > 0 && (
+                {cleanDates.length > 0 && (
                     <Section delay={0.1}>
                         <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-red-500" /> Important Dates
                             </h2>
-                            <div className="divide-y divide-border/40 rounded-lg border border-border/40 overflow-hidden">
-                                {update.important_dates.map((d, i) => (
-                                    <div key={i} className={cn("flex items-start gap-2 px-3 py-2.5 text-xs", i % 2 === 0 ? "bg-secondary/20" : "bg-transparent")}>
-                                        <span className="flex-1 min-w-0 break-words text-muted-foreground">{d.event}</span>
-                                        {d.status && (
-                                            <span className={cn("px-1.5 py-0.5 rounded-full border text-[9px] font-semibold capitalize whitespace-nowrap flex-shrink-0", getDateStatusClasses(d.status))}>
-                                                {d.status}
-                                            </span>
-                                        )}
-                                        <span className="flex-shrink-0 font-semibold text-foreground whitespace-nowrap">{d.date}</span>
-                                        {d.link && isPdfOrWebsiteLink(d.link) && !isFreeJobAlertUrl(d.link) && (
-                                            <a href={d.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                <ExternalLink className="h-3 w-3" />
-                                            </a>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                            <ImportantDatesList dates={update.important_dates} />
                         </Card>
                     </Section>
                 )}
 
                 {/* ── Overview ─────────────────────────────────── */}
-                {update.overview && update.overview.length > 0 && (
+                {cleanOverview.length > 0 && (
                     <Section delay={0.12}>
                         <Card className="border border-border/40 bg-card/60 backdrop-blur-md shadow-card rounded-2xl p-5 space-y-4">
                             <h2 className="text-sm font-bold text-foreground">Overview</h2>
                             <div className="divide-y divide-border/40 rounded-lg border border-border/40 overflow-hidden">
-                                {update.overview.map((item, i) => (
+                                {cleanOverview.map((item, i) => (
                                     <div key={i} className={cn("flex gap-3 px-3 py-2.5 text-xs", i % 2 === 0 ? "bg-secondary/20" : "bg-transparent")}>
                                         <span className="text-muted-foreground w-[38%] flex-shrink-0">{item.field}</span>
                                         <span className="font-medium text-foreground flex-1 break-words">{item.value}</span>
@@ -406,19 +386,24 @@ export default function ExamUpdateDetail() {
                                 <Download className="h-4 w-4 text-blue-500" /> Important Links
                             </h2>
                             <div className="space-y-1.5">
-                                {pdfLinks.map((dl, i) => (
-                                    <a
-                                        key={i}
-                                        href={dl.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors text-xs font-medium text-foreground"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <span className="line-clamp-1">{dl.text.length > 60 ? dl.text.slice(0, 60) + "…" : dl.text}</span>
-                                        <ExternalLink className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                                    </a>
-                                ))}
+                                {pdfLinks.map((dl, i) => {
+                                    // "Click here" repeated down the list names nothing — infer
+                                    // the destination from the URL instead.
+                                    const label = linkLabel(dl.text, dl.url, update.category);
+                                    return (
+                                        <a
+                                            key={i}
+                                            href={dl.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors text-xs font-medium text-foreground"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <span className="line-clamp-1">{label.length > 60 ? label.slice(0, 60) + "…" : label}</span>
+                                            <ExternalLink className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                                        </a>
+                                    );
+                                })}
                             </div>
                         </Card>
                     </Section>

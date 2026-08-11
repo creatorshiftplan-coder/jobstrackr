@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getExamStatusType, getBadgeConfig } from "@/lib/examStatus";
-import { useAllExamUpdates } from "@/hooks/useExamUpdates";
+import { useAllExamUpdates, useExamUpdateSearch } from "@/hooks/useExamUpdates";
 import { searchUpdates, scoreUpdateForQuery, tokenizeQuery } from "@/lib/updateSearch";
 import { useDebouncedValue } from "@/hooks/useDebounce";
 import { useQueryClient } from "@tanstack/react-query";
@@ -96,14 +96,17 @@ function SectionHeading({
     title,
     count,
     accent = false,
+    hint,
 }: {
     icon: LucideIcon;
     title: string;
     count?: number;
     accent?: boolean;
+    /** Small trailing note, e.g. the sort order applied to the section. */
+    hint?: string;
 }) {
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
             <span
                 className={cn(
                     "flex h-6 w-6 items-center justify-center rounded-md",
@@ -124,6 +127,12 @@ function SectionHeading({
                 <Badge variant="secondary" className="h-5 min-w-5 justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums">
                     {count}
                 </Badge>
+            )}
+            {hint && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {hint}
+                </span>
             )}
         </div>
     );
@@ -200,6 +209,8 @@ export default function Trending() {
     // Fetch exam updates from the updates tab (scraped data)
     const updateCategory = TAB_TO_UPDATE_CATEGORY[selectedTab];
     const { data: examUpdates, isLoading: updatesLoading } = useAllExamUpdates(updateCategory);
+    // Whole-table search — the cached feed above only spans the newest 100 rows.
+    const { data: searchResults, isFetching: searchFetching } = useExamUpdateSearch(debouncedSearch);
     const queryClient = useQueryClient();
 
     // Prefetch homepage jobs data when idle (P7: cross-page prefetching)
@@ -368,11 +379,26 @@ export default function Trending() {
         return result;
     }, [exams, selectedTab, selectedCategories, selectedLocations, latestFilter, isUpdatesOnlyTab, debouncedSearch]);
 
-    // Filter exam updates for display — deep search across ALL update fields
+    // Filter exam updates for display — deep search across ALL update fields.
+    // While searching, the cached feed (newest 100 rows ≈ a few hours) is merged
+    // with the server-side search over the whole table, so a query for an exam
+    // that was not scraped today still answers with that exam's posts.
     const filteredUpdates = useMemo(() => {
-        if (!examUpdates) return [];
-        return debouncedSearch.trim() ? searchUpdates(examUpdates as any[], debouncedSearch) : examUpdates;
-    }, [examUpdates, debouncedSearch]);
+        const search = debouncedSearch.trim();
+        if (!search) return examUpdates || [];
+
+        const merged = [...(examUpdates || [])];
+        const seen = new Set(merged.map((u) => u.id));
+        for (const u of searchResults || []) {
+            if (!seen.has(u.id)) {
+                seen.add(u.id);
+                merged.push(u);
+            }
+        }
+        const ranked = searchUpdates(merged, search);
+        // Tab filters apply to the server results too — they are unfiltered.
+        return updateCategory ? ranked.filter((u) => u.category === updateCategory) : ranked;
+    }, [examUpdates, searchResults, debouncedSearch, updateCategory]);
 
     // Updates scraped in the last 24h — surfaced at top (hidden while searching so
     // results aren't split across two sections)
@@ -381,6 +407,11 @@ export default function Trending() {
         const cutoff = Date.now() - 24 * 60 * 60 * 1000;
         return examUpdates.filter((u) => new Date(u.scraped_at).getTime() > cutoff);
     }, [examUpdates, debouncedSearch]);
+
+    const isSearching = !!debouncedSearch.trim();
+    // The server search can still be in flight after the local feed has been
+    // filtered — showing "No matches found" in that gap is just wrong.
+    const searchPending = isSearching && searchFetching && filteredUpdates.length === 0;
 
     const activeFilterCount = selectedCategories.length + selectedLocations.length;
     const hasActiveFilters = activeFilterCount > 0;
@@ -697,17 +728,22 @@ export default function Trending() {
                     />
                 ) : isUpdatesOnlyTab ? (
                     /* Updates-only tabs (Answer Key, Cutoff, Syllabus, News) */
-                    updatesLoading ? (
+                    updatesLoading || searchPending ? (
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             {[1, 2, 3, 4].map((i) => (
                                 <UpdateCardSkeleton key={i} />
                             ))}
                         </div>
                     ) : filteredUpdates.length > 0 ? (
-                        <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
-                            {filteredUpdates.map((update, index) => (
-                                <ExamUpdateCard key={update.id} update={update} index={index} />
-                            ))}
+                        <div className="space-y-3">
+                            {isSearching && (
+                                <SectionHeading icon={SearchIcon} title="Search Results" count={filteredUpdates.length} hint="Newest first" />
+                            )}
+                            <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
+                                {filteredUpdates.map((update, index) => (
+                                    <ExamUpdateCard key={update.id} update={update} index={index} />
+                                ))}
+                            </div>
                         </div>
                     ) : (
                         <EmptyState
@@ -724,9 +760,9 @@ export default function Trending() {
                     /* Combined view: Exam updates + Exam cards */
                     <div className="space-y-8">
                         {/* Exam Updates Section / Skeleton */}
-                        {updatesLoading ? (
+                        {updatesLoading || searchPending ? (
                             <div className="space-y-3">
-                                <SectionHeading icon={Newspaper} title="Latest Updates" />
+                                <SectionHeading icon={isSearching ? SearchIcon : Newspaper} title={isSearching ? "Search Results" : "Latest Updates"} />
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                     {[1, 2, 3, 4].map((i) => (
                                         <UpdateCardSkeleton key={i} />
@@ -749,7 +785,6 @@ export default function Trending() {
 
                                 {/* Exam Updates Section (shown at top for relevant tabs) */}
                                 {filteredUpdates.length > 0 && selectedTab !== "notification" && (() => {
-                                    const isSearching = !!debouncedSearch.trim();
                                     const isAllTab = selectedTab === "all";
                                     // Show every match while searching; otherwise cap the "all" tab at 10.
                                     const visibleLimit = isAllTab && !showAllUpdates && !isSearching ? 10 : filteredUpdates.length;
@@ -762,6 +797,7 @@ export default function Trending() {
                                                 icon={isSearching ? SearchIcon : Newspaper}
                                                 title={isSearching ? "Search Results" : isAllTab ? "Latest Updates" : `${selectedTab.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())} Updates`}
                                                 count={filteredUpdates.length}
+                                                hint={isSearching ? "Newest first" : undefined}
                                             />
                                             <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
                                                 {visibleUpdates.map((update, index) => (

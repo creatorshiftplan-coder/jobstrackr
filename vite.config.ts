@@ -435,6 +435,44 @@ function localCachePlugin(env: Record<string, string>) {
         }
       });
 
+      // /api/cache/search-updates — full-table search (mirrors api/cache/[key].ts).
+      // The exam-updates feed above is only the newest 100 rows, so searching it
+      // alone misses every exam that has not been scraped in the last few hours.
+      server.middlewares.use("/api/cache/search-updates", async (req: any, res: any) => {
+        try {
+          const url = new URL(req.url || "", "http://localhost");
+          const raw = (url.searchParams.get("q") || "").trim().slice(0, 80);
+          const stop = new Set(["the", "a", "an", "of", "for", "in", "on", "and", "or", "to", "exam", "exams", "update", "updates", "latest", "news"]);
+          const all = raw.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((t) => t.length >= 3);
+          const meaningful = all.filter((t) => !stop.has(t));
+          const tokens = (meaningful.length > 0 ? meaningful : all).slice(0, 4);
+          if (tokens.length === 0) {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end("[]");
+            return;
+          }
+          const tokenClause = (t: string) => `title.ilike.*${t}*,summary.ilike.*${t}*,category.ilike.*${t}*`;
+          const filter = tokens.length === 1
+            ? `or=(${tokenClause(tokens[0])})`
+            : `and=(${tokens.map((t) => `or(${tokenClause(t)})`).join(",")})`;
+          // Same light column set production uses, so what dev searches and
+          // renders matches what ships (notably: no `sections` article bodies).
+          const cols = [
+            "id", "slug", "url", "title", "category", "status", "published_date",
+            "summary", "important_dates", "download_links", "tags",
+            "scraped_at", "created_at", "updated_at", "job_id", "exam_id",
+          ].join(",");
+          const data = await supabaseFetch(
+            `exam_updates?select=${cols}&${filter}&order=scraped_at.desc&limit=60`
+          );
+          res.writeHead(200, { "Content-Type": "application/json", "X-Cache-Hit": "0" });
+          res.end(JSON.stringify(data || []));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+
       // /api/cache/exam-countdown — wide window so upcoming exam dates surface
       server.middlewares.use("/api/cache/exam-countdown", async (_req: any, res: any) => {
         try {

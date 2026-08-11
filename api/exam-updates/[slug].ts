@@ -118,6 +118,60 @@ function formatDate(dateStr: string | null): string {
   } catch { return dateStr; }
 }
 
+// ── Important-date cleanup (mirrors src/lib/importantDates.ts) ──────────────
+// Scraped date tables carry their own header row as data, "Click here" link
+// rows, and source-site promos. Keep these rules in step with the shared lib —
+// api/ functions are bundled separately and cannot import from src/.
+const DATE_HEADER_ONLY_EVENT_RE =
+  /^(events?|activit(y|ies)|particulars?|items?|link\s*descriptions?|descriptions?|sl\.?\s*no\.?|s\.?\s*no\.?|serial\s*no\.?|#|post\s*names?)$/i;
+// Safety net: a value holding a real date is never treated as a header.
+const DATE_SIGNAL_RE =
+  /\b(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}(st|nd|rd|th)?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*\d{1,2}|(19|20)\d{2})\b/i;
+const DATE_HEADER_CELL_RE =
+  /^(events?|activit(y|ies)|dates?(\s*(&|and|\/)\s*(times?|status|details?))?|times?|schedules?|items?|documents?|actions?|remarks?|status|particulars?|details?|links?|descriptions?|sl\.?\s*no\.?|s\.?\s*no\.?|post\s*names?|job\s*openings?|last\s*date)$/i;
+const DATE_METADATA_EVENT_RE =
+  /^(article\s*(title|name|type|link|url)|page\s*title|source|post\s*name)$/i;
+const DATE_WEBSITE_EVENT_RE =
+  /^(official\s*(portal|website|site|link)|website|home\s*page|apply\s*(online\s*)?link)$/i;
+const DATE_URL_VALUE_RE = /^(https?:\/\/\S+|[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}([/?#]\S*)?)$/i;
+const DATE_LINK_LABEL_RE =
+  /^(click|here|links?|download|view|check|apply|visit|obtain|collect|access|get|open|read\s*more|active\s*now|available(\s*soon)?)(\s*(here|now|link|pdf|online|portal|site|website|more))?$/i;
+const DATE_PROMO_ROW_RE =
+  /sarkari\s*(result|exam|job)|freejobalert|free\s*job\s*alert|rojgar\s*result|join\s*(our\s*)?(the\s*)?(telegram|whatsapp|arattai|youtube|instagram|facebook)|(telegram|whatsapp|arattai)\s*(channel|group|link)|follow\s*us|subscribe\s*(to\s*)?(our|us)|(download|get|install)\s*(our\s*|the\s*|mobile\s*|android\s*|ios\s*)*app\b/i;
+
+function cleanImportantDates(rows: any): { event: string; date: string }[] {
+  if (!Array.isArray(rows)) return [];
+  const out: { event: string; date: string }[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (!row) continue;
+    const event = String(row.event ?? '').replace(/\s+/g, ' ').trim();
+    const date = String(row.date ?? '').replace(/\s+/g, ' ').trim();
+    const link = String(row.link ?? '').trim();
+    if (!event || !date) continue;
+    // Channel invites are never exam dates — match the URL, not just the label,
+    // so a row titled anything at all still goes. freejobalert rows go too:
+    // this table renders no links, so there is nothing left to keep.
+    if (isWhatsAppUrl(link) || isTelegramUrl(link)) continue;
+    if (isWhatsAppUrl(date) || isTelegramUrl(date)) continue;
+    if (isFreeJobAlertUrl(date)) continue;
+    if (!DATE_SIGNAL_RE.test(date)) {
+      if (DATE_HEADER_ONLY_EVENT_RE.test(event.replace(/[:.]+$/, '').trim())) continue;
+      if (DATE_HEADER_CELL_RE.test(event.replace(/[:.]+$/, '')) &&
+          DATE_HEADER_CELL_RE.test(date.replace(/[:.]+$/, ''))) continue;
+    }
+    if (DATE_LINK_LABEL_RE.test(date)) continue;
+    if (DATE_PROMO_ROW_RE.test(event) || DATE_PROMO_ROW_RE.test(date)) continue;
+    if (DATE_METADATA_EVENT_RE.test(event)) continue;
+    if (DATE_WEBSITE_EVENT_RE.test(event) && DATE_URL_VALUE_RE.test(date)) continue;
+    const key = `${event.toLowerCase()}|${date.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ event, date });
+  }
+  return out;
+}
+
 // ── Link filtering (mirrors src/lib/urlUtils.ts) ────────────────────────────
 function isFreeJobAlertUrl(url: string | null | undefined): boolean {
   return !!url && url.toLowerCase().includes('freejobalert');
@@ -318,30 +372,39 @@ function buildExamUpdatePage(update: any, linkedJob: any, relatedUpdates: any[])
 
   // ── Important dates table ───────────────────────────────────────
   let datesHtml = '';
-  if (Array.isArray(update.important_dates) && update.important_dates.length > 0) {
-    const rows = update.important_dates
-      .filter((d: any) => d && (d.event || d.date))
-      .map((d: any) =>
-        `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#4b5563">${escapeHtml(d.event || '')}</td>
-         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#0f172a;white-space:nowrap">${escapeHtml(d.date || '')}</td></tr>`
+  const dateRows = cleanImportantDates(update.important_dates);
+  if (dateRows.length > 0) {
+    const rows = dateRows
+      .map((d) =>
+        `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#4b5563;overflow-wrap:break-word">${escapeHtml(d.event)}</td>
+         <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#0f172a;overflow-wrap:break-word">${escapeHtml(d.date)}</td></tr>`
       ).join('');
-    if (rows) {
-      datesHtml = `
+    // table-layout:fixed + explicit column widths: a sentence-length "date"
+    // (they are common in scraped tables) can no longer starve the event
+    // column and wrap its label one letter per line.
+    datesHtml = `
       <section>
         <h2>📅 Important Dates</h2>
-        <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
-          <thead><tr style="background:#f8fafc"><th style="padding:8px 12px;text-align:left;font-size:0.8rem;color:#64748b;text-transform:uppercase">Event</th><th style="padding:8px 12px;text-align:left;font-size:0.8rem;color:#64748b;text-transform:uppercase">Date</th></tr></thead>
+        <table style="width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+          <thead><tr style="background:#f8fafc"><th style="width:55%;padding:8px 12px;text-align:left;font-size:0.8rem;color:#64748b;text-transform:uppercase">Event</th><th style="width:45%;padding:8px 12px;text-align:left;font-size:0.8rem;color:#64748b;text-transform:uppercase">Date</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </section>`;
-    }
   }
 
   // ── Overview grid ───────────────────────────────────────────────
   let overviewHtml = '';
   if (Array.isArray(update.overview) && update.overview.length > 0) {
     const items = update.overview
-      .filter((o: any) => o && (o.field || o.value))
+      .filter((o: any) => {
+        const field = String(o?.field ?? '').trim();
+        const value = String(o?.value ?? '').trim();
+        if (!field || !value) return false;
+        // The overview table's own header row ("Particulars | Details").
+        if (DATE_HEADER_CELL_RE.test(field.replace(/[:.]+$/, '')) &&
+            DATE_HEADER_CELL_RE.test(value.replace(/[:.]+$/, ''))) return false;
+        return !DATE_PROMO_ROW_RE.test(field);
+      })
       .map((o: any) =>
         `<div style="display:flex;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px">
           <span style="color:#64748b;min-width:90px;font-size:0.85rem">${escapeHtml(o.field || '')}</span>

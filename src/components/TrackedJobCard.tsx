@@ -46,6 +46,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ExamCredentialsModal } from "@/components/ExamCredentialsModal";
 import { useExamUpdatesForExam, ExamUpdateItem } from "@/hooks/useExamUpdates";
 import { isFreeJobAlertUrl, isWhatsAppUrl, isWhatsAppContent } from "@/lib/urlUtils";
+import { normalizeImportantDates, partitionImportantDates } from "@/lib/importantDates";
+import { linkLabel } from "@/lib/linkLabels";
 import { Link } from "react-router-dom";
 
 // Helper function to get phase-specific data from AI response
@@ -333,7 +335,9 @@ function mergeImportantDates(updates: ExamUpdateItem[]): MergedDate[] {
   const seen = new Map<string, MergedDate>();
 
   for (const update of updates.slice(0, 5)) {
-    for (const d of (update.important_dates || [])) {
+    // normalizeImportantDates drops the scraped header rows, "Click here" link
+    // rows and source-site promos that otherwise show up as fake milestones.
+    for (const d of normalizeImportantDates(update.important_dates)) {
       if (isSocialChannelDate(d.event, d.link)) continue;
       const key = normalizeEventName(d.event);
       if (!key || seen.has(key)) continue;
@@ -377,59 +381,23 @@ function categorizeLinkIcon(text: string): { icon: typeof FileText; color: strin
   return { icon: Download, color: "text-primary" };
 }
 
-/** Check if link text is generic/uninformative */
-function isGenericLinkText(text: string): boolean {
-  const t = text.toLowerCase().trim();
-  return (
-    t === "click here" || t === "click" || t === "here" ||
-    t === "link" || t === "download" || t === "view" ||
-    t === "open" || t === "go" || t === "visit" ||
-    t.startsWith("click here") || t.startsWith("http")
-  );
-}
-
-/** Try to infer a descriptive label from a URL */
-function inferLabelFromUrl(url: string, parentCategory?: string): string {
-  const u = url.toLowerCase();
-  if (u.includes("admit") || u.includes("hall-ticket") || u.includes("hallticket"))
-    return "Admit Card";
-  if (u.includes("result") || u.includes("score"))
-    return "Check Result";
-  if (u.includes("answer") || u.includes("key"))
-    return "Answer Key";
-  if (u.includes("apply") || u.includes("registr") || u.includes("application"))
-    return "Apply Online";
-  if (u.includes("syllabus") || u.includes("pattern"))
-    return "Syllabus";
-  if (u.includes("notification") || u.includes(".pdf"))
-    return "Notification PDF";
-  if (u.includes("cutoff") || u.includes("cut-off"))
-    return "Cutoff";
-  // Fall back to parent update category
-  if (parentCategory) {
-    const cat = parentCategory.toLowerCase().replace(/_/g, " ");
-    if (cat.includes("admit")) return "Admit Card Link";
-    if (cat.includes("result")) return "Result Link";
-    if (cat.includes("answer")) return "Answer Key Link";
-    if (cat.includes("syllabus")) return "Syllabus Link";
-  }
-  return "Official Link";
-}
-
 /** Collect + deduplicate download links from multiple ExamUpdateItems */
 function mergeDownloadLinks(updates: ExamUpdateItem[]): CategorizedLink[] {
   const seen = new Set<string>();
   const links: CategorizedLink[] = [];
 
   for (const update of updates.slice(0, 5)) {
-    for (const dl of (update.download_links || [])) {
+    // Date rows that were really link rows carry URLs that are often not in
+    // download_links at all — take those too, labelled by their event cell.
+    const candidates = [
+      ...(update.download_links || []),
+      ...partitionImportantDates(update.important_dates).links,
+    ];
+    for (const dl of candidates) {
       if (!dl.url || seen.has(dl.url) || isFreeJobAlertUrl(dl.url) || isWhatsAppUrl(dl.url)) continue;
       seen.add(dl.url);
-      // Fix generic link text
-      let displayText = dl.text;
-      if (isGenericLinkText(displayText)) {
-        displayText = inferLabelFromUrl(dl.url, update.category);
-      }
+      // Fix generic link text ("Click here" tells the user nothing)
+      const displayText = linkLabel(dl.text, dl.url, update.category);
       const { icon, color } = categorizeLinkIcon(displayText);
       links.push({
         text: displayText.length > 35 ? displayText.slice(0, 35) + "…" : displayText,
@@ -1063,7 +1031,7 @@ export function TrackedJobCard({ attempt, cardIndex = 0 }: TrackedJobCardProps) 
                           )} />
                           {/* Event name */}
                           <span className={cn(
-                            "flex-1 min-w-0 truncate",
+                            "flex-1 min-w-0 break-words",
                             d.isPassed ? "text-muted-foreground" : "text-foreground"
                           )}>
                             {d.event}

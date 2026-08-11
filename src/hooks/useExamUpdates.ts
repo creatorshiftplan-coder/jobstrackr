@@ -98,6 +98,35 @@ export function useAllExamUpdates(category?: string) {
 }
 
 /**
+ * Search the whole exam_updates table, not just the cached feed.
+ *
+ * `useAllExamUpdates` returns the 100 most recent rows — at current scrape
+ * volume that is roughly a six-hour window, so filtering it in the browser
+ * answers "ntpc" with nothing and the Updates page falls back to stale
+ * tracked-exam cards. The server does the filtering here and returns matches
+ * newest-first, Redis-cached per query.
+ */
+export function useExamUpdateSearch(query: string | undefined) {
+  const q = (query || "").trim();
+  // Below three characters the query matches half the table; not worth a round
+  // trip, and the in-memory feed still covers it.
+  const enabled = q.length >= 3;
+
+  return useQuery({
+    queryKey: ["exam-update-search", q.toLowerCase()],
+    queryFn: async (): Promise<ExamUpdateItem[]> => {
+      const res = await fetch(`/api/cache/search-updates?q=${encodeURIComponent(q)}`);
+      if (!res.ok) return [];
+      const rows = (await res.json()) as ExamUpdateItem[];
+      return Array.isArray(rows) ? rows : [];
+    },
+    enabled,
+    staleTime: 15 * 60 * 1000, // matches the server cache TTL
+    placeholderData: (prev) => prev, // keep the last results while retyping
+  });
+}
+
+/**
  * Fetch a single exam_update by its UUID (for the detail page)
  */
 // Matches a v4-style UUID; anything else is treated as a slug.

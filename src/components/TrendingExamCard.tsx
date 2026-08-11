@@ -81,6 +81,24 @@ function getTimeAgo(dateStr?: string | null): string {
     }
 }
 
+/**
+ * How fresh the card actually is.
+ *
+ * `ai_last_updated_at` is when the AI summary was last regenerated, which for
+ * most exams is months ago — showing it made every search result read "5 months
+ * ago" even when the exam had a result posted this week. The scraped updates
+ * attached to the card are the real signal, so use the newest of those and fall
+ * back to the AI timestamp only when there are none.
+ */
+function freshestTimestamp(exam: TrendingExam, updates: ExamUpdateItem[] | undefined): string | null {
+    let newest = 0;
+    for (const u of updates || []) {
+        const t = new Date(u.scraped_at || u.created_at || 0).getTime();
+        if (!isNaN(t) && t > newest) newest = t;
+    }
+    return newest > 0 ? new Date(newest).toISOString() : exam.ai_last_updated_at || null;
+}
+
 // Get color config for update category
 function getUpdateCategoryConfig(category: string): { bg: string; text: string; border: string; label: string; icon: typeof FileText } {
     const cat = category?.toLowerCase().replace(/[_\s]+/g, "") || "";
@@ -196,7 +214,6 @@ function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCard
     const { toast } = useToast();
     const statusType = getExamStatusType(exam.ai_cached_response);
     const badge = getStatusBadgeConfig(statusType);
-    const timeAgo = getTimeAgo(exam.ai_last_updated_at);
     const summary = exam.ai_cached_response?.summary || "Tap to view the latest updates for this exam.";
     const sectorImage = SECTOR_IMAGES[exam.category || "default"] || SECTOR_IMAGES.default;
 
@@ -204,6 +221,7 @@ function FeaturedCard({ exam, index, initialExpanded = false }: TrendingExamCard
     const { data: matchingJob, isLoading: isLoadingJob } = useJobForExam(exam.name);
     const jobId = matchingJob?.id;
     const { data: examUpdates } = useExamUpdatesForExam(exam.id, exam.name);
+    const timeAgo = getTimeAgo(freshestTimestamp(exam, examUpdates));
     const latestScrapedUpdates = (examUpdates || []).filter((update) => !isWhatsAppUrl(update.url) && !isWhatsAppContent(update.title) && !isTelegramUrl(update.url) && !isTelegramContent(update.title) && (update.summary || update.status || update.download_links?.length)).slice(0, 3);
 
     // Save job functionality - use matching job ID if found
@@ -385,7 +403,6 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
     const navigate = useNavigate();
     const statusType = getExamStatusType(exam.ai_cached_response);
     const badge = getStatusBadgeConfig(statusType);
-    const timeAgo = getTimeAgo(exam.ai_last_updated_at);
     const summary = exam.ai_cached_response?.summary || "Tap to view updates.";
     const statusData = exam.ai_cached_response;
     const countdown = getCountdown(statusData?.last_date_to_apply || statusData?.exam_dates);
@@ -394,6 +411,7 @@ function SimpleCard({ exam, index, initialExpanded = false }: TrendingExamCardPr
     const { data: matchingJob } = useJobForExam(exam.name);
     const jobId = matchingJob?.id;
     const { data: examUpdates } = useExamUpdatesForExam(exam.id, exam.name);
+    const timeAgo = getTimeAgo(freshestTimestamp(exam, examUpdates));
     const latestScrapedUpdates = (examUpdates || []).filter((update) => !isWhatsAppUrl(update.url) && !isWhatsAppContent(update.title) && !isTelegramUrl(update.url) && !isTelegramContent(update.title) && (update.summary || update.status || update.download_links?.length)).slice(0, 3);
 
     // Sync expanded state when initialExpanded changes (e.g., from URL param)

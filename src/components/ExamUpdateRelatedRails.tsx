@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAllExamUpdates, ExamUpdateItem } from "@/hooks/useExamUpdates";
 import { useSimilarJobs, SimilarJob } from "@/hooks/useSimilarJobs";
 import { sortByTitleMatch } from "@/lib/titleMatcher";
+import { firstImportantDate } from "@/lib/importantDates";
 import { SITE_URL } from "@/lib/seoConfig";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -79,19 +80,10 @@ function Rail({ title, icon, accentClass, seeAllTo, children }: {
     );
 }
 
-// Scraped date tables often start with a header row ({event:"Event", date:"Date"}),
-// and some rows carry link text ("Click Here") instead of an actual date.
-const HEADER_CELL_RE = /^(events?|dates?|particulars?|details?|links?|job openings?|last date)$/i;
-const JUNK_DATE_RE = /click\s*here|^links?$|download|^here$/i;
-
+// Header rows, "Click Here" link rows and source-site promos all arrive inside
+// important_dates — lib/importantDates owns those rules for every surface.
 function firstRealDate(update: ExamUpdateItem) {
-    return update.important_dates?.find(
-        (d) =>
-            d.event?.trim() &&
-            d.date?.trim() &&
-            !JUNK_DATE_RE.test(d.date.trim()) &&
-            !(HEADER_CELL_RE.test(d.event.trim()) && HEADER_CELL_RE.test(d.date.trim()))
-    );
+    return firstImportantDate(update.important_dates);
 }
 
 function isNewItem(createdAt?: string | null): boolean {
