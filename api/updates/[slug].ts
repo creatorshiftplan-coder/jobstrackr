@@ -81,14 +81,23 @@ export const config = {
 };
 
 /**
- * How long the Vercel CDN holds a rendered status-update page, in seconds.
+ * How long the Vercel CDN holds a rendered status-update page, in seconds —
+ * the worst-case ceiling, not the real freshness mechanism.
  *
  * The old 30-minute TTL was the shortest of the three SEO routes and this is
  * also the slowest renderer (the Aug-2026 logs caught a 5.9s execution), so it
- * was the worst cost-per-request offender. A status update changes at most
- * once a day, so a day-long CDN copy loses nothing.
+ * was the worst cost-per-request offender. Bumping it to a full day (so a
+ * day-long CDN copy "loses nothing") assumed nothing else kept the page
+ * fresh — but exams are edited through supabase/functions/exams/index.ts
+ * (admin-only PUT), which now calls `purgeCacheTags(["exam-<id>"])` right
+ * after the write (supabase/functions/_shared/purgeCache.ts), matching this
+ * page's `Vercel-Cache-Tag` header below. An admin edit is purged from the
+ * CDN within seconds; this TTL only matters if that purge doesn't fire
+ * (VERCEL_API_TOKEN / VERCEL_PROJECT_ID unset, or the Vercel API call fails).
+ * 1h keeps that fallback bounded without reintroducing the 30-min
+ * cost-per-request problem this route was originally flagged for.
  */
-const UPDATE_CDN_TTL = 86400;
+const UPDATE_CDN_TTL = 3600; // 1 hour — purge-on-write handles the real case
 
 /**
  * Universal Status Update Page SEO Renderer
@@ -222,6 +231,9 @@ export default async function handler(request: Request) {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'public, max-age=600, stale-while-revalidate=2592000',
         'CDN-Cache-Control': `public, max-age=${UPDATE_CDN_TTL}, stale-while-revalidate=2592000`,
+        // Lets supabase/functions/exams/index.ts (admin PUT) purge just this
+        // page on write instead of waiting out UPDATE_CDN_TTL.
+        'Vercel-Cache-Tag': `exam-${exam.id}`,
       },
     });
   } catch (error) {

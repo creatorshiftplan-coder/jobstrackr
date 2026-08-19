@@ -70,24 +70,24 @@ export const config = {
 };
 
 /**
- * How long the Vercel CDN holds a rendered exam-update article, in seconds.
+ * How long the Vercel CDN holds a rendered exam-update article, in seconds —
+ * now just the worst-case ceiling, not the real freshness mechanism.
  *
- * NOT immutable: sync-sheets upserts this table with
- * `{ onConflict: "url", ignoreDuplicates: false }`, so re-scraping a source URL
- * overwrites the whole row in place. That is exactly how a page flips from
- * "result expected" to "result out" — the slug, and therefore the URL, does not
- * change. A long TTL would pin the stale headline at the moment it matters most.
+ * NOT immutable: sync-sheets and govtjob-scraper both upsert this table in
+ * place (`onConflict: "url"` / `.eq("url", ...)`), so re-scraping a source URL
+ * overwrites the row without changing the slug. That is exactly how a page
+ * flips from "result expected" to "result out". Both writers now call
+ * `purgeCacheTags(["examupdate-<id>"])` (supabase/functions/_shared/purgeCache.ts)
+ * right after the write, matching this page's `Vercel-Cache-Tag` header below —
+ * so a real status flip is purged from the CDN within seconds, not this TTL.
  *
- * 6h is the ceiling that bounds that staleness to a quarter of a day while
- * still cutting crawler-driven executions 3x versus the old 2h value. Vercel's
- * cache is per-PoP over ~3.4k URLs and 7 regions, so the old value meant a
- * near-guaranteed miss on every crawl.
- *
- * To go higher, purge this route from the sync-sheets function on write — it
- * already has the affected rows in `insertedUpdates`. Do that before raising
- * this number, not after.
+ * 2h is the fallback for when that purge doesn't fire (VERCEL_API_TOKEN /
+ * VERCEL_PROJECT_ID unset, or the Vercel API call fails) — it was 6h while
+ * TTL alone was the only freshness signal; an 8.6k-URL, 7-region cache still
+ * makes a 30-min-style TTL a near-guaranteed miss on every crawl, so this
+ * stays well above that, not down at the pre-Aug-2026 30-min value.
  */
-const EXAM_UPDATE_CDN_TTL = 21600; // 6 hours
+const EXAM_UPDATE_CDN_TTL = 7200; // 2 hours — purge-on-write handles the real case
 
 /**
  * Exam Update Article SEO Renderer
@@ -319,6 +319,9 @@ export default async function handler(request: Request) {
         // See EXAM_UPDATE_CDN_TTL before changing either value.
         'Cache-Control': 'public, max-age=600, stale-while-revalidate=2592000',
         'CDN-Cache-Control': `public, max-age=${EXAM_UPDATE_CDN_TTL}, stale-while-revalidate=2592000`,
+        // Lets sync-sheets / govtjob-scraper purge just this page on write
+        // instead of waiting out EXAM_UPDATE_CDN_TTL — see supabase/functions/_shared/purgeCache.ts.
+        'Vercel-Cache-Tag': `examupdate-${update.id}`,
       },
     });
   } catch (error) {

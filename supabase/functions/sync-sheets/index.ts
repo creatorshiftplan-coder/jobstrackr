@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { purgeCacheTags } from "../_shared/purgeCache.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -452,14 +453,24 @@ Deno.serve(async (req) => {
         updatesCursor = updateRows[updateRows.length - 1].scraped_at || updatesCursor;
         await advance("updates", updatesCursor);
 
-        // Broadcast to channels. telegram-auto-post links to /exam-update/{id} and
-        // dedups by update_id, so re-posting an already-sent update is a no-op.
-        if (broadcastEnabled && mapped.length) {
-          const { data: insertedUpdates } = await supabase
+        if (mapped.length) {
+          const { data: touchedUpdates } = await supabase
             .from("exam_updates")
             .select("id, title, category, status, summary, important_dates")
             .in("url", mapped.map((m: any) => m.url));
-          await broadcast(fnBase, serviceKey, "exam_update", insertedUpdates || []);
+
+          // Purge each touched page's CDN copy so a status flip (e.g. "result
+          // expected" -> "result out") is visible immediately instead of
+          // waiting out EXAM_UPDATE_CDN_TTL — see api/exam-updates/[slug].ts.
+          if (touchedUpdates?.length) {
+            await purgeCacheTags(touchedUpdates.map((u: any) => `examupdate-${u.id}`));
+          }
+
+          // Broadcast to channels. telegram-auto-post links to /exam-update/{id}
+          // and dedups by update_id, so re-posting an already-sent update is a no-op.
+          if (broadcastEnabled && touchedUpdates?.length) {
+            await broadcast(fnBase, serviceKey, "exam_update", touchedUpdates);
+          }
         }
       }
 

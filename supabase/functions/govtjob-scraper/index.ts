@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.47/deno-dom-wasm.ts";
+import { purgeCacheTags } from "../_shared/purgeCache.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -595,12 +596,18 @@ async function upsertArticle(
             .from("exam_updates")
             .update(record)
             .eq("url", article.url);
+        // Purge the CDN copy of /exam-update/:slug so this write (e.g. a status
+        // flip) is visible immediately — see api/exam-updates/[slug].ts.
+        if (!error) await purgeCacheTags([`examupdate-${existing.id}`]);
         return error ? "error" : "updated";
     } else {
         record.created_at = new Date().toISOString();
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
             .from("exam_updates")
-            .insert(record);
+            .insert(record)
+            .select("id")
+            .single();
+        if (!error && inserted?.id) await purgeCacheTags([`examupdate-${inserted.id}`]);
         return error ? "error" : "new";
     }
 }
