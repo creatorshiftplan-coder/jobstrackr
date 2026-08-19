@@ -340,18 +340,26 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
 
   // Omit baseSalary entirely rather than publishing a pay-matrix level as a
   // wage — a wrong figure in structured data is worse than an absent one.
+  //
+  // Google requires baseSalary.value to carry EITHER a single `value` OR a
+  // complete `minValue`+`maxValue` pair — a lone minValue or maxValue (a
+  // one-sided salary, e.g. "₹25,000+ per month") satisfies neither, so GSC
+  // flagged it as a missing-field structured data issue (Aug-2026). When only
+  // one bound is known, publish it as the single point value instead.
   const ldSalaryMin = plausibleSalary(job.salary_min);
   const ldSalaryMax = plausibleSalary(job.salary_max);
   if (ldSalaryMin || ldSalaryMax) {
+    const value: any = { '@type': 'QuantitativeValue', unitText: 'MONTH' };
+    if (ldSalaryMin && ldSalaryMax) {
+      value.minValue = ldSalaryMin;
+      value.maxValue = ldSalaryMax;
+    } else {
+      value.value = ldSalaryMin || ldSalaryMax;
+    }
     jsonLd.baseSalary = {
       '@type': 'MonetaryAmount',
       currency: 'INR',
-      value: {
-        '@type': 'QuantitativeValue',
-        ...(ldSalaryMin && { minValue: ldSalaryMin }),
-        ...(ldSalaryMax && { maxValue: ldSalaryMax }),
-        unitText: 'MONTH',
-      },
+      value,
     };
   }
 
