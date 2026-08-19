@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { purgeCacheTags } from "../_shared/purgeCache.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -128,6 +129,10 @@ Deno.serve(async (req) => {
         .single();
 
       if (error) throw error;
+
+      // Purge the CDN copy of /updates/:slug so this edit is visible
+      // immediately — see api/updates/[slug].ts.
+      if (data?.id) await purgeCacheTags([`exam-${data.id}`]);
 
       return new Response(JSON.stringify({ data, error: null, success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
