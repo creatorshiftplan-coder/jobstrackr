@@ -471,7 +471,7 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
   <link rel="modulepreload" crossorigin href="/assets/vendor-icons-pac45oDU.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-supabase-BvsnE-zR.js">
   <link rel="modulepreload" crossorigin href="/assets/vendor-lottie-8Z6zZkhm.js">
-  <link rel="stylesheet" crossorigin href="/assets/main-ZCSaDqyi.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-Blj4uk3Q.css">
   <!-- PROD_HEAD_ASSETS_END -->
 </head>
 <body>
@@ -572,7 +572,7 @@ function buildSeoPage(job: any, relatedJobs: any[], origin: string): string {
   <!-- React SPA Mount Point -->
   <div id="root"></div>
   <!-- PROD_BODY_ASSETS_START -->
-  <script type="module" crossorigin src="/assets/main-C6907xmQ.js"></script>
+  <script type="module" crossorigin src="/assets/main-D-IcMctX.js"></script>
   <!-- PROD_BODY_ASSETS_END -->
   <script>
     // Mark body when SPA mounts to hide SSR content

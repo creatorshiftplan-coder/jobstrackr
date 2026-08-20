@@ -1,0 +1,86 @@
+{
+  "_comment": "Single source of truth for per-route SEO on the client-rendered (non-SSR) routes. Consumed at RUNTIME by src/lib/seoConfig.ts (useRouteSeo, after hydration) and at BUILD time by scripts/postbuild.js, which pre-renders one static HTML file per route into dist/ so crawlers get the right <title>/description/canonical/robots in the FIRST byte of HTML rather than only after JS runs. Keep additions here, not in either consumer.",
+  "siteUrl": "https://jobstrackr.in",
+  "defaultTitle": "JobsTrackr – Government Job Tracker & Eligibility Finder",
+  "defaultDescription": "Track government job exams, find which exams you're eligible for, and never miss a deadline — JobsTrackr is India's smartest free government job tracking app.",
+  "routes": {
+    "/": {
+      "title": "JobsTrackr – Government Job Tracker & Eligibility Finder",
+      "description": "Track government job exams, find which exams you're eligible for, and never miss a deadline — JobsTrackr is India's smartest free government job tracking app.",
+      "canonicalPath": "/"
+    },
+    "/welcome": {
+      "title": "Welcome to JobsTrackr – Smart Government Job Tracker",
+      "description": "Get started with JobsTrackr. Track government exams, check your eligibility automatically, and stay ahead of every Sarkari job deadline — free."
+    },
+    "/search": {
+      "title": "Search Government Jobs & Exams | JobsTrackr",
+      "description": "Search the latest government job notifications and exams across India by department, qualification, and location on JobsTrackr."
+    },
+    "/trending": {
+      "title": "Latest Government Exam Updates | JobsTrackr",
+      "description": "Follow the latest government job notifications, admit cards, answer keys, and results as they are released — all in one live feed on JobsTrackr."
+    },
+    "/calendar": {
+      "title": "Government Exam Calendar | JobsTrackr",
+      "description": "View an organised calendar of upcoming government exam dates, application deadlines, and important events for Indian government jobs."
+    },
+    "/countdown": {
+      "title": "Government Exam Countdown Wall | JobsTrackr",
+      "description": "Live countdowns to upcoming government exam dates and application deadlines. Never miss an important Sarkari job date again."
+    },
+    "/syllabus": {
+      "title": "Government Exam Syllabus Checker | JobsTrackr",
+      "description": "Check the complete syllabus for government exams in one place. Know exactly what to study for your next Sarkari exam on JobsTrackr."
+    },
+    "/formmate": {
+      "title": "FormMate – Government Job Application Helper | JobsTrackr",
+      "description": "FormMate puts every detail you need to fill a government job application in one place, so you can apply faster and error-free."
+    },
+    "/for-you": {
+      "title": "Recommended Government Jobs For You | JobsTrackr",
+      "description": "Personalised government job and exam recommendations based on your qualification, age, and preferences on JobsTrackr."
+    },
+    "/faq": {
+      "title": "Frequently Asked Questions | JobsTrackr",
+      "description": "Answers to common questions about JobsTrackr — eligibility matching, exam tracking, alerts, and how to use the app."
+    },
+    "/help": {
+      "title": "Help & Support | JobsTrackr",
+      "description": "Get help using JobsTrackr — guides and support for tracking government jobs and exams."
+    },
+    "/user-manual": {
+      "title": "User Manual | JobsTrackr",
+      "description": "A complete guide to using JobsTrackr to find eligible government jobs and track your exams."
+    },
+    "/tracker": {
+      "title": "My Exam Tracker | JobsTrackr",
+      "description": "Track the government exams you are preparing for, with live status updates, dates, and deadlines on JobsTrackr."
+    },
+    "/privacy-policy": {
+      "title": "Privacy Policy | JobsTrackr",
+      "description": "Read how JobsTrackr collects, uses, and protects your personal data."
+    },
+    "/refund-policy": {
+      "title": "Refund Policy | JobsTrackr",
+      "description": "Read the JobsTrackr refund policy."
+    },
+    "/terms-of-service": {
+      "title": "Terms of Service | JobsTrackr",
+      "description": "Read the terms and conditions for using JobsTrackr."
+    },
+
+    "/auth": { "title": "Sign In | JobsTrackr", "robots": "noindex, follow" },
+    "/reset-password": { "title": "Reset Password | JobsTrackr", "robots": "noindex, follow" },
+    "/profile": { "title": "My Profile | JobsTrackr", "robots": "noindex, follow" },
+    "/saved": { "title": "Saved Jobs | JobsTrackr", "robots": "noindex, follow" },
+    "/documents": { "title": "My Documents | JobsTrackr", "robots": "noindex, follow" },
+    "/edit-profile": { "title": "Edit Profile | JobsTrackr", "robots": "noindex, follow" },
+    "/edit-education": { "title": "Edit Education | JobsTrackr", "robots": "noindex, follow" },
+    "/edit-sector-preferences": { "title": "Edit Sector Preferences | JobsTrackr", "robots": "noindex, follow" },
+    "/admin": { "title": "Admin | JobsTrackr", "robots": "noindex, follow" },
+    "/more": { "title": "More | JobsTrackr", "robots": "noindex, follow" },
+    "/settings/notifications": { "title": "Notification Settings | JobsTrackr", "robots": "noindex, follow" },
+    "/syllabus/result": { "title": "Syllabus Result | JobsTrackr", "robots": "noindex, follow" }
+  }
+}
